@@ -1,0 +1,59 @@
+/**
+ * Overview of uHub
+ */
+digraph G
+{
+
+	"main()" -> "event_dispatch()"
+	
+	"event_dispatch()" -> "net_on_accept()"
+	"event_dispatch()" -> "net_on_read()"
+	"event_dispatch()" -> "net_on_write()"
+	"event_dispatch()" -> "event_queue_process()"
+
+	/* net events */
+	"net_on_write()" -> "net_send()"
+	"net_on_write()" -> "user_disconnect()"
+	"net_on_accept()" -> "user_create()"
+	"net_on_read()" -> "net_recv()"
+	"net_on_read()" -> "user_disconnect()"
+	
+	"net_recv()" -> "hub_handle_message()"
+	
+	/* adc message handling */
+	"hub_handle_message()" -> "hub_handle_password()"
+	"hub_handle_message()" -> "hub_handle_support()"
+	
+	"hub_handle_password()" -> "user_disconnect()"
+	"hub_handle_support()" -> "user_disconnect()"
+	"hub_handle_password()" -> "route_to_user()"
+	"hub_handle_support()" -> "route_to_user()"
+	
+	"hub_handle_message()" -> "hub_handle_info()"
+	"hub_handle_message()" -> "route_message()"
+	"hub_handle_info()" -> "route_to_user()"
+	"hub_handle_info()" -> "route_to_all()"
+	
+	/* message routing, depending on message type */
+	"route_message()" -> "route_to_user()"
+	"route_message()" -> "route_to_all()" -> "route_to_user()"
+	"route_message()" -> "route_to_subscribers()" -> "route_to_user()"
+	
+	"route_to_user()" -> "net_send()"
+	"route_to_user()" -> "queue_command()"
+	"route_to_user()" -> "user_disconnect()"
+	
+	
+	/* Message dispatcher */
+	"event_queue_process()" -> "hub_event_dispatcher()"
+	"hub_event_dispatcher()" -> "EVENT_USER_JOIN"
+	"hub_event_dispatcher()" -> "EVENT_USER_QUIT"
+	"EVENT_USER_QUIT" -> "route_to_all()"
+	"EVENT_USER_QUIT" -> "user_destroy()"
+	"EVENT_USER_JOIN" -> "route_to_all()"
+	
+	/* user_disconnect() -- critical part */
+	"user_disconnect()" -> "user_set_state(state_cleanup)" -> "post: EVENT_USER_QUIT"
+	"user_disconnect()" -> "user_destroy()"
+	
+}

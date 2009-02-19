@@ -1,0 +1,120 @@
+0.2.5-3487:
+- Fixed out of memory situations, used when uhub operates on a limited heap.
+- Code cleanups, reduced heap memory footprint.
+- Fixed bug throwing users out due to exessive send queue when logging into a large hub.
+- Added some simple hub commands (!stats, !uptime, !version, !help, etc).
+
+
+0.2.4-3470:
+- Added option chat_is_privileged, which makes chat for privileged users only.
+- Started working on hub commands.
+- Fixed a double free() related crash / abort.
+- Fixed several send() -> EPIPE related crashes.
+
+
+0.2.3-3429:
+- Fixed one crash bug (jump to NULL).
+- Fixed IPv6 dual stack issues on Winsock, but needs Vista or later to compile.
+- Disable IPv6 if dual stack is not supported (WinXP with IPv6).
+- Fixed bind issue for IPv4 addresses.
+- Made sure no chat message could have PM context flag, unless set by the hub.
+- Ignore empty INF update messages.
+
+
+0.2.2-3393:
+- Fixed a crash related to hub login.
+- Added some fixes for older versions of libevent
+- Added option to log messages through syslog.
+- Added low bandwidth mode for really big hubs.
+- Started writing a benchmark tool for the hub.
+- Fix bug: reload configuration reset uptime.
+- Experimental support for NetBSD 3.1.
+
+
+0.2.1-3321:
+- Added more robust configuration file parsing.
+- Use defaults if config file is not found, unless a file is specified.
+- Added user class super user (above operator, below admin).
+- Added NAT override for clients behind the same NAT as the hub.
+- Fixed a bug summarizing shared size and files for the PING extension.
+- Fixed bugs related to hub limits.
+
+
+0.2.0-3293:
+- Fixed multiple crash bugs.
+- Fully compatible with ADC/1.0.
+- Protocol extensions: 'TIGR' and 'PING'
+- Added support for configuring min/max share size, slots, concurrent hubs, not very well tested.
+- Made all status message strings configurable.
+- Various BSD issues fixed. Should perform equally well as Linux.
+- Allow ignored configuration options (used when deprecating configuration options).
+- Added command line options for checking configuration.
+- A windows port is more or less done (MinGW)
+- Lots of new auto tests added.
+
+
+0.1.6-2608:
+- Changes required for the ADC/0.14 specification.
+- Stability fixes.
+- Win32 fixes, it compiles and runs, but not quite ported yet.
+- Added CMAKE files, which can be used instead of GNU make.
+- Made sure all messages are terminated when created.
+- Use length of messages, instead of strlen() to determine them.
+- Added more asserts for messages. Spotted a few errors as a result of that.
+- Added support for more sophisticated memory allocation debugging.
+
+
+0.1.5-2462
+- Fixed double free (crash).
+- Fixed password challenge/response coding error (crash).
+- Changes required for the new ADC/0.13 specification.
+- Fixed IPv6 netmask matching (banning)
+- Added UDP server, needed for auto-configure extension (AUT0)
+- Send 'ping' messages periodically if nothing heard from clients.
+- Print IP when client disconnects.
+- Lots of automatic testcases added, fix many bugs in the process.
+- GCC 2.95 compile fixes.
+
+
+0.1.4-2301:
+- uHub now requires and utilizes libevent. This allows for greater code
+portability, and less code complexity.
+- Various FreeBSD/OpenBSD/NetBSD fixes have been applied.
+- Can now log files other than stderr.
+- Added several automatic testcases.
+- The application should now be much more stable, and never consume much CPU.
+- Fixed several small annoying bugs.
+
+
+0.1.3-2147:
+- Changed license to GPL3
+- Fixed several crashes
+- Major code cleanups
+- Refactored event handling
+- Log file format change (minor)
+- Automatic regression testing of code base (via exotic).
+- Memory handling debug infrastructure.
+
+
+0.1.2-2020:
+- Fix infinite loops
+- Don't log users leaving unless they are logged in.
+- Fix private messages in chat only hubs.
+- Operators/admins override chat only hub settings.
+- Fix client/server protocol support negotiation handling
+- IP banning should now work (IPv6 is not tested yet).
+
+
+0.1.1-1956:
+- Fixed memory leaks in ACL handling
+- Prevent unneeded malloc's in command handling when buffers are big enough.
+- Code cleanups and more doxygen style comments added.
+- Fixed crashes and infinite loops
+- FreeBSD compile fixes
+- Timestamp log messages.
+- Log network/bandwidth statistics
+
+
+0.1.0-1840:
+- First public release
+

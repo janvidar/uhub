@@ -1,0 +1,76 @@
+ADC protocol extensions supported:
+
+STATUS: **** Not yet implemented.
+
+the 'AUT0' extension (network connection auto detection extension).
+Rationale: Detect if client is capable of initiating active connections.
+
+After logging in:
+
+Client -> 'HCHK 12345 ABCD'.
+
+Server sends a UDP packet containing token to the client's IP address at the given port as shown in the INF message.
+
+Server -> 'ICHK ABCD'
+
+The server should send it from a UDP socket bound to the same port as the TCP server, which means the server will
+have to listen to both TCP and UDP.
+
+If client receives the packet, it knows it can receive UDP connections, and will advertise it in the INF message as
+a supported feature.
+
+If the client does not receive any UDP packets within a few seconds, it MAY try to reconfigure the router using 
+UPnP/ZeroConf, and issue a HCHK command to the server again.
+
+If the client still doesn't receive any UDP packets, hole punching can be tried.
+The server will send a UDP packet to the hub (using the port of the TCP server), and reissue the HCHK command.
+The UDP packet SHOULD be echoed by the hub.
+This UDP packet should contain simply 'HECH {cid} {token}' (Hub echo).
+
+The hub should send a packet containing the token back:
+'IECH {token} {host:port}', aswell as the same message via TCP.
+
+If the client receives the message via UDP, it should now be able to determine the type of NAT.
+If the client receives the message via TCP only it knows it has a firewall blocking icomming communication.
+If the client does not receive the message, it should assume a firewall is blocking all UDP communication,
+and resume in passive mode.
+
+Requirements:
+'AUT0' in the extensions message (SUP) for client and hub.
+Server will also listen to UDP messages on the same port as the TCP port.
+
+The server MUST now respond to the 'HCHK' command via TCP
+The server MUST now respond to the 'HECH' command via UDP.
+
+The client will always initiate communication.
+
+-------------------------------------------------------------------------------
+
+Syntax: HCHK {port} {token}
+- port is a 16-bit port number where the client is listening for packets.
+- token is 4 bytes base32 encoded data specified by the client.
+
+Example:
+Client: 'HCHK 1511 BACD' (tcp)
+Server: 'ICHK BACD' (udp)
+
+-------------------------------------------------------------------------------
+
+Syntax: HECH {cid} {token}
+- cid is the client ID.
+- token is 4 bytes base32 encoded data specified by the client.
+
+Example:
+Client: 'HECH 3NGFVJUDBRHX2CYRJGQ5HACRDM5CTNLGZ36M64I BACD' (udp)
+Server: 'IECH BACD 192.168.0.1:1512' (udp)
+Server: 'IECH BACD 192.168.0.1:1512' (tcp)
+
+Security considerations:
+The hub must verify that IP address where the HECH command originated from
+matches the IP address where the user with the given CID is connected from.
+If the CID and IP does not match, or the CID is not used the hub MUST ignore
+the request.
+
+
+
+

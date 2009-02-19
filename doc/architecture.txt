@@ -1,0 +1,91 @@
+= Architecture of uHub =
+
+uHub is single threaded and handles network and timer events using the 
+libevent library.
+For each state there is a read event (and sometimes a write event) and timeout
+event in case an expected read (or write) event does not occur.
+
+
+== Protocol overview ==
+uHub use "speak" the ADC protocol, which works in short as follows:
+(C = client, S = server aka uHub).
+
+C: HSUP ADBASE
+Client connects to hub and supplies a list of supported features to the hub.
+
+S: ISUP ADBASE { }
+Server responds with a list of supported features.
+
+S: ISID xxxx
+Server assigns a session-ID to the client (4 bytes, BASE32 encoded).
+
+C: BINF xxxx (...)
+Client sends information about itself, such as nick name, etc.
+The hub will relay this information to all users, including the client.
+
+S: BINF xxx1 NInick1 (...)
+S: BINF xxx2 NInick2
+S: (...)
+S: BINF xxxx (client's own nick)
+Client gets list of other clients, which ends with the client's own user info.
+At this point the client is successfully logged into the hub.
+
+
+== The hub architecture ==
+
+Accepting new users
+
+
+
+
+
+    ---------------------              -----------------
+    | Accept connection | <----------  | libevent loop |
+    ---------------------              -----------------
+              |
+              V
+    ---------------------           ------------
+    | Setup login timer | --+---->  | Timeout? | <----+
+    ---------------------   |       ------------      |
+              |             |             |           |
+              V             |             V           |
+    ---------------------   |      ---------------    |
+    |   Receive 'HSUP'  | --+----> | DISCONNECT! |    |
+    ---------------------          ---------------    |
+              |                           ^           |
+              V                           |           |
+    ---------------------                 |           |
+    | Send 'ISUP', and  |                 |           |
+    | assign Session ID |                 |           |
+    ---------------------                 |           |
+              |                           |           |
+              V                           |           |
+    ---------------------                 |           |
+    |   Receive 'BINF'  |-----------------+------------
+ +--| Validate message  |                 ^
+ |  ---------------------                 |
+ |            |                           |
+ |            V                           |
+ |  ---------------------         ---------------------
+ |  |   Send password   | ------> | Reveive and check |
+ |  | request, if needed|         | password.         |
+ |  ---------------------         ---------------------
+ |                                         |
+ |                                         |
+ |  ------------------------               |
+ +->| Send welcome message |<--------------+
+    ------------------------
+              |
+              V
+    ------------------------
+    | Send user list to    |
+    | newly accepted user. |
+    ------------------------
+              |
+              V
+    ------------------------
+    |  User is logged in.  |
+    |   Announce to all.   |
+    ------------------------
+
+

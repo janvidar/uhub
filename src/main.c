@@ -1,0 +1,441 @@
+/*
+ * uhub - A tiny ADC p2p connection hub
+ * Copyright (C) 2007-2009, Jan Vidar Krey
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#include "uhub.h"
+
+
+static int arg_verbose = 5;
+static int arg_fork    = 0;
+static int arg_check_config = 0;
+static int arg_dump_config  = 0;
+static int arg_have_config = 0;
+static const char* arg_uid = 0;
+static const char* arg_gid = 0;
+static const char* arg_config  = 0;
+static const char* arg_log = 0;
+static int arg_log_syslog = 0;
+
+
+#ifndef WIN32
+void hub_handle_signal(int fd, short events, void* arg)
+{
+	struct hub_info* hub = (struct hub_info*) arg;
+	int signal = fd;
+	struct timeval now = {0, 0};
+
+	switch (signal)
+	{
+		case SIGINT:
+			hub_log(log_info, "Interrupted. Shutting down...");
+			hub->status = hub_status_shutdown;
+			event_loopexit(&now);
+			break;
+
+		case SIGTERM:
+			hub_log(log_info, "Terminated. Shutting down...");
+			hub->status = hub_status_shutdown;
+			event_loopexit(&now);
+			break;
+
+		case SIGPIPE:
+			hub_log(log_trace, "hub_handle_signal(): caught SIGPIPE (ignoring)");
+			break;
+
+		case SIGHUP:
+			hub_log(log_info, "Caught hangup signal. Reloading configuration files...");
+			hub->status = hub_status_restart;
+			event_loopexit(&now);
+			break;
+
+		case SIGUSR1:
+			hub_log(log_trace, "hub_handle_signal(): caught SIGUSR1 -- FIXME");
+			break;
+
+		case SIGUSR2:
+			hub_log(log_trace, "hub_handle_signal(): caught SIGUSR2");
+			{
+				user_manager_stats(hub);
+			}
+			break;
+
+		default:
+			hub_log(log_trace, "hub_handle_signal(): caught unknown signal: %d", signal);
+			hub->status = hub_status_shutdown;
+			event_loopexit(&now);
+			break;
+	}
+}
+
+static struct event signal_events[10];
+static int signals[] =
+{
+	SIGINT,  /* Interrupt the application */
+	SIGTERM, /* Terminate the application */
+	SIGPIPE, /* prevent sigpipe from kills the application */
+	SIGHUP,  /* reload configuration */
+	SIGUSR1, /* dump statistics */
+	SIGUSR2, /* (unused) */
+	0
+};
+
+void setup_signal_handlers(struct hub_info* hub)
+{
+	int i = 0;
+	for (i = 0; signals[i]; i++)
+	{
+		signal_set(&signal_events[i], signals[i], hub_handle_signal, hub);
+		if (signal_add(&signal_events[i], NULL))
+		{
+			hub_log(log_error, "Error setting signal handler %d", signals[i]);
+		}
+    }
+}
+
+void shutdown_signal_handlers(struct hub_info* hub)
+{
+	int i = 0;
+	for (i = 0; signals[i]; i++)
+	{
+		signal_del(&signal_events[i]);
+    }
+}
+
+#endif /* WIN32 */
+
+
+int main_loop()
+{
+	struct hub_config configuration;
+	struct acl_handle acl;
+	struct hub_info* hub = 0;
+
+	if (net_initialize() == -1)
+		return -1;
+
+	do
+	{
+		if (read_config(arg_config, &configuration, !arg_have_config) == -1)
+			return -1;
+
+		if (acl_initialize(&configuration, &acl) == -1)
+			return -1;
+
+		/*
+		 * Don't restart networking when re-reading configuration.
+		 * This might not be possible either, since we might have
+		 * dropped our privileges to do so.
+		 */
+		if (!hub)
+		{
+			hub = hub_start_service(&configuration);
+			if (!hub)
+				return -1;
+#ifndef WIN32
+			setup_signal_handlers(hub);
+#endif
+		}
+
+		hub_set_variables(hub, &acl);
+
+		event_dispatch();
+
+		hub_free_variables(hub);
+		acl_shutdown(&acl);
+		free_config(&configuration);
+
+	} while(hub->status != hub_status_shutdown);
+
+#ifndef WIN32
+	shutdown_signal_handlers(hub);
+#endif
+	
+	if (hub)
+	{
+		hub_shutdown_service(hub);
+	}
+
+	net_shutdown();
+	hub_log_shutdown();
+	return 0;
+}
+
+
+int check_configuration(int dump)
+{
+	struct hub_config configuration;
+	int ret = read_config(arg_config, &configuration, 0);
+	
+	if (dump)
+	{
+		dump_config(&configuration, dump > 1);
+		puts("");
+	}
+	
+	if (ret == -1)
+	{
+		fprintf(stderr, "ERROR\n");
+        	return 1;
+	}
+	fprintf(stdout, "OK\n");
+	return 0;
+}
+
+
+void print_version()
+{
+	fprintf(stdout, "" PRODUCT " " VERSION " " PRODUCT_TITLE "\n");
+	fprintf(stdout, "Copyright (C) 2007-2009, Jan Vidar Krey <janvidar@extatic.org>\n"
+			"This is free software with ABSOLUTELY NO WARRANTY.\n\n");
+	exit(0);
+}
+
+
+void print_usage(char* program)
+{
+	fprintf(stderr, "Usage: %s [options]\n\n", program);
+	fprintf(stderr,
+		"Options:\n"
+		"   -v          Verbose mode. Add more -v's for higher verbosity.\n"
+		"   -q          Quiet mode - no output\n"
+		"   -f          Fork to background\n"
+		"   -l <file>   Log messages to given file (default: stderr)\n"
+		"   -L          Log messages to syslog\n"
+		"   -c <file>   Specify configuration file (default: " SERVER_CONFIG ")\n"
+		"   -C          Check configuration and return\n"
+		"   -s          Show configuration parameters\n"
+		"   -S          Show configuration parameters, but ignore defaults\n"
+		"   -h          This message\n"
+#ifndef WIN32
+		"   -u <user>   Run as given user\n"
+		"   -g <group>  Run with given group permissions\n"
+#endif
+		"   -V          Show version number.\n"
+	);
+
+	exit(0);
+}
+
+
+void parse_command_line(int argc, char** argv)
+{
+	int opt;
+	while ((opt = getopt(argc, argv, "vqfc:l:hu:g:VCsSL")) != -1)
+	{
+		switch (opt)
+		{
+			case 'V':
+				print_version();
+				break;
+
+			case 'v':
+				arg_verbose++;
+				break;
+
+			case 'q':
+				arg_verbose -= 99;
+				break;
+
+			case 'f':
+				arg_fork = 1;
+				break;
+
+			case 'c':
+				arg_config = optarg;
+				arg_have_config = 1;
+				break;
+
+			case 'C':
+				arg_check_config = 1;
+				arg_have_config = 1;
+				break;
+
+			case 's':
+				arg_dump_config = 1;
+				arg_check_config = 1;
+				break;
+				
+			case 'S':
+				arg_dump_config = 2;
+				arg_check_config = 1;
+				break;
+
+			case 'l':
+				arg_log = optarg;
+				break;
+				
+			case 'L':
+				arg_log_syslog = 1;
+				break;
+
+			case 'h':
+				print_usage(argv[0]);
+				break;
+
+			case 'u':
+				arg_uid = optarg;
+				break;
+
+			case 'g':
+				arg_gid = optarg;
+				break;
+
+			default:
+				print_usage(argv[0]);
+				break;
+		}
+	}
+
+	if (arg_config == NULL)
+	{
+		arg_config = SERVER_CONFIG;
+	}
+
+	hub_log_initialize(arg_log, arg_log_syslog);
+	hub_set_log_verbosity(arg_verbose);
+}
+
+
+#ifndef WIN32
+int drop_privileges()
+{
+	struct group* perm_group = 0;
+	struct passwd* perm_user = 0;
+	gid_t perm_gid = 0;
+	uid_t perm_uid = 0;
+	int gid_ok = 0;
+	int ret = 0;
+
+	if (arg_gid)
+	{
+		ret = 0;
+		while ((perm_group = getgrent()) != NULL)
+		{
+			if (strcmp(perm_group->gr_name, arg_gid) == 0)
+			{
+				perm_gid = perm_group->gr_gid;
+				ret = 1;
+				break;
+			}
+		}
+
+		endgrent();
+
+		if (!ret)
+		{
+			hub_log(log_fatal, "Unable to determine group id, check group name.");
+			return -1;
+		}
+
+		hub_log(log_trace, "Setting group id %d (%s)", (int) perm_gid, arg_gid);
+		ret = setgid(perm_gid);
+		if (ret == -1)
+		{
+			hub_log(log_fatal, "Unable to change group id, permission denied.");
+			return -1;
+		}
+		gid_ok = 1;
+	}
+
+	if (arg_uid)
+	{
+		ret = 0;
+		while ((perm_user = getpwent()) != NULL)
+		{
+			if (strcmp(perm_user->pw_name, arg_uid) == 0)
+			{
+				perm_uid = perm_user->pw_uid;
+				if (!gid_ok)
+					perm_gid = perm_user->pw_gid;
+				ret = 1;
+				break;
+			}
+		}
+
+		endpwent();
+
+		if (!ret)
+		{
+			hub_log(log_fatal, "Unable to determine user id, check user name.");
+			return -1;
+		}
+
+		if (!gid_ok) {
+			hub_log(log_trace, "Setting group id %d (%s)", (int) perm_gid, arg_gid);
+			ret = setgid(perm_gid);
+			if (ret == -1)
+			{
+				hub_log(log_fatal, "Unable to change group id, permission denied.");
+				return -1;
+			}
+		}
+
+		hub_log(log_trace, "Setting user id %d (%s)", (int) perm_uid, arg_uid);
+		ret = setuid(perm_uid);
+		if (ret == -1)
+		{
+			hub_log(log_fatal, "Unable to change user id, permission denied.");
+			return -1;
+		}
+	}
+
+	return 0;
+}
+#endif /* WIN32 */
+
+
+int main(int argc, char** argv)
+{
+	int ret = 0;
+
+	parse_command_line(argc, argv);
+
+	if (arg_check_config)
+	{
+		return check_configuration(arg_dump_config);
+	}
+
+#ifndef WIN32
+	if (arg_fork)
+	{
+		ret = fork();
+		if (ret == -1)
+		{
+			hub_log(log_fatal, "Unable to fork to background!");
+			return -1;
+		}
+		else if (ret == 0)
+		{
+			/* child process */
+		}
+		else
+		{
+			/* parent process */
+			hub_log(log_debug, "Forked to background\n");
+			return 0;
+		}
+	}
+
+	if (drop_privileges() == -1)
+		return -1;
+#endif /* WIN32 */
+
+	ret = main_loop();
+	return ret;
+}
+
