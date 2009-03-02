@@ -58,7 +58,7 @@ static int set_feature_cast_supports(struct user* u, struct adc_message* cmd)
 			it = &it[5];
 		}
 		
-		if (strlen(it) > 0)
+		if (*it)
 		{
 			user_set_feature_cast_support(u, it);
 		}

@@ -53,7 +53,7 @@ static int check_cmd_bool(const char* cmd, struct linked_list* list, char* line,
 		data++;
 		
 		data = strip_white_space(data);
-		if (!strlen(data))
+		if (!*data)
 		{
 			hub_log(log_fatal, "ACL parse error on line %d", line_count);
 			return -1;
@@ -80,7 +80,7 @@ static int check_cmd_user(const char* cmd, int status, struct linked_list* list,
 		data++;
 		
 		data = strip_white_space(data);
-		if (!strlen(data))
+		if (!*data)
 		{
 			hub_log(log_fatal, "ACL parse error on line %d", line_count);
 			return -1;
@@ -192,7 +192,7 @@ static int check_cmd_addr(const char* cmd, struct linked_list* list, char* line,
 		data1++;
 		
 		data1 = strip_white_space(data1);
-		if (!strlen(data1))
+		if (!*data1)
 		{
 			hub_log(log_fatal, "ACL parse error on line %d", line_count);
 			return -1;
@@ -266,7 +266,7 @@ static int acl_parse_line(char* line, int line_count, void* ptr_data)
 		pos[0] = 0;
 	}
 	
-	if (strlen(line) == 0)
+	if (!*line)
 		return 0;
 
 #ifdef ACL_DEBUG
@@ -274,7 +274,7 @@ static int acl_parse_line(char* line, int line_count, void* ptr_data)
 #endif
 	line = strip_white_space(line);
 	
-	if (!strlen(line))
+	if (!*line)
 	{
 		hub_log(log_fatal, "ACL parse error on line %d", line_count);
 		return -1;
@@ -328,7 +328,7 @@ int acl_initialize(struct hub_config* config, struct acl_handle* handle)
 	
 	if (config)
 	{
-		if (strlen(config->file_acl) == 0) return 0;
+		if (!*config->file_acl) return 0;
 		
 		ret = file_read_lines(config->file_acl, handle, &acl_parse_line);
 		if (ret == -1)

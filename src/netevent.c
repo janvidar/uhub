@@ -79,7 +79,7 @@ void net_on_read(int fd, short ev, void *arg)
 			while ((pos = strchr(start, '\n')))
 			{
 				pos[0] = '\0';
-				if (strlen(start) > 0 && strlen(start) < user->hub->config->max_recv_buffer)
+				if (*start && strlen(start) < user->hub->config->max_recv_buffer)
 				{
 					if (hub_handle_message(user, start, &pos[0]-&start[0]) == -1)
 					{
