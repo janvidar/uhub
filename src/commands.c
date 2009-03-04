@@ -38,9 +38,17 @@ static int command_stats(struct user* user, const char* message)
     
     if (user->credentials < cred_super)
 	return command_access_denied(user);
-   
-    char temp[64];
-    snprintf(temp, 64, "*** Stats: %u users, peak %u", (unsigned int) user->hub->users->count, (unsigned int) user->hub->users->count_peak);
+     
+    char temp[128];
+
+    snprintf(temp, 128, "*** Stats: %zu users, peak: %zu. Network (up/down): %d/%d KB/s, peak: %d/%d KB/s",
+	user->hub->users->count,
+	user->hub->users->count_peak,
+	(int) user->hub->stats.net_tx / 1024,
+	(int) user->hub->stats.net_rx / 1024,
+	(int) user->hub->stats.net_tx_peak / 1024,
+	(int) user->hub->stats.net_rx_peak / 1024);
+
     char* buffer = adc_msg_escape(temp);
     command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
     adc_msg_add_argument(command, buffer);

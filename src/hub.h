@@ -66,6 +66,19 @@ enum hub_state
 	hub_status_disabled      = 5, /**<<<"Hub is disabled (Running, but not accepting users) */
 };
 
+/**
+ * Always updated each minute.
+ */
+struct hub_stats
+{
+	size_t net_tx;
+	size_t net_rx;
+	size_t net_tx_peak;
+	size_t net_rx_peak;
+	size_t net_tx_total;
+	size_t net_rx_total;
+};
+
 struct hub_info
 {
 	int fd_tcp;
@@ -77,6 +90,7 @@ struct hub_info
 #ifdef ADC_UDP_OPERATION
 	struct event ev_datagram;
 #endif
+	struct hub_stats stats;
 	struct event_queue* queue;
 	struct hub_config* config;
 	struct user_manager* users;

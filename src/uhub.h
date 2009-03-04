@@ -113,7 +113,7 @@
 #define TIMEOUT_HANDSHAKE 30
 #define TIMEOUT_SENDQ     120
 #define TIMEOUT_IDLE      7200
-#define TIMEOUT_STATS     3600
+#define TIMEOUT_STATS     60
 
 #define MAX_CLIENTS  512
 #define MAX_CID_LEN  39

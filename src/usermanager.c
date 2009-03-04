@@ -39,30 +39,40 @@ static void clear_user_list_callback(void* ptr)
 }
 
 
-void user_manager_stats(struct hub_info* hub)
+void user_manager_update_stats(struct hub_info* hub)
 {
-	int factor = 0;
+	const int factor = TIMEOUT_STATS;
 	struct net_statistics* total;
 	struct net_statistics* intermediate;
 	net_stats_get(&intermediate, &total);
-	
-	factor = (time(NULL) - intermediate->timestamp);
-	if (!factor) factor++;
 
-	hub_log(log_info, "Statistics  users=%zu, net_tx=%d KB/s, net_rx=%d KB/s",
-		hub->users->count,
-		(int) ((intermediate->tx / factor) / 1024),
-		(int) ((intermediate->rx / factor) / 1024));
+	hub->stats.net_tx = (intermediate->tx / factor);
+	hub->stats.net_rx = (intermediate->rx / factor);
+	hub->stats.net_tx_peak = MAX(hub->stats.net_tx, hub->stats.net_tx_peak);
+	hub->stats.net_tx_peak = MAX(hub->stats.net_rx, hub->stats.net_rx_peak);
+	hub->stats.net_tx_total = total->tx;
+	hub->stats.net_rx_total = total->rx;
 	
 	net_stats_reset();
 }
 
 
+void user_manager_print_stats(struct hub_info* hub)
+{
+	hub_log(log_info, "Statistics  users=%zu (peak_users=%zu), net_tx=%d KB/s, net_rx=%d KB/s (peak_tx=%d KB/s, peak_rx=%d KB/s)",
+		hub->users->count,
+		hub->users->count_peak,
+		(int) hub->stats.net_tx / 1024,
+		(int) hub->stats.net_rx / 1024,
+		(int) hub->stats.net_tx_peak / 1024,
+		(int) hub->stats.net_rx_peak / 1024);
+}
+
 static void timer_statistics(int fd, short ev, void *arg)
 {
 	struct hub_info* hub = (struct hub_info*) arg;
 	struct timeval timeout = { TIMEOUT_STATS, 0 };
-	user_manager_stats(hub);
+	user_manager_update_stats(hub);
 	evtimer_set(&hub->ev_timer, timer_statistics, hub);
 	evtimer_add(&hub->ev_timer, &timeout);
 }
