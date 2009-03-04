@@ -1,3 +1,7 @@
+0.2.6:
+- Better uptime command formatting.
+
+
 0.2.5-3487:
 - Fixed out of memory situations, used when uhub operates on a limited heap.
 - Code cleanups, reduced heap memory footprint.
