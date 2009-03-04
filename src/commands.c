@@ -74,9 +74,64 @@ static int command_help(struct user* user, const char* message)
 static int command_uptime(struct user* user, const char* message)
 {
     struct adc_message* command;
-    char temp[64];
-    snprintf(temp, 64, "*** Uptime: %s seconds", uhub_itoa((int) difftime(time(0), user->hub->tm_started)));
-    char* buffer = adc_msg_escape(temp);
+    char tmp[128];
+    size_t w;
+    size_t d;
+    size_t h;
+    size_t m;
+    size_t s;
+    size_t D = (size_t) difftime(time(0), user->hub->tm_started);
+
+    w = D / (7 * 24 * 3600);
+    D = D % (7 * 24 * 3600);
+    d = D / (24 * 3600);
+    D = D % (24 * 3600);
+    h = D / 3600;
+    D = D % 3600;
+    m = D / 60;
+    s = D % 60;
+
+    tmp[0] = 0;
+    strcat(tmp, "*** Uptime: ");
+    
+    if (w)
+    {
+    	strcat(tmp, uhub_itoa((int) w));
+	strcat(tmp, " week");
+	if (w != 1) strcat(tmp, "s");
+	strcat(tmp, ", ");
+    }
+
+    if (w || d)
+    {
+	strcat(tmp, uhub_itoa((int) d));
+	strcat(tmp, " day");
+	if (d != 1) strcat(tmp, "s");
+	strcat(tmp, ", ");
+    }
+
+    if (w || d || h)
+    {
+	strcat(tmp, uhub_itoa((int) h));
+	strcat(tmp, " hour");
+	if (h != 1) strcat(tmp, "s");
+	strcat(tmp, ", ");
+    }
+
+    if (w || d || h || m)
+    {
+	strcat(tmp, uhub_itoa((int) m));
+	strcat(tmp, " minute");
+	if (m != 1) strcat(tmp, "s");
+	strcat(tmp, ", and ");
+    }
+
+    strcat(tmp, uhub_itoa((int) s));
+    strcat(tmp, " second");
+    if (s != 1) strcat(tmp, "s");
+    strcat(tmp, ".");
+
+    char* buffer = adc_msg_escape(tmp);
     command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
     adc_msg_add_argument(command, buffer);
     route_to_user(user, command);
