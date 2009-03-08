@@ -148,6 +148,26 @@ static int command_version(struct user* user, const char* message)
     return 0;
 }
 
+static int command_myip(struct user* user, const char* message)
+{
+    struct adc_message* command;
+    char tmp[128];
+    char* buffer;
+
+    tmp[0] = 0;
+    strcat(tmp, "*** Your IP: ");
+    strcat(tmp, ip_convert_to_string(&user->ipaddr));
+
+    buffer = adc_msg_escape(tmp);
+    command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
+    adc_msg_add_argument(command, buffer);
+    route_to_user(user, command);
+    adc_msg_free(command);
+    hub_free(buffer);
+    return 0;
+}
+
+
 int command_dipatcher(struct user* user, const char* message)
 {
     if      (!strncmp(message, "!stats",   6)) command_stats(user, message);
@@ -155,6 +175,7 @@ int command_dipatcher(struct user* user, const char* message)
     else if (!strncmp(message, "!kick",    5)) command_kick(user, message);
     else if (!strncmp(message, "!version", 8)) command_version(user, message);
     else if (!strncmp(message, "!uptime",  7)) command_uptime(user, message);
+    else if (!strncmp(message, "+myip",    5)) command_myip(user, message);
     else
 	return 1;
     return 0;
