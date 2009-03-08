@@ -1,6 +1,7 @@
 0.2.6:
 - Better "!uptime" command formatting.
 - Better "!stats"; can display peak and current bandwidth usage.
+- Added "+myip" command.
 
 
 0.2.5-3487:
