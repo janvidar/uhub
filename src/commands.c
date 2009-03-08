@@ -62,7 +62,7 @@ static int command_stats(struct user* user, const char* message)
 static int command_help(struct user* user, const char* message)
 {
     struct adc_message* command;
-    char* buffer = adc_msg_escape(
+    char* buffer = adc_msg_escape("\n"
 	"*** Available commands:\n"
 	"!help         - Show this help message\n"
 	"!stats        - Show hub stats (super)\n"
