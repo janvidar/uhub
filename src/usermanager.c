@@ -49,7 +49,7 @@ void user_manager_update_stats(struct hub_info* hub)
 	hub->stats.net_tx = (intermediate->tx / factor);
 	hub->stats.net_rx = (intermediate->rx / factor);
 	hub->stats.net_tx_peak = MAX(hub->stats.net_tx, hub->stats.net_tx_peak);
-	hub->stats.net_tx_peak = MAX(hub->stats.net_rx, hub->stats.net_rx_peak);
+	hub->stats.net_rx_peak = MAX(hub->stats.net_rx, hub->stats.net_rx_peak);
 	hub->stats.net_tx_total = total->tx;
 	hub->stats.net_rx_total = total->rx;
 	
