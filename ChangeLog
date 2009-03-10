@@ -2,6 +2,7 @@
 - Better "!uptime" command formatting.
 - Better "!stats"; can display peak and current bandwidth usage.
 - Added "+myip" command.
+- Ensure super users and hub owners also have the operator flag set.
 
 
 0.2.5-3487:
