@@ -3,6 +3,7 @@
 - Better "!stats"; can display peak and current bandwidth usage.
 - Added "+myip" command.
 - Ensure super users and hub owners also have the operator flag set.
+- Better dynamic send queue handling for large hubs at the cost of more memory use.
 
 
 0.2.5-3487:
