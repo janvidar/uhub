@@ -36,7 +36,7 @@ struct ip_addr_encap {
 
 extern int ip_convert_to_binary(const char* text_addr, struct ip_addr_encap* raw);
 
-extern char* ip_convert_to_string(struct ip_addr_encap* raw);
+extern const char* ip_convert_to_string(struct ip_addr_encap* raw);
 
 
 /*

@@ -188,50 +188,35 @@ static int check_required_login_flags(struct user* user, struct adc_message* cmd
  */
 int check_network(struct user* user, struct adc_message* cmd)
 {
-	int want_ipv4 = 0;
-	int want_ipv6 = 0;
-	int nat_override = 0;
-	const char* address = 0;
+	const char* address = ip_convert_to_string(&user->ipaddr);
 	
-	/* Add correct/verified IP addresses instead (if requested/stripped) */
-	address = (char*) net_get_peer_address(user->sd);
-	if (address)
+	/* Check for NAT override address */
+	if (acl_is_ip_nat_override(user->hub->acl, address))
 	{
-		if (strchr(address, '.'))
+		char* client_given_ip = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
+		if (strcmp(client_given_ip, "0.0.0.0") != 0)
 		{
+			user_set_nat_override(user);
 			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
 			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_UDP_PORT);
-			want_ipv4 = 1;
-		}
-		else if (strchr(address, ':'))
-		{
-			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
-			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_UDP_PORT);
-			want_ipv6 = 1;
-		}
-		
-		/* check if user can do nat override */
-		if (want_ipv4 && acl_is_ip_nat_override(user->hub->acl, address))
-		{
-			char* client_given_ip = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
-			if (strcmp(client_given_ip, "0.0.0.0") != 0)
-			{
-				user_set_nat_override(user);
-				nat_override = 1;
-			}
 			hub_free(client_given_ip);
+			return 0;
 		}
+		hub_free(client_given_ip);
 	}
-	
-	if (!nat_override)
+
+	if (strchr(address, '.'))
 	{
-		if (want_ipv4)
-			adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR, address);
-		
-		if (want_ipv6)
-			adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR, address);
+		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
+		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_UDP_PORT);
+		adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR, address);
 	}
-	
+	else if (strchr(address, ':'))
+	{
+		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
+		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_UDP_PORT);
+		adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR, address);
+	}
 	return 0;
 }
 
