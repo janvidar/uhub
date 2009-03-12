@@ -193,30 +193,21 @@ int check_network(struct user* user, struct adc_message* cmd)
 	int nat_override = 0;
 	const char* address = 0;
 	
-	if (adc_msg_has_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR))
-	{
-		want_ipv6 = 1;
-	}
-	
-	if (adc_msg_has_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR))
-	{
-		want_ipv4 = 1;
-	}
-	
-	if (!want_ipv4 && !want_ipv6)
-		return 0;
-	
 	/* Add correct/verified IP addresses instead (if requested/stripped) */
 	address = (char*) net_get_peer_address(user->sd);
 	if (address)
 	{
-		if (want_ipv4 && strchr(address, '.'))
+		if (strchr(address, '.'))
 		{
-			want_ipv6 = 0;
+			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
+			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_UDP_PORT);
+			want_ipv4 = 1;
 		}
-		else if (want_ipv6)
+		else if (strchr(address, ':'))
 		{
-			want_ipv4 = 0;
+			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
+			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_UDP_PORT);
+			want_ipv6 = 1;
 		}
 		
 		/* check if user can do nat override */
@@ -234,16 +225,10 @@ int check_network(struct user* user, struct adc_message* cmd)
 	
 	if (!nat_override)
 	{
-		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
-		if (!want_ipv4)
-			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_UDP_PORT);
-		else
+		if (want_ipv4)
 			adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR, address);
 		
-		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
-		if (!want_ipv6)
-			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_UDP_PORT);
-		else
+		if (want_ipv6)
 			adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR, address);
 	}
 	
