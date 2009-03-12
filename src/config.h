@@ -35,8 +35,8 @@ struct hub_config
 	char* hub_name;              /**<<< "Name of hub (default: 'My uhub hub')" */
 	char* hub_description;       /**<<< "Name of hub (default: 'no description')" */
 	int max_recv_buffer;         /**<<< "Max read buffer before parse, per user (default: 4096)" */
-	int max_send_buffer;         /**<<< "Max send buffer before disconnect, per user (default: 16384)" */
-	int max_send_buffer_soft;    /**<<< "Max send buffer before message drops, per user (default: 8192)" */
+	int max_send_buffer;         /**<<< "Max send buffer before disconnect, per user (default: 128K)" */
+	int max_send_buffer_soft;    /**<<< "Max send buffer before message drops, per user (default: 96K)" */
 	int low_bandwidth_mode;      /**<<< "If this is enabled, the hub will strip off elements from each user's info message to reduce bandwidth usage" */
 	
 	/* Limits enforced on users */
