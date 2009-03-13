@@ -209,12 +209,14 @@ int check_network(struct user* user, struct adc_message* cmd)
 	{
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_UDP_PORT);
+		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
 		adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR, address);
 	}
 	else if (strchr(address, ':'))
 	{
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_UDP_PORT);
+		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
 		adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR, address);
 	}
 	return 0;
