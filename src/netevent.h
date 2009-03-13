@@ -35,7 +35,6 @@ extern void net_on_write(int fd, short ev, void *arg);
  */
 extern void net_on_read_timeout(int fd, short ev, void* arg);
 
-
 /**
  * Network callback to accept incoming connections.
  */

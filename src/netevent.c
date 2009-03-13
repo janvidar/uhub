@@ -192,7 +192,7 @@ void net_on_write(int fd, short ev, void *arg)
 			else
 			{
 				user->send_queue_size -= ret;
-				user->send_queue_offset -= ret;
+				user->send_queue_offset += ret;
 				break;
 			}
 		}
