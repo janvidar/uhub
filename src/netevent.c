@@ -177,8 +177,10 @@ void net_on_write(int fd, short ev, void *arg)
 				user->send_queue_size -= ret;
 				user->send_queue_offset = 0;
 				
-				assert(user->send_queue_size >= 0);
-				assert(user->send_queue_offset >= 0);
+				if ((user->send_queue_size < 0) || (user->send_queue_offset < 0))
+				{
+					hub_log(log_error, "INVALID: send_queue_size=%d, send_queue_offset=%d", user->send_queue_size, user->send_queue_offset);
+				}
 			
 				list_remove(user->send_queue, msg);
 				
@@ -198,8 +200,10 @@ void net_on_write(int fd, short ev, void *arg)
 				user->send_queue_size -= ret;
 				user->send_queue_offset += ret;
 				
-				assert(user->send_queue_size >= 0);
-				assert(user->send_queue_offset >= 0);
+				if ((user->send_queue_size < 0) || (user->send_queue_offset < 0))
+				{
+					hub_log(log_error, "INVALID: send_queue_size=%d, send_queue_offset=%d", user->send_queue_size, user->send_queue_offset);
+				}
 				break;
 			}
 		}
