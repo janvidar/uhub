@@ -176,6 +176,10 @@ void net_on_write(int fd, short ev, void *arg)
 			{
 				user->send_queue_size -= ret;
 				user->send_queue_offset = 0;
+				
+				assert(user->send_queue_size >= 0);
+				assert(user->send_queue_offset >= 0);
+			
 				list_remove(user->send_queue, msg);
 				
 				if (user_flag_get(user, flag_user_list) && (msg == user->info || user->send_queue_size == 0))
@@ -193,6 +197,9 @@ void net_on_write(int fd, short ev, void *arg)
 			{
 				user->send_queue_size -= ret;
 				user->send_queue_offset -= ret;
+				
+				assert(user->send_queue_size >= 0);
+				assert(user->send_queue_offset >= 0);
 				break;
 			}
 		}
