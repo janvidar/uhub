@@ -64,7 +64,7 @@
 		int val; \
 		errno = 0; \
 		val = strtol(data, &endptr, 10); \
-		if (((errno == ERANGE && (val == INT_MAX || val == INT_MIN)) || (errno != 0 && val == 0)) || endptr == data /*|| endptr != &data[strlen(data)-1]*/) { \
+		if (((errno == ERANGE && (val == INT_MAX || val == INT_MIN)) || (errno != 0 && val == 0)) || endptr == data) { \
 			hub_log(log_fatal, "Configuration error on line %d: '%s' must be a number", line_count, key); \
 			return -1; \
 		} \
@@ -458,7 +458,7 @@ static int config_parse_line(char* line, int line_count, void* ptr_data)
 		pos[0] = 0;
 	}
 
-	if (strlen(line) == 0) return 0;
+	if (!*line) return 0;
 
 #ifdef CONFIG_DUMP
 	hub_log(log_trace, "config_parse_line(): '%s'", line);
@@ -479,7 +479,7 @@ static int config_parse_line(char* line, int line_count, void* ptr_data)
 	key = strip_white_space(key);
 	data = strip_white_space(data);
 
-	if (!strlen(key) || !strlen(data))
+	if (!*key || !*data)
 	{
 		hub_log(log_fatal, "Configuration parse error on line %d", line_count);
 		return -1;

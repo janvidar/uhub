@@ -45,7 +45,8 @@ extern void user_manager_shutdown(struct hub_info* hub);
 /**
  * Generate statistics for logfiles.
  */
-extern void user_manager_stats(struct hub_info* hub);
+extern void user_manager_update_stats(struct hub_info* hub);
+extern void user_manager_print_stats(struct hub_info* hub);
 
 /**
  * Add a new user to the user manager.

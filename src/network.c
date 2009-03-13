@@ -591,19 +591,6 @@ void net_stats_get(struct net_statistics** intermediate, struct net_statistics**
 }
 
 
-void net_stats_report()
-{
-	int factor = (time(NULL) - stats.timestamp);
-	if (!factor) factor++;
-
-	hub_log(log_info, "Statistics  NET: tx=%d KB/s, rx=%d KB/s, (acc=%d/cls=%d/err=%d)",
-		(int) ((stats.tx / factor) / 1024),
-		(int) ((stats.rx / factor) / 1024),
-		(int) stats.accept,
-		(int) stats.closed,
-		(int) stats.errors);
-}
-
 void net_stats_reset()
 {
 	stats_total.tx += stats.tx;
@@ -619,8 +606,7 @@ void net_stats_reset()
 
 int net_stats_timeout()
 {
-	/* FIXME: Configurable time for dumping network statistics */
-	return (time(NULL) - stats.timestamp > 60) ? 1 : 0;
+	return (difftime(time(NULL), stats.timestamp) > TIMEOUT_STATS) ? 1 : 0;
 }
 
 

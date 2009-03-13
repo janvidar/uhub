@@ -688,7 +688,7 @@ char* adc_msg_get_argument(struct adc_message* cmd, int offset)
 					argument[strlen(argument)-1] = 0;
 			}
 			
-			if (strlen(argument))
+			if (*argument)
 			{
 				adc_msg_terminate(cmd);
 				return argument;

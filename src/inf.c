@@ -58,7 +58,7 @@ static int set_feature_cast_supports(struct user* u, struct adc_message* cmd)
 			it = &it[5];
 		}
 		
-		if (strlen(it) > 0)
+		if (*it)
 		{
 			user_set_feature_cast_support(u, it);
 		}
@@ -188,65 +188,37 @@ static int check_required_login_flags(struct user* user, struct adc_message* cmd
  */
 int check_network(struct user* user, struct adc_message* cmd)
 {
-	int want_ipv4 = 0;
-	int want_ipv6 = 0;
-	int nat_override = 0;
-	const char* address = 0;
+	const char* address = ip_convert_to_string(&user->ipaddr);
 	
-	if (adc_msg_has_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR))
+	/* Check for NAT override address */
+	if (acl_is_ip_nat_override(user->hub->acl, address))
 	{
-		want_ipv6 = 1;
-	}
-	
-	if (adc_msg_has_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR))
-	{
-		want_ipv4 = 1;
-	}
-	
-	if (!want_ipv4 && !want_ipv6)
-		return 0;
-	
-	/* Add correct/verified IP addresses instead (if requested/stripped) */
-	address = (char*) net_get_peer_address(user->sd);
-	if (address)
-	{
-		if (want_ipv4 && strchr(address, '.'))
+		char* client_given_ip = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
+		if (strcmp(client_given_ip, "0.0.0.0") != 0)
 		{
-			want_ipv6 = 0;
-		}
-		else if (want_ipv6)
-		{
-			want_ipv4 = 0;
-		}
-		
-		/* check if user can do nat override */
-		if (want_ipv4 && acl_is_ip_nat_override(user->hub->acl, address))
-		{
-			char* client_given_ip = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
-			if (strcmp(client_given_ip, "0.0.0.0") != 0)
-			{
-				user_set_nat_override(user);
-				nat_override = 1;
-			}
+			user_set_nat_override(user);
+			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
+			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_UDP_PORT);
 			hub_free(client_given_ip);
+			return 0;
 		}
+		hub_free(client_given_ip);
 	}
-	
-	if (!nat_override)
+
+	if (strchr(address, '.'))
+	{
+		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
+		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_UDP_PORT);
+		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
+		adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR, address);
+	}
+	else if (strchr(address, ':'))
 	{
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
-		if (!want_ipv4)
-			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_UDP_PORT);
-		else
-			adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR, address);
-		
+		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_UDP_PORT);
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
-		if (!want_ipv6)
-			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_UDP_PORT);
-		else
-			adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR, address);
+		adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR, address);
 	}
-	
 	return 0;
 }
 
@@ -359,7 +331,7 @@ static int check_logged_in(struct user* user, struct adc_message* cmd)
 	{
 		if (lookup1 == lookup2)
 		{
-			hub_log(log_debug, "check_logged_in: exact same user is logged in: %s", user->id.nick);
+			hub_log(log_error, "check_logged_in: exact same user is logged in: %s", user->id.nick);
 			user_disconnect(lookup1, quit_timeout);
 			return 0;
 		}

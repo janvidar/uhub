@@ -90,7 +90,7 @@ int ip_convert_to_binary(const char* taddr, struct ip_addr_encap* raw)
 }
 
 
-char* ip_convert_to_string(struct ip_addr_encap* raw)
+const char* ip_convert_to_string(struct ip_addr_encap* raw)
 {
 	static char address[INET6_ADDRSTRLEN+1];
 	memset(address, 0, INET6_ADDRSTRLEN);

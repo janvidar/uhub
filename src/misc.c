@@ -38,8 +38,8 @@ char* strip_white_space(char* string)
 	
 	while (string[0] && is_white_space(string[0])) string++;
 	
-	if (!strlen(string))
-		return string;
+	if (!*string)
+		return 0;
 	
 	/* Strip appending whitespace */
 	pos = &string[strlen(string)-1];
@@ -187,7 +187,7 @@ int file_read_lines(const char* file, void* data, file_line_handler_t handler)
 		while ((pos = strchr(start, '\n')))
 		{
 			pos[0] = '\0';
-			if (strlen(start) > 0)
+			if (*start)
 			{
 				hub_log(log_dump, "Line: %s", start);
 				if (handler(start, line_count+1, data) < 0)
@@ -197,7 +197,7 @@ int file_read_lines(const char* file, void* data, file_line_handler_t handler)
 			line_count++;
 		}
 		
-		if (strlen(start) > 0)
+		if (*start)
 		{
 			buf[strlen(start)] = 0;
 			hub_log(log_dump, "Line: %s", start);

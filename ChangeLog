@@ -1,3 +1,12 @@
+0.2.6:
+- Better "!uptime" command formatting.
+- Better "!stats"; can display peak and current bandwidth usage.
+- Added "+myip" command.
+- Ensure super users and hub owners also have the operator flag set.
+- Bug #1: Better dynamic send queue handling for large hubs at the cost of more memory use.
+- Bug #5: Always provide IP-address to all users, not just for active clients.
+
+
 0.2.5-3487:
 - Fixed out of memory situations, used when uhub operates on a limited heap.
 - Code cleanups, reduced heap memory footprint.

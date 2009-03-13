@@ -189,7 +189,7 @@ int hub_handle_chat_message(struct user* u, struct adc_message* cmd)
 	int relay = 1;
 	
 	/* TODO: Check for hub-commands here. Set relay to 0 and the message will not be sent to other users. */
-	if (message[0] == '!')
+	if (message[0] == '!' || message[0] == '+')
 	{
 	    relay = command_dipatcher(u, message);
 	}

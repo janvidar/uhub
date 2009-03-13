@@ -70,7 +70,7 @@ void hub_handle_signal(int fd, short events, void* arg)
 		case SIGUSR2:
 			hub_log(log_trace, "hub_handle_signal(): caught SIGUSR2");
 			{
-				user_manager_stats(hub);
+				user_manager_print_stats(hub);
 			}
 			break;
 

@@ -35,12 +35,20 @@ static int command_access_denied(struct user* user)
 static int command_stats(struct user* user, const char* message)
 {
     struct adc_message* command;
-    
+
     if (user->credentials < cred_super)
 	return command_access_denied(user);
-   
-    char temp[64];
-    snprintf(temp, 64, "*** Stats: %u users, peak %u", (unsigned int) user->hub->users->count, (unsigned int) user->hub->users->count_peak);
+	
+    char temp[128];
+
+    snprintf(temp, 128, "*** Stats: %zu users, peak: %zu. Network (up/down): %d/%d KB/s, peak: %d/%d KB/s",
+	user->hub->users->count,
+	user->hub->users->count_peak,
+	(int) user->hub->stats.net_tx / 1024,
+	(int) user->hub->stats.net_rx / 1024,
+	(int) user->hub->stats.net_tx_peak / 1024,
+	(int) user->hub->stats.net_rx_peak / 1024);
+
     char* buffer = adc_msg_escape(temp);
     command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
     adc_msg_add_argument(command, buffer);
@@ -54,7 +62,7 @@ static int command_stats(struct user* user, const char* message)
 static int command_help(struct user* user, const char* message)
 {
     struct adc_message* command;
-    char* buffer = adc_msg_escape(
+    char* buffer = adc_msg_escape("\n"
 	"*** Available commands:\n"
 	"!help         - Show this help message\n"
 	"!stats        - Show hub stats (super)\n"
@@ -74,9 +82,36 @@ static int command_help(struct user* user, const char* message)
 static int command_uptime(struct user* user, const char* message)
 {
     struct adc_message* command;
-    char temp[64];
-    snprintf(temp, 64, "*** Uptime: %s seconds", uhub_itoa((int) difftime(time(0), user->hub->tm_started)));
-    char* buffer = adc_msg_escape(temp);
+    char tmp[128];
+    size_t d;
+    size_t h;
+    size_t m;
+    size_t D = (size_t) difftime(time(0), user->hub->tm_started);
+
+    d = D / (24 * 3600);
+    D = D % (24 * 3600);
+    h = D / 3600;
+    D = D % 3600;
+    m = D / 60;
+
+    tmp[0] = 0;
+    strcat(tmp, "*** Uptime: ");
+    
+    if (d)
+    {
+	strcat(tmp, uhub_itoa((int) d));
+	strcat(tmp, " day");
+	if (d != 1) strcat(tmp, "s");
+	strcat(tmp, ", ");
+    }
+
+    if (h < 10) strcat(tmp, "0");
+    strcat(tmp, uhub_itoa((int) h));
+    strcat(tmp, ":");
+    if (m < 10) strcat(tmp, "0");
+    strcat(tmp, uhub_itoa((int) m));
+
+    char* buffer = adc_msg_escape(tmp);
     command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
     adc_msg_add_argument(command, buffer);
     route_to_user(user, command);
@@ -113,6 +148,26 @@ static int command_version(struct user* user, const char* message)
     return 0;
 }
 
+static int command_myip(struct user* user, const char* message)
+{
+    struct adc_message* command;
+    char tmp[128];
+    char* buffer;
+
+    tmp[0] = 0;
+    strcat(tmp, "*** Your IP: ");
+    strcat(tmp, ip_convert_to_string(&user->ipaddr));
+
+    buffer = adc_msg_escape(tmp);
+    command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
+    adc_msg_add_argument(command, buffer);
+    route_to_user(user, command);
+    adc_msg_free(command);
+    hub_free(buffer);
+    return 0;
+}
+
+
 int command_dipatcher(struct user* user, const char* message)
 {
     if      (!strncmp(message, "!stats",   6)) command_stats(user, message);
@@ -120,6 +175,7 @@ int command_dipatcher(struct user* user, const char* message)
     else if (!strncmp(message, "!kick",    5)) command_kick(user, message);
     else if (!strncmp(message, "!version", 8)) command_version(user, message);
     else if (!strncmp(message, "!uptime",  7)) command_uptime(user, message);
+    else if (!strncmp(message, "+myip",    5)) command_myip(user, message);
     else
 	return 1;
     return 0;

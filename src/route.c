@@ -80,6 +80,26 @@ static void queue_command(struct user* user, struct adc_message* msg__, int offs
 }
 
 // #define ALWAYS_QUEUE_MESSAGES
+static size_t get_max_send_queue(struct hub_info* hub)
+{
+	return MAX(hub->config->max_send_buffer, (hub->config->max_recv_buffer * hub_get_user_count(hub)));
+}
+
+/*
+ * @return 1 if send queue is OK.
+ *         -1 if send queue is overflowed
+ *         0 if soft send queue is overflowed (not implemented at the moment)
+ */
+static int check_send_queue(struct user* user, struct adc_message* msg)
+{
+	if (user_flag_get(user, flag_user_list))
+		return 1;
+
+	if ((user->send_queue_size + msg->length) > get_max_send_queue(user->hub))      
+		return -1;
+	
+	return 1;
+}
 
 int route_to_user(struct user* user, struct adc_message* msg)
 {
@@ -118,24 +138,23 @@ int route_to_user(struct user* user, struct adc_message* msg)
 	else
 #endif
 	{
-		if (!user_flag_get(user, flag_user_list) && user->send_queue_size + msg->length > user->hub->config->max_send_buffer && msg->priority >= 0)
+		ret = check_send_queue(user, msg);
+		if (ret == -1)
 		{
 			/* User is not able to swallow the data, let's cut our losses and disconnect. */
 			user_disconnect(user, quit_send_queue);
-			return 0;
+		}
+		else if (ret == 1)
+		{
+			/* queue command */
+			queue_command(user, msg, 0);
+                        if (user->ev_write)
+				event_add(user->ev_write, NULL);
+
 		}
 		else
 		{
-			if (user->send_queue_size + msg->length > user->hub->config->max_send_buffer_soft && msg->priority >= 0)
-			{
-				/* Don't queue this message if it is low priority! */
-			}
-			else
-			{
-				queue_command(user, msg, 0);
-				if (user->ev_write)
-					event_add(user->ev_write, NULL);
-			}
+			/* do not queue command as our soft-limits are exceeded */
 		}
 	}
 	
