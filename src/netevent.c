@@ -147,6 +147,7 @@ void net_on_read(int fd, short ev, void *arg)
 	}
 }
 
+#define DEBUG_SENDQ
 
 void net_on_write(int fd, short ev, void *arg)
 {
@@ -174,6 +175,9 @@ void net_on_write(int fd, short ev, void *arg)
 			
 			if (ret == length)
 			{
+#ifdef DEBUG_SENDQ
+				hub_log(log_error, "SENDQ: sent=%d bytes/%d (all), send_queue_size=%d, offset=%d\n", ret, (int) msg->length, user->send_queue_size, user->send_queue_offset);
+#endif
 				user->send_queue_size -= ret;
 				user->send_queue_offset = 0;
 				
@@ -197,10 +201,14 @@ void net_on_write(int fd, short ev, void *arg)
 			}
 			else
 			{
+#ifdef DEBUG_SENDQ
+                                hub_log(log_error, "SENDQ: sent=%d bytes/%d (part), send_queue_size=%d, offset=%d\n", ret, (int) msg->length, user->send_queue_size, user->send_queue_offset);
+#endif
+
 				user->send_queue_size -= ret;
 				user->send_queue_offset += ret;
 				
-				if ((user->send_queue_size < 0) || (user->send_queue_offset < 0))
+				if ((user->send_queue_size < 0) || (user->send_queue_offset < 0) || (user->send_queue_offset > msg->length))
 				{
 					hub_log(log_error, "INVALID: send_queue_size=%d, send_queue_offset=%d", user->send_queue_size, user->send_queue_offset);
 				}
