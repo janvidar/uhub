@@ -222,6 +222,9 @@ $(PCH): $(uhub_HEADERS)
 	$(MV) $@.tmp $@
 endif
 
+autotest.c: $(autotest_SOURCES)
+	$(shell exotic --standalone $(autotest_SOURCES) > $@)
+
 $(autotest_OBJECTS): autotest.c
 	$(MSG_CC) $(CC) -c $(CFLAGS) -Isrc -o $@.tmp $< && \
 	$(MV) $@.tmp $@
