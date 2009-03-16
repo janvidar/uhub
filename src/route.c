@@ -67,16 +67,12 @@ static void queue_command(struct user* user, struct adc_message* msg__, int offs
 #ifdef DEBUG_SENDQ
 	hub_log(log_trace, "SENDQ: user=%p, msg=%p (%zu), offset=%d, length=%d, total_length=%d", user, msg, msg->references, offset, msg->length, user->send_queue_size);
 #endif
-	
-	if (offset > 0)
+
+	user->send_queue_size += msg->length - offset;
+	if (list_size(user->send_queue) == 1)
 	{
-		user->send_queue_size += msg->length - offset;
 		user->send_queue_offset = offset;
 		user->tm_last_write = time(NULL);
-	}
-	else
-	{
-		user->send_queue_size += msg->length;
 	}
 }
 
