@@ -15,7 +15,7 @@ BITS          ?= AUTO
 SILENT        ?= YES
 LDLIBS        += -levent
 TERSE         ?= NO
-
+STACK_PROTECT ?= NO
 
 ifeq ($(OS), Windows_NT)
 WINDOWS       ?= YES
@@ -67,10 +67,15 @@ LDFLAGS       += -L/source/libevent
 
 -include release_setup.mk
 ifeq ($(RELEASE),YES)
-CFLAGS        += -Os -DNDEBUG -fstack-protector-all
+CFLAGS        += -Os -DNDEBUG
 else
-CFLAGS        += -g -DDEBUG -fstack-protector-all
+CFLAGS        += -g -DDEBUG
 endif
+
+ifeq ($(STACK_PROTECT),YES)
+CFLAGS        += -fstack-protector-all
+endif
+
 
 ifeq ($(PROFILING),YES)
 CFLAGS        += -pg

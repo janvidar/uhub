@@ -26,7 +26,8 @@ URL_ARCHIVE='build-archive:~/uhub/'
 URL_PUBLISH='domeneshop:~/www/downloads/uhub/'
 URL_SNAPSHOT='domeneshop:~/www/downloads/uhub/snapshots/'
 
-function export_source_directory() {
+function export_source_directory
+{
 	if [ -d ${PACKAGE} ]; then
 		rm -Rf ${PACKAGE};
 	fi
@@ -36,7 +37,7 @@ function export_source_directory() {
 		exit 1
 	fi
 
-	git archive --format=tar --prefix=${PACKAGE}/ HEAD | tar x
+	git archive --format=tar --prefix=${PACKAGE}/ HEAD > tmp.tar && tar -xf tmp.tar && rm tmp.tar
 
 	if [ ! -d ${PACKAGE} ]; then
 		echo "Something went wrong while exporting the repo."
@@ -44,7 +45,7 @@ function export_source_directory() {
 	fi
 }
 
-function package_zips()
+function package_zips
 {
 	tar cf $1.tar $2
 	gzip -c -9 $1.tar > $1.tar.gz
@@ -53,7 +54,7 @@ function package_zips()
 	zip -q -9 -r $1.zip $2
 }
 
-function export_sources()
+function export_sources
 {
 	export_source_directory
 	make autotest.c && cp autotest.c ${PACKAGE}/autotest.c
@@ -65,7 +66,7 @@ function export_sources()
 	cp ChangeLog ChangeLog-${VERSION}
 }
 
-function export_binaries()
+function export_binaries
 {
 	export_source_directory
 	rm -Rf ${PACKAGE}/admin
