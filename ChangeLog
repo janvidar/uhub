@@ -3,8 +3,11 @@
 - Better "!stats"; can display peak and current bandwidth usage.
 - Added "+myip" command.
 - Ensure super users and hub owners also have the operator flag set.
-- Bug #1: Better dynamic send queue handling for large hubs at the cost of more memory use.
+- Bug #1: Disconnecting users due to excessive "send queue".
 - Bug #5: Always provide IP-address to all users, not just for active clients.
+- Better send queue priorities.
+- Dump configuration does not quote integer and boolean settings.
+- Minor optimizations.
 
 
 0.2.5-3487:

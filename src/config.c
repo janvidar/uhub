@@ -366,20 +366,20 @@ void free_config(struct hub_config* config)
 	if (ignore_defaults) \
 	{ \
 		if (config->NAME != DEFAULT) \
-			fprintf(stdout, "%s = \"%d\"\n", #NAME , config->NAME); \
+			fprintf(stdout, "%s = %d\n", #NAME , config->NAME); \
 	} \
 	else \
-		fprintf(stdout, "%s = \"%d\"\n", #NAME , config->NAME); \
+		fprintf(stdout, "%s = %d\n", #NAME , config->NAME); \
 
 
 #define DUMP_BOOL(NAME, DEFAULT) \
 	if (ignore_defaults) \
 	{ \
 		if (config->NAME != DEFAULT) \
-			fprintf(stdout, "%s = \"%s\"\n", #NAME , (config->NAME ? "yes" : "no")); \
+			fprintf(stdout, "%s = %s\n", #NAME , (config->NAME ? "yes" : "no")); \
 	} \
 	else \
-		fprintf(stdout, "%s = \"%s\"\n", #NAME , (config->NAME ? "yes" : "no"));
+		fprintf(stdout, "%s = %s\n", #NAME , (config->NAME ? "yes" : "no"));
 
 void dump_config(struct hub_config* config, int ignore_defaults)
 {
