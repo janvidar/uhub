@@ -14,6 +14,7 @@ USE_BIGENDIAN ?= AUTO
 BITS          ?= AUTO
 SILENT        ?= YES
 LDLIBS        += -levent
+TERSE         ?= NO
 
 
 ifeq ($(OS), Windows_NT)
@@ -47,6 +48,18 @@ else
 	MSG_LD=
 	MSG_AR=
 endif
+
+ifeq ($(TERSE), YES)
+	MSG_CC=@
+	MSG_PCH=@
+	MSG_LD=@
+	MSG_AR=@
+	MSG_CLEAN=-n ""
+else
+	MSG_CLEAN="Clean as a whistle"
+endif
+
+
 
 
 CFLAGS        += -I/source/libevent
@@ -239,7 +252,7 @@ dist-clean:
 
 clean:
 	@rm -rf $(libuhub_OBJECTS) $(PCH) *~ core $(uhub_BINARY) $(LIBUHUB) $(all_OBJECTS) && \
-	echo Clean as a whistle
+	echo $(MSG_CLEAN)
 
 -include release_targets.mk
 
