@@ -8,7 +8,13 @@ fi
 
 if [ "${HOST_SYSTEM}" = "mingw32_nt-5.1" ]; then
 	HOST_SYSTEM=win32
+	BINARY=uhub.exe
+	WANTZIP=1
+else
+	WANTZIP=0
+	BINARY=uhub
 fi
+
 
 VERSION=`grep define\ VERSION version.h | cut -f 3 -d " " | tr -d [=\"=]`
 SNAPSHOT=`date '+%Y%m%d'`
@@ -24,7 +30,27 @@ function export_source_directory() {
 	if [ -d ${PACKAGE} ]; then
 		rm -Rf ${PACKAGE};
 	fi
+
+	if [ ! -d .git ]; then
+		echo "No git repo found in `dirname $0`"
+		exit 1
+	fi
+
 	git archive --format=tar --prefix=${PACKAGE}/ HEAD | tar x
+
+	if [ ! -d ${PACKAGE} ]; then
+		echo "Something went wrong while exporting the repo."
+		exit 1
+	fi
+}
+
+function package_zips()
+{
+	tar cf $1.tar $2
+	gzip -c -9 $1.tar > $1.tar.gz
+	bzip2 -c -9 $1.tar > $1.tar.bz2
+	rm -f $1.tar
+	zip -q -9 -r $1.zip $2
 }
 
 function export_sources()
@@ -33,13 +59,9 @@ function export_sources()
 	make autotest.c && cp autotest.c ${PACKAGE}/autotest.c
 	rm -Rf ${PACKAGE}/admin
 
-	tar cf ${PACKAGE_SRC}.tar ${PACKAGE}
-	gzip  -c -9 ${PACKAGE_SRC}.tar > ${PACKAGE_SRC}.tar.gz
-	bzip2 -c -9 ${PACKAGE_SRC}.tar > ${PACKAGE_SRC}.tar.bz2
-
-	rm -f ${PACKAGE_SRC}.tar
-        rm -Rf ${PACKAGE};
-
+	package_zips ${PACKAGE_SRC} ${PACKAGE}
+        
+	rm -Rf ${PACKAGE};
 	cp ChangeLog ChangeLog-${VERSION}
 }
 
@@ -57,20 +79,16 @@ function export_binaries()
 
 	make
 
-	if [ -x uhub ]; then
-		cp uhub ${PACKAGE}
-	elif [ -x uhub.exe ]; then
-		cp uhub.exe ${PACKAGE}
+	if [ -x ${BINARY} ]; then
+		cp ${BINARY} ${PACKAGE}
 	else
 		echo "No binary found!"
 		exit 1
 	fi
 
-	tar cf ${PACKAGE_BIN}.tar ${PACKAGE}
-	gzip  -c -9 ${PACKAGE_BIN}.tar > ${PACKAGE_BIN}.tar.gz
-	bzip2 -c -9 ${PACKAGE_BIN}.tar > ${PACKAGE_BIN}.tar.bz2
-	rm -f ${PACKAGE_BIN}.tar
-        rm -Rf ${PACKAGE};
+	package_zips ${PACKAGE_BIN} ${PACKAGE}
+
+	rm -Rf ${PACKAGE};
 }
 
 
