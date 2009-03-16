@@ -13,9 +13,8 @@ endif
 
 VERSION       ?= $(shell grep define\ VERSION version.h | cut -f 3 -d " " | tr -d [=\"=] )
 SNAPSHOT      ?= $(shell date '+%Y%m%d' )
-
-REVISION      ?= $(shell svn info | grep Revision | tr -d [:alpha:][:punct:][:space:] )
-PACKAGE       ?= uhub-$(VERSION)-$(REVISION)
+REVISION      ?= HEAD
+PACKAGE       ?= uhub-$(VERSION)
 PACKAGE_SRC   ?= $(PACKAGE)-src
 PACKAGE_BIN   ?= $(PACKAGE)-$(HOST_SYSTEM)-$(HOST_MACHINE)
 

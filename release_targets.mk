@@ -9,37 +9,54 @@ ifeq ($(RELEASE),YES)
 %.tar.gz: %.tar
 	@gzip -c -9 $^ > $@
 
-ChangeLog-$(VERSION)-$(REVISION): ChangeLog
+ChangeLog-$(VERSION): ChangeLog
 	@cp $^ $@
 
-changelog: ChangeLog-$(VERSION)-$(REVISION)
+changelog: ChangeLog-$(VERSION)
 
-$(PACKAGE_SRC).tar $(PACKAGE_SRC).zip: autotest.c
+define gitexport
 	@if [ -d $(PACKAGE) ]; then rm -Rf $(PACKAGE); fi
-	@svn export . $(PACKAGE) > /dev/null
+	@git archive --format=tar --prefix=$(PACKAGE)/ $(REVISION) | tar x
+endef
+
+define cleanexport
+	@if [ -d $(PACKAGE) ]; then rm -Rf $(PACKAGE); fi
+endef
+
+package:
+	$(gitexport)
 	@rm -f $(PACKAGE)/release_*.mk
 	@grep -v \\-include $(PACKAGE)/GNUmakefile > $(PACKAGE)/GNUmakefile2
 	@mv $(PACKAGE)/GNUmakefile2 $(PACKAGE)/GNUmakefile
-	@mv $< $(PACKAGE)
+	@$(shell exotic --standalone $(autotest_SOURCES) > $(PACKAGE)/autotest.c )
+
+package-bin:
+	$(gitexport)
+	@rm -Rf $(PACKAGE)/src
+	@rm -Rf $(PACKAGE)/autotest
+	@rm -f $(PACKAGE)/autotest.c
+	@rm -f $(PACKAGE)/*akefile
+	@rm -f $(PACKAGE)/release_*.mk
+	@rm -f $(PACKAGE)/version.h
+	@rm -f $(PACKAGE)/doc/architecture.txt
+	@rm -f $(PACKAGE)/doc/Doxyfile
+	@rm -f $(PACKAGE)/doc/uhub.dot
+	@rm -f $(PACKAGE)/doc/extensions.txt
+
+package-bin-build: package-bin clean $(uhub_BINARY)
+	@cp $(uhub_BINARY) $(PACKAGE)
+
+$(PACKAGE_SRC).tar: package
 	@tar cf $(PACKAGE_SRC).tar $(PACKAGE)
-	@zip -r $(PACKAGE_SRC).zip $(PACKAGE)
-	@rm -Rf $(PACKAGE)
 
-$(PACKAGE_BIN).tar: clean $(uhub_BINARY)
-	@if [ -d $(PACKAGE) ]; then rm -Rf $(PACKAGE); fi
-	@svn export . $(PACKAGE) > /dev/null
-	@rm -Rf $(PACKAGE)/src $(PACKAGE)/autotest $(PACKAGE)/*akefile $(PACKAGE)/$(LIBUHUB) $(PACKAGE)/release_*.mk $(PACKAGE)/version.h
-	@cp $(uhub_BINARY) $(PACKAGE)
-	@tar cf $@ $(PACKAGE)
-	@rm -Rf $(PACKAGE)
+$(PACKAGE_SRC).zip: package
+	@zip -q -9 -r $(PACKAGE_SRC).zip $(PACKAGE)	
 
-$(PACKAGE_BIN).zip: clean $(uhub_BINARY)
-	@if [ -d $(PACKAGE) ]; then rm -Rf $(PACKAGE); fi
-	@svn export . $(PACKAGE) > /dev/null
-	@rm -Rf $(PACKAGE)/src $(PACKAGE)/autotest $(PACKAGE)/*akefile $(PACKAGE)/$(LIBUHUB) $(PACKAGE)/release_*.mk $(PACKAGE)/version.h
-	@cp $(uhub_BINARY) $(PACKAGE)
-	@zip -r $@ $(PACKAGE)
-	@rm -Rf $(PACKAGE)
+$(PACKAGE_BIN).tar: package-bin-build
+	@tar cf $(PACKAGE_BIN).tar $(PACKAGE)
+
+$(PACKAGE_BIN).zip: package-bin-build
+	@zip -q -9 -r $(PACKAGE_BIN).zip
 
 $(PACKAGE_SRC).tar.gz: $(PACKAGE_SRC).tar
 
@@ -57,7 +74,7 @@ publish-snapshot: snapshot
 	@scp -q uhub-snapshot-$(SNAPSHOT).tar.gz $(URL_SNAPSHOT)
 
 publish: release
-	@scp -q $(PACKAGE_SRC).tar.gz $(PACKAGE_SRC).tar.bz2 $(PACKAGE_BIN).tar.gz $(PACKAGE_BIN).tar.bz2 ChangeLog-$(VERSION)-$(REVISION) $(URL_PUBLISH)
+	@scp -q $(PACKAGE_SRC).tar.gz $(PACKAGE_SRC).tar.bz2 $(PACKAGE_BIN).tar.gz $(PACKAGE_BIN).tar.bz2 ChangeLog-$(VERSION) $(URL_PUBLISH)
 
 tarballs: $(PACKAGE_SRC).tar.gz $(PACKAGE_SRC).tar.bz2 $(PACKAGE_SRC).zip
 	@rm $(PACKAGE_SRC).tar
@@ -72,7 +89,7 @@ binaries: $(PACKAGE_BIN).tar.gz $(PACKAGE_BIN).tar.bz2
 endif
 
 release: binaries tarballs changelog
-
+	$(cleanexport)
 else
 
 
