@@ -23,7 +23,7 @@
 void on_login_success(struct user* u)
 {
 	/* Logging - FIXME: Move this to a plugin */
-	const char* addr = net_get_peer_address(u->sd);
+	const char* addr = ip_convert_to_string(&u->ipaddr);
 	const char* credentials_string[] = { "!none!", "link", "guest", "user", "operator", "super", "admin" };
 	struct timeval timeout = { TIMEOUT_IDLE, 0 };
 	
@@ -54,7 +54,7 @@ void on_login_success(struct user* u)
 
 void on_login_failure(struct user* u, enum status_message msg)
 {
-	const char* addr = net_get_peer_address(u->sd);
+	const char* addr = ip_convert_to_string(&u->ipaddr);
 	const char* message = hub_get_status_message(u->hub, msg);
 	hub_log(log_user, "Login FAIL  %s/%s \"%s\" [%s] (%s) \"%s\"", sid_to_string(u->id.sid), u->id.cid, u->id.nick, addr, message, u->user_agent);
 	
