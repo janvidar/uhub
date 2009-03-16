@@ -4,9 +4,10 @@
 - Added "+myip" command.
 - Ensure super users and hub owners also have the operator flag set.
 - Bug #1: Disconnecting users due to excessive "send queue".
-- Bug #5: Always provide IP-address to all users, not just for active clients.
+- Bug #5: Always provide IP-address for all users, not just for active clients.
 - Better send queue priorities.
 - Dump configuration does not quote integer and boolean settings.
+- Sources hosted by GitHub.com, and bug tracker on bugs.extatic.org
 - Minor optimizations.
 
 
