@@ -63,8 +63,10 @@ static void queue_command(struct user* user, struct adc_message* msg__, int offs
 {
 	struct adc_message* msg = adc_msg_incref(msg__);
 	list_append(user->send_queue, msg);
-	
-	hub_log(log_trace, "queue_command(), user=%p, msg=%p (%zu), offset=%d", user, msg, msg->references, offset);
+
+#ifdef DEBUG_SENDQ
+	hub_log(log_trace, "SENDQ: user=%p, msg=%p (%zu), offset=%d, length=%d, total_length=%d", user, msg, msg->references, offset, msg->length, user->send_queue_size);
+#endif
 	
 	if (offset > 0)
 	{
@@ -75,15 +77,24 @@ static void queue_command(struct user* user, struct adc_message* msg__, int offs
 	else
 	{
 		user->send_queue_size += msg->length;
-		user->send_queue_offset = 0;
 	}
 }
 
 // #define ALWAYS_QUEUE_MESSAGES
 static size_t get_max_send_queue(struct hub_info* hub)
 {
-	return MAX(hub->config->max_send_buffer, (hub->config->max_recv_buffer * hub_get_user_count(hub)));
+	/* TODO: More dynamic send queue limit, for instance:
+	 * return MAX(hub->config->max_send_buffer, (hub->config->max_recv_buffer * hub_get_user_count(hub)));
+	 */
+	return hub->config->max_send_buffer;
 }
+
+static size_t get_max_send_queue_soft(struct hub_info* hub)
+{
+	return hub->config->max_send_buffer_soft;
+}
+
+
 
 /*
  * @return 1 if send queue is OK.
@@ -97,7 +108,10 @@ static int check_send_queue(struct user* user, struct adc_message* msg)
 
 	if ((user->send_queue_size + msg->length) > get_max_send_queue(user->hub))      
 		return -1;
-	
+
+	if (user->send_queue_size > get_max_send_queue_soft(user->hub) && msg->priority < 0)
+		return 0;
+
 	return 1;
 }
 

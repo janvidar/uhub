@@ -768,7 +768,9 @@ int hub_handle_info(struct user* user, const struct adc_message* cmd_unmodified)
 {
 	struct adc_message* cmd = adc_msg_copy(cmd_unmodified); /* FIXME: Have a small memory leak here! */
 	if (!cmd) return -1; /* OOM */
-	
+
+	cmd->priority = 1;
+
 	hub_handle_info_common(user, cmd);
 
 	/* If user is logging in, perform more checks,

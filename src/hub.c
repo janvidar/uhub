@@ -50,6 +50,13 @@ int hub_handle_message(struct user* u, const char* line, size_t length)
 				   so we ignore them. */
 				break;
 
+			case ADC_CMD_EMSG:
+			case ADC_CMD_DMSG:
+			case ADC_CMD_BMSG:
+			case ADC_CMD_FMSG:
+				ret = hub_handle_chat_message(u, cmd);
+				break;
+
 			case ADC_CMD_BSCH:
 			case ADC_CMD_DSCH:
 			case ADC_CMD_ESCH:
@@ -57,17 +64,12 @@ int hub_handle_message(struct user* u, const char* line, size_t length)
 			case ADC_CMD_DRES:
 			case ADC_CMD_DRCM:
 			case ADC_CMD_DCTM:
+				cmd->priority = -1;
 				if (u->hub->config->chat_only && u->credentials < cred_operator)
 				{
 					/* These below aren't allowed in chat only hubs */
 					break;
 				}
-			
-			case ADC_CMD_EMSG:
-			case ADC_CMD_DMSG:
-			case ADC_CMD_BMSG:
-			case ADC_CMD_FMSG:
-				ret = hub_handle_chat_message(u, cmd); break;
 			
 			default:
 				if (user_is_logged_in(u))
