@@ -185,7 +185,7 @@ void net_on_write(int fd, short ev, void *arg)
 				{
 					hub_log(log_error, "INVALID: send_queue_size=%d, send_queue_offset=%d", user->send_queue_size, user->send_queue_offset);
 				}
-#endif DEBUG_SENDQ
+#endif
 			
 				list_remove(user->send_queue, msg);
 				
