@@ -1,0 +1,46 @@
+Getting started guide
+---------------------
+
+(This document is maintained at http://www.extatic.org/uhub/getstarted.html )
+
+Unpack your binaries 
+
+Example:
+  % tar xzf uhub-0.2.6-linux-i386.tar.gz
+  % cd uhub-0.2.6
+
+Copy the binary to /usr/local/bin
+
+  % sudo cp uhub /usr/local/bin
+
+Create configuration files.
+If no configuration files are created, uhub will use the default parameters, so you can skip this step if you are in a hurry to see it run.
+
+As root, or use sudo.
+  % mkdir /etc/uhub
+  % cp doc/uhub.conf /etc/uhub
+  % cp doc/users.conf /etc/uhub
+  % echo "welcome to uhub" > /etc/uhub/motd.txt
+
+Start the hub in the foreground for the first time. Shut it down, by pressing CTRL+C.
+
+  % uhub
+  Thu, 05 Feb 2009 00:48:04 +0000 INFO: Starting server, listening on :::1511...
+
+Connect to the hub using an ADC client, use the address adc://localhost:1511, or replace localhost with the correct hostname or IP address.
+NOTE: It is important to use the "adc://" prefix, and the port number when using DC++ and other ADC clients.
+
+If you modify the configuration files in /etc/uhub you will have to notify uhub by sending a HUP signal.
+
+  % kill -HUP <pid of uhub>
+Or, for the lazy people
+  % killall -HUP uhub
+
+In order to run uhub as a daemon, start it with the -f switch which will make it fork into the background.
+In addition, use the -l to specify a log file instead of stdout. One can also specify a specific user and/or group, 
+if one wishes to run uhub as a specific user using the -u and -g switches.
+
+Example:
+  % uhub -f -l mylog.txt -u nobody -g nogroup
+
+Your mileage may vary -- Good luck!

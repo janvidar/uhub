@@ -1,0 +1,27 @@
+How to compile:
+---------------
+
+See the official compiling howto: http://www.extatic.org/uhub/compile.html
+
+Prerequisites
+
+Before you try to compile µHub, please make sure the following prerequisites are met.
+  * GNU make
+  * gcc > 3.0 (or MinGW on Windows)
+  * libevent >= 1.3
+  * Perl 5
+
+Linux and Mac OSX
+-----------------
+Simply, run:
+  % make 
+
+FreeBSD, NetBSD and OpenBSD
+---------------------------
+Use GNU make, not BSD make: 
+  % gmake
+
+If you have an old gcc compiler, try disabling pre-compiled headers like this:
+gmake USE_PCH=NO
+
+
