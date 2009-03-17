@@ -1,0 +1,15 @@
+Source: uhub
+Section: net
+Priority: extra
+Maintainer: Jan Vidar Krey <janvidar@extatic.org>
+Build-Depends: debhelper (>= 7)
+Standards-Version: 3.8.1
+Homepage: http://www.extatic.org/uhub/
+
+Package: uhub
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: uHub is a high performance peer-to-peer hub for the ADC network.
+ Its low memory footprint allows it to handle several thousand users on high-end servers,
+ or a small private hub on embedded hardware.
+ uHub uses the ADC protocol, and is compatible with DC++, jUCy and other ADC clients.

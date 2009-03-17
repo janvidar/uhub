@@ -30,8 +30,9 @@ CFLAGS        += -mno-cygwin
 LDFLAGS       += -mno-cygwin
 BIN_EXT       ?= .exe
 else
-UHUB_CONF_DIR ?= /etc/uhub
-UHUB_PREFIX   ?= /usr/local
+DESTDIR       ?= /
+UHUB_CONF_DIR ?= $(DESTDIR)/etc/uhub
+UHUB_PREFIX   ?= $(DESTDIR)/usr/
 CFLAGS        += -I/usr/local/include
 LDFLAGS       += -L/usr/local/lib
 BIN_EXT       ?=
@@ -251,7 +252,7 @@ install: $(uhub_BINARY)
 	@if [ ! -d $(UHUB_CONF_DIR) ]; then echo Creating $(UHUB_CONF_DIR); mkdir -p $(UHUB_CONF_DIR); fi
 	@if [ ! -f $(UHUB_CONF_DIR)/uhub.conf ]; then cp doc/uhub.conf $(UHUB_CONF_DIR); fi
 	@if [ ! -f $(UHUB_CONF_DIR)/users.conf ]; then cp doc/users.conf  $(UHUB_CONF_DIR); fi
-	@touch $(UHUB_CONF_DIR)/motd
+	@touch $(UHUB_CONF_DIR)/motd.txt
 	@echo done.
 endif
 
