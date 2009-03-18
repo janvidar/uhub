@@ -136,6 +136,25 @@ static int command_kick(struct user* user, const char* message)
     return 0;
 }
 
+static int command_reload(struct user* user, const char* message)
+{
+	if (user->credentials < cred_admin)
+		return command_access_denied(user);
+
+	user->hub->status = hub_status_restart;
+	return 0;
+}
+
+static int command_shutdown(struct user* user, const char* message)
+{
+	if (user->credentials < cred_admin)
+		return command_access_denied(user);
+
+	user->hub->status = hub_status_shutdown;
+	return 0;
+}
+
+
 static int command_version(struct user* user, const char* message)
 {
     struct adc_message* command;
@@ -176,6 +195,8 @@ int command_dipatcher(struct user* user, const char* message)
     else if (!strncmp(message, "!version", 8)) command_version(user, message);
     else if (!strncmp(message, "!uptime",  7)) command_uptime(user, message);
     else if (!strncmp(message, "+myip",    5)) command_myip(user, message);
+    else if (!strncmp(message, "!reload",  7)) command_reload(user, message);
+    else if (!strncmp(message, "!shutdown",9)) command_shutdown(user, message);
     else
 	return 1;
     return 0;
