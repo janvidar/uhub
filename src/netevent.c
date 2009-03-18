@@ -291,7 +291,10 @@ void net_on_accept(int server_fd, short ev, void *arg)
 		
 		event_set(user->ev_read,  fd, EV_READ | EV_PERSIST, net_on_read,  user);
 		event_set(user->ev_write, fd, EV_WRITE,             net_on_write, user);
+		event_base_set(hub->evbase, user->ev_read);
+		event_base_set(hub->evbase, user->ev_write);
 		event_add(user->ev_read,  &timeout);
+		
 	}
 }
 

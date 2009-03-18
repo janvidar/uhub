@@ -35,9 +35,8 @@ int event_queue_initialize(struct event_queue** queue, event_queue_callback call
 	
 	(*queue)->q1 = list_create();
 	(*queue)->q2 = list_create();
-	(*queue)->event = (struct event*) hub_malloc_zero(sizeof(struct event));
 	
-	if (!(*queue)->q1 || !(*queue)->q2 || !(*queue)->event)
+	if (!(*queue)->q1 || !(*queue)->q2)
 	{
 		list_destroy((*queue)->q1);
 		list_destroy((*queue)->q2);
@@ -47,7 +46,6 @@ int event_queue_initialize(struct event_queue** queue, event_queue_callback call
 	(*queue)->callback = callback;
 	(*queue)->callback_data = ptr;
 	
-	evtimer_set((*queue)->event, libevent_queue_process, *queue);
 	return 0;
 }
 
@@ -57,12 +55,6 @@ void event_queue_shutdown(struct event_queue* queue)
 	/* Should be empty at this point! */
 	list_destroy(queue->q1);
 	list_destroy(queue->q2);
-	
-	if (queue->event)
-	{
-		evtimer_del(queue->event);
-		hub_free(queue->event);
-	}
 	hub_free(queue);
 }
 
@@ -135,12 +127,6 @@ void event_queue_post(struct event_queue* queue, struct event_data* message)
 #endif
 		
 		list_append(q, data);
-		
-	
-		if (!queue->locked && queue->event)
-		{
-			libevent_queue_schedule(queue);
-		}
 	}
 	else
 	{
@@ -154,19 +140,5 @@ size_t event_queue_size(struct event_queue* queue)
 	return list_size(queue->q1) + list_size(queue->q2);
 }
 
-void libevent_queue_schedule(struct event_queue* queue)
-{
-	struct timeval zero = { 0, };
-	evtimer_add(queue->event, &zero);
-}
-
-void libevent_queue_process(int fd, short events, void* arg)
-{
-	struct event_queue* queue = (struct event_queue*) arg;
-	if (event_queue_process(queue))
-	{
-		libevent_queue_schedule(queue);
-	}
-}
 
 

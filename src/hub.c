@@ -479,7 +479,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		net_address_to_string(AF_INET6, &((struct sockaddr_in6*) &addr)->sin6_addr, address_buf, INET6_ADDRSTRLEN);
 	}
 
-	hub->evbase = event_init();
+	hub->evbase = event_base_new();
 	if (!hub->evbase)
 	{
 		hub_log(log_error, "Unable to initialize libevent.");
@@ -614,6 +614,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	}
 	
 	event_set(&hub->ev_accept, hub->fd_tcp, EV_READ | EV_PERSIST, net_on_accept, hub);
+	event_base_set(hub->evbase, &hub->ev_accept);
 	if (event_add(&hub->ev_accept, NULL) == -1)
 	{
 		user_manager_shutdown(hub);
@@ -627,6 +628,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 
 #ifdef ADC_UDP_OPERATION
 	event_set(&hub->ev_datagram, hub->fd_udp, EV_READ | EV_PERSIST, net_on_packet, hub);
+	event_base_set(hub->evbase, &hub->ev_datagram);
 	if (event_add(&hub->ev_datagram, NULL) == -1)
 	{
 		user_manager_shutdown(hub);
@@ -977,7 +979,10 @@ void hub_event_loop(struct hub_info* hub)
 	do
 	{
 		 ret = event_base_loop(hub->evbase, EVLOOP_ONCE);
-		
+		 if (ret != 0)
+			break;
+		 
+		 event_queue_process(hub->queue);
 	}
-	while (ret == hub_status_running);
+	while (hub->status == hub_status_running);
 }
