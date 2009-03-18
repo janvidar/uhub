@@ -23,7 +23,6 @@ static int is_ipv6_supported = -1; /* -1 = CHECK, 0 = NO, 1 = YES */
 static int net_initialized = 0;
 static struct net_statistics stats;
 static struct net_statistics stats_total;
-static struct event_base* evbase;
 
 #if defined(IPV6_BINDV6ONLY)
 #define SOCK_DUAL_STACK_OPT IPV6_BINDV6ONLY
@@ -53,16 +52,6 @@ int net_initialize()
 		/* FIXME: Initialize OpenSSL here. */
 #endif /*  SSL_SUPPORT */
 
-#ifdef OLD_LIBEVENT
-		event_init();
-#else
-		evbase = event_init();
-		if (!evbase)
-		{
-			hub_log(log_error, "Unable to initialize libevent.");
-			return -1;
-		}
-#endif
 		net_initialized = 1;
 		return 0;
 	}
@@ -80,11 +69,6 @@ int net_shutdown()
 		/* FIXME: Shutdown OpenSSL here. */
 #endif
 
-#ifndef OLD_LIBEVENT
-		event_base_free(evbase);
-#endif
-		evbase = 0;
-		
 #ifdef WINSOCK
 		WSACleanup();
 #endif
