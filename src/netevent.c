@@ -242,11 +242,10 @@ void net_on_accept(int server_fd, short ev, void *arg)
 {
 	struct hub_info* hub = (struct hub_info*) arg;
 	struct user* user = 0;
-	int accept_more = 1;
 	const char* addr;
 	struct timeval timeout = { TIMEOUT_CONNECTED, 0 };
 	
-	while (accept_more)
+	for (;;)
 	{
 		int fd = net_accept(server_fd);
 		if (fd == -1)
@@ -294,7 +293,6 @@ void net_on_accept(int server_fd, short ev, void *arg)
 		event_base_set(hub->evbase, user->ev_read);
 		event_base_set(hub->evbase, user->ev_write);
 		event_add(user->ev_read,  &timeout);
-		
 	}
 }
 
