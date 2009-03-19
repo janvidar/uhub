@@ -32,7 +32,7 @@ BIN_EXT       ?= .exe
 else
 DESTDIR       ?= /
 UHUB_CONF_DIR ?= $(DESTDIR)/etc/uhub
-UHUB_PREFIX   ?= $(DESTDIR)/usr/
+UHUB_PREFIX   ?= $(DESTDIR)/usr/local
 CFLAGS        += -I/usr/local/include
 LDFLAGS       += -L/usr/local/lib
 BIN_EXT       ?=
