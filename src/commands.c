@@ -89,17 +89,17 @@ static int command_uptime(struct user* user, const char* message)
 
 	if (d)
 	{
-	strcat(tmp, uhub_itoa((int) d));
-	strcat(tmp, " day");
-	if (d != 1) strcat(tmp, "s");
-	strcat(tmp, ", ");
+		strcat(tmp, uhub_itoa((int) d));
+		strcat(tmp, " day");
+		if (d != 1) strcat(tmp, "s");
+		strcat(tmp, ", ");
 	}
 
 	if (h < 10) strcat(tmp, "0");
-	strcat(tmp, uhub_itoa((int) h));
+		strcat(tmp, uhub_itoa((int) h));
 	strcat(tmp, ":");
 	if (m < 10) strcat(tmp, "0");
-	strcat(tmp, uhub_itoa((int) m));
+		strcat(tmp, uhub_itoa((int) m));
 
 	send_message(user, tmp);
 	return 0;
