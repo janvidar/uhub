@@ -61,7 +61,7 @@ static int command_help(struct user* user, const char* message)
 		"*** Available commands:\n"
 		"!help         - Show this help message\n"
 		"!stats        - Show hub stats (super)\n"
-		"!version      - Show this help message\n"
+		"!version      - Show hub version info\n"
 		"!uptime       - Display hub uptime\n"
 		"!kick <user>  - Kick user (operator)\n"
 		"!reload       - Reload configuration (admin)\n"
