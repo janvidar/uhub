@@ -37,20 +37,17 @@ void hub_handle_signal(int fd, short events, void* arg)
 {
 	struct hub_info* hub = (struct hub_info*) arg;
 	int signal = fd;
-	struct timeval now = {0, 0};
 
 	switch (signal)
 	{
 		case SIGINT:
 			hub_log(log_info, "Interrupted. Shutting down...");
 			hub->status = hub_status_shutdown;
-			event_loopexit(&now);
 			break;
 
 		case SIGTERM:
 			hub_log(log_info, "Terminated. Shutting down...");
 			hub->status = hub_status_shutdown;
-			event_loopexit(&now);
 			break;
 
 		case SIGPIPE:
@@ -60,7 +57,6 @@ void hub_handle_signal(int fd, short events, void* arg)
 		case SIGHUP:
 			hub_log(log_info, "Caught hangup signal. Reloading configuration files...");
 			hub->status = hub_status_restart;
-			event_loopexit(&now);
 			break;
 
 		case SIGUSR1:
@@ -77,7 +73,6 @@ void hub_handle_signal(int fd, short events, void* arg)
 		default:
 			hub_log(log_trace, "hub_handle_signal(): caught unknown signal: %d", signal);
 			hub->status = hub_status_shutdown;
-			event_loopexit(&now);
 			break;
 	}
 }
