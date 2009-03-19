@@ -645,6 +645,7 @@ void update_user_info(struct user* u, struct adc_message* cmd)
 		argument = adc_msg_get_argument(cmd, n++);
 	}
 	user_set_info(u, cmd_new);
+	adc_msg_free(cmd_new);
 }
 
 
@@ -766,7 +767,7 @@ int hub_handle_info_login(struct user* user, struct adc_message* cmd)
  */
 int hub_handle_info(struct user* user, const struct adc_message* cmd_unmodified)
 {
-	struct adc_message* cmd = adc_msg_copy(cmd_unmodified); /* FIXME: Have a small memory leak here! */
+	struct adc_message* cmd = adc_msg_copy(cmd_unmodified);
 	if (!cmd) return -1; /* OOM */
 
 	cmd->priority = 1;

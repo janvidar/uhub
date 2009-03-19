@@ -479,7 +479,11 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		net_address_to_string(AF_INET6, &((struct sockaddr_in6*) &addr)->sin6_addr, address_buf, INET6_ADDRSTRLEN);
 	}
 
+#ifdef LIBEVENT_1_4
 	hub->evbase = event_base_new();
+#else
+	hub->evbase = event_init();
+#endif
 	if (!hub->evbase)
 	{
 		hub_log(log_error, "Unable to initialize libevent.");
