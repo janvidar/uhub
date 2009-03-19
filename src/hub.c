@@ -479,11 +479,20 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		net_address_to_string(AF_INET6, &((struct sockaddr_in6*) &addr)->sin6_addr, address_buf, INET6_ADDRSTRLEN);
 	}
 
+	hub->evbase = event_base_new();
+	if (!hub->evbase)
+	{
+		hub_log(log_error, "Unable to initialize libevent.");
+		hub_free(hub);
+		return 0;
+	}
+
 	hub_log(log_info, "Starting server, listening on %s:%d...", address_buf, config->server_port);
 
 	server_tcp = net_socket_create(af, SOCK_STREAM, IPPROTO_TCP);
 	if (server_tcp == -1)
 	{
+		event_base_free(hub->evbase);
 		hub_free(hub);
 		return 0;
 	}
@@ -492,6 +501,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	server_udp = net_socket_create(af, SOCK_DGRAM,  IPPROTO_UDP);
 	if (server_udp == -1)
 	{
+		event_base_free(hub->evbase);
 		hub_free(hub);
 		return 0;
 	}
@@ -500,6 +510,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	ret = net_set_reuseaddress(server_tcp, 1);
 	if (ret == -1)
 	{
+		event_base_free(hub->evbase);
 		hub_free(hub);
 		net_close(server_tcp);
 #ifdef ADC_UDP_OPERATION
@@ -512,6 +523,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	ret = net_set_reuseaddress(server_udp, 1);
 	if (ret == -1)
 	{
+		event_base_free(hub->evbase);
 		hub_free(hub);
 		net_close(server_tcp);
 		net_close(server_udp);
@@ -523,6 +535,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	ret = net_set_nonblocking(server_tcp, 1);
 	if (ret == -1)
 	{
+		event_base_free(hub->evbase);
 		hub_free(hub);
 		net_close(server_tcp);
 #ifdef ADC_UDP_OPERATION
@@ -535,6 +548,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	ret = net_set_nonblocking(server_udp, 1);
 	if (ret == -1)
 	{
+		event_base_free(hub->evbase);
 		hub_free(hub);
 		net_close(server_tcp);
 		net_close(server_udp);
@@ -547,6 +561,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	if (ret == -1)
 	{
 		hub_log(log_fatal, "hub_start_service(): Unable to bind to TCP local address. errno=%d, str=%s", net_error(), net_error_string(net_error()));
+		event_base_free(hub->evbase);
 		hub_free(hub);
 		net_close(server_tcp);
 #ifdef ADC_UDP_OPERATION
@@ -560,6 +575,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	if (ret == -1)
 	{
 		hub_log(log_fatal, "hub_start_service(): Unable to bind to UDP local address. errno=%d, str=%s", net_error(), net_error_string(net_error()));
+		event_base_free(hub->evbase);
 		hub_free(hub);
 		net_close(server_tcp);
 		net_close(server_udp);
@@ -571,6 +587,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	if (ret == -1)
 	{
 		hub_log(log_fatal, "hub_start_service(): Unable to listen to socket");
+		event_base_free(hub->evbase);
 		hub_free(hub);
 		net_close(server_tcp);
 #ifdef ADC_UDP_OPERATION
@@ -597,6 +614,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	}
 	
 	event_set(&hub->ev_accept, hub->fd_tcp, EV_READ | EV_PERSIST, net_on_accept, hub);
+	event_base_set(hub->evbase, &hub->ev_accept);
 	if (event_add(&hub->ev_accept, NULL) == -1)
 	{
 		user_manager_shutdown(hub);
@@ -610,6 +628,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 
 #ifdef ADC_UDP_OPERATION
 	event_set(&hub->ev_datagram, hub->fd_udp, EV_READ | EV_PERSIST, net_on_packet, hub);
+	event_base_set(hub->evbase, &hub->ev_datagram);
 	if (event_add(&hub->ev_datagram, NULL) == -1)
 	{
 		user_manager_shutdown(hub);
@@ -650,6 +669,7 @@ void hub_shutdown_service(struct hub_info* hub)
 	net_close(hub->fd_tcp);
 	user_manager_shutdown(hub);
 	hub->status = hub_status_stopped;
+	event_base_free(hub->evbase);
 	hub_free(hub);
 	hub = 0;
 }
@@ -950,3 +970,19 @@ size_t hub_get_min_hubs_op(struct hub_info* hub)
 }
 
 
+void hub_event_loop(struct hub_info* hub)
+{
+#if 0
+	event_dispatch();
+#endif
+	int ret;
+	do
+	{
+		 ret = event_base_loop(hub->evbase, EVLOOP_ONCE);
+		 if (ret != 0)
+			break;
+		 
+		 event_queue_process(hub->queue);
+	}
+	while (hub->status == hub_status_running);
+}

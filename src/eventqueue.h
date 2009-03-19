@@ -36,7 +36,6 @@ struct event_queue
 	struct linked_list* q2; /* secondary, when primary is locked */
 	event_queue_callback callback;
 	void* callback_data;
-	struct event* event;     /* libevent handle */
 };
 
 extern int event_queue_initialize(struct event_queue** queue, event_queue_callback callback, void* ptr);
@@ -44,12 +43,6 @@ extern int event_queue_process(struct event_queue* queue);
 extern void event_queue_shutdown(struct event_queue* queue);
 extern void event_queue_post(struct event_queue* queue, struct event_data* message);
 extern size_t event_queue_size(struct event_queue* queue);
-
-/**
- * Only used internally with libevent.
- */
-extern void libevent_queue_process(int fd, short events, void* arg);
-extern void libevent_queue_schedule(struct event_queue* queue);
 
 #endif /* HAVE_UHUB_EVENT_QUEUE_H */
 

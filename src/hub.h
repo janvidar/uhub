@@ -92,6 +92,7 @@ struct hub_info
 #endif
 	struct hub_stats stats;
 	struct event_queue* queue;
+	struct event_base* evbase;
 	struct hub_config* config;
 	struct user_manager* users;
 	struct acl_handle* acl;
@@ -334,6 +335,10 @@ extern size_t hub_get_max_hubs_total(struct hub_info* hub);
  */
 extern void hub_schedule_runslice(struct hub_info* hub);
 
+/**
+ * Run event loop.
+ */
+extern void hub_event_loop(struct hub_info* hub);
 
 
 #endif /* HAVE_UHUB_HUB_H */

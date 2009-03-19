@@ -74,6 +74,7 @@ static void timer_statistics(int fd, short ev, void *arg)
 	struct timeval timeout = { TIMEOUT_STATS, 0 };
 	user_manager_update_stats(hub);
 	evtimer_set(&hub->ev_timer, timer_statistics, hub);
+	event_base_set(hub->evbase, &hub->ev_timer);
 	evtimer_add(&hub->ev_timer, &timeout);
 }
 
@@ -97,6 +98,7 @@ int user_manager_init(struct hub_info* hub)
 	hub->users = users;
 	
 	evtimer_set(&hub->ev_timer, timer_statistics, hub);
+	event_base_set(hub->evbase, &hub->ev_timer);
 	evtimer_add(&hub->ev_timer, &timeout);
 	return 0;
 }

@@ -936,6 +936,7 @@ int main(int argc, char** argv)
 	parse_command_line(argc, argv);
 	
 	net_initialize();
+	event_init();
 	
 	memset(&saddr, 0, sizeof(saddr));
 	saddr.sin_family = AF_INET;
