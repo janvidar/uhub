@@ -779,6 +779,16 @@ int hub_handle_info(struct user* user, const struct adc_message* cmd_unmodified)
 	 */
 	if (user_is_connecting(user))
 	{
+		/*
+		 * Don't allow the user to send multiple INF messages in this stage!
+		 * Since that can have serious side-effects.
+		 */
+		if (user->info)
+		{
+			adc_msg_free(cmd);
+			return 0;
+		}
+	
 		int ret = hub_handle_info_login(user, cmd);
 		if (ret < 0)
 		{
