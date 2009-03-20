@@ -51,11 +51,9 @@ void hub_handle_signal(int fd, short events, void* arg)
 			break;
 
 		case SIGPIPE:
-			hub_log(log_trace, "hub_handle_signal(): caught SIGPIPE (ignoring)");
 			break;
 
 		case SIGHUP:
-			hub_log(log_info, "Caught hangup signal. Reloading configuration files...");
 			hub->status = hub_status_restart;
 			break;
 
@@ -126,6 +124,11 @@ int main_loop()
 
 	do
 	{
+		if (hub)
+		{
+			hub_log(log_info, "Reloading configuration files...");
+		}
+	
 		if (read_config(arg_config, &configuration, !arg_have_config) == -1)
 			return -1;
 
