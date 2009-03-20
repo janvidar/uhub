@@ -35,7 +35,7 @@ enum user_state
 };
 
 
-enum user_flags   
+enum user_flags
 {
 	feature_base    = 0x00000001, /** BASE: Basic configuration (required by all clients) */
 	feature_auto    = 0x00000002, /** AUT0: Automatic nat detection traversal */
