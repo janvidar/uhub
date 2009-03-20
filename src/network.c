@@ -465,11 +465,9 @@ const char* net_get_peer_address(int fd)
 	name4 = (struct sockaddr_in*)  &storage;
 	name  = (struct sockaddr*)     &storage;
 	
-	
-	int af = net_is_ipv6_supported() ? AF_INET6 : AF_INET;
-
 	if (getpeername(fd, (struct sockaddr*) name, &namelen) != -1)
 	{
+		int af = name4->sin_family;
 		if (af == AF_INET6)
 		{
 			net_address_to_string(af, (void*) &name6->sin6_addr, address, INET6_ADDRSTRLEN);
