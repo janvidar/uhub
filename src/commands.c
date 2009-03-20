@@ -42,26 +42,28 @@ static void send_message(struct user* user, const char* message)
 	hub_free(buffer);
 }
 
-static int command_access_denied(struct user* user)
+static int command_access_denied(struct user* user, const char* command)
 {
-    send_message(user, "*** Access denied.");
-    return 0;
+	char temp[64];
+	snprintf(temp, 64, "*** Access denied: \"%s\"", command);
+	send_message(user, temp);
+	return 0;
 }
 
 
 static int command_stats(struct user* user, const char* message)
 {
-    char temp[128];
-    snprintf(temp, 128, "*** Stats: %zu users, peak: %zu. Network (up/down): %d/%d KB/s, peak: %d/%d KB/s",
+	char temp[128];
+	snprintf(temp, 128, "*** Stats: %zu users, peak: %zu. Network (up/down): %d/%d KB/s, peak: %d/%d KB/s",
 	user->hub->users->count,
 	user->hub->users->count_peak,
 	(int) user->hub->stats.net_tx / 1024,
 	(int) user->hub->stats.net_rx / 1024,
 	(int) user->hub->stats.net_tx_peak / 1024,
 	(int) user->hub->stats.net_rx_peak / 1024);
-
-    send_message(user, temp);
-    return 0;
+	
+	send_message(user, temp);
+	return 0;
 }
 
 
@@ -152,11 +154,7 @@ static int command_version(struct user* user, const char* message)
 static int command_myip(struct user* user, const char* message)
 {
     char tmp[128];
-
-    tmp[0] = 0;
-    strcat(tmp, "*** Your IP: ");
-    strcat(tmp, ip_convert_to_string(&user->ipaddr));
-
+    snprintf(tmp, 128, "*** Your IP: %s", ip_convert_to_string(&user->ipaddr));
     send_message(user, tmp);
     return 0;
 }
@@ -174,7 +172,7 @@ int command_dipatcher(struct user* user, const char* message)
 			}
 			else
 			{
-				return command_access_denied(user);
+				return command_access_denied(user, &command_handlers[n].prefix[1]);
 			}
 		}
 	}
