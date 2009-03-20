@@ -19,6 +19,19 @@
 
 #include "uhub.h"
 
+typedef int (*command_handler)(struct user* user, const char* message);
+
+struct commands_handler
+{
+	const char* prefix;
+	size_t length;
+	enum user_credentials cred;
+	command_handler handler;
+	const char* description;
+};
+
+static struct commands_handler command_handlers[];
+
 static void send_message(struct user* user, const char* message)
 {
 	char* buffer = adc_msg_escape(message);
@@ -57,16 +70,23 @@ static int command_stats(struct user* user, const char* message)
 
 static int command_help(struct user* user, const char* message)
 {
-       send_message(user, "\n"
-		"*** Available commands:\n"
-		"!help         - Show this help message\n"
-		"!stats        - Show hub stats (super)\n"
-		"!version      - Show hub version info\n"
-		"!uptime       - Display hub uptime\n"
-		"!kick <user>  - Kick user (operator)\n"
-		"!reload       - Reload configuration (admin)\n"
-		"!shutdown     - Shutdown hub (admin)\n"
-	);
+#define MAX_HELP_MSG 1024
+	size_t n;
+	char msg[MAX_HELP_MSG];
+	msg[0] = 0;
+	strcat(msg, "\n*** Available commands:\n");
+	
+	for (n = 0; command_handlers[n].prefix; n++)
+	{
+		if (command_handlers[n].cred <= user->credentials)
+		{
+			strcat(msg, command_handlers[n].prefix);
+			strcat(msg, " - ");
+			strcat(msg, command_handlers[n].description);
+			strcat(msg, "\n");
+		}
+	}
+	send_message(user, msg);
     return 0;
 }
 
@@ -153,19 +173,35 @@ static int command_myip(struct user* user, const char* message)
     return 0;
 }
 
-
 int command_dipatcher(struct user* user, const char* message)
 {
-    if      (!strncmp(message, "!stats",   6)) command_stats(user, message);
-    else if (!strncmp(message, "!help",    5)) command_help(user, message);
-    else if (!strncmp(message, "!kick",    5)) command_kick(user, message);
-    else if (!strncmp(message, "!version", 8)) command_version(user, message);
-    else if (!strncmp(message, "!uptime",  7)) command_uptime(user, message);
-    else if (!strncmp(message, "+myip",    5)) command_myip(user, message);
-    else if (!strncmp(message, "!reload",  7)) command_reload(user, message);
-    else if (!strncmp(message, "!shutdown",9)) command_shutdown(user, message);
-    else
+	size_t n = 0;
+	for (n = 0; command_handlers[n].prefix; n++)
+	{
+		if (!strncmp(message, command_handlers[n].prefix, command_handlers[n].length))
+		{
+			if (command_handlers[n].cred <= user->credentials)
+			{
+				return command_handlers[n].handler(user, message);
+			}
+			else
+			{
+				return command_access_denied(user);
+			}
+		}
+	}
 	return 1;
-    return 0;
 }
+
+static struct commands_handler command_handlers[] = {
+	{ "!help",       5, cred_guest,     command_help,     "Show this help message." },
+	{ "!stats",      6, cred_super,     command_stats,    "Show hub statistics." },
+	{ "!version",    8, cred_guest,     command_version,  "Show hub version info."  },
+	{ "!uptime",     7, cred_guest,     command_uptime,   "Display hub uptime info." },
+	{ "!kick",       5, cred_operator,  command_kick,     "Kick a user" },
+	{ "!reload",     7, cred_admin,     command_reload,   "Reload configuration files." },
+	{ "!shutdown",   9, cred_admin,     command_shutdown, "Shutdown hub." },
+	{ "+myip",       5, cred_guest,     command_myip,     "Show your own IP." },
+	{ 0,             0, cred_none,      command_help,     "{ Last dummy option }" }
+};
 
