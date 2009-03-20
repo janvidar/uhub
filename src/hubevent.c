@@ -19,12 +19,36 @@
 
 #include "uhub.h"
 
+static void log_user_login(struct user* u)
+{
+	const char* credentials_string[] = { "", "link", "guest", "user", "operator", "super", "admin" };
+	const char* addr = ip_convert_to_string(&u->ipaddr);
+	hub_log(log_user, "LoginOK     %s/%s %s \"%s\" (%s) \"%s\"", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, credentials_string[u->credentials], u->user_agent);
+}
+
+static void log_user_login_error(struct user* u, enum status_message msg)
+{
+	const char* addr = ip_convert_to_string(&u->ipaddr);
+	const char* message = hub_get_status_message(u->hub, msg);
+	hub_log(log_user, "LoginError  %s/%s %s \"%s\" (%s) \"%s\"", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, message, u->user_agent);
+}
+
+static void log_user_logout(struct user* u, const char* message)
+{
+	const char* addr = ip_convert_to_string(&u->ipaddr);
+	hub_log(log_user, "Logout      %s/%s %s \"%s\" (%s)", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, message);
+}
+
+static void log_user_nick_change(struct user* u, const char* nick)
+{
+	const char* addr = ip_convert_to_string(&u->ipaddr);
+	hub_log(log_user, "NickChange  %s/%s %s \"%s\" -> \"%s\"", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, nick);
+}
+
+
 /* Send MOTD, do logging etc */
 void on_login_success(struct user* u)
 {
-	/* Logging - FIXME: Move this to a plugin */
-	const char* addr = ip_convert_to_string(&u->ipaddr);
-	const char* credentials_string[] = { "!none!", "link", "guest", "user", "operator", "super", "admin" };
 	struct timeval timeout = { TIMEOUT_IDLE, 0 };
 	
 	/* Send user list of all existing users */
@@ -36,7 +60,7 @@ void on_login_success(struct user* u)
 	user_manager_add(u);
 
 	/* Print log message */
-	hub_log(log_user, "Login OK    %s/%s \"%s\" [%s] (%s) \"%s\"", sid_to_string(u->id.sid), u->id.cid, u->id.nick, addr, credentials_string[u->credentials], u->user_agent);
+	log_user_login(u);
 
 	/* Announce new user to all connected users */
 	if (user_is_logged_in(u))
@@ -51,36 +75,29 @@ void on_login_success(struct user* u)
 		event_add(u->ev_read, &timeout);
 }
 
-
 void on_login_failure(struct user* u, enum status_message msg)
 {
-	const char* addr = ip_convert_to_string(&u->ipaddr);
-	const char* message = hub_get_status_message(u->hub, msg);
-	hub_log(log_user, "Login FAIL  %s/%s \"%s\" [%s] (%s) \"%s\"", sid_to_string(u->id.sid), u->id.cid, u->id.nick, addr, message, u->user_agent);
-	
+	log_user_login_error(u, msg);
 	hub_send_status(u, msg, status_level_fatal);
 	user_disconnect(u, quit_logon_error);
 }
-
 
 void on_nick_change(struct user* u, const char* nick)
 {
 	if (user_is_logged_in(u))
 	{
-		hub_log(log_user, "Nick change %s/%s \"%s\" -> \"%s\"", sid_to_string(u->id.sid), u->id.cid, u->id.nick, nick);
+		log_user_nick_change(u, nick);
 	}
 }
-
 
 void on_logout_user(struct user* user)
 {
 	const char* reason = "";
-	const char* addr;
 	
 	/* These are used for logging purposes */
 	switch (user->quit_reason)
 	{
-		case quit_disconnected:     reason = "disconnected";    break;
+		case quit_disconnected:     reason = "disconnected";   break;
 		case quit_kicked:           reason = "kicked";         break;
 		case quit_banned:           reason = "banned";         break;
 		case quit_timeout:          reason = "timeout";        break;
@@ -90,6 +107,7 @@ void on_logout_user(struct user* user)
 		case quit_protocol_error:   reason = "protocol error"; break;
 		case quit_logon_error:      reason = "login error";    break;
 		case quit_hub_disabled:     reason = "hub disabled";   break;
+		case quit_ghost_timeout:    reason = "ghost";          break;
 		default:
 			if (user->hub->status == hub_status_shutdown)
 				reason = "hub shutdown";
@@ -98,10 +116,7 @@ void on_logout_user(struct user* user)
 			break;
 	}
 	
-	addr = ip_convert_to_string(&user->ipaddr);
-	hub_log(log_user, "Logout      %s/%s \"%s\" [%s] (%s)", sid_to_string(user->id.sid), user->id.cid, user->id.nick, addr, reason);
-
-	
+	log_user_logout(user, reason);
 	user->quit_reason = 0;
 }
 

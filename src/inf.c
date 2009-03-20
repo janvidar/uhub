@@ -332,7 +332,7 @@ static int check_logged_in(struct user* user, struct adc_message* cmd)
 		if (lookup1 == lookup2)
 		{
 			hub_log(log_debug, "check_logged_in: exact same user is logged in: %s", user->id.nick);
-			user_disconnect(lookup1, quit_timeout);
+			user_disconnect(lookup1, quit_ghost_timeout);
 			return 0;
 		}
 		else

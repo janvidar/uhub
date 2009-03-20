@@ -177,8 +177,8 @@ void hub_log(int log_verbosity, const char *format, ...)
 	if (log_verbosity < verbosity)
 	{
 		t = time(NULL);
-		tmp = gmtime(&t);
-		strftime(timestamp, 32, "%a, %d %b %Y %H:%M:%S +0000", tmp);
+		tmp = localtime(&t);
+		strftime(timestamp, 32, "%Y-%m-%d %H:%M:%S %z", tmp);
 		va_start(args, format);
 		vsnprintf(logmsg, 1024, format, args);
 		va_end(args);
