@@ -51,9 +51,6 @@ static int command_access_denied(struct user* user)
 
 static int command_stats(struct user* user, const char* message)
 {
-    if (user->credentials < cred_super)
-	return command_access_denied(user);
-	
     char temp[128];
     snprintf(temp, 128, "*** Stats: %zu users, peak: %zu. Network (up/down): %d/%d KB/s, peak: %d/%d KB/s",
 	user->hub->users->count,
@@ -127,18 +124,12 @@ static int command_uptime(struct user* user, const char* message)
 
 static int command_kick(struct user* user, const char* message)
 {
-	if (user->credentials < cred_operator)
-		return command_access_denied(user);
-
 	send_message(user, "*** Kick not implemented!");
 	return 0;
 }
 
 static int command_reload(struct user* user, const char* message)
 {
-	if (user->credentials < cred_admin)
-		return command_access_denied(user);
-
 	send_message(user, "*** Reloading configuration");
 	user->hub->status = hub_status_restart;
 	return 0;
@@ -146,9 +137,6 @@ static int command_reload(struct user* user, const char* message)
 
 static int command_shutdown(struct user* user, const char* message)
 {
-	if (user->credentials < cred_admin)
-		return command_access_denied(user);
-
 	send_message(user, "*** Hub shuting down...");
 	user->hub->status = hub_status_shutdown;
 	return 0;
