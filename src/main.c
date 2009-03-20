@@ -183,6 +183,9 @@ int check_configuration(int dump)
 		puts("");
 	}
 	
+	if (dump)
+		return 0;
+	
 	if (ret == -1)
 	{
 		fprintf(stderr, "ERROR\n");
