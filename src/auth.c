@@ -23,7 +23,7 @@
 #define ACL_ADD_BOOL(S, L)    do { ret = check_cmd_bool(S,    L, line, line_count); if (ret != 0) return ret; } while(0)
 #define ACL_ADD_ADDR(S, L)    do { ret = check_cmd_addr(S,    L, line, line_count); if (ret != 0) return ret; } while(0)
 
-static const char* get_user_credential_string(enum user_credentials cred)
+const char* get_user_credential_string(enum user_credentials cred)
 {
 	switch (cred)
 	{

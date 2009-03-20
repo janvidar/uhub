@@ -21,9 +21,9 @@
 
 static void log_user_login(struct user* u)
 {
-	const char* credentials_string[] = { "", "link", "guest", "user", "operator", "super", "admin" };
+	const char* cred = get_user_credential_string(u->credentials);
 	const char* addr = ip_convert_to_string(&u->ipaddr);
-	hub_log(log_user, "LoginOK     %s/%s %s \"%s\" (%s) \"%s\"", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, credentials_string[u->credentials], u->user_agent);
+	hub_log(log_user, "LoginOK     %s/%s %s \"%s\" (%s) \"%s\"", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, cred, u->user_agent);
 }
 
 static void log_user_login_error(struct user* u, enum status_message msg)

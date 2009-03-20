@@ -48,6 +48,8 @@ enum user_credentials
  	cred_link,                 /**<<< "User is a link (not used currently)" */
 };
 
+const char* get_user_credential_string(enum user_credentials cred);
+
 struct user_access_info
 {
 	char* username;          /* name of user, cid or IP range */
