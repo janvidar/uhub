@@ -73,7 +73,7 @@ enum user_quit_reason
 
 struct user_info
 {
-    	sid_t sid;                    /** session ID */
+	sid_t sid;                    /** session ID */
 	char cid[MAX_CID_LEN+1];      /** global client ID */
 	char nick[MAX_NICK_LEN+1];    /** User's nick name */
 };
