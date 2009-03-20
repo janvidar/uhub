@@ -2,7 +2,6 @@
 
 static struct event_queue* eq;
 static int eq_val;
-struct event* libevent_handle; 
 
 static void eq_callback(void* callback_data, struct event_data* event_data)
 {
@@ -17,8 +16,6 @@ EXO_TEST(eventqueue_init_1, {
 
 EXO_TEST(eventqueue_init_2, {
 	/* hack */
-	libevent_handle = eq->event;
-	eq->event = 0;
 	return eq->callback_data == &eq_val && eq->callback == eq_callback && eq->q1 && eq->q2 && !eq->locked;
 });
 
@@ -81,7 +78,6 @@ EXO_TEST(eventqueue_size_4, {
 });
 
 EXO_TEST(eventqueue_shutdown_1, {
-	eq->event = libevent_handle;
 	event_queue_shutdown(eq);
 	return 1;
 });
