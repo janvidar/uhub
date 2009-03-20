@@ -57,17 +57,6 @@ void hub_handle_signal(int fd, short events, void* arg)
 			hub->status = hub_status_restart;
 			break;
 
-		case SIGUSR1:
-			hub_log(log_trace, "hub_handle_signal(): caught SIGUSR1 -- FIXME");
-			break;
-
-		case SIGUSR2:
-			hub_log(log_trace, "hub_handle_signal(): caught SIGUSR2");
-			{
-				user_manager_print_stats(hub);
-			}
-			break;
-
 		default:
 			hub_log(log_trace, "hub_handle_signal(): caught unknown signal: %d", signal);
 			hub->status = hub_status_shutdown;
@@ -82,8 +71,6 @@ static int signals[] =
 	SIGTERM, /* Terminate the application */
 	SIGPIPE, /* prevent sigpipe from kills the application */
 	SIGHUP,  /* reload configuration */
-	SIGUSR1, /* dump statistics */
-	SIGUSR2, /* (unused) */
 	0
 };
 
