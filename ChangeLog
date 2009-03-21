@@ -1,4 +1,13 @@
 0.2.7:
+- Fixed a nasty crash (bug #11), Thanks Toast for finding it.
+- Fix bug #9 - net_get_peer_address() failure on CentOS/Xen configurations.
+- Write a log message if an operator reloads the config file.
+- Don't print OK or ERROR when using '-s' or '-S' show the configuration.
+- Cleanup credential string handling
+- Made sure "!help" only display accessible commands.
+- Cleanup in-hub command parsing
+- Fix a possible crash if multiple INF messages are sent during login.
+- Rewrote the mainloop to not use a timer.
 
 
 0.2.6:
