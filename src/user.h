@@ -47,11 +47,12 @@ enum user_flags
 	feature_ping    = 0x00000080, /** PING: Hub pinger information extension */
 	feature_link    = 0x00000100, /** LINK: Hub link (not supported) */
 	flag_ignore     = 0x01000000, /** Ignore further reads */
-	flag_choke      = 0x02000000, /** Choked: Cannot send, waiting for write event */ 
-	flag_want_read  = 0x04000000, /** Need to read (SSL) */
-	flag_want_write = 0x08000000, /** Need to write (SSL) */
-	flag_user_list  = 0x10000000, /** Send queue bypass (when receiving the send queue) */
-	flag_nat        = 0x20000000, /** nat override enabled */
+	flag_maxbuf     = 0x02000000, /** Hit max buf read, ignore msg */
+	flag_choke      = 0x04000000, /** Choked: Cannot send, waiting for write event */ 
+	flag_want_read  = 0x08000000, /** Need to read (SSL) */
+	flag_want_write = 0x10000000, /** Need to write (SSL) */
+	flag_user_list  = 0x20000000, /** Send queue bypass (when receiving the send queue) */
+	flag_nat        = 0x40000000, /** nat override enabled */
 };
 
 

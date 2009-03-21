@@ -25,10 +25,9 @@ void net_on_read(int fd, short ev, void *arg)
 	static char buf[MAX_RECV_BUF];
 	struct user* user = (struct user*) arg;
 	char* pos;
-	char* start;
-	ssize_t offset;
+	size_t offset;
+	size_t buflen;
 	ssize_t size;
-	ssize_t buflen;
 	int more = 1;
 	int flag_close = 0;
 	
@@ -55,11 +54,7 @@ void net_on_read(int fd, short ev, void *arg)
 			memcpy(buf, user->recv_buf, user->recv_buf_offset);
 			offset = user->recv_buf_offset;
 		}
-		else
-		{
-			offset = 0;
-		}
-			
+		
 		size = net_recv(fd, &buf[offset], MAX_RECV_BUF - offset, 0);
 		if (size == -1)
 		{
@@ -75,40 +70,63 @@ void net_on_read(int fd, short ev, void *arg)
 		else
 		{
 			buflen = offset + size;
-			start = buf;
-			while ((pos = strchr(start, '\n')))
+			ssize_t handled = 0;
+			
+			while ((pos = memchr(&buf[handled], '\n', (buflen - handled))))
 			{
 				pos[0] = '\0';
-				if (*start && strlen(start) < user->hub->config->max_recv_buffer)
-				{
-					if (hub_handle_message(user, start, &pos[0]-&start[0]) == -1)
-					{
-						flag_close = quit_protocol_error;
-						more = 0;
-						break;
-					}
-				}
-				start = &pos[1];
-			}
-			
-			if (!more) break;
-			
-			if (&buf[offset + size] > &start[0])
-			{
-				if (!user->recv_buf)
-				{
-					user->recv_buf = hub_malloc(user->hub->config->max_recv_buffer);
-				}
+				size_t msglen = &pos[0] - &buf[handled];
 				
-				if (!user->recv_buf)
+				if (user_flag_get(user, flag_maxbuf))
 				{
-					flag_close = quit_memory_error;
-					break;
+					user_flag_unset(user, flag_maxbuf);
 				}
 				else
 				{
-					memcpy(user->recv_buf, start, &buf[offset + size] - &start[0]);
-					user->recv_buf_offset = &buf[offset + size] - &start[0];
+					if (msglen < user->hub->config->max_recv_buffer)
+					{
+						if (hub_handle_message(user, &buf[handled], msglen) == -1)
+						{
+							flag_close = quit_protocol_error;
+							more = 0;
+							break;
+						}
+					}
+				}
+				handled += msglen;
+				handled++;
+			}
+			
+			if (handled == 0 && user_flag_get(user, flag_maxbuf))
+				handled = buflen;
+			
+			if (!more)
+				break;
+			
+			if (handled < buflen)
+			{
+				if ((buflen - handled) > user->hub->config->max_recv_buffer)
+				{
+					user_flag_set(user, flag_maxbuf);
+					hub_free(user->recv_buf);
+					user->recv_buf = 0;
+					user->recv_buf_offset = 0;
+				}
+				else
+				{
+					if (!user->recv_buf)
+						user->recv_buf = hub_malloc(user->hub->config->max_recv_buffer);
+				
+					if (user->recv_buf)
+					{
+						memcpy(user->recv_buf, &buf[handled], buflen - handled);
+						user->recv_buf_offset = buflen - handled;
+					}
+					else
+					{
+						flag_close = quit_memory_error;
+						break;
+					}
 				}
 			}
 			else
