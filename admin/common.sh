@@ -29,10 +29,7 @@ SNAPSHOT=`date '+%Y%m%d'`
 PACKAGE=uhub-${VERSION}
 PACKAGE_SRC=${PACKAGE}-src
 PACKAGE_BIN=${PACKAGE}-${HOST_SYSTEM}-${HOST_MACHINE}
-
-URL_ARCHIVE='build-archive:~/uhub/'
-URL_PUBLISH='domeneshop:~/www/downloads/uhub/'
-URL_SNAPSHOT='domeneshop:~/www/downloads/uhub/snapshots/'
+URL_ARCHIVE='build-archive:~/www/downloads/uhub/'
 
 function export_source_directory
 {
@@ -116,6 +113,24 @@ function export_binaries
 	package_zips ${PACKAGE_BIN} ${PACKAGE}
 
 	rm -Rf ${PACKAGE};
+}
+
+function upload_pkg
+{
+	if [ -f $1 ]; then
+		echo scp $1 ${URL_ARCHIVE}
+	fi
+}
+
+function upload_packages
+{
+	upload_pkg ${PACKAGE_SRC}.tar.gz
+	upload_pkg ${PACKAGE_SRC}.tar.bz2
+	upload_pkg ${PACKAGE_SRC}.zip
+	upload_pkg ChangeLog-${VERSION}
+	upload_pkg ${PACKAGE_BIN}.tar.gz
+	upload_pkg ${PACKAGE_BIN}.tar.bz2
+	upload_pkg ${PACKAGE_BIN}.zip
 }
 
 
