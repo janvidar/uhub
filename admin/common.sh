@@ -6,15 +6,22 @@ else
 	HOST_MACHINE=`uname -m | tr [:upper:] [:lower:] | sed s/i686/i386/ | sed s/x86_64/amd64/ | sed s/ppc64/powerpc/`
 fi
 
+BINSUFFIX=
+
 if [ "${HOST_SYSTEM}" = "mingw32_nt-5.1" ]; then
 	HOST_SYSTEM=win32
-	BINARY=uhub.exe
+	BINSUFFIX=.exe
 	WANTZIP=1
 else
 	WANTZIP=0
-	BINARY=uhub
 fi
 
+MAKE=make
+BINARY=uhub${BINSUFFIX}
+
+if [ "${HOST_SYSTEM}" = "FreeBSD" ]; then
+	MAKE=gmake
+fi
 
 VERSION=`grep define\ VERSION version.h | cut -f 3 -d " " | tr -d [=\"=]`
 SNAPSHOT=`date '+%Y%m%d'`
@@ -51,15 +58,23 @@ function package_zips
 	gzip -c -9 $1.tar > $1.tar.gz
 	bzip2 -c -9 $1.tar > $1.tar.bz2
 	rm -f $1.tar
-	zip -q -9 -r $1.zip $2
+	
+	if [ $WANTZIP -eq 1 ]; then
+		zip -q -9 -r $1.zip $2
+	fi
 }
 
 function export_sources
 {
-	export_source_directory
-	make autotest.c && cp autotest.c ${PACKAGE}/autotest.c
-	rm -Rf ${PACKAGE}/admin
+	if [ ! -d ${PACKAGE} ]; then
+		export_source_directory
+	fi
 
+	cd ${PACKAGE}
+	${MAKE} autotest.c
+
+	cd ..
+	rm -Rf ${PACKAGE}/admin
 	package_zips ${PACKAGE_SRC} ${PACKAGE}
         
 	rm -Rf ${PACKAGE};
@@ -68,24 +83,31 @@ function export_sources
 
 function export_binaries
 {
-	export_source_directory
+	if [ ! -d ${PACKAGE} ]; then
+		export_source_directory
+	fi
+
+	cd ${PACKAGE}
+	${MAKE} RELEASE=YES
+
+	if [ ! -x ${BINARY} ]; then
+		echo "Packaging failed, no binary found..."
+		exit 1
+	fi
+
+	cd ..
+
 	rm -Rf ${PACKAGE}/admin
 	rm -Rf ${PACKAGE}/autotest
 	rm -Rf ${PACKAGE}/src
+	rm -Rf ${PACKAGE}/debian
 	rm -f ${PACKAGE}/autotest.c
 	rm -f ${PACKAGE}/*akefile
 	rm -f ${PACKAGE}/version.h
 	rm -f ${PACKAGE}/doc/Doxyfile
 	rm -f ${PACKAGE}/doc/uhub.dot
+	rm -f ${PACKAGE}/libuhub*
 
-	make
-
-	if [ -x ${BINARY} ]; then
-		cp ${BINARY} ${PACKAGE}
-	else
-		echo "No binary found!"
-		exit 1
-	fi
 
 	package_zips ${PACKAGE_BIN} ${PACKAGE}
 

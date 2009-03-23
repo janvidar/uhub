@@ -114,6 +114,7 @@ int main_loop()
 		if (hub)
 		{
 			hub_log(log_info, "Reloading configuration files...");
+			hub_log(log_debug, "Hub status: %d", (int) hub->status);
 		}
 	
 		if (read_config(arg_config, &configuration, !arg_have_config) == -1)
