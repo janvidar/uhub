@@ -20,7 +20,7 @@ fi
 
 BINARY=uhub${BINSUFFIX}
 
-if [ "${HOST_SYSTEM}" = "FreeBSD" ]; then
+if [ "${HOST_SYSTEM}" = "freebsd" ]; then
 	MAKE=gmake
 fi
 
