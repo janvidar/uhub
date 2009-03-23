@@ -29,7 +29,7 @@ SNAPSHOT=`date '+%Y%m%d'`
 PACKAGE=uhub-${VERSION}
 PACKAGE_SRC=${PACKAGE}-src
 PACKAGE_BIN=${PACKAGE}-${HOST_SYSTEM}-${HOST_MACHINE}
-URL_ARCHIVE='build-archive:~/www/downloads/uhub/'
+ARCHIVE='build-archive:~/www/downloads/uhub/'
 
 function export_source_directory
 {
