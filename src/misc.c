@@ -31,7 +31,7 @@ int is_white_space(char c)
 	return 0;
 }
 
-int is_printable(char c)
+static int is_printable(unsigned char c)
 {
 	if (c >= 32)
 		return 1;

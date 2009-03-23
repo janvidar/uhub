@@ -100,4 +100,12 @@ EXO_TEST(utf8_valid_3, { return is_valid_utf8("0123456789"); });
 EXO_TEST(utf8_valid_4, { return is_valid_utf8( (char[]) { 0x65, 0x00} ); });
 EXO_TEST(utf8_valid_5, { return !is_valid_utf8( (char[]) { 0xD8, 0x00} ); });
 
+EXO_TEST(utf8_valid_6, { return is_valid_utf8( (char[]) { 0x24, 0x00} ); });
+EXO_TEST(utf8_valid_7, { return !is_valid_utf8( (char[]) { 0xC2, 0x24, 0x00} ); });
+EXO_TEST(utf8_valid_8, { return is_valid_utf8( (char[]) { 0xC2, 0xA2, 0x00} ); });
+EXO_TEST(utf8_valid_9, { return is_valid_utf8( (char[]) { 0xE2, 0x82, 0xAC, 0x00} ); });
+EXO_TEST(utf8_valid_10, { return !is_valid_utf8( (char[]) { 0xC2, 0x32, 0x00} ); });
+EXO_TEST(utf8_valid_11, { return !is_valid_utf8( (char[]) { 0xE2, 0x82, 0x32, 0x00} ); });
+EXO_TEST(utf8_valid_12, { return !is_valid_utf8( (char[]) { 0xE2, 0x32, 0x82, 0x00} ); });
+
 
