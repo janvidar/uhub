@@ -118,7 +118,7 @@ function export_binaries
 function upload_pkg
 {
 	if [ -f $1 ]; then
-		echo scp $1 ${URL_ARCHIVE}
+		scp $1 ${ARCHIVE}
 	fi
 }
 
