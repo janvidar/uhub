@@ -7,16 +7,17 @@ else
 fi
 
 BINSUFFIX=
+MAKEARGS=
+MAKE=make
+WANTZIP=0
 
 if [ "${HOST_SYSTEM}" = "mingw32_nt-5.1" ]; then
 	HOST_SYSTEM=win32
 	BINSUFFIX=.exe
 	WANTZIP=1
-else
-	WANTZIP=0
+	MAKEARGS="USE_BIGENDIAN=NO"
 fi
 
-MAKE=make
 BINARY=uhub${BINSUFFIX}
 
 if [ "${HOST_SYSTEM}" = "FreeBSD" ]; then
@@ -58,7 +59,7 @@ function package_zips
 	gzip -c -9 $1.tar > $1.tar.gz
 	bzip2 -c -9 $1.tar > $1.tar.bz2
 	rm -f $1.tar
-	
+
 	if [ $WANTZIP -eq 1 ]; then
 		zip -q -9 -r $1.zip $2
 	fi
@@ -71,10 +72,10 @@ function export_sources
 	fi
 
 	cd ${PACKAGE}
-	${MAKE} autotest.c
+	${MAKE} ${MAKEARGS} autotest.c
 	cd ..
 
-	if [ -f ${PACKAGE}/autotest.c ]; then
+	if [ ! -f ${PACKAGE}/autotest.c ]; then
 		echo "Unable to create autotest.c, aborting..."
 		exit 1
 	fi
@@ -93,7 +94,7 @@ function export_binaries
 	fi
 
 	cd ${PACKAGE}
-	${MAKE} RELEASE=YES
+	${MAKE} ${MAKEARGS} RELEASE=YES
 	cd ..
 
 	if [ ! -x ${PACKAGE}/${BINARY} ]; then
