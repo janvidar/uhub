@@ -1,3 +1,8 @@
+0.2.8:
+- Fix bug #13: getsockname() failure, use sockaddr from accept() instead.
+- Fix bug #10: Improve logging, ensure logs are machine readable.
+
+
 0.2.7:
 - Fixed a nasty crash (bug #11), Thanks Toast for finding it.
 - Fix bug #9 - net_get_peer_address() failure on CentOS/Xen configurations.
