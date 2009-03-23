@@ -159,6 +159,13 @@ EXO_TEST(adc_message_parse_23, {
         return msg == NULL;
 });
 
+EXO_TEST(adc_message_parse_24, {
+        struct adc_message* msg = adc_msg_parse_verify(g_user, "EMSG AAAC\0AAAB Hello\\sthere!\n", 29);
+        return msg == NULL;
+});
+
+
+
 
 EXO_TEST(adc_message_add_arg_1, {
 	struct adc_message* msg = adc_msg_create(test_string1);
