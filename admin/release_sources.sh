@@ -5,5 +5,5 @@
 . admin/common.sh
 
 # Git Export
-export_binaries
+export_sources
 
