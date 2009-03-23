@@ -236,13 +236,19 @@ int net_close(int fd)
 }
 
 
-int net_accept(int fd)
+int net_accept(int fd, struct ip_addr_encap* ipaddr)
 {
 	struct sockaddr_storage addr;
+        struct sockaddr_in*  addr4;
+        struct sockaddr_in6* addr6;
 	socklen_t addr_size;
 	int ret = 0;
 	addr_size = sizeof(struct sockaddr_storage);
+
 	memset(&addr, 0, addr_size);
+	addr4 = (struct sockaddr_in*) &addr;
+	addr6 = (struct sockaddr_in6*) &addr;
+
 	ret = accept(fd, (struct sockaddr*) &addr, &addr_size);
 
 	if (ret == -1)
@@ -270,6 +276,20 @@ int net_accept(int fd)
 	else
 	{
 		net_stats_add_accept();
+
+		if (ipaddr)
+		{
+			memset(ipaddr, 0, sizeof(struct ip_addr_encap));
+			ipaddr->af = addr4->sin_family;
+			if (ipaddr->af == AF_INET6)
+			{
+				memcpy(&ipaddr->internal_ip_data.in6, &addr6->sin6_addr, sizeof(struct in6_addr));	
+			}
+			else
+			{
+				memcpy(&ipaddr->internal_ip_data.in, &addr4->sin_addr, sizeof(struct in_addr));
+			}
+		}
 	}
 
 	return ret;

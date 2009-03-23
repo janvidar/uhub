@@ -83,8 +83,11 @@ extern int net_close(int fd);
 
 /**
  * A wrapper for the accept() function call.
+ * @param fd socket descriptor
+ * @param ipaddr (in/out) if non-NULL the ip address of the
+ * accepted peer is filled in.
  */
-extern int net_accept(int fd);
+extern int net_accept(int fd, struct ip_addr_encap* ipaddr);
 
 /**
  * A wrapper for the connect() call.

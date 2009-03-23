@@ -260,12 +260,13 @@ void net_on_accept(int server_fd, short ev, void *arg)
 {
 	struct hub_info* hub = (struct hub_info*) arg;
 	struct user* user = 0;
+	struct ip_addr_encap ipaddr;
 	const char* addr;
 	struct timeval timeout = { TIMEOUT_CONNECTED, 0 };
 	
 	for (;;)
 	{
-		int fd = net_accept(server_fd);
+		int fd = net_accept(server_fd, &ipaddr);
 		if (fd == -1)
 		{
 			if (net_error() == EWOULDBLOCK)
@@ -279,7 +280,7 @@ void net_on_accept(int server_fd, short ev, void *arg)
 			}
 		}
 		
-		addr = net_get_peer_address(fd);
+		addr = ip_convert_to_string(&ipaddr); 
 
 		/* FIXME: Should have a plugin log this */
 		hub_log(log_trace, "Got connection from %s", addr);
@@ -301,7 +302,7 @@ void net_on_accept(int server_fd, short ev, void *arg)
 		}
 		
 		/* Store IP address in user object */
-		ip_convert_to_binary(addr, &user->ipaddr);
+		memcpy(&user->ipaddr, &ipaddr, sizeof(ipaddr));
 		
 		net_set_nonblocking(fd, 1);
 		net_set_nosigpipe(fd, 1);
