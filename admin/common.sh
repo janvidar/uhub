@@ -72,8 +72,13 @@ function export_sources
 
 	cd ${PACKAGE}
 	${MAKE} autotest.c
-
 	cd ..
+
+	if [ -f ${PACKAGE}/autotest.c ]; then
+		echo "Unable to create autotest.c, aborting..."
+		exit 1
+	fi
+
 	rm -Rf ${PACKAGE}/admin
 	package_zips ${PACKAGE_SRC} ${PACKAGE}
         
@@ -89,13 +94,12 @@ function export_binaries
 
 	cd ${PACKAGE}
 	${MAKE} RELEASE=YES
+	cd ..
 
-	if [ ! -x ${BINARY} ]; then
+	if [ ! -x ${PACKAGE}/${BINARY} ]; then
 		echo "Packaging failed, no binary found..."
 		exit 1
 	fi
-
-	cd ..
 
 	rm -Rf ${PACKAGE}/admin
 	rm -Rf ${PACKAGE}/autotest
@@ -107,7 +111,6 @@ function export_binaries
 	rm -f ${PACKAGE}/doc/Doxyfile
 	rm -f ${PACKAGE}/doc/uhub.dot
 	rm -f ${PACKAGE}/libuhub*
-
 
 	package_zips ${PACKAGE_BIN} ${PACKAGE}
 
