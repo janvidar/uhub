@@ -31,6 +31,16 @@ int is_white_space(char c)
 	return 0;
 }
 
+int is_printable(char c)
+{
+	if (c >= 32)
+		return 1;
+		
+	if (c == '\t' || c == '\r' || c == '\n')
+		return 1;
+	return 0;
+}
+
 
 char* strip_white_space(char* string)
 {
@@ -48,17 +58,15 @@ char* strip_white_space(char* string)
 	return string;
 }
 
-
-int is_valid_utf8(const char* string)
+static int is_valid_utf8_str(const char* string, size_t length)
 {
 	int expect = 0;
 	char div = 0;
-	int pos = 0;
-	int length = strlen(string);
+	size_t pos = 0;
 	
 	if (length == 0) return 1;
 	
-	for (pos = 0; pos < strlen(string); pos++)
+	for (pos = 0; pos < length; pos++)
 	{
 		if (expect)
 		{
@@ -74,13 +82,28 @@ int is_valid_utf8(const char* string)
 					if (string[pos] & div) expect++;
 					else break;
 				}
-				if ((string[pos] & div) || (pos+expect >= strlen(string))) return 0;
+				if ((string[pos] & div) || (pos+expect >= length)) return 0;
 			}
 		}
 	}
 	return 1;
 }
 
+int is_valid_utf8(const char* string)
+{
+	return is_valid_utf8_str(string, strlen(string));
+}
+
+int is_printable_utf8(const char* string, size_t length)
+{
+	size_t pos = 0;
+	for (pos = 0; pos < length; pos++)
+	{
+		if (!is_printable(string[pos]))
+			return 0;
+	}
+	return is_valid_utf8_str(string, length);
+}
 
 int is_valid_base32_char(char c)
 {

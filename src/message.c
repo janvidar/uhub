@@ -26,8 +26,6 @@
 	uhub_assert(X->capacity); \
 	uhub_assert(X->length); \
 	uhub_assert(X->length <= X->capacity); \
-	if (X->length != strlen(X->cache)) \
-		hub_log(log_error, "Assert: X->length (%d) != strlen(X->cache) (%d)", X->length, strlen(X->cache)); \
 	uhub_assert(X->length == strlen(X->cache)); \
 	uhub_assert(X->references >= 0);
 #else
@@ -265,6 +263,13 @@ struct adc_message* adc_msg_parse(const char* line, size_t length)
 	
 	if (command == NULL)
 		return NULL; /* OOM */
+		
+	if (!is_printable_utf8(line, length))
+	{
+		hub_log(log_debug, "Dropped message with non-printable UTF-8 characters.");
+		hub_free(command);
+		return NULL;
+	}
 
 	if (line[length-1] != '\n')
 	{

@@ -1,6 +1,7 @@
 0.2.8:
 - Fix bug #13: getsockname() failure, use sockaddr from accept() instead.
 - Fix bug #10: Improve logging, ensure logs are machine readable.
+- Fix bug #12: asserts in adc_msg_parse -> enabled strict utf8 parsing.
 
 
 0.2.7:
