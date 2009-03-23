@@ -29,7 +29,7 @@ static void log_user_login(struct user* u)
 static void log_user_login_error(struct user* u, enum status_message msg)
 {
 	const char* addr = ip_convert_to_string(&u->ipaddr);
-	const char* message = hub_get_status_message(u->hub, msg);
+	const char* message = hub_get_status_message_log(u->hub, msg);
 	hub_log(log_user, "LoginError  %s/%s %s \"%s\" (%s) \"%s\"", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, message, u->user_agent);
 }
 

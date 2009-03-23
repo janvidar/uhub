@@ -238,6 +238,8 @@ extern void hub_free_variables(struct hub_info* hub);
  * Returns a string for the given status_message (See enum status_message).
  */
 extern const char* hub_get_status_message(struct hub_info* hub, enum status_message msg);
+extern const char* hub_get_status_message_log(struct hub_info* hub, enum status_message msg);
+
 
 /**
  * Sends a status_message to a user.
