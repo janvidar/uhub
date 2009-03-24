@@ -492,6 +492,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	}
 
 	hub_log(log_info, "Starting " PRODUCT "/" VERSION ", listening on %s:%d...", address_buf, config->server_port);
+	hub_log(log_debug, "Using libevent %s, backend: %s", event_get_version(), event_get_method());
 
 	server_tcp = net_socket_create(af, SOCK_STREAM, IPPROTO_TCP);
 	if (server_tcp == -1)
