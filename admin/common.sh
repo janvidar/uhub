@@ -84,20 +84,25 @@ function export_sources
 	cp ChangeLog ChangeLog-${VERSION}
 }
 
+function build_binaries
+{
+        if [ ! -d ${PACKAGE} ]; then
+                export_source_directory
+        fi
+
+        cd ${PACKAGE}
+        ${MAKE} ${MAKEARGS} RELEASE=YES
+        cd ..
+
+        if [ ! -x ${PACKAGE}/${BINARY} ]; then
+                echo "Build failed, no binary found..."
+                exit 1
+        fi	
+}
+
 function export_binaries
 {
-	if [ ! -d ${PACKAGE} ]; then
-		export_source_directory
-	fi
-
-	cd ${PACKAGE}
-	${MAKE} ${MAKEARGS} RELEASE=YES
-	cd ..
-
-	if [ ! -x ${PACKAGE}/${BINARY} ]; then
-		echo "Packaging failed, no binary found..."
-		exit 1
-	fi
+	build_binaries
 
 	rm -Rf ${PACKAGE}/admin
 	rm -Rf ${PACKAGE}/autotest
@@ -111,7 +116,6 @@ function export_binaries
 	rm -f ${PACKAGE}/libuhub*
 
 	package_zips ${PACKAGE_BIN} ${PACKAGE}
-
 	rm -Rf ${PACKAGE};
 }
 
