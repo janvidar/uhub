@@ -1,0 +1,72 @@
+.TH UHUB 1 "March 2009"
+.\" Please adjust this date whenever revising the manpage.
+.\"
+.\" Some roff macros, for reference:
+.\" .nh        disable hyphenation
+.\" .hy        enable hyphenation
+.\" .ad l      left justify
+.\" .ad b      justify to both left and right margins
+.\" .nf        disable filling
+.\" .fi        enable filling
+.\" .br        insert line break
+.\" .sp <n>    insert n+1 empty lines
+.\" for manpage-specific macros, see man(7)
+.SH NAME
+uhub \- a high performance ADC peer-to-peer hub
+.SH SYNOPSIS
+.B uhub
+.RI [ options ]
+.SH DESCRIPTION
+uHub is a high performance peer-to-peer hub for the ADC network.
+Its low memory footprint allows it to handle several thousand users
+on high-end servers, or a small private hub on embedded hardware.
+.SH "OPTIONS"
+.TP
+.BI \^\-v
+Verbose mode, add more -v's for higher verbosity.
+.TP
+.BI \^\-q 
+Quiet mode, if quiet mode is enabled no output or logs are made.
+.TP
+.BI \^\-f
+Fork uhub to background in order to run it as a daemon.
+.TP
+.BI \^\-l " logfile"
+Log messages to the given logfile (default: stderr)
+.TP
+.BI \^\-L
+Log messages to syslog.
+.TP
+.BI \^\-c " config"
+Specify configuration file (default: /etc/uhub/uhub.conf)
+.TP
+.BI \^\-C
+Check configuration files and return. Will print either \"OK\" or \"ERROR\".
+.TP
+.BI \^\-s
+Show all configuration parameters. In a format that is compatible with
+the configuration files.
+.TP
+.BI \^\-S
+Show all non-default configuration parameters.
+.TP
+.BI \^\-h
+Show the help message.
+.TP
+.BI \^\-u " user"
+Drop privileges and run as the given user.
+.TP
+.BI \^\-g " group"
+Drop privileges and run with the given group permissions.
+.TP
+.BI \^\-V
+Show the version number
+.SH EXAMPLES
+To run uhub as a daemon, and log to a file:
+.TP
+.B uhub " -f -l /var/log/uhub/uhub.log"
+.SH AUTHOR
+This program was written by Jan Vidar Krey <janvidar@extatic.org>
+.SH "BUG REPORTS"
+If you find a bug in uhub please report it to
+.B http://bugs.extatic.org/

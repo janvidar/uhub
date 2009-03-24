@@ -13,6 +13,7 @@ fi
 mkdir -p \
 	deb/DEBIAN \
 	deb/usr/bin \
+	deb/usr/share/man/man1/ \
 	deb/usr/share/doc/uhub \
 	deb/etc/uhub \
 	|| exit 1
@@ -28,10 +29,11 @@ cp ${PACKAGE}/doc/uhub.conf deb/etc/uhub
 cp ${PACKAGE}/doc/users.conf deb/etc/uhub
 echo "Welcome to uHub" > deb/etc/uhub/motd.txt
 
-# Copy debian policy files
+# Copy other files
 cp ${PACKAGE}/README deb/usr/share/doc/uhub
 cp ${PACKAGE}/AUTHORS deb/usr/share/doc/uhub
 gzip -c --best < ${PACKAGE}/ChangeLog > deb/usr/share/doc/uhub/changelog.gz
+gzip -c --best < ${PACKAGE}/doc/uhub.1 > deb/usr/share/man/man1/uhub.1.gz
 
 cat > deb/usr/share/doc/uhub/copyright <<EOF
 uHub - a high performance hub for the ADC peer-to-peer network
