@@ -1016,17 +1016,20 @@ size_t hub_get_min_hubs_op(struct hub_info* hub)
 
 void hub_event_loop(struct hub_info* hub)
 {
-#if 0
-	event_dispatch();
-#endif
 	int ret;
 	do
 	{
 		 ret = event_base_loop(hub->evbase, EVLOOP_ONCE);
+		 
 		 if (ret != 0)
+		 {
+			 hub_log(log_debug, "event_base_loop returned: %d", (int) ret);
+		 }
+		 
+		 if (ret < 0)
 			break;
 		 
 		 event_queue_process(hub->queue);
 	}
-	while (hub->status == hub_status_running);
+	while (hub->status == hub_status_running || hub->status == hub_status_disabled);
 }
