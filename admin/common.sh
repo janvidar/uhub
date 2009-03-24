@@ -79,7 +79,7 @@ function export_sources
 
 	rm -Rf ${PACKAGE}/admin
 	package_zips ${PACKAGE_SRC} ${PACKAGE}
-        
+
 	rm -Rf ${PACKAGE};
 	cp ChangeLog ChangeLog-${VERSION}
 }
@@ -97,7 +97,7 @@ function build_binaries
         if [ ! -x ${PACKAGE}/${BINARY} ]; then
                 echo "Build failed, no binary found..."
                 exit 1
-        fi	
+        fi
 }
 
 function export_binaries
@@ -116,7 +116,7 @@ function export_binaries
 	rm -f ${PACKAGE}/libuhub*
 
 	package_zips ${PACKAGE_BIN} ${PACKAGE}
-	rm -Rf ${PACKAGE};
+	rm -Rf ${PACKAGE}
 }
 
 function upload_pkg
