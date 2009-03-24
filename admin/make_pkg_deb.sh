@@ -89,3 +89,7 @@ mv deb.deb uhub_${VERSION}-${DEB_REVISION}_${HOST_MACHINE}.deb
 ### Check for errors
 lintian uhub_${VERSION}-${DEB_REVISION}_${HOST_MACHINE}.deb
 
+### Cleanup
+rm -Rf deb
+rm -Rf ${PACKAGE}
+
