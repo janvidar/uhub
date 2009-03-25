@@ -21,32 +21,9 @@
 #define HAVE_UHUB_NET_EVENT_H
 
 /**
- * Network callback for reading data from a socket.
- */
-extern void net_on_read(int fd, short ev, void *arg);
-
-/**
- * Network callback for writing data to a socket.
- */
-extern void net_on_write(int fd, short ev, void *arg);
-
-/**
- * Network callback for timers.
- */
-extern void net_on_read_timeout(int fd, short ev, void* arg);
-
-/**
  * Network callback to accept incoming connections.
  */
 extern void net_on_accept(int fd, short ev, void *arg);
-
-#ifdef ADC_UDP_OPERATION
-/**
- * Network callback to receive incoming UDP datagram.
- */
-extern void net_on_packet(int fd, short ev, void *arg);
-#endif
-
 
 #endif /* HAVE_UHUB_NET_EVENT_H */
 
