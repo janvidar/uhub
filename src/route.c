@@ -135,8 +135,8 @@ int route_to_user(struct user* user, struct adc_message* msg)
 		{
 			queue_command(user, msg, ret);
 			
-			if (user->send_queue_size && user->ev_write)
-				event_add(user->ev_write, NULL);
+			if (user->send_queue_size && user->ev_handle)
+				event_add(user->ev_handle, NULL);
 		}
 		else
 		{
@@ -158,8 +158,8 @@ int route_to_user(struct user* user, struct adc_message* msg)
 		{
 			/* queue command */
 			queue_command(user, msg, 0);
-                        if (user->ev_write)
-				event_add(user->ev_write, NULL);
+                        if (user->ev_handle)
+				event_add(user->ev_handle, NULL);
 
 		}
 		else

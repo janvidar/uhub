@@ -149,18 +149,18 @@ void net_on_read(int fd, short ev, void *arg)
 	
 	if (user_is_logged_in(user))
 	{
-		if (user->ev_read)
+		if (user->ev_handle)
 		{
 			struct timeval timeout = { TIMEOUT_IDLE, 0 };
-			event_add(user->ev_read, &timeout);
+			event_add(user->ev_handle, &timeout);
 		}
 	}
 	else if (user_is_connecting(user))
 	{
-		if (user->ev_read)
+		if (user->ev_handle)
 		{
 			struct timeval timeout = { TIMEOUT_HANDSHAKE, 0 };
-			event_add(user->ev_read, &timeout);
+			event_add(user->ev_handle, &timeout);
 		}
 	}
 }
@@ -250,8 +250,8 @@ void net_on_write(int fd, short ev, void *arg)
 	}
 	else
 	{
-		if (user->send_queue_size > 0 && user->ev_write)
-			event_add(user->ev_write, NULL);
+		if (user->send_queue_size > 0 && user->ev_handle)
+			event_add(user->ev_handle, NULL);
 	}
 }
 
@@ -307,11 +307,9 @@ void net_on_accept(int server_fd, short ev, void *arg)
 		net_set_nonblocking(fd, 1);
 		net_set_nosigpipe(fd, 1);
 		
-		event_set(user->ev_read,  fd, EV_READ | EV_PERSIST, net_on_read,  user);
-		event_set(user->ev_write, fd, EV_WRITE,             net_on_write, user);
-		event_base_set(hub->evbase, user->ev_read);
-		event_base_set(hub->evbase, user->ev_write);
-		event_add(user->ev_read,  &timeout);
+		event_set(user->ev_handle,  fd, EV_READ | EV_PERSIST, net_on_read,  user);
+		event_base_set(hub->evbase, user->ev_handle);
+		event_add(user->ev_handle,  &timeout);
 	}
 }
 

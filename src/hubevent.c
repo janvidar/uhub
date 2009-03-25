@@ -71,8 +71,8 @@ void on_login_success(struct user* u)
 		hub_send_motd(u);
 		
 	/* reset to idle timeout */
-	if (u->ev_read)
-		event_add(u->ev_read, &timeout);
+	if (u->ev_handle)
+		event_add(u->ev_handle, &timeout);
 }
 
 void on_login_failure(struct user* u, enum status_message msg)

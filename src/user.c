@@ -30,13 +30,11 @@ struct user* user_create(struct hub_info* hub, int sd)
 	if (user == NULL)
 		return NULL; /* OOM */
 
-	user->ev_write = hub_malloc_zero(sizeof(struct event));
-	user->ev_read  = hub_malloc_zero(sizeof(struct event));
+	user->ev_handle = hub_malloc_zero(sizeof(struct event));
 
-	if (!user->ev_write || !user->ev_read)
+	if (!user->ev_handle)
 	{
-	    hub_free(user->ev_read);
-	    hub_free(user->ev_write);
+	    hub_free(user->ev_handle);
 	    hub_free(user);
 	    return NULL;
 	}
@@ -65,18 +63,11 @@ void user_destroy(struct user* user)
 {
 	hub_log(log_trace, "user_destroy(), user=%p", user);
 
-	if (user->ev_write)
+	if (user->ev_handle)
 	{
-		event_del(user->ev_write);
-		hub_free(user->ev_write);
-		user->ev_write = 0;
-	}
-	
-	if (user->ev_read)
-	{
-		event_del(user->ev_read);
-		hub_free(user->ev_read);
-		user->ev_read = 0;
+		event_del(user->ev_handle);
+		hub_free(user->ev_handle);
+		user->ev_handle = 0;
 	}
 	
 	net_close(user->sd);
@@ -213,11 +204,11 @@ void user_disconnect(struct user* user, int reason)
 	}
 	
 	/* dont read more data from this user */
-	if (user->ev_read)
+	if (user->ev_handle)
 	{
-		event_del(user->ev_read);
-		hub_free(user->ev_read);
-		user->ev_read = 0;
+		event_del(user->ev_handle);
+		hub_free(user->ev_handle);
+		user->ev_handle = 0;
 	}
 	
 	hub_log(log_trace, "user_disconnect(), user=%p, reason=%d, state=%d", user, reason, user->state);

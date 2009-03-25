@@ -99,8 +99,7 @@ struct user_counts
 struct user
 {
 	int                  sd;                      /** socket descriptor */
-	struct event*        ev_read;                 /** libevent struct for read events */
-	struct event*        ev_write;                /** libevent struct for write events */
+	struct event*        ev_handle;
 	enum user_state      state;                   /** see enum user_state */
 	enum user_credentials credentials;            /** see enum user_credentials */
 	struct user_info     id;                      /** Contains nick name and CID */

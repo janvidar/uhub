@@ -146,8 +146,8 @@ int hub_handle_support(struct user* u, struct adc_message* cmd)
 		if (ok)
 		{
 			hub_send_handshake(u);
-			if (u->ev_read)
-				event_add(u->ev_read, &timeout);
+			if (u->ev_handle)
+				event_add(u->ev_handle, &timeout);
 		}
 		else
 		{
