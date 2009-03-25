@@ -192,19 +192,8 @@ void net_on_write(int fd, short ev, void *arg)
 			
 			if (ret == length)
 			{
-#ifdef DEBUG_SENDQ
-				hub_log(log_error, "SENDQ: sent=%d bytes/%d (all), send_queue_size=%d, offset=%d", ret, (int) msg->length, user->send_queue_size, user->send_queue_offset);
-#endif
 				user->send_queue_size -= ret;
 				user->send_queue_offset = 0;
-			
-#ifdef DEBUG_SENDQ
-				if ((user->send_queue_size < 0) || (user->send_queue_offset < 0))
-				{
-					hub_log(log_error, "INVALID: send_queue_size=%d, send_queue_offset=%d", user->send_queue_size, user->send_queue_offset);
-				}
-#endif
-			
 				list_remove(user->send_queue, msg);
 				
 				if (user_flag_get(user, flag_user_list) && (msg == user->info || user->send_queue_size == 0))
@@ -220,18 +209,8 @@ void net_on_write(int fd, short ev, void *arg)
 			}
 			else
 			{
-#ifdef DEBUG_SENDQ
-                                hub_log(log_error, "SENDQ: sent=%d bytes/%d (part), send_queue_size=%d, offset=%d", ret, (int) msg->length, user->send_queue_size, user->send_queue_offset);
-#endif
 				user->send_queue_size -= ret;
 				user->send_queue_offset += ret;
-				
-#ifdef DEBUG_SENDQ				
-				if ((user->send_queue_size < 0) || (user->send_queue_offset < 0) || (user->send_queue_offset > msg->length))
-				{
-					hub_log(log_error, "INVALID: send_queue_size=%d, send_queue_offset=%d", user->send_queue_size, user->send_queue_offset);
-				}
-#endif
 				break;
 			}
 		}
