@@ -255,7 +255,9 @@ extern int user_set_feature_cast_support(struct user* u, char feature[4]);
  */
 extern void user_clear_feature_cast_support(struct user* u);
 
-
+extern void user_trigger_init(struct user* user);
+extern void user_trigger_update(struct user* user, int w, int timeout_sec);
+extern void user_trigger_shutdown(struct user* user);
 
 #endif /* HAVE_UHUB_USER_H */
 

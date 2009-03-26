@@ -20,32 +20,15 @@
 #include "uhub.h"
 
 
-void net_on_read(int fd, short ev, void *arg)
+static int on_read(struct user* user)
 {
 	static char buf[MAX_RECV_BUF];
-	struct user* user = (struct user*) arg;
-	char* pos;
 	size_t offset;
 	size_t buflen;
 	ssize_t size;
 	int more = 1;
-	int flag_close = 0;
-	
-	hub_log(log_trace, "net_on_read() : fd=%d, ev=%d, arg=%p", fd, (int) ev, arg);
-	
-	if (ev == EV_TIMEOUT)
-	{
-		more = 0;
-		if (user_is_connecting(user))
-		{
-			flag_close = quit_timeout;
-		}
-		else
-		{
-			hub_send_ping(user);
-		}
-	}
-	
+	char* pos;
+
 	while (more)
 	{
 		offset = 0;
@@ -55,17 +38,16 @@ void net_on_read(int fd, short ev, void *arg)
 			offset = user->recv_buf_offset;
 		}
 		
-		size = net_recv(fd, &buf[offset], MAX_RECV_BUF - offset, 0);
+		size = net_recv(user->sd, &buf[offset], MAX_RECV_BUF - offset, 0);
 		if (size == -1)
 		{
 			if (net_error() != EWOULDBLOCK)
-				flag_close = quit_socket_error;
+				return quit_socket_error;
 			break;
 		}
 		else if (size == 0)
 		{
-			flag_close = quit_disconnected;
-			break;
+			return quit_disconnected;
 		}
 		else
 		{
@@ -87,9 +69,7 @@ void net_on_read(int fd, short ev, void *arg)
 					{
 						if (hub_handle_message(user, &buf[handled], msglen) == -1)
 						{
-							flag_close = quit_protocol_error;
-							more = 0;
-							break;
+							return quit_protocol_error;
 						}
 					}
 				}
@@ -124,8 +104,7 @@ void net_on_read(int fd, short ev, void *arg)
 					}
 					else
 					{
-						flag_close = quit_memory_error;
-						break;
+						return quit_memory_error;
 					}
 				}
 			}
@@ -140,39 +119,14 @@ void net_on_read(int fd, short ev, void *arg)
 			}
 		}
 	}
-	
-	if (flag_close)
-	{
-		user_disconnect(user, flag_close);
-		return;
-	}
-	
-	if (user_is_logged_in(user))
-	{
-		if (user->ev_handle)
-		{
-			struct timeval timeout = { TIMEOUT_IDLE, 0 };
-			event_add(user->ev_handle, &timeout);
-		}
-	}
-	else if (user_is_connecting(user))
-	{
-		if (user->ev_handle)
-		{
-			struct timeval timeout = { TIMEOUT_HANDSHAKE, 0 };
-			event_add(user->ev_handle, &timeout);
-		}
-	}
+	return 0;
 }
 
-
-void net_on_write(int fd, short ev, void *arg)
+static int on_write(struct user* user)
 {
-	struct user* user = (struct user*) arg;
 	struct adc_message* msg;
 	int ret;
 	int length;
-	int close_flag = 0;
 	
 	msg = list_get_first(user->send_queue);
 	while (msg)
@@ -182,12 +136,10 @@ void net_on_write(int fd, short ev, void *arg)
 	
 		if (ret == 0 || (ret == -1 && net_error() == EWOULDBLOCK))
 		{
-			close_flag = 0;
-			break;
+			return 0;
 		}
 		else if (ret > 0)
 		{
-			
 			user->tm_last_write = time(NULL);
 			
 			if (ret == length)
@@ -216,23 +168,66 @@ void net_on_write(int fd, short ev, void *arg)
 		}
 		else
 		{
-			close_flag = quit_socket_error;
-			break;
+			return quit_socket_error;
 		}
 		msg = list_get_first(user->send_queue);
 	}
+	return 0;
+}
+
+
+void on_net_event(int fd, short ev, void *arg)
+{
+	struct user* user = (struct user*) arg;
+	int want_close = 0;
+	int want_write = 0;
 	
+	hub_log(log_debug, "on_net_event() : fd=%d, ev=%d, user=%s", fd, (int) ev, user);
 	
-	if (close_flag)
+	if (ev == EV_TIMEOUT)
 	{
-		user_disconnect(user, close_flag);
+		
+		hub_log(log_debug, "EV_TIMEOUT");
+		
+		if (user_is_connecting(user))
+		{
+			want_close = quit_timeout;
+		}
+		else
+		{
+			hub_send_ping(user);
+		}
 	}
 	else
 	{
-		if (user->send_queue_size > 0 && user->ev_handle)
-			event_add(user->ev_handle, NULL);
+		if (ev & EV_WRITE)
+		{
+			want_close = on_write(user);
+			want_write = (user->send_queue_size != 0);
+		}
+		
+		if (!want_close && ev & EV_READ)
+		{
+			want_close = on_read(user);
+		}
+	}
+		
+	if (want_close)
+	{
+		user_disconnect(user, want_close);
+		return;
+	}
+	
+	if (user_is_logged_in(user))
+	{
+		user_trigger_update(user, want_write, TIMEOUT_IDLE);
+	}
+	else if (user_is_connecting(user))
+	{
+		user_trigger_update(user, want_write, TIMEOUT_HANDSHAKE);
 	}
 }
+
 
 
 void net_on_accept(int server_fd, short ev, void *arg)
@@ -241,7 +236,6 @@ void net_on_accept(int server_fd, short ev, void *arg)
 	struct user* user = 0;
 	struct ip_addr_encap ipaddr;
 	const char* addr;
-	struct timeval timeout = { TIMEOUT_CONNECTED, 0 };
 	
 	for (;;)
 	{
@@ -282,13 +276,10 @@ void net_on_accept(int server_fd, short ev, void *arg)
 		
 		/* Store IP address in user object */
 		memcpy(&user->ipaddr, &ipaddr, sizeof(ipaddr));
-		
+
 		net_set_nonblocking(fd, 1);
 		net_set_nosigpipe(fd, 1);
-		
-		event_set(user->ev_handle,  fd, EV_READ | EV_PERSIST, net_on_read,  user);
-		event_base_set(hub->evbase, user->ev_handle);
-		event_add(user->ev_handle,  &timeout);
+		user_trigger_init(user);
 	}
 }
 

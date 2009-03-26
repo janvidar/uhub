@@ -20,10 +20,19 @@
 #ifndef HAVE_UHUB_NET_EVENT_H
 #define HAVE_UHUB_NET_EVENT_H
 
+struct user;
+
+extern void on_net_event(int fd, short ev, void *arg);
+
 /**
  * Network callback to accept incoming connections.
  */
 extern void net_on_accept(int fd, short ev, void *arg);
+
+/**
+ *
+ */
+extern void net_update_trigger(struct user* user, int write, struct timeval timeout);
 
 #endif /* HAVE_UHUB_NET_EVENT_H */
 

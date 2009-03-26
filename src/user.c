@@ -63,15 +63,8 @@ void user_destroy(struct user* user)
 {
 	hub_log(log_trace, "user_destroy(), user=%p", user);
 
-	if (user->ev_handle)
-	{
-		event_del(user->ev_handle);
-		hub_free(user->ev_handle);
-		user->ev_handle = 0;
-	}
-	
+	user_trigger_shutdown(user);
 	net_close(user->sd);
-	
 	adc_msg_free(user->info);
 	user_clear_feature_cast_support(user);
 	
@@ -204,12 +197,7 @@ void user_disconnect(struct user* user, int reason)
 	}
 	
 	/* dont read more data from this user */
-	if (user->ev_handle)
-	{
-		event_del(user->ev_handle);
-		hub_free(user->ev_handle);
-		user->ev_handle = 0;
-	}
+	user_flag_set(user, flag_ignore);
 	
 	hub_log(log_trace, "user_disconnect(), user=%p, reason=%d, state=%d", user, reason, user->state);
 	
@@ -294,6 +282,36 @@ int user_is_disconnecting(struct user* user)
 	return 0;
 }
 
+void user_trigger_init(struct user* user)
+{
+	if (user->ev_handle)
+	{
+		struct timeval timeout = { TIMEOUT_CONNECTED, 0 };
+		event_set(user->ev_handle, user->sd, EV_READ | EV_PERSIST, on_net_event, user);
+		event_base_set(user->hub->evbase, user->ev_handle);
+		event_add(user->ev_handle, &timeout);
+	}
+}
 
+void user_trigger_update(struct user* user, int w, int timeout_sec)
+{
+	if (user->ev_handle)
+	{
+		struct timeval timeout = { timeout_sec, 0 };
+		int f = w ? EV_WRITE | EV_READ | EV_PERSIST : EV_READ | EV_PERSIST;
+		event_del(user->ev_handle);
+		event_set(user->ev_handle, user->sd, f, on_net_event, user);
+		event_base_set(user->hub->evbase, user->ev_handle);
+		event_add(user->ev_handle, &timeout);
+	}
+}
 
-
+void user_trigger_shutdown(struct user* user)
+{
+	if (user->ev_handle)
+	{
+		event_del(user->ev_handle);
+		hub_free(user->ev_handle);
+		user->ev_handle = 0;
+	}
+}
