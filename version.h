@@ -7,7 +7,7 @@
 #endif
 
 #ifndef VERSION
-#define VERSION "0.2.8"
+#define VERSION "0.2.9-alpha"
 #endif
 
 #ifndef COPYRIGHT

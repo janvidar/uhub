@@ -222,6 +222,13 @@ int check_network(struct user* user, struct adc_message* cmd)
 	return 0;
 }
 
+void strip_network(struct user* user, struct adc_message* cmd)
+{
+	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
+	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_UDP_PORT);
+	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
+	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_UDP_PORT);
+}
 
 static int nick_length_ok(const char* nick)
 {
@@ -829,7 +836,10 @@ int hub_handle_info(struct user* user, const struct adc_message* cmd_unmodified)
 		
 		/* FIXME - What if limits are not met ? */
 		check_limits(user, cmd);
+		strip_network(user, cmd);
 		hub_handle_info_low_bandwidth(user, cmd);
+		
+		
 		update_user_info(user, cmd);
 		
 		if (!adc_msg_is_empty(cmd))
