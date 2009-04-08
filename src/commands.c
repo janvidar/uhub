@@ -126,7 +126,28 @@ static int command_uptime(struct user* user, const char* message)
 
 static int command_kick(struct user* user, const char* message)
 {
-	send_message(user, "*** Kick not implemented!");
+	if (strlen(message) < 7)
+	{
+		send_message(user, "*** No nickname given, try: !kick <nick>");
+		return 0;
+	}
+	
+	const char* nick = &message[7];
+	struct user* target = get_user_by_nick(user->hub, nick);
+	
+	if (!target)
+	{
+		send_message(user, "*** No such user");
+		return 0;
+	}
+	
+	if (target == user)
+	{
+		send_message(user, "*** No can do.");
+		return 0;
+	}
+	
+	user_disconnect(target, quit_kicked);
 	return 0;
 }
 
