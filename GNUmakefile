@@ -144,6 +144,7 @@ libuhub_SOURCES := \
 		src/misc.c \
 		src/netevent.c \
 		src/network.c \
+		src/rbtree.c \
 		src/route.c \
 		src/sid.c \
 		src/tiger.c \
@@ -171,6 +172,7 @@ uhub_HEADERS := \
 		src/misc.h \
 		src/netevent.h \
 		src/network.h \
+		src/rbtree.h \
 		src/route.h \
 		src/sid.h \
 		src/tiger.h \
