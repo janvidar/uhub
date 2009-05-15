@@ -44,17 +44,32 @@ static void send_message(struct user* user, const char* message)
 
 static int command_access_denied(struct user* user, const char* command)
 {
-	char temp[64];
-	snprintf(temp, 64, "*** Access denied: \"%s\"", command);
+	char temp[128];
+	snprintf(temp, 128, "*** Access denied: \"%s\"", command);
 	send_message(user, temp);
 	return 0;
 }
 
+static int command_not_found(struct user* user, const char* command)
+{
+	char temp[128];
+	snprintf(temp, 128, "*** Command not found: \"%s\"", command);
+	send_message(user, temp);
+	return 0;
+}
+
+static int command_status(struct user* user, const char* command, const char* message)
+{
+	char temp[1024];
+	snprintf(temp, 1024, "*** %s: %s", command, message);
+	send_message(user, temp);
+	return 0;
+}
 
 static int command_stats(struct user* user, const char* message)
 {
 	char temp[128];
-	snprintf(temp, 128, "*** Stats: %zu users, peak: %zu. Network (up/down): %d/%d KB/s, peak: %d/%d KB/s",
+	snprintf(temp, 128, "%zu users, peak: %zu. Network (up/down): %d/%d KB/s, peak: %d/%d KB/s",
 	user->hub->users->count,
 	user->hub->users->count_peak,
 	(int) user->hub->stats.net_tx / 1024,
@@ -62,10 +77,8 @@ static int command_stats(struct user* user, const char* message)
 	(int) user->hub->stats.net_tx_peak / 1024,
 	(int) user->hub->stats.net_rx_peak / 1024);
 	
-	send_message(user, temp);
-	return 0;
+	return command_status(user, "stats", message);
 }
-
 
 static int command_help(struct user* user, const char* message)
 {
@@ -73,20 +86,20 @@ static int command_help(struct user* user, const char* message)
 	size_t n;
 	char msg[MAX_HELP_MSG];
 	msg[0] = 0;
-	strcat(msg, "\n*** Available commands:\n");
+	strcat(msg, "Available commands:\n");
 	
 	for (n = 0; command_handlers[n].prefix; n++)
 	{
 		if (command_handlers[n].cred <= user->credentials)
 		{
+			strcat(msg, "!");
 			strcat(msg, command_handlers[n].prefix);
 			strcat(msg, " - ");
 			strcat(msg, command_handlers[n].description);
 			strcat(msg, "\n");
 		}
 	}
-	send_message(user, msg);
-    return 0;
+	return command_status(user, "help", msg);
 }
 
 static int command_uptime(struct user* user, const char* message)
@@ -104,8 +117,6 @@ static int command_uptime(struct user* user, const char* message)
 	m = D / 60;
 
 	tmp[0] = 0;
-	strcat(tmp, "*** Uptime: ");
-
 	if (d)
 	{
 		strcat(tmp, uhub_itoa((int) d));
@@ -115,21 +126,19 @@ static int command_uptime(struct user* user, const char* message)
 	}
 
 	if (h < 10) strcat(tmp, "0");
-		strcat(tmp, uhub_itoa((int) h));
+	strcat(tmp, uhub_itoa((int) h));
 	strcat(tmp, ":");
 	if (m < 10) strcat(tmp, "0");
-		strcat(tmp, uhub_itoa((int) m));
+	strcat(tmp, uhub_itoa((int) m));
 
-	send_message(user, tmp);
-	return 0;
+	return command_status(user, "uptime", tmp);
 }
 
 static int command_kick(struct user* user, const char* message)
 {
 	if (strlen(message) < 7)
 	{
-		send_message(user, "*** No nickname given, try: !kick <nick>");
-		return 0;
+		return command_status(user, "kick", "No nickname given");
 	}
 	
 	const char* nick = &message[7];
@@ -137,47 +146,41 @@ static int command_kick(struct user* user, const char* message)
 	
 	if (!target)
 	{
-		send_message(user, "*** No such user");
-		return 0;
+		return command_status(user, "kick", "No such user");
 	}
 	
 	if (target == user)
 	{
-		send_message(user, "*** No can do.");
-		return 0;
+		return command_status(user, "kick", "Cannot kick yourself");
 	}
 	
 	user_disconnect(target, quit_kicked);
-	return 0;
+	return command_status(user, "kick", nick);
 }
 
 static int command_reload(struct user* user, const char* message)
 {
-	send_message(user, "*** Reloading configuration");
 	user->hub->status = hub_status_restart;
-	return 0;
+	return command_status(user, "reload", "Reloading configuration...");
 }
 
 static int command_shutdown(struct user* user, const char* message)
 {
-	send_message(user, "*** Hub shuting down...");
 	user->hub->status = hub_status_shutdown;
-	return 0;
+	return command_status(user, "shutdown", "Hub shutting down...");
 }
 
 
 static int command_version(struct user* user, const char* message)
 {
-    send_message(user, "*** Powered by " PRODUCT "/" VERSION);
-    return 0;
+    return command_status(user, "version", "Powered by " PRODUCT "/" VERSION);
 }
 
 static int command_myip(struct user* user, const char* message)
 {
     char tmp[128];
-    snprintf(tmp, 128, "*** Your IP: %s", ip_convert_to_string(&user->ipaddr));
-    send_message(user, tmp);
-    return 0;
+    snprintf(tmp, 128, "Your IP is \"%s\"", ip_convert_to_string(&user->ipaddr));
+    return command_status(user, "myip", tmp);
 }
 
 int command_dipatcher(struct user* user, const char* message)
@@ -193,22 +196,24 @@ int command_dipatcher(struct user* user, const char* message)
 			}
 			else
 			{
-				return command_access_denied(user, &command_handlers[n].prefix[1]);
+				return command_access_denied(user, command_handlers[n].prefix);
 			}
 		}
 	}
+
+	command_not_found(user, message);
 	return 1;
 }
 
 static struct commands_handler command_handlers[] = {
-	{ "!help",       5, cred_guest,     command_help,     "Show this help message." },
-	{ "!stats",      6, cred_super,     command_stats,    "Show hub statistics." },
-	{ "!version",    8, cred_guest,     command_version,  "Show hub version info."  },
-	{ "!uptime",     7, cred_guest,     command_uptime,   "Display hub uptime info." },
-	{ "!kick",       5, cred_operator,  command_kick,     "Kick a user" },
-	{ "!reload",     7, cred_admin,     command_reload,   "Reload configuration files." },
-	{ "!shutdown",   9, cred_admin,     command_shutdown, "Shutdown hub." },
-	{ "+myip",       5, cred_guest,     command_myip,     "Show your own IP." },
-	{ 0,             0, cred_none,      command_help,     "{ Last dummy option }" }
+	{ "help",       4, cred_guest,     command_help,     "Show this help message."      },
+	{ "stats",      5, cred_super,     command_stats,    "Show hub statistics."         },
+	{ "version",    7, cred_guest,     command_version,  "Show hub version info."       },
+	{ "uptime",     6, cred_guest,     command_uptime,   "Display hub uptime info."     },
+	{ "kick",       4, cred_operator,  command_kick,     "Kick a user"                  },
+	{ "reload",     6, cred_admin,     command_reload,   "Reload configuration files."  },
+	{ "shutdown",   8, cred_admin,     command_shutdown, "Shutdown hub."                },
+	{ "myip",       4, cred_guest,     command_myip,     "Show your own IP."            },
+	{ 0,            0, cred_none,      command_help,     ""                             }
 };
 
