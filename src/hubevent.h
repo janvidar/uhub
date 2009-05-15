@@ -23,22 +23,22 @@
 /**
  * This event is triggered whenever a user successfully logs in to the hub.
  */
-extern void on_login_success(struct user* u);
+extern void on_login_success(struct hub_info* hub, struct user* u);
 
 /**
  * This event is triggered whenever a user failed to log in to the hub.
  */
-extern void on_login_failure(struct user* u, enum status_message msg);
+extern void on_login_failure(struct hub_info* hub, struct user* u, enum status_message msg);
 
 /**
  * This event is triggered whenever a previously logged in user leaves the hub.
  */
-extern void on_logout_user(struct user* u);
+extern void on_logout_user(struct hub_info* hub, struct user* u);
 
 /**
  * This event is triggered whenever a user changes his/her nickname.
  */
-extern void on_nick_change(struct user* u, const char* nick);
+extern void on_nick_change(struct hub_info* hub, struct user* u, const char* nick);
 
 
 #endif /* HAVE_UHUB_HUB_EVENT_H */

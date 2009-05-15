@@ -42,7 +42,8 @@ void net_on_read(int fd, short ev, void *arg)
 		}
 		else
 		{
-			hub_send_ping(user);
+			// FIXME: hub is not neccesarily set!
+			// hub_send_ping(hub, user);
 		}
 	}
 	
@@ -85,7 +86,8 @@ void net_on_read(int fd, short ev, void *arg)
 				{
 					if (msglen < user->hub->config->max_recv_buffer)
 					{
-						if (hub_handle_message(user, &buf[handled], msglen) == -1)
+						// FIXME: hub is not set????
+						if (hub_handle_message(user->hub, user, &buf[handled], msglen) == -1)
 						{
 							flag_close = quit_protocol_error;
 							more = 0;

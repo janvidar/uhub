@@ -19,7 +19,7 @@
 
 #include "uhub.h"
 
-typedef int (*command_handler)(struct user* user, const char* message);
+typedef int (*command_handler)(struct hub_info* hub, struct user* user, const char* message);
 
 struct commands_handler
 {
@@ -32,7 +32,7 @@ struct commands_handler
 
 static struct commands_handler command_handlers[];
 
-static void send_message(struct user* user, const char* message)
+static void send_message(struct hub_info* hub, struct user* user, const char* message)
 {
 	char* buffer = adc_msg_escape(message);
 	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
@@ -42,45 +42,45 @@ static void send_message(struct user* user, const char* message)
 	hub_free(buffer);
 }
 
-static int command_access_denied(struct user* user, const char* command)
+static int command_access_denied(struct hub_info* hub, struct user* user, const char* command)
 {
 	char temp[128];
 	snprintf(temp, 128, "*** Access denied: \"%s\"", command);
-	send_message(user, temp);
+	send_message(hub, user, temp);
 	return 0;
 }
 
-static int command_not_found(struct user* user, const char* command)
+static int command_not_found(struct hub_info* hub, struct user* user, const char* command)
 {
 	char temp[128];
 	snprintf(temp, 128, "*** Command not found: \"%s\"", command);
-	send_message(user, temp);
+	send_message(hub, user, temp);
 	return 0;
 }
 
-static int command_status(struct user* user, const char* command, const char* message)
+static int command_status(struct hub_info* hub, struct user* user, const char* command, const char* message)
 {
 	char temp[1024];
 	snprintf(temp, 1024, "*** %s: %s", command, message);
-	send_message(user, temp);
+	send_message(hub, user, temp);
 	return 0;
 }
 
-static int command_stats(struct user* user, const char* message)
+static int command_stats(struct hub_info* hub, struct user* user, const char* message)
 {
 	char temp[128];
 	snprintf(temp, 128, "%zu users, peak: %zu. Network (up/down): %d/%d KB/s, peak: %d/%d KB/s",
-	user->hub->users->count,
-	user->hub->users->count_peak,
-	(int) user->hub->stats.net_tx / 1024,
-	(int) user->hub->stats.net_rx / 1024,
-	(int) user->hub->stats.net_tx_peak / 1024,
-	(int) user->hub->stats.net_rx_peak / 1024);
+	hub->users->count,
+	hub->users->count_peak,
+	(int) hub->stats.net_tx / 1024,
+	(int) hub->stats.net_rx / 1024,
+	(int) hub->stats.net_tx_peak / 1024,
+	(int) hub->stats.net_rx_peak / 1024);
 	
-	return command_status(user, "stats", message);
+	return command_status(hub, user, "stats", message);
 }
 
-static int command_help(struct user* user, const char* message)
+static int command_help(struct hub_info* hub, struct user* user, const char* message)
 {
 #define MAX_HELP_MSG 1024
 	size_t n;
@@ -99,16 +99,16 @@ static int command_help(struct user* user, const char* message)
 			strcat(msg, "\n");
 		}
 	}
-	return command_status(user, "help", msg);
+	return command_status(hub, user, "help", msg);
 }
 
-static int command_uptime(struct user* user, const char* message)
+static int command_uptime(struct hub_info* hub, struct user* user, const char* message)
 {
 	char tmp[128];
 	size_t d;
 	size_t h;
 	size_t m;
-	size_t D = (size_t) difftime(time(0), user->hub->tm_started);
+	size_t D = (size_t) difftime(time(0), hub->tm_started);
 
 	d = D / (24 * 3600);
 	D = D % (24 * 3600);
@@ -131,59 +131,58 @@ static int command_uptime(struct user* user, const char* message)
 	if (m < 10) strcat(tmp, "0");
 	strcat(tmp, uhub_itoa((int) m));
 
-	return command_status(user, "uptime", tmp);
+	return command_status(hub, user, "uptime", tmp);
 }
 
-static int command_kick(struct user* user, const char* message)
+static int command_kick(struct hub_info* hub, struct user* user, const char* message)
 {
 	if (strlen(message) < 7)
 	{
-		return command_status(user, "kick", "No nickname given");
+		return command_status(hub, user, "kick", "No nickname given");
 	}
 	
 	const char* nick = &message[7];
-	struct user* target = get_user_by_nick(user->hub, nick);
+	struct user* target = get_user_by_nick(hub, nick);
 	
 	if (!target)
 	{
-		return command_status(user, "kick", "No such user");
+		return command_status(hub, user, "kick", "No such user");
 	}
 	
 	if (target == user)
 	{
-		return command_status(user, "kick", "Cannot kick yourself");
+		return command_status(hub, user, "kick", "Cannot kick yourself");
 	}
 	
 	user_disconnect(target, quit_kicked);
-	return command_status(user, "kick", nick);
+	return command_status(hub, user, "kick", nick);
 }
 
-static int command_reload(struct user* user, const char* message)
+static int command_reload(struct hub_info* hub, struct user* user, const char* message)
 {
-	user->hub->status = hub_status_restart;
-	return command_status(user, "reload", "Reloading configuration...");
+	hub->status = hub_status_restart;
+	return command_status(hub, user, "reload", "Reloading configuration...");
 }
 
-static int command_shutdown(struct user* user, const char* message)
+static int command_shutdown(struct hub_info* hub, struct user* user, const char* message)
 {
-	user->hub->status = hub_status_shutdown;
-	return command_status(user, "shutdown", "Hub shutting down...");
+	hub->status = hub_status_shutdown;
+	return command_status(hub, user, "shutdown", "Hub shutting down...");
 }
 
-
-static int command_version(struct user* user, const char* message)
+static int command_version(struct hub_info* hub, struct user* user, const char* message)
 {
-    return command_status(user, "version", "Powered by " PRODUCT "/" VERSION);
+    return command_status(hub, user, "version", "Powered by " PRODUCT "/" VERSION);
 }
 
-static int command_myip(struct user* user, const char* message)
+static int command_myip(struct hub_info* hub, struct user* user, const char* message)
 {
     char tmp[128];
     snprintf(tmp, 128, "Your IP is \"%s\"", ip_convert_to_string(&user->ipaddr));
-    return command_status(user, "myip", tmp);
+    return command_status(hub, user, "myip", tmp);
 }
 
-int command_dipatcher(struct user* user, const char* message)
+int command_dipatcher(struct hub_info* hub, struct user* user, const char* message)
 {
 	size_t n = 0;
 	for (n = 0; command_handlers[n].prefix; n++)
@@ -192,16 +191,16 @@ int command_dipatcher(struct user* user, const char* message)
 		{
 			if (command_handlers[n].cred <= user->credentials)
 			{
-				return command_handlers[n].handler(user, message);
+				return command_handlers[n].handler(hub, user, message);
 			}
 			else
 			{
-				return command_access_denied(user, command_handlers[n].prefix);
+				return command_access_denied(hub, user, command_handlers[n].prefix);
 			}
 		}
 	}
 
-	command_not_found(user, message);
+	command_not_found(hub, user, message);
 	return 1;
 }
 

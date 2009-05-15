@@ -32,4 +32,4 @@ struct command_info
 	plugin_event_chat_message function;
 };
 
-int command_dipatcher(struct user* user, const char* message);
+int command_dipatcher(struct hub_info* hub, struct user* user, const char* message);

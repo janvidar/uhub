@@ -19,7 +19,7 @@
 
 #include "uhub.h"
 
-int hub_handle_message(struct user* u, const char* line, size_t length)
+int hub_handle_message(struct hub_info* hub, struct user* u, const char* line, size_t length)
 {
 	int ret = 0;
 	struct adc_message* cmd = 0;
@@ -36,12 +36,12 @@ int hub_handle_message(struct user* u, const char* line, size_t length)
 	{
 		switch (cmd->cmd)
 		{
-			case ADC_CMD_HSUP: ret = hub_handle_support(u, cmd); break;
-			case ADC_CMD_HPAS: ret = hub_handle_password(u, cmd); break;
-			case ADC_CMD_BINF: ret = hub_handle_info(u, cmd); break;
+			case ADC_CMD_HSUP: ret = hub_handle_support(hub, u, cmd); break;
+			case ADC_CMD_HPAS: ret = hub_handle_password(hub, u, cmd); break;
+			case ADC_CMD_BINF: ret = hub_handle_info(hub, u, cmd); break;
 
 #ifdef ADC_UDP_OPERATION
-			case ADC_CMD_HCHK: ret = hub_handle_autocheck(u, cmd); break;
+			case ADC_CMD_HCHK: ret = hub_handle_autocheck(hub, u, cmd); break;
 #endif
 			case ADC_CMD_DINF:
 			case ADC_CMD_EINF:
@@ -54,7 +54,7 @@ int hub_handle_message(struct user* u, const char* line, size_t length)
 			case ADC_CMD_DMSG:
 			case ADC_CMD_BMSG:
 			case ADC_CMD_FMSG:
-				ret = hub_handle_chat_message(u, cmd);
+				ret = hub_handle_chat_message(hub, u, cmd);
 				break;
 
 			case ADC_CMD_BSCH:
@@ -65,7 +65,7 @@ int hub_handle_message(struct user* u, const char* line, size_t length)
 			case ADC_CMD_DRCM:
 			case ADC_CMD_DCTM:
 				cmd->priority = -1;
-				if (u->hub->config->chat_only && u->credentials < cred_operator)
+				if (hub->config->chat_only && u->credentials < cred_operator)
 				{
 					/* These below aren't allowed in chat only hubs */
 					break;
@@ -96,7 +96,7 @@ int hub_handle_message(struct user* u, const char* line, size_t length)
 }
 
 
-int hub_handle_support(struct user* u, struct adc_message* cmd)
+int hub_handle_support(struct hub_info* hub, struct user* u, struct adc_message* cmd)
 {
 	int ret = 0;
 	int index = 0;
@@ -104,9 +104,9 @@ int hub_handle_support(struct user* u, struct adc_message* cmd)
 	char* arg = adc_msg_get_argument(cmd, index);
 	struct timeval timeout = { TIMEOUT_HANDSHAKE, 0 };
 
-	if (u->hub->status == hub_status_disabled && u->state == state_protocol)
+	if (hub->status == hub_status_disabled && u->state == state_protocol)
 	{
-		on_login_failure(u, status_msg_hub_disabled);
+		on_login_failure(hub, u, status_msg_hub_disabled);
 		return -1;
 	}
 	
@@ -145,7 +145,7 @@ int hub_handle_support(struct user* u, struct adc_message* cmd)
 	
 		if (ok)
 		{
-			hub_send_handshake(u);
+			hub_send_handshake(hub, u);
 			if (u->ev_read)
 				event_add(u->ev_read, &timeout);
 		}
@@ -161,7 +161,7 @@ int hub_handle_support(struct user* u, struct adc_message* cmd)
 }
 
 
-int hub_handle_password(struct user* u, struct adc_message* cmd)
+int hub_handle_password(struct hub_info* hub, struct user* u, struct adc_message* cmd)
 {
 	char* password = adc_msg_get_argument(cmd, 0);
 	int ret = 0;
@@ -170,11 +170,11 @@ int hub_handle_password(struct user* u, struct adc_message* cmd)
 	{
 		if (password_verify(u, password))
 		{
-			on_login_success(u);
+			on_login_success(hub, u);
 		}
 		else
 		{
-			on_login_failure(u, status_msg_auth_invalid_password);
+			on_login_failure(hub, u, status_msg_auth_invalid_password);
 			ret = -1;
 		}
 	}
@@ -184,7 +184,7 @@ int hub_handle_password(struct user* u, struct adc_message* cmd)
 }
 
 
-int hub_handle_chat_message(struct user* u, struct adc_message* cmd)
+int hub_handle_chat_message(struct hub_info* hub, struct user* u, struct adc_message* cmd)
 {
 	char* message = adc_msg_get_argument(cmd, 0);
 	int ret = 0;
@@ -193,7 +193,7 @@ int hub_handle_chat_message(struct user* u, struct adc_message* cmd)
 	/* TODO: Check for hub-commands here. Set relay to 0 and the message will not be sent to other users. */
 	if (message[0] == '!' || message[0] == '+')
 	{
-	    relay = command_dipatcher(u, message);
+	    relay = command_dipatcher(hub, u, message);
 	}
 
 	if (relay && user_is_logged_in(u))
@@ -244,29 +244,29 @@ int hub_handle_autocheck(struct user* u, struct adc_message* cmd)
 }
 #endif
 
-
+#ifdef ADC_UDP_OPERATION
 void hub_send_autocheck(struct user* u, uint16_t port, const char* token)
 {
 	
 }
+#endif
 
-
-void hub_send_support(struct user* u)
+void hub_send_support(struct hub_info* hub, struct user* u)
 {
 	if (user_is_connecting(u) || user_is_logged_in(u))
 	{
-		route_to_user(u, u->hub->command_support);
+		route_to_user(u, hub->command_support);
 	}
 }
 
 
-void hub_send_sid(struct user* u)
+void hub_send_sid(struct hub_info* hub, struct user* u)
 {
 	struct adc_message* command;
 	if (user_is_connecting(u))
 	{
 		command = adc_msg_construct(ADC_CMD_ISID, 10);
-		u->id.sid = user_manager_get_free_sid(u->hub);
+		u->id.sid = user_manager_get_free_sid(hub);
 		adc_msg_add_argument(command, (const char*) sid_to_string(u->id.sid));
 		route_to_user(u, command);
 		adc_msg_free(command);
@@ -274,7 +274,7 @@ void hub_send_sid(struct user* u)
 }
 
 
-void hub_send_ping(struct user* user)
+void hub_send_ping(struct hub_info* hub, struct user* user)
 {
 	/* This will just send a newline, despite appearing to do more below. */
 	struct adc_message* ping = adc_msg_construct(0, 0);
@@ -287,9 +287,9 @@ void hub_send_ping(struct user* user)
 }
 
 
-void hub_send_hubinfo(struct user* u)
+void hub_send_hubinfo(struct hub_info* hub, struct user* u)
 {
-	struct adc_message* info = adc_msg_copy(u->hub->command_info);
+	struct adc_message* info = adc_msg_copy(hub->command_info);
 	int value = 0;
 	
 	if (user_flag_get(u, feature_ping))
@@ -301,43 +301,43 @@ void hub_send_hubinfo(struct user* u)
 		NE - Hub Network
 		OW - Hub Owner name
 */
-		adc_msg_add_named_argument(info, "UC", uhub_itoa(hub_get_user_count(u->hub)));
-		adc_msg_add_named_argument(info, "MC", uhub_itoa(hub_get_max_user_count(u->hub)));
-		adc_msg_add_named_argument(info, "SS", uhub_ulltoa(hub_get_shared_size(u->hub)));
-		adc_msg_add_named_argument(info, "SF", uhub_itoa(hub_get_shared_files(u->hub)));
+		adc_msg_add_named_argument(info, "UC", uhub_itoa(hub_get_user_count(hub)));
+		adc_msg_add_named_argument(info, "MC", uhub_itoa(hub_get_max_user_count(hub)));
+		adc_msg_add_named_argument(info, "SS", uhub_ulltoa(hub_get_shared_size(hub)));
+		adc_msg_add_named_argument(info, "SF", uhub_itoa(hub_get_shared_files(hub)));
 		
 		/* Maximum/minimum share size */
-		value = hub_get_max_share(u->hub);
+		value = hub_get_max_share(hub);
 		if (value) adc_msg_add_named_argument(info, "XS", uhub_itoa(value));
-		value = hub_get_min_share(u->hub);
+		value = hub_get_min_share(hub);
 		if (value) adc_msg_add_named_argument(info, "MS", uhub_itoa(value));
 		
 		/* Maximum/minimum upload slots allowed per user */
-		value = hub_get_max_slots(u->hub);
+		value = hub_get_max_slots(hub);
 		if (value) adc_msg_add_named_argument(info, "XL", uhub_itoa(value));
-		value = hub_get_min_slots(u->hub);
+		value = hub_get_min_slots(hub);
 		if (value) adc_msg_add_named_argument(info, "ML", uhub_itoa(value));
 		
 		/* guest users must be on min/max hubs */
-		value = hub_get_max_hubs_user(u->hub);
+		value = hub_get_max_hubs_user(hub);
 		if (value) adc_msg_add_named_argument(info, "XU", uhub_itoa(value));
-		value = hub_get_min_hubs_user(u->hub);
+		value = hub_get_min_hubs_user(hub);
 		if (value) adc_msg_add_named_argument(info, "MU", uhub_itoa(value));
 		
 		/* registered users must be on min/max hubs */
-		value = hub_get_max_hubs_reg(u->hub);
+		value = hub_get_max_hubs_reg(hub);
 		if (value) adc_msg_add_named_argument(info, "XR", uhub_itoa(value));
-		value = hub_get_min_hubs_reg(u->hub);
+		value = hub_get_min_hubs_reg(hub);
 		if (value) adc_msg_add_named_argument(info, "MR", uhub_itoa(value));
 		
 		/* operators must be on min/max hubs */
-		value = hub_get_max_hubs_op(u->hub);
+		value = hub_get_max_hubs_op(hub);
 		if (value) adc_msg_add_named_argument(info, "XO", uhub_itoa(value));
-		value = hub_get_min_hubs_op(u->hub);
+		value = hub_get_min_hubs_op(hub);
 		if (value) adc_msg_add_named_argument(info, "MO", uhub_itoa(value));
 		
 		/* uptime in seconds */
-		adc_msg_add_named_argument(info, "UP", uhub_itoa((int) difftime(time(0), u->hub->tm_started)));
+		adc_msg_add_named_argument(info, "UP", uhub_itoa((int) difftime(time(0), hub->tm_started)));
 	}
 	
 	if (user_is_connecting(u) || user_is_logged_in(u))
@@ -347,20 +347,17 @@ void hub_send_hubinfo(struct user* u)
 	adc_msg_free(info);
 	
 	/* Only send banner when connecting */
-	if (u->hub->config->show_banner && user_is_connecting(u))
+	if (hub->config->show_banner && user_is_connecting(u))
 	{
-		route_to_user(u, u->hub->command_banner);
+		route_to_user(u, hub->command_banner);
 	}
-	
-	
 }
 
-
-void hub_send_handshake(struct user* u)
+void hub_send_handshake(struct hub_info* hub, struct user* u)
 {
-	hub_send_support(u);
-	hub_send_sid(u);
-	hub_send_hubinfo(u);
+	hub_send_support(hub, u);
+	hub_send_sid(hub, u);
+	hub_send_hubinfo(hub, u);
 
 	if (!user_is_disconnecting(u))
 	{
@@ -368,17 +365,15 @@ void hub_send_handshake(struct user* u)
 	}
 }
 
-
-void hub_send_motd(struct user* u)
+void hub_send_motd(struct hub_info* hub, struct user* u)
 {
-	if (u->hub->command_motd)
+	if (hub->command_motd)
 	{
-		route_to_user(u, u->hub->command_motd);
+		route_to_user(u, hub->command_motd);
 	}
 }
 
-
-void hub_send_password_challenge(struct user* u)
+void hub_send_password_challenge(struct hub_info* hub, struct user* u)
 {
 	struct adc_message* igpa;
 	igpa = adc_msg_construct(ADC_CMD_IGPA, 38);
@@ -390,8 +385,8 @@ void hub_send_password_challenge(struct user* u)
 
 static void hub_event_dispatcher(void* callback_data, struct event_data* message)
 {
-/*
 	struct hub_info* hub = (struct hub_info*) callback_data;
+/*
 	hub_log(log_trace, "hub_event_dispatcher: %x (ptr=%p)", message->id, message->ptr);
 */
 	
@@ -404,20 +399,20 @@ static void hub_event_dispatcher(void* callback_data, struct event_data* message
 		
 			if (message->flags)
 			{
-				hub_send_password_challenge((struct user*) message->ptr);
+				hub_send_password_challenge(hub, (struct user*) message->ptr);
 			}
 			else
 			{
-				on_login_success((struct user*) message->ptr);
+				on_login_success(hub, (struct user*) message->ptr);
 			}
 			break;
 		}
 
 		case UHUB_EVENT_USER_QUIT:
 		{
-			user_manager_remove((struct user*) message->ptr);
+			user_manager_remove(hub, (struct user*) message->ptr);
 			send_quit_message((struct user*) message->ptr);
-			on_logout_user((struct user*) message->ptr);
+			on_logout_user(hub, (struct user*) message->ptr);
 			user_schedule_destroy((struct user*) message->ptr);
 			break;
 		}
@@ -797,9 +792,9 @@ static void set_status_code(enum msg_status_level level, int code, char buffer[4
  * @param msg See enum status_message
  * @param level See enum status_level
  */
-void hub_send_status(struct user* user, enum status_message msg, enum msg_status_level level)
+void hub_send_status(struct hub_info* hub, struct user* user, enum status_message msg, enum msg_status_level level)
 {
-	struct hub_config* cfg = user->hub->config;
+	struct hub_config* cfg = hub->config;
 	struct adc_message* cmd = adc_msg_construct(ADC_CMD_ISTA, 6);
 	if (!cmd) return;
 	char code[4];

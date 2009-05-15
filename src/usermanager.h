@@ -39,8 +39,10 @@ extern int user_manager_init(struct hub_info* hub);
 /**
  * Shuts down the user manager.
  * All users will be disconnected and deleted as part of this.
+ *
+ * @return 0 on success, or -1 in an error occured (hub is invalid).
  */
-extern void user_manager_shutdown(struct hub_info* hub);
+extern int user_manager_shutdown(struct hub_info* hub);
 
 /**
  * Generate statistics for logfiles.
@@ -49,31 +51,44 @@ extern void user_manager_update_stats(struct hub_info* hub);
 extern void user_manager_print_stats(struct hub_info* hub);
 
 /**
- * Add a new user to the user manager.
+ * Add a user to the user manager.
+ *
+ * @param hub The hub to add the user to
+ * @param user The user to be added to the hub.
  */
-extern void user_manager_add(struct user* user);
+extern int user_manager_add(struct hub_info* hub, struct user* user);
 
 /**
  * Remove a user from the user manager.
  * This user is connected, and will be moved to the leaving queue, pending
  * all messages in the message queue, and resource cleanup.
+ *
+ * @return 0 if successfully removed, -1 if error.
  */
-extern void user_manager_remove(struct user* user);
+extern int user_manager_remove(struct hub_info* hub, struct user* user);
 
 /**
- * Returns a free sid for a new user.
+ * Returns and allocates an unused session ID (SID).
  */
 extern sid_t user_manager_get_free_sid(struct hub_info* hub);
 
 /**
- * Lookup a user based on the session ID (sid).
- * NOTE: This will only search connected users.
+ * Lookup a user based on the session ID (SID).
+ *
+ * NOTE: This function will only search connected users, which means
+ * that SIDs assigned to users who are not yet completely logged in,
+ * or are in the process of being disconnected will result in this 
+ * function returning NULL even though the sid is not freely available.
+ *
+ * FIXME: Is that really safe / sensible ?
+ * - Makes sense from a message routing point of view.
+ *
  * @return a user if found, or NULL if not found
  */
 extern struct user* get_user_by_sid(struct hub_info* hub, sid_t sid);
 
 /**
- * Lookup a user based on the client ID (cid).
+ * Lookup a user based on the client ID (CID).
  * @return a user if found, or NULL if not found
  */
 extern struct user* get_user_by_cid(struct hub_info* hub, const char* cid);

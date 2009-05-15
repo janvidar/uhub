@@ -189,6 +189,7 @@ autotest_SOURCES := \
 		autotest/test_hub.tcc \
 		autotest/test_misc.tcc \
 		autotest/test_tiger.tcc \
+		autotest/test_usermanager.tcc \
 		autotest/test_eventqueue.tcc
 
 autotest_OBJECTS = autotest.o

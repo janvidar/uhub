@@ -47,7 +47,7 @@ static void log_user_nick_change(struct user* u, const char* nick)
 
 
 /* Send MOTD, do logging etc */
-void on_login_success(struct user* u)
+void on_login_success(struct hub_info* hub, struct user* u)
 {
 	struct timeval timeout = { TIMEOUT_IDLE, 0 };
 	
@@ -57,7 +57,7 @@ void on_login_success(struct user* u)
 
 	/* Mark as being in the normal state, and add user to the user list */
 	user_set_state(u, state_normal);
-	user_manager_add(u);
+	user_manager_add(hub, u);
 
 	/* Print log message */
 	log_user_login(u);
@@ -68,21 +68,21 @@ void on_login_success(struct user* u)
 	
 	/* Send message of the day (if any) */
 	if (user_is_logged_in(u)) /* Previous send() can fail! */
-		hub_send_motd(u);
+		hub_send_motd(hub, u);
 		
 	/* reset to idle timeout */
 	if (u->ev_read)
 		event_add(u->ev_read, &timeout);
 }
 
-void on_login_failure(struct user* u, enum status_message msg)
+void on_login_failure(struct hub_info* hub, struct user* u, enum status_message msg)
 {
 	log_user_login_error(u, msg);
-	hub_send_status(u, msg, status_level_fatal);
+	hub_send_status(hub, u, msg, status_level_fatal);
 	user_disconnect(u, quit_logon_error);
 }
 
-void on_nick_change(struct user* u, const char* nick)
+void on_nick_change(struct hub_info* hub, struct user* u, const char* nick)
 {
 	if (user_is_logged_in(u))
 	{
@@ -90,7 +90,7 @@ void on_nick_change(struct user* u, const char* nick)
 	}
 }
 
-void on_logout_user(struct user* user)
+void on_logout_user(struct hub_info* hub, struct user* user)
 {
 	const char* reason = "";
 	
@@ -109,7 +109,7 @@ void on_logout_user(struct user* user)
 		case quit_hub_disabled:     reason = "hub disabled";   break;
 		case quit_ghost_timeout:    reason = "ghost";          break;
 		default:
-			if (user->hub->status == hub_status_shutdown)
+			if (hub->status == hub_status_shutdown)
 				reason = "hub shutdown";
 			else
 				reason = "unknown error";

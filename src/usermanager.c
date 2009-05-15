@@ -68,6 +68,7 @@ void user_manager_print_stats(struct hub_info* hub)
 		(int) hub->stats.net_rx_peak / 1024);
 }
 
+#ifdef USERMANAGER_TIMER
 static void timer_statistics(int fd, short ev, void *arg)
 {
 	struct hub_info* hub = (struct hub_info*) arg;
@@ -77,14 +78,21 @@ static void timer_statistics(int fd, short ev, void *arg)
 	event_base_set(hub->evbase, &hub->ev_timer);
 	evtimer_add(&hub->ev_timer, &timeout);
 }
+#endif
 
 
 int user_manager_init(struct hub_info* hub)
 {
 	struct user_manager* users = NULL;
+#ifdef USERMANAGER_TIMER
 	struct timeval timeout = { TIMEOUT_STATS, 0 };
+#endif
+	if (!hub)
+		return -1;
 
 	users = (struct user_manager*) hub_malloc_zero(sizeof(struct user_manager));
+	if (!users)
+		return -1;
 
 	users->list = list_create();
 	users->free_sid = 1;
@@ -96,42 +104,68 @@ int user_manager_init(struct hub_info* hub)
 	}
 	
 	hub->users = users;
-	
+
+#ifdef USERMANAGER_TIMER
 	evtimer_set(&hub->ev_timer, timer_statistics, hub);
 	event_base_set(hub->evbase, &hub->ev_timer);
 	evtimer_add(&hub->ev_timer, &timeout);
+#endif // 0
 	return 0;
 }
 
 
-void user_manager_shutdown(struct hub_info* hub)
+int user_manager_shutdown(struct hub_info* hub)
 {
-	struct user_manager* users = hub->users;
+	if (!hub || !hub->users)
+		return -1;
+
+#ifdef USERMANAGER_TIMER
 	event_del(&hub->ev_timer);
+#endif
 
-	list_clear(users->list, &clear_user_list_callback);
-	list_destroy(users->list);
+	if (hub->users->list)
+	{
+		list_clear(hub->users->list, &clear_user_list_callback);
+		list_destroy(hub->users->list);
+	}
 	hub_free(hub->users);
+	hub->users = 0;
+
+	return 0;
 }
 
 
-void user_manager_add(struct user* user)
+int user_manager_add(struct hub_info* hub, struct user* user)
 {
-	list_append(user->hub->users->list, user);
-	user->hub->users->count++;
-	user->hub->users->count_peak = MAX(user->hub->users->count, user->hub->users->count_peak);
+	if (!hub || !user)
+		return -1;
 
-	user->hub->users->shared_size  += user->limits.shared_size;
-	user->hub->users->shared_files += user->limits.shared_files;
+	if (user->hub)
+		return -1;
+
+	list_append(hub->users->list, user);
+	hub->users->count++;
+	hub->users->count_peak = MAX(hub->users->count, hub->users->count_peak);
+
+	hub->users->shared_size  += user->limits.shared_size;
+	hub->users->shared_files += user->limits.shared_files;
+
+	user->hub = hub;
+	return 0;
 }
 
-void user_manager_remove(struct user* user)
+int user_manager_remove(struct hub_info* hub, struct user* user)
 {
-	list_remove(user->hub->users->list, user);
-	user->hub->users->count--;
+	if (!hub || !user)
+		return -1;
+
+	list_remove(hub->users->list, user);
+	hub->users->count--;
 	
-	user->hub->users->shared_size  -= user->limits.shared_size;
-	user->hub->users->shared_files -= user->limits.shared_files;
+	hub->users->shared_size  -= user->limits.shared_size;
+	hub->users->shared_files -= user->limits.shared_files;
+
+	return 0;
 }
 
 

@@ -116,106 +116,117 @@ struct hub_info
  *
  * @return 0 on success, -1 on error
  */
-extern int hub_handle_message(struct user* u, const char* message, size_t length);
+extern int hub_handle_message(struct hub_info* hub, struct user* u, const char* message, size_t length);
 
 /**
  * Handle protocol support/subscription messages received clients.
  *
  * @return 0 on success, -1 on error
  */
-extern int hub_handle_support(struct user* u, struct adc_message* cmd);
+extern int hub_handle_support(struct hub_info* hub, struct user* u, struct adc_message* cmd);
 
 /**
  * Handle password messages received from clients.
  *
  * @return 0 on success, -1 on error
  */
-extern int hub_handle_password(struct user* u, struct adc_message* cmd);
+extern int hub_handle_password(struct hub_info* hub, struct user* u, struct adc_message* cmd);
 
 /**
  * Handle chat messages received from clients.
  * @return 0 on success, -1 on error.
  */
-extern int hub_handle_chat_message(struct user* u, struct adc_message* cmd);
+extern int hub_handle_chat_message(struct hub_info* hub, struct user* u, struct adc_message* cmd);
 
 /**
  * Used internally by hub_handle_info
  * @return 1 if nickname is OK, or 0 if nickname is not accepted.
  */
-extern int  hub_handle_info_check_nick(struct user* u, struct adc_message* cmd);
+extern int  hub_handle_info_check_nick(struct hub_info* hub, struct user* u, struct adc_message* cmd);
 
 /**
  * Used internally by hub_handle_info
  * @return 1 if CID/PID is OK, or 0 if not valid.
  */
-extern int  hub_handle_info_check_cid(struct user* u, struct adc_message* cmd);
+extern int  hub_handle_info_check_cid(struct hub_info* hub, struct user* u, struct adc_message* cmd);
 
 /**
  * Can only be used by administrators or operators.
  *
  * @return 0 on success, -1 on error
  */
-extern int hub_handle_kick(struct user* u, struct adc_message* cmd);
+extern int hub_handle_kick(struct hub_info* hub, struct user* u, struct adc_message* cmd);
 
 #ifdef ADC_UDP_OPERATION
 /**
  * Handle incoming autocheck message.
  */
-extern int hub_handle_autocheck(struct user* u, struct adc_message* cmd);
+extern int hub_handle_autocheck(struct hub_info* hub, struct user* u, struct adc_message* cmd);
 #endif
 
 /**
  * Send the support line for the hub to a particular user.
  * Only used during the initial handshake.
  */
-extern void hub_send_support(struct user* u);
+extern void hub_send_support(struct hub_info* hub, struct user* u);
 
 /**
  * Send a message assigning a SID for a user.
  * This is only sent after hub_send_support() during initial handshake.
  */
-extern void hub_send_sid(struct user* u);
+extern void hub_send_sid(struct hub_info* hub, struct user* u);
 
 /**
  * Send a 'ping' message to user.
  */
-extern void hub_send_ping(struct user* user);
+extern void hub_send_ping(struct hub_info* hub, struct user* user);
 
 /**
  * Send a message containing hub information to a particular user.
  * This is sent during user connection, but can safely be sent at any
  * point later.
  */
-extern void hub_send_hubinfo(struct user* u);
+extern void hub_send_hubinfo(struct hub_info* hub, struct user* u);
 
 /**
  * Send handshake. This basically calls
  * hub_send_support() and hub_send_sid()
  */
-extern void hub_send_handshake(struct user* u);
+extern void hub_send_handshake(struct hub_info* hub, struct user* u);
 
 /**
  * Send a welcome message containing the message of the day to 
  * one particular user. This can be sent in any point in time.
  */
-extern void hub_send_motd(struct user* u);
+extern void hub_send_motd(struct hub_info* hub, struct user* u);
 
 /**
  * Send a password challenge to a user.
  * This is only used if the user tries to access the hub using a
  * password protected nick name.
  */
-extern void hub_send_password_challenge(struct user* u);
+extern void hub_send_password_challenge(struct hub_info* hub, struct user* u);
 
+/**
+ * Sends a status_message to a user.
+ */
+extern void hub_send_status(struct hub_info*, struct user* user, enum status_message msg, enum msg_status_level level);
+
+#ifdef ADC_UDP_OPERATION
 /**
  * Send an autocheck message to a user.
  * This is basically a UDP message. The user's client can then determine
  * if UDP communication works by either hole punching or configuring UPnP.
  */
-extern void hub_send_autocheck(struct user* u, uint16_t port, const char* token);
+extern void hub_send_autocheck(struct hub_info* hub, struct user* u, uint16_t port, const char* token);
+#endif
 
 /**
- * This starts the hub.
+ * Allocates memory, initializes the hub based on the configuration,
+ * and returns a hub handle.
+ * This hub handle must be passed to hub_shutdown_service() in order to cleanup before exiting.
+ *
+ * @return a pointer to the hub info.
  */
 extern struct hub_info* hub_start_service(struct hub_config* config);
 
@@ -239,12 +250,6 @@ extern void hub_free_variables(struct hub_info* hub);
  */
 extern const char* hub_get_status_message(struct hub_info* hub, enum status_message msg);
 extern const char* hub_get_status_message_log(struct hub_info* hub, enum status_message msg);
-
-
-/**
- * Sends a status_message to a user.
- */
-extern void hub_send_status(struct user* user, enum status_message msg, enum msg_status_level level);
 
 /**
  * Returns the number of logged in users on the hub.
