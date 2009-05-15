@@ -17,6 +17,8 @@
  *
  */
 
+#if 0
+
 #include <sys/types.h>
 #include "rbtree.h"
 
@@ -131,3 +133,5 @@ void* rb_tree_get(struct rb_tree* tree, const void* key)
 		return node->value;
 	return 0;
 }
+
+#endif
