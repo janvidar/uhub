@@ -27,6 +27,13 @@ static void inf_create_hub()
 static void inf_destroy_hub()
 {
 	/* FIXME */
+	list_destroy(inf_hub->users->list);
+	acl_shutdown(inf_hub->acl);
+	free_config(inf_hub->config);
+	hub_free(inf_hub->users);
+	hub_free(inf_hub->acl);
+	hub_free(inf_hub->config);
+	hub_free(inf_hub);
 }
 
 

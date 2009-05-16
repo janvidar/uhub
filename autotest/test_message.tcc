@@ -17,6 +17,11 @@ static void create_test_user()
 	g_user->id.sid = 1;
 }
 
+EXO_TEST(adc_message_first, {
+	create_test_user();	
+	return g_user != 0;
+});
+
 EXO_TEST(adc_message_parse_1, {
 	struct adc_message* msg = adc_msg_create("IMSG Hello\\sWorld!");
 	int ok = msg != NULL;
@@ -30,7 +35,6 @@ EXO_TEST(adc_message_parse_2, {
 });
 
 EXO_TEST(adc_message_parse_3, {
-	create_test_user();
 	struct adc_message* msg = adc_msg_parse_verify(g_user, "BMSG AAAB Hello\\sWorld!", 23);
 	int ok = msg != NULL;
 	adc_msg_free(msg);
@@ -535,4 +539,11 @@ EXO_TEST(adc_message_empty_3, {
 	adc_msg_free(msg);
 	return ok;
 });
+
+EXO_TEST(adc_message_last, {
+	hub_free(g_user);
+	g_user = 0;
+	return g_user == 0;
+});
+
 

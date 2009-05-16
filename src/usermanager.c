@@ -165,6 +165,8 @@ int user_manager_remove(struct hub_info* hub, struct user* user)
 	hub->users->shared_size  -= user->limits.shared_size;
 	hub->users->shared_files -= user->limits.shared_files;
 
+	user->hub = 0;
+	
 	return 0;
 }
 
