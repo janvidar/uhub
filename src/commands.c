@@ -142,7 +142,7 @@ static int command_kick(struct hub_info* hub, struct user* user, const char* mes
 	}
 	
 	const char* nick = &message[7];
-	struct user* target = get_user_by_nick(hub, nick);
+	struct user* target = uman_get_user_by_nick(hub, nick);
 	
 	if (!target)
 	{

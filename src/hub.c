@@ -362,7 +362,7 @@ static void hub_event_dispatcher(void* callback_data, struct event_data* message
 		case UHUB_EVENT_USER_QUIT:
 		{
 			uman_remove(hub, (struct user*) message->ptr);
-			send_quit_message((struct user*) message->ptr);
+			uman_send_quit_message((struct user*) message->ptr);
 			on_logout_user(hub, (struct user*) message->ptr);
 			user_schedule_destroy((struct user*) message->ptr);
 			break;
@@ -611,7 +611,7 @@ void hub_free_variables(struct hub_info* hub)
  */
 static inline int is_nick_in_use(struct hub_info* hub, const char* nick)
 {
-	struct user* lookup = get_user_by_nick(hub, nick);
+	struct user* lookup = uman_get_user_by_nick(hub, nick);
 	if (lookup)
 	{
 		return 1;
@@ -625,7 +625,7 @@ static inline int is_nick_in_use(struct hub_info* hub, const char* nick)
  */
 static inline int is_cid_in_use(struct hub_info* hub, const char* cid)
 {
-	struct user* lookup = get_user_by_cid(hub, cid);
+	struct user* lookup = uman_get_user_by_cid(hub, cid);
 	if (lookup)
 	{
 		return 1;

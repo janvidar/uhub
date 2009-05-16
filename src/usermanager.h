@@ -85,19 +85,19 @@ extern sid_t uman_get_free_sid(struct hub_info* hub);
  *
  * @return a user if found, or NULL if not found
  */
-extern struct user* get_user_by_sid(struct hub_info* hub, sid_t sid);
+extern struct user* uman_get_user_by_sid(struct hub_info* hub, sid_t sid);
 
 /**
  * Lookup a user based on the client ID (CID).
  * @return a user if found, or NULL if not found
  */
-extern struct user* get_user_by_cid(struct hub_info* hub, const char* cid);
+extern struct user* uman_get_user_by_cid(struct hub_info* hub, const char* cid);
 
 /**
  * Lookup a user based on the nick name.
  * @return a user if found, or NULL if not found
  */
-extern struct user* get_user_by_nick(struct hub_info* hub, const char* nick);
+extern struct user* uman_get_user_by_nick(struct hub_info* hub, const char* nick);
 
 /**
  * Send the user list of connected clients to 'user'.
@@ -105,13 +105,13 @@ extern struct user* get_user_by_nick(struct hub_info* hub, const char* nick);
  *
  * @return 1 if sending the user list succeeded, 0 otherwise.
  */
-extern int send_user_list(struct user* user);
+extern int uman_send_user_list(struct user* user);
 
 /**
  * Send a quit message to all connected users when 'user' is
  * leaving the hub (for whatever reason).
  */
-extern void send_quit_message(struct user* user);
+extern void uman_send_quit_message(struct user* user);
 
 
 #endif /* HAVE_UHUB_USER_MANAGER_H */

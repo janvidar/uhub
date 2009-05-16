@@ -171,7 +171,7 @@ int uman_remove(struct hub_info* hub, struct user* user)
 }
 
 
-struct user* get_user_by_sid(struct hub_info* hub, sid_t sid)
+struct user* uman_get_user_by_sid(struct hub_info* hub, sid_t sid)
 {
 	struct user* user = (struct user*) list_get_first(hub->users->list); /* iterate users */
 	while (user)
@@ -184,7 +184,7 @@ struct user* get_user_by_sid(struct hub_info* hub, sid_t sid)
 }
 
 
-struct user* get_user_by_cid(struct hub_info* hub, const char* cid)
+struct user* uman_get_user_by_cid(struct hub_info* hub, const char* cid)
 {
 	struct user* user = (struct user*) list_get_first(hub->users->list); /* iterate users - only on incoming INF msg */
 	while (user)
@@ -197,7 +197,7 @@ struct user* get_user_by_cid(struct hub_info* hub, const char* cid)
 }
 
 
-struct user* get_user_by_nick(struct hub_info* hub, const char* nick)
+struct user* uman_get_user_by_nick(struct hub_info* hub, const char* nick)
 {
 	struct user* user = (struct user*) list_get_first(hub->users->list); /* iterate users - only on incoming INF msg */
 	while (user)
@@ -210,7 +210,7 @@ struct user* get_user_by_nick(struct hub_info* hub, const char* nick)
 }
 
 
-int send_user_list(struct user* target)
+int uman_send_user_list(struct user* target)
 {
 	int ret = 1;
 	user_flag_set(target, flag_user_list);
@@ -234,7 +234,7 @@ int send_user_list(struct user* target)
 }
 
 
-void send_quit_message(struct user* leaving)
+void uman_send_quit_message(struct user* leaving)
 {
 	struct adc_message* command = adc_msg_construct(ADC_CMD_IQUI, 6);
 	adc_msg_add_argument(command, (const char*) sid_to_string(leaving->id.sid));

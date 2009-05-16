@@ -52,7 +52,7 @@ void on_login_success(struct hub_info* hub, struct user* u)
 	struct timeval timeout = { TIMEOUT_IDLE, 0 };
 	
 	/* Send user list of all existing users */
-	if (!send_user_list(u))
+	if (!uman_send_user_list(u))
 		return;
 
 	/* Mark as being in the normal state, and add user to the user list */

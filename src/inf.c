@@ -326,8 +326,8 @@ static int check_nick(struct hub_info* hub, struct user* user, struct adc_messag
 
 static int check_logged_in(struct hub_info* hub, struct user* user, struct adc_message* cmd)
 {
-	struct user* lookup1 = get_user_by_nick(hub, user->id.nick);
-	struct user* lookup2 = get_user_by_cid(hub,  user->id.cid);
+	struct user* lookup1 = uman_get_user_by_nick(hub, user->id.nick);
+	struct user* lookup2 = uman_get_user_by_cid(hub,  user->id.cid);
 	
 	if (lookup1 == user)
 	{
