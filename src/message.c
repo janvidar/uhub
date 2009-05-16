@@ -34,6 +34,7 @@
 
 struct adc_message* adc_msg_incref(struct adc_message* msg)
 {
+	if (!msg) return 0;
 #ifndef ADC_MESSAGE_INCREF
 	msg->references++;
 	return msg;
