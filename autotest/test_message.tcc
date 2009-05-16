@@ -519,6 +519,17 @@ EXO_TEST(adc_message_update_4, {
 	return strlen(g_user->info->cache) == 159;
 });
 
+EXO_TEST(adc_message_update_4_cleanup, {
+	adc_msg_free(updater1);
+	updater1 = 0;
+	adc_msg_free(updater2);
+	updater2 = 0;
+	adc_msg_free(g_user->info);
+	g_user->info = 0;
+	return 1;
+});
+
+
 EXO_TEST(adc_message_empty_1, {
 	struct adc_message* msg = adc_msg_parse_verify(g_user, test_string2, strlen(test_string2));
 	int ok = adc_msg_is_empty(msg) == 0;
