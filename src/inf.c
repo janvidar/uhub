@@ -686,13 +686,6 @@ static int check_registered_users_only(struct hub_info* hub, struct user* user)
 	return 0;
 }
 
-#define INF_CHECK(FUNC, HUB, USER, CMD) \
-	do { \
-		int ret = FUNC(HUB, USER, CMD); \
-		if (ret < 0) \
-			return ret; \
-	} while(0)
-
 static int hub_handle_info_common(struct user* user, struct adc_message* cmd)
 {
 	/* Remove server restricted flags */
@@ -725,10 +718,15 @@ static int hub_handle_info_low_bandwidth(struct hub_info* hub, struct user* user
 	return 0;
 }
 
-int hub_handle_info_login(struct hub_info* hub, struct user* user, struct adc_message* cmd)
+#define INF_CHECK(FUNC, HUB, USER, CMD) \
+	do { \
+		int ret = FUNC(HUB, USER, CMD); \
+		if (ret < 0) \
+			return ret; \
+	} while(0)
+
+int hub_perform_login_checks(struct hub_info* hub, struct user* user, struct adc_message* cmd)
 {
-	int need_auth = 0;
-	
 	/* Make syntax checks.  */
 	INF_CHECK(check_required_login_flags, hub, user, cmd);
 	INF_CHECK(check_cid,                  hub, user, cmd);
@@ -737,6 +735,15 @@ int hub_handle_info_login(struct hub_info* hub, struct user* user, struct adc_me
 	INF_CHECK(check_user_agent,           hub, user, cmd);
 	INF_CHECK(check_acl,                  hub, user, cmd);
 	INF_CHECK(check_logged_in,            hub, user, cmd);
+	
+	return 0;
+}
+
+int hub_handle_info_login(struct hub_info* hub, struct user* user, struct adc_message* cmd)
+{
+	int need_auth = 0;
+
+	INF_CHECK(hub_perform_login_checks, hub, user, cmd);
 	
 	/* Private ID must never be broadcasted - drop it! */
 	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_PRIVATE_ID);

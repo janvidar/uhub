@@ -112,7 +112,14 @@ void user_set_state(struct user* user, enum user_state state)
 void user_set_info(struct user* user, struct adc_message* cmd)
 {
 	adc_msg_free(user->info);
-	user->info = adc_msg_incref(cmd);
+	if (cmd)
+	{
+		user->info = adc_msg_incref(cmd);
+	}
+	else
+	{
+		user->info = 0;
+	}
 }
 
 

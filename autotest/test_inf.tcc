@@ -61,13 +61,13 @@ EXO_TEST(inf_create_setup,
 });
 
 
-
+/* FIXME: MEMORY LEAK - Need to fix hub_handle_info_login */
 #define CHECK_INF(MSG, EXPECT) \
 	struct adc_message* msg = adc_msg_parse_verify(inf_user, MSG, strlen(MSG)); \
-	int ok = hub_handle_info_login(inf_hub, inf_user, msg); \
+	int ok = hub_handle_info_login(inf_hub, inf_user, msg); /* FIXME: MEMORY LEAK */ \
 	adc_msg_free(msg); \
-	if (ok != EXPECT) \
-		printf("Expected %d, got %d\n", EXPECT, ok); \
+	if (ok == EXPECT) \
+		user_set_info(inf_user, 0); \
 	return ok == EXPECT;
 	
 
