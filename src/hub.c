@@ -39,10 +39,6 @@ int hub_handle_message(struct hub_info* hub, struct user* u, const char* line, s
 			case ADC_CMD_HSUP: ret = hub_handle_support(hub, u, cmd); break;
 			case ADC_CMD_HPAS: ret = hub_handle_password(hub, u, cmd); break;
 			case ADC_CMD_BINF: ret = hub_handle_info(hub, u, cmd); break;
-
-#ifdef ADC_UDP_OPERATION
-			case ADC_CMD_HCHK: ret = hub_handle_autocheck(hub, u, cmd); break;
-#endif
 			case ADC_CMD_DINF:
 			case ADC_CMD_EINF:
 			case ADC_CMD_FINF:
@@ -206,51 +202,6 @@ int hub_handle_chat_message(struct hub_info* hub, struct user* u, struct adc_mes
 	return ret;
 }
 
-int on_kick(struct user* u, struct adc_message* cmd)
-{
-	hub_log(log_error, "on_kick() not implemented");
-	return -1;
-}
-
-#ifdef ADC_UDP_OPERATION
-int hub_handle_autocheck(struct user* u, struct adc_message* cmd)
-{
-	char* port_str = adc_msg_get_argument(cmd, 0);
-	char* token    = adc_msg_get_argument(cmd, 1);
-	int port = 0;
-	
-	if (!port_str || !token || strlen(token) != 4)
-	{
-		hub_free(port_str);
-		hub_free(token);
-		return -1;
-	}
-	
-	port = uhub_atoi(port_str);
-	
-	if (port == 0 || port > 65535)
-	{
-		hub_free(port_str);
-		hub_free(token);
-		return -1;
-	}
-	
-	hub_send_autocheck(u, port, token);
-	
-	hub_free(port_str);
-	hub_free(token);
-	
-	return 0;
-}
-#endif
-
-#ifdef ADC_UDP_OPERATION
-void hub_send_autocheck(struct user* u, uint16_t port, const char* token)
-{
-	
-}
-#endif
-
 void hub_send_support(struct hub_info* hub, struct user* u)
 {
 	if (user_is_connecting(u) || user_is_logged_in(u))
@@ -266,7 +217,7 @@ void hub_send_sid(struct hub_info* hub, struct user* u)
 	if (user_is_connecting(u))
 	{
 		command = adc_msg_construct(ADC_CMD_ISID, 10);
-		u->id.sid = user_manager_get_free_sid(hub);
+		u->id.sid = uman_get_free_sid(hub);
 		adc_msg_add_argument(command, (const char*) sid_to_string(u->id.sid));
 		route_to_user(u, command);
 		adc_msg_free(command);
@@ -410,7 +361,7 @@ static void hub_event_dispatcher(void* callback_data, struct event_data* message
 
 		case UHUB_EVENT_USER_QUIT:
 		{
-			user_manager_remove(hub, (struct user*) message->ptr);
+			uman_remove(hub, (struct user*) message->ptr);
 			send_quit_message((struct user*) message->ptr);
 			on_logout_user(hub, (struct user*) message->ptr);
 			user_schedule_destroy((struct user*) message->ptr);
@@ -434,12 +385,9 @@ static void hub_event_dispatcher(void* callback_data, struct event_data* message
 struct hub_info* hub_start_service(struct hub_config* config)
 {
 	struct hub_info* hub = 0;
-	int server_tcp, ret, ipv6_supported, af;
-#ifdef ADC_UDP_OPERATION
-	int server_udp;
-#endif
 	struct sockaddr_storage addr;
 	socklen_t sockaddr_size;
+	int server_tcp, ret, ipv6_supported, af;
 	char address_buf[INET6_ADDRSTRLEN+1];
 	
 	hub = hub_malloc_zero(sizeof(struct hub_info));
@@ -497,40 +445,14 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		return 0;
 	}
 	
-#ifdef ADC_UDP_OPERATION
-	server_udp = net_socket_create(af, SOCK_DGRAM,  IPPROTO_UDP);
-	if (server_udp == -1)
-	{
-		event_base_free(hub->evbase);
-		hub_free(hub);
-		return 0;
-	}
-#endif
-	
 	ret = net_set_reuseaddress(server_tcp, 1);
 	if (ret == -1)
 	{
 		event_base_free(hub->evbase);
 		hub_free(hub);
 		net_close(server_tcp);
-#ifdef ADC_UDP_OPERATION
-		net_close(server_udp);
-#endif
 		return 0;
 	}
-	
-#ifdef ADC_UDP_OPERATION
-	ret = net_set_reuseaddress(server_udp, 1);
-	if (ret == -1)
-	{
-		event_base_free(hub->evbase);
-		hub_free(hub);
-		net_close(server_tcp);
-		net_close(server_udp);
-		return 0;
-	}
-#endif
-
 	
 	ret = net_set_nonblocking(server_tcp, 1);
 	if (ret == -1)
@@ -538,24 +460,8 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		event_base_free(hub->evbase);
 		hub_free(hub);
 		net_close(server_tcp);
-#ifdef ADC_UDP_OPERATION
-		net_close(server_udp);
-#endif
 		return 0;
 	}
-	
-#ifdef ADC_UDP_OPERATION
-	ret = net_set_nonblocking(server_udp, 1);
-	if (ret == -1)
-	{
-		event_base_free(hub->evbase);
-		hub_free(hub);
-		net_close(server_tcp);
-		net_close(server_udp);
-		return 0;
-	}
-#endif
-	
 	
 	ret = net_bind(server_tcp, (struct sockaddr*) &addr, sockaddr_size);
 	if (ret == -1)
@@ -564,24 +470,8 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		event_base_free(hub->evbase);
 		hub_free(hub);
 		net_close(server_tcp);
-#ifdef ADC_UDP_OPERATION
-		net_close(server_udp);
-#endif
 		return 0;
 	}
-
-#ifdef ADC_UDP_OPERATION
-	ret = net_bind(server_udp, (struct sockaddr*) &addr, sockaddr_size);
-	if (ret == -1)
-	{
-		hub_log(log_fatal, "hub_start_service(): Unable to bind to UDP local address. errno=%d, str=%s", net_error(), net_error_string(net_error()));
-		event_base_free(hub->evbase);
-		hub_free(hub);
-		net_close(server_tcp);
-		net_close(server_udp);
-		return 0;
-	}
-#endif	
 
 	ret = net_listen(server_tcp, SERVER_BACKLOG);
 	if (ret == -1)
@@ -590,26 +480,17 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		event_base_free(hub->evbase);
 		hub_free(hub);
 		net_close(server_tcp);
-#ifdef ADC_UDP_OPERATION
-		net_close(server_udp);
-#endif
 		return 0;
 	}
 	
 	hub->fd_tcp = server_tcp;
-#ifdef ADC_UDP_OPERATION	
-	hub->fd_udp = server_udp;
-#endif
 	hub->config = config;
 	hub->users = NULL;
 	
-	if (user_manager_init(hub) == -1)
+	if (uman_init(hub) == -1)
 	{
 		hub_free(hub);
 		net_close(server_tcp);
-#ifdef ADC_UDP_OPERATION
-		net_close(server_udp);
-#endif
 		return 0;
 	}
 	
@@ -617,36 +498,17 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	event_base_set(hub->evbase, &hub->ev_accept);
 	if (event_add(&hub->ev_accept, NULL) == -1)
 	{
-		user_manager_shutdown(hub);
+		uman_shutdown(hub);
 		hub_free(hub);
 		net_close(server_tcp);
-#ifdef ADC_UDP_OPERATION
-		net_close(server_udp);
-#endif
 		return 0;
 	}
-
-#ifdef ADC_UDP_OPERATION
-	event_set(&hub->ev_datagram, hub->fd_udp, EV_READ | EV_PERSIST, net_on_packet, hub);
-	event_base_set(hub->evbase, &hub->ev_datagram);
-	if (event_add(&hub->ev_datagram, NULL) == -1)
-	{
-		user_manager_shutdown(hub);
-		hub_free(hub);
-		net_close(server_tcp);
-		net_close(server_udp);
-		return 0;
-	}
-#endif
 
 	if (event_queue_initialize(&hub->queue, hub_event_dispatcher, (void*) hub) == -1)
 	{
-		user_manager_shutdown(hub);
+		uman_shutdown(hub);
 		hub_free(hub);
 		net_close(server_tcp);
-#ifdef ADC_UDP_OPERATION
-		net_close(server_udp);
-#endif
 		return 0;
 	}
 	
@@ -662,12 +524,8 @@ void hub_shutdown_service(struct hub_info* hub)
 
 	event_queue_shutdown(hub->queue);
 	event_del(&hub->ev_accept);
-#ifdef ADC_UDP_OPERATION
-	event_del(&hub->ev_datagram);
-	net_close(hub->fd_udp);
-#endif
 	net_close(hub->fd_tcp);
-	user_manager_shutdown(hub);
+	uman_shutdown(hub);
 	hub->status = hub_status_stopped;
 	event_base_free(hub->evbase);
 	hub_free(hub);

@@ -57,7 +57,7 @@ void on_login_success(struct hub_info* hub, struct user* u)
 
 	/* Mark as being in the normal state, and add user to the user list */
 	user_set_state(u, state_normal);
-	user_manager_add(hub, u);
+	uman_add(hub, u);
 
 	/* Print log message */
 	log_user_login(u);

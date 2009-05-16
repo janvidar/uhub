@@ -21,7 +21,7 @@
 
 /*
  * This callback function is used to clear user objects from the userlist.
- * Should only be used in user_manager_shutdown().
+ * Should only be used in uman_shutdown().
  */
 static void clear_user_list_callback(void* ptr)
 {
@@ -39,7 +39,7 @@ static void clear_user_list_callback(void* ptr)
 }
 
 
-void user_manager_update_stats(struct hub_info* hub)
+void uman_update_stats(struct hub_info* hub)
 {
 	const int factor = TIMEOUT_STATS;
 	struct net_statistics* total;
@@ -57,7 +57,7 @@ void user_manager_update_stats(struct hub_info* hub)
 }
 
 
-void user_manager_print_stats(struct hub_info* hub)
+void uman_print_stats(struct hub_info* hub)
 {
 	hub_log(log_info, "Statistics  users=%zu (peak_users=%zu), net_tx=%d KB/s, net_rx=%d KB/s (peak_tx=%d KB/s, peak_rx=%d KB/s)",
 		hub->users->count,
@@ -73,7 +73,7 @@ static void timer_statistics(int fd, short ev, void *arg)
 {
 	struct hub_info* hub = (struct hub_info*) arg;
 	struct timeval timeout = { TIMEOUT_STATS, 0 };
-	user_manager_update_stats(hub);
+	uman_update_stats(hub);
 	evtimer_set(&hub->ev_timer, timer_statistics, hub);
 	event_base_set(hub->evbase, &hub->ev_timer);
 	evtimer_add(&hub->ev_timer, &timeout);
@@ -81,7 +81,7 @@ static void timer_statistics(int fd, short ev, void *arg)
 #endif
 
 
-int user_manager_init(struct hub_info* hub)
+int uman_init(struct hub_info* hub)
 {
 	struct user_manager* users = NULL;
 #ifdef USERMANAGER_TIMER
@@ -114,7 +114,7 @@ int user_manager_init(struct hub_info* hub)
 }
 
 
-int user_manager_shutdown(struct hub_info* hub)
+int uman_shutdown(struct hub_info* hub)
 {
 	if (!hub || !hub->users)
 		return -1;
@@ -135,7 +135,7 @@ int user_manager_shutdown(struct hub_info* hub)
 }
 
 
-int user_manager_add(struct hub_info* hub, struct user* user)
+int uman_add(struct hub_info* hub, struct user* user)
 {
 	if (!hub || !user)
 		return -1;
@@ -154,7 +154,7 @@ int user_manager_add(struct hub_info* hub, struct user* user)
 	return 0;
 }
 
-int user_manager_remove(struct hub_info* hub, struct user* user)
+int uman_remove(struct hub_info* hub, struct user* user)
 {
 	if (!hub || !user)
 		return -1;
@@ -249,7 +249,7 @@ void send_quit_message(struct user* leaving)
 }
 
 
-sid_t user_manager_get_free_sid(struct hub_info* hub)
+sid_t uman_get_free_sid(struct hub_info* hub)
 {
 #if 0
 	struct user* user;

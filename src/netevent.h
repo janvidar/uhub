@@ -40,13 +40,5 @@ extern void net_on_read_timeout(int fd, short ev, void* arg);
  */
 extern void net_on_accept(int fd, short ev, void *arg);
 
-#ifdef ADC_UDP_OPERATION
-/**
- * Network callback to receive incoming UDP datagram.
- */
-extern void net_on_packet(int fd, short ev, void *arg);
-#endif
-
-
 #endif /* HAVE_UHUB_NET_EVENT_H */
 

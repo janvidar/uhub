@@ -34,7 +34,7 @@ struct user_manager
  * Initializes the user manager.
  * @return 0 on success, or -1 if error (out of memory).
  */
-extern int user_manager_init(struct hub_info* hub);
+extern int uman_init(struct hub_info* hub);
 
 /**
  * Shuts down the user manager.
@@ -42,13 +42,13 @@ extern int user_manager_init(struct hub_info* hub);
  *
  * @return 0 on success, or -1 in an error occured (hub is invalid).
  */
-extern int user_manager_shutdown(struct hub_info* hub);
+extern int uman_shutdown(struct hub_info* hub);
 
 /**
  * Generate statistics for logfiles.
  */
-extern void user_manager_update_stats(struct hub_info* hub);
-extern void user_manager_print_stats(struct hub_info* hub);
+extern void uman_update_stats(struct hub_info* hub);
+extern void uman_print_stats(struct hub_info* hub);
 
 /**
  * Add a user to the user manager.
@@ -56,7 +56,7 @@ extern void user_manager_print_stats(struct hub_info* hub);
  * @param hub The hub to add the user to
  * @param user The user to be added to the hub.
  */
-extern int user_manager_add(struct hub_info* hub, struct user* user);
+extern int uman_add(struct hub_info* hub, struct user* user);
 
 /**
  * Remove a user from the user manager.
@@ -65,12 +65,12 @@ extern int user_manager_add(struct hub_info* hub, struct user* user);
  *
  * @return 0 if successfully removed, -1 if error.
  */
-extern int user_manager_remove(struct hub_info* hub, struct user* user);
+extern int uman_remove(struct hub_info* hub, struct user* user);
 
 /**
  * Returns and allocates an unused session ID (SID).
  */
-extern sid_t user_manager_get_free_sid(struct hub_info* hub);
+extern sid_t uman_get_free_sid(struct hub_info* hub);
 
 /**
  * Lookup a user based on the session ID (SID).

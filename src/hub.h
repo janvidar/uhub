@@ -82,14 +82,8 @@ struct hub_stats
 struct hub_info
 {
 	int fd_tcp;
-#ifdef ADC_UDP_OPERATION
-	int fd_udp;
-#endif
 	struct event ev_accept;
 	struct event ev_timer;
-#ifdef ADC_UDP_OPERATION
-	struct event ev_datagram;
-#endif
 	struct hub_stats stats;
 	struct event_queue* queue;
 	struct event_base* evbase;
@@ -151,20 +145,6 @@ extern int  hub_handle_info_check_nick(struct hub_info* hub, struct user* u, str
 extern int  hub_handle_info_check_cid(struct hub_info* hub, struct user* u, struct adc_message* cmd);
 
 /**
- * Can only be used by administrators or operators.
- *
- * @return 0 on success, -1 on error
- */
-extern int hub_handle_kick(struct hub_info* hub, struct user* u, struct adc_message* cmd);
-
-#ifdef ADC_UDP_OPERATION
-/**
- * Handle incoming autocheck message.
- */
-extern int hub_handle_autocheck(struct hub_info* hub, struct user* u, struct adc_message* cmd);
-#endif
-
-/**
  * Send the support line for the hub to a particular user.
  * Only used during the initial handshake.
  */
@@ -211,15 +191,6 @@ extern void hub_send_password_challenge(struct hub_info* hub, struct user* u);
  * Sends a status_message to a user.
  */
 extern void hub_send_status(struct hub_info*, struct user* user, enum status_message msg, enum msg_status_level level);
-
-#ifdef ADC_UDP_OPERATION
-/**
- * Send an autocheck message to a user.
- * This is basically a UDP message. The user's client can then determine
- * if UDP communication works by either hole punching or configuring UPnP.
- */
-extern void hub_send_autocheck(struct hub_info* hub, struct user* u, uint16_t port, const char* token);
-#endif
 
 /**
  * Allocates memory, initializes the hub based on the configuration,

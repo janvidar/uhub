@@ -317,19 +317,3 @@ void net_on_accept(int server_fd, short ev, void *arg)
 	}
 }
 
-#ifdef ADC_UDP_OPERATION
-extern void net_on_packet(int fd, short ev, void *arg)
-{
-	static char buffer[1024] = {0,};
-	// struct hub_info* hub = (struct hub_info*) arg;
-	// struct user* user = 0;
-	ssize_t size;
-	struct sockaddr_storage from;
-	socklen_t fromlen;
-	
-	size = recvfrom(fd, buffer, 1024, 0, (struct sockaddr*) &from, &fromlen);
-	
-	// FIXME: A plugin should handle this!
-	hub_log(log_info, "Datagram    [%s] (%d bytes)", buffer, (int) size);
-}
-#endif
