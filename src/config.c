@@ -464,6 +464,11 @@ static int config_parse_line(char* line, int line_count, void* ptr_data)
 	hub_log(log_trace, "config_parse_line(): '%s'", line);
 #endif
 
+	if (!is_valid_utf8(line))
+	{
+		hub_log(log_warning, "Invalid utf-8 characters on line %d", line_count);
+	}
+
 	if ((pos = strchr(line, '=')) != NULL)
 	{
 		pos[0] = 0;
