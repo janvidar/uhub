@@ -508,10 +508,10 @@ EXO_TEST(adc_message_update_3, {
 	return updater2 != NULL;
 });
 
-extern void update_user_info(struct user* u, struct adc_message* cmd);
+extern void update_user_info(struct hub_info* hub, struct user* u, struct adc_message* cmd);
 
 EXO_TEST(adc_message_update_4, {
-	update_user_info(g_user, updater2);
+	update_user_info(g_user->hub, g_user, updater2);
 	return strlen(g_user->info->cache) == 159;
 });
 

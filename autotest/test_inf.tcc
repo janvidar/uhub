@@ -8,7 +8,7 @@
 static struct user* inf_user       = 0;
 static struct hub_info* inf_hub    = 0;
 
-extern int hub_handle_info_login(struct user* user, struct adc_message* cmd);
+extern int hub_handle_info_login(struct hub_info* hub, struct user* user, struct adc_message* cmd);
 
 static void inf_create_hub()
 {
@@ -36,7 +36,6 @@ static void inf_create_user()
 	inf_user = (struct user*) hub_malloc_zero(sizeof(struct user));
 	inf_user->id.sid = 1;
 	inf_user->sd  = -1;
-	inf_user->hub = inf_hub;
 	inf_user->limits.upload_slots = 1;
 }
 
@@ -58,7 +57,7 @@ EXO_TEST(inf_create_setup,
 
 #define CHECK_INF(MSG, EXPECT) \
 	struct adc_message* msg = adc_msg_parse_verify(inf_user, MSG, strlen(MSG)); \
-	int ok = hub_handle_info_login(inf_user, msg); \
+	int ok = hub_handle_info_login(inf_hub, inf_user, msg); \
 	adc_msg_free(msg); \
 	if (ok != EXPECT) \
 		printf("Expected %d, got %d\n", EXPECT, ok); \
@@ -106,7 +105,7 @@ EXO_TEST(inf_nick_10, {
 	struct adc_message* msg = adc_msg_parse_verify(inf_user, line, strlen(line));
 	
 	adc_msg_add_named_argument(msg, "NI", nick);
-	int ok = hub_handle_info_login(inf_user, msg);
+	int ok = hub_handle_info_login(inf_hub, inf_user, msg);
 	adc_msg_free(msg);
 	if (ok != status_msg_inf_error_nick_not_utf8)
 		printf("Expected %d, got %d\n", status_msg_inf_error_nick_not_utf8, ok);
