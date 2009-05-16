@@ -115,6 +115,42 @@ void user_set_info(struct user* user, struct adc_message* cmd)
 	user->info = adc_msg_incref(cmd);
 }
 
+void user_update_info(struct user* u, struct adc_message* cmd)
+{
+	char prefix[2];
+	char* argument;
+	size_t n = 0;
+	struct adc_message* cmd_new = adc_msg_copy(u->info);
+	if (!cmd_new)
+	{
+		/* FIXME: OOM! */
+		return;
+	}
+	
+	/*
+	 * FIXME: Optimization potential:
+	 *
+	 * remove parts of cmd that do not really change anything in cmd_new.
+	 * this can save bandwidth if clients send multiple updates for information
+	 * that does not really change anything.
+	 */
+	argument = adc_msg_get_argument(cmd, n++);
+	while (argument)
+	{
+		if (strlen(argument) >= 2)
+		{
+			prefix[0] = argument[0];
+			prefix[1] = argument[1];
+			adc_msg_replace_named_argument(cmd_new, prefix, argument+2);
+		}
+		
+		hub_free(argument);
+		argument = adc_msg_get_argument(cmd, n++);
+	}
+	user_set_info(u, cmd_new);
+	adc_msg_free(cmd_new);
+}
+
 
 static int convert_support_fourcc(int fourcc)
 {

@@ -171,8 +171,17 @@ extern void user_disconnect(struct user* user, int reason);
  * This associates a INF message to the user.
  * If the user already has a INF message associated, then this is
  * released before setting the new one.
+ * 
+ * @param info new inf message (can be NULL)
  */
 extern void user_set_info(struct user* user, struct adc_message* info);
+
+/**
+ * Update a user's INF message.
+ * Will parse replace all ellements in the user's inf message with
+ * the parameters from the cmd (merge operation).
+ */
+extern void user_update_info(struct user* user, struct adc_message* cmd);
 
 /**
  * Specify a user's state.

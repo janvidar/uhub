@@ -626,43 +626,6 @@ static int user_is_registered(struct user* user)
 }
 
 
-void update_user_info(struct hub_info* hub, struct user* u, struct adc_message* cmd)
-{
-	char prefix[2];
-	char* argument;
-	size_t n = 0;
-	struct adc_message* cmd_new = adc_msg_copy(u->info);
-	if (!cmd_new)
-	{
-		/* FIXME: OOM! */
-		return;
-	}
-	
-	/*
-	 * FIXME: Optimization potential:
-	 *
-	 * remove parts of cmd that do not really change anything in cmd_new.
-	 * this can save bandwidth if clients send multiple updates for information
-	 * that does not really change anything.
-	 */
-	argument = adc_msg_get_argument(cmd, n++);
-	while (argument)
-	{
-		if (strlen(argument) >= 2)
-		{
-			prefix[0] = argument[0];
-			prefix[1] = argument[1];
-			adc_msg_replace_named_argument(cmd_new, prefix, argument+2);
-		}
-		
-		hub_free(argument);
-		argument = adc_msg_get_argument(cmd, n++);
-	}
-	user_set_info(u, cmd_new);
-	adc_msg_free(cmd_new);
-}
-
-
 static int check_is_hub_full(struct hub_info* hub, struct user* user)
 {
 	/*
@@ -853,7 +816,7 @@ int hub_handle_info(struct hub_info* hub, struct user* user, const struct adc_me
 		strip_network(user, cmd);
 		hub_handle_info_low_bandwidth(hub, user, cmd);
 		
-		update_user_info(hub, user, cmd);
+		user_update_info(user, cmd);
 		
 		if (!adc_msg_is_empty(cmd))
 		{
