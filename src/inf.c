@@ -638,6 +638,13 @@ void update_user_info(struct hub_info* hub, struct user* u, struct adc_message* 
 		return;
 	}
 	
+	/*
+	 * FIXME: Optimization potential:
+	 *
+	 * remove parts of cmd that do not really change anything in cmd_new.
+	 * this can save bandwidth if clients send multiple updates for information
+	 * that does not really change anything.
+	 */
 	argument = adc_msg_get_argument(cmd, n++);
 	while (argument)
 	{
@@ -838,7 +845,6 @@ int hub_handle_info(struct hub_info* hub, struct user* user, const struct adc_me
 		check_limits(hub, user, cmd);
 		strip_network(user, cmd);
 		hub_handle_info_low_bandwidth(hub, user, cmd);
-		
 		
 		update_user_info(hub, user, cmd);
 		
