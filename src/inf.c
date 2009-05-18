@@ -339,7 +339,7 @@ static int check_logged_in(struct hub_info* hub, struct user* user, struct adc_m
 		if (lookup1 == lookup2)
 		{
 			hub_log(log_debug, "check_logged_in: exact same user is logged in: %s", user->id.nick);
-			user_disconnect(lookup1, quit_ghost_timeout);
+			hub_disconnect_user(hub, lookup1, quit_ghost_timeout);
 			return 0;
 		}
 		else
@@ -702,17 +702,22 @@ int hub_perform_login_checks(struct hub_info* hub, struct user* user, struct adc
 	return 0;
 }
 
+/**
+ * Perform additional INF checks used at time of login.
+ *
+ * @return 0 if success, <0 if error, >0 if authentication needed.
+ */
 int hub_handle_info_login(struct hub_info* hub, struct user* user, struct adc_message* cmd)
 {
-	int need_auth = 0;
+	int code = 0;
 
 	INF_CHECK(hub_perform_login_checks, hub, user, cmd);
 	
 	/* Private ID must never be broadcasted - drop it! */
 	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_PRIVATE_ID);
 	
-	/* FIXME: This needs some cleaning up */
-	need_auth = set_credentials(hub, user, cmd);
+	
+	code = set_credentials(hub, user, cmd);
 	
 	/* Note: this must be done *after* set_credentials. */
 	if (check_is_hub_full(hub, user))
@@ -733,7 +738,7 @@ int hub_handle_info_login(struct hub_info* hub, struct user* user, struct adc_me
 	/* Set initial user info */
 	user_set_info(user, cmd);
 	
-	return need_auth;
+	return code;
 }
 
 /*
@@ -820,7 +825,7 @@ int hub_handle_info(struct hub_info* hub, struct user* user, const struct adc_me
 		
 		if (!adc_msg_is_empty(cmd))
 		{
-			route_message(user, cmd);
+			route_message(hub, user, cmd);
 		}
 		
 		adc_msg_free(cmd);

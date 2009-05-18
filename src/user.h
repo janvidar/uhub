@@ -147,11 +147,6 @@ extern struct user* user_create(struct hub_info* hub, int sd);
 extern void user_destroy(struct user* user);
 
 /**
- * Will post a message that will delete the user later.
- */
-extern void user_schedule_destroy(struct user* user);
-
-/**
  * Disconnect a user.
  * This will mark the user connection ready for being terminated.
  * A reason can be given using the enum user_quit_reason.

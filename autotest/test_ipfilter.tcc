@@ -595,5 +595,5 @@ EXO_TEST(ip6_bitwise_OR_3, {
 });
 
 EXO_TEST(shutdown_network, {
-    return net_shutdown() == 0;
+    return net_destroy() == 0;
 });

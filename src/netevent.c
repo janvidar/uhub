@@ -19,6 +19,8 @@
 
 #include "uhub.h"
 
+/* FIXME: This should not be needed! */
+extern struct hub_info* g_hub;
 
 void net_on_read(int fd, short ev, void *arg)
 {
@@ -145,7 +147,7 @@ void net_on_read(int fd, short ev, void *arg)
 	
 	if (flag_close)
 	{
-		user_disconnect(user, flag_close);
+		hub_disconnect_user(g_hub, user, flag_close);
 		return;
 	}
 	
@@ -248,7 +250,7 @@ void net_on_write(int fd, short ev, void *arg)
 	
 	if (close_flag)
 	{
-		user_disconnect(user, close_flag);
+		hub_disconnect_user(g_hub, user, close_flag);
 	}
 	else
 	{

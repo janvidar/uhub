@@ -318,6 +318,16 @@ extern void hub_schedule_runslice(struct hub_info* hub);
  */
 extern void hub_event_loop(struct hub_info* hub);
 
+/**
+ * Schedule destroying a user.
+ */
+extern void hub_schedule_destroy_user(struct hub_info* hub, struct user* user);
+
+/**
+ * Disconnect a user from the hub.
+ */
+extern void hub_disconnect_user(struct hub_info* hub, struct user* user, int reason);
+
 
 #endif /* HAVE_UHUB_HUB_H */
 

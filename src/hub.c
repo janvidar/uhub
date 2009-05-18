@@ -19,6 +19,8 @@
 
 #include "uhub.h"
 
+struct hub_info* g_hub = 0;
+
 int hub_handle_message(struct hub_info* hub, struct user* u, const char* line, size_t length)
 {
 	int ret = 0;
@@ -70,7 +72,7 @@ int hub_handle_message(struct hub_info* hub, struct user* u, const char* line, s
 			default:
 				if (user_is_logged_in(u))
 				{
-					ret = route_message(u, cmd);
+					ret = route_message(hub, u, cmd);
 				}
 				else
 				{
@@ -148,7 +150,7 @@ int hub_handle_support(struct hub_info* hub, struct user* u, struct adc_message*
 		else
 		{
 			/* disconnect user. Do not send crap during initial handshake! */
-			user_disconnect(u, quit_logon_error);
+			hub_disconnect_user(hub, u, quit_logon_error);
 			ret = -1;
 		}
 	}
@@ -195,7 +197,7 @@ int hub_handle_chat_message(struct hub_info* hub, struct user* u, struct adc_mes
 	if (relay && user_is_logged_in(u))
 	{
 		/* adc_msg_remove_named_argument(cmd, "PM"); */
-		ret = route_message(u, cmd);
+		ret = route_message(hub, u, cmd);
 	}
 	
 	free(message);
@@ -206,7 +208,7 @@ void hub_send_support(struct hub_info* hub, struct user* u)
 {
 	if (user_is_connecting(u) || user_is_logged_in(u))
 	{
-		route_to_user(u, hub->command_support);
+		route_to_user(hub, u, hub->command_support);
 	}
 }
 
@@ -219,7 +221,7 @@ void hub_send_sid(struct hub_info* hub, struct user* u)
 		command = adc_msg_construct(ADC_CMD_ISID, 10);
 		u->id.sid = uman_get_free_sid(hub);
 		adc_msg_add_argument(command, (const char*) sid_to_string(u->id.sid));
-		route_to_user(u, command);
+		route_to_user(hub, u, command);
 		adc_msg_free(command);
 	}
 }
@@ -233,7 +235,7 @@ void hub_send_ping(struct hub_info* hub, struct user* user)
 	ping->cache[1]     = 0;
 	ping->length       = 1;
 	ping->priority     = 1;
-	route_to_user(user, ping);
+	route_to_user(hub, user, ping);
 	adc_msg_free(ping);
 }
 
@@ -293,14 +295,14 @@ void hub_send_hubinfo(struct hub_info* hub, struct user* u)
 	
 	if (user_is_connecting(u) || user_is_logged_in(u))
 	{
-		route_to_user(u, info);
+		route_to_user(hub, u, info);
 	}
 	adc_msg_free(info);
 	
 	/* Only send banner when connecting */
 	if (hub->config->show_banner && user_is_connecting(u))
 	{
-		route_to_user(u, hub->command_banner);
+		route_to_user(hub, u, hub->command_banner);
 	}
 }
 
@@ -320,7 +322,7 @@ void hub_send_motd(struct hub_info* hub, struct user* u)
 {
 	if (hub->command_motd)
 	{
-		route_to_user(u, hub->command_motd);
+		route_to_user(hub, u, hub->command_motd);
 	}
 }
 
@@ -330,7 +332,7 @@ void hub_send_password_challenge(struct hub_info* hub, struct user* u)
 	igpa = adc_msg_construct(ADC_CMD_IGPA, 38);
 	adc_msg_add_argument(igpa, password_generate_challenge(u));
 	user_set_state(u, state_verify);
-	route_to_user(u, igpa);
+	route_to_user(hub, u, igpa);
 	adc_msg_free(igpa);
 }
 
@@ -362,9 +364,9 @@ static void hub_event_dispatcher(void* callback_data, struct event_data* message
 		case UHUB_EVENT_USER_QUIT:
 		{
 			uman_remove(hub, (struct user*) message->ptr);
-			uman_send_quit_message((struct user*) message->ptr);
+			uman_send_quit_message(hub, (struct user*) message->ptr);
 			on_logout_user(hub, (struct user*) message->ptr);
-			user_schedule_destroy((struct user*) message->ptr);
+			hub_schedule_destroy_user(hub, (struct user*) message->ptr);
 			break;
 		}
 		
@@ -514,6 +516,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	
 	hub->status = hub_status_running;
 	
+	g_hub = hub;
 	return hub;
 }
 
@@ -530,6 +533,7 @@ void hub_shutdown_service(struct hub_info* hub)
 	event_base_free(hub->evbase);
 	hub_free(hub);
 	hub = 0;
+	g_hub = 0;
 }
 
 #define SERVER "" PRODUCT "/" VERSION ""
@@ -707,7 +711,7 @@ void hub_send_status(struct hub_info* hub, struct user* user, enum status_messag
 		adc_msg_add_argument(cmd, flag);
 	}
 	
-	route_to_user(user, cmd);
+	route_to_user(hub, user, cmd);
 	adc_msg_free(cmd);
 	
 }
@@ -887,3 +891,56 @@ void hub_event_loop(struct hub_info* hub)
 	}
 	while (hub->status == hub_status_running || hub->status == hub_status_disabled);
 }
+
+void hub_schedule_destroy_user(struct hub_info* hub, struct user* user)
+{
+	struct event_data post;
+	memset(&post, 0, sizeof(post));
+	post.id = UHUB_EVENT_USER_DESTROY;
+	post.ptr = user;
+	event_queue_post(hub->queue, &post);
+}
+
+void hub_disconnect_user(struct hub_info* hub, struct user* user, int reason)
+{
+	struct event_data post;
+	int need_notify = 0;
+	
+	/* is user already being disconnected ? */
+	if (user_is_disconnecting(user))
+	{
+		return;
+	}
+	
+	/* dont read more data from this user */
+	/* FIXME: Remove this from here! */
+	if (user->ev_read)
+	{
+		event_del(user->ev_read);
+		hub_free(user->ev_read);
+		user->ev_read = 0;
+	}
+
+	/* this should be enough? */
+	net_shutdown_r(user->sd);
+	
+	hub_log(log_trace, "hub_disconnect_user(), user=%p, reason=%d, state=%d", user, reason, user->state);
+	
+	need_notify = user_is_logged_in(user);
+	user->quit_reason = reason;
+	user_set_state(user, state_cleanup);
+	
+	if (need_notify)
+	{
+		memset(&post, 0, sizeof(post));
+		post.id     = UHUB_EVENT_USER_QUIT;
+		post.ptr    = user;
+		event_queue_post(hub->queue, &post);
+	}
+	else
+	{
+		user->quit_reason = quit_unknown;
+		hub_schedule_destroy_user(hub, user);
+	}
+}
+

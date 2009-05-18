@@ -37,7 +37,7 @@ static void send_message(struct hub_info* hub, struct user* user, const char* me
 	char* buffer = adc_msg_escape(message);
 	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
 	adc_msg_add_argument(command, buffer);
-	route_to_user(user, command);
+	route_to_user(hub, user, command);
 	adc_msg_free(command);
 	hub_free(buffer);
 }
@@ -154,7 +154,7 @@ static int command_kick(struct hub_info* hub, struct user* user, const char* mes
 		return command_status(hub, user, "kick", "Cannot kick yourself");
 	}
 	
-	user_disconnect(target, quit_kicked);
+	hub_disconnect_user(hub, target, quit_kicked);
 	return command_status(hub, user, "kick", nick);
 }
 

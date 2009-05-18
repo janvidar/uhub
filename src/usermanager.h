@@ -105,13 +105,13 @@ extern struct user* uman_get_user_by_nick(struct hub_info* hub, const char* nick
  *
  * @return 1 if sending the user list succeeded, 0 otherwise.
  */
-extern int uman_send_user_list(struct user* user);
+extern int uman_send_user_list(struct hub_info* hub, struct user* user);
 
 /**
  * Send a quit message to all connected users when 'user' is
  * leaving the hub (for whatever reason).
  */
-extern void uman_send_quit_message(struct user* user);
+extern void uman_send_quit_message(struct hub_info* hub, struct user* user);
 
 
 #endif /* HAVE_UHUB_USER_MANAGER_H */

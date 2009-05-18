@@ -157,7 +157,7 @@ int main_loop()
 		hub_shutdown_service(hub);
 	}
 
-	net_shutdown();
+	net_destroy();
 	hub_log_shutdown();
 	return 0;
 }

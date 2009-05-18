@@ -210,20 +210,20 @@ struct user* uman_get_user_by_nick(struct hub_info* hub, const char* nick)
 }
 
 
-int uman_send_user_list(struct user* target)
+int uman_send_user_list(struct hub_info* hub, struct user* target)
 {
 	int ret = 1;
 	user_flag_set(target, flag_user_list);
-	struct user* user = (struct user*) list_get_first(target->hub->users->list); /* iterate users - only on INF or PAS msg */
+	struct user* user = (struct user*) list_get_first(hub->users->list); /* iterate users - only on INF or PAS msg */
 	while (user)
 	{
 		if (user_is_logged_in(user))
 		{
-			ret = route_to_user(target, user->info);
+			ret = route_to_user(hub, target, user->info);
 			if (!ret)
 				break;
 		}
-		user = (struct user*) list_get_next(user->hub->users->list);
+		user = (struct user*) list_get_next(hub->users->list);
 	}
 	
 	if (!target->send_queue_size)
@@ -234,7 +234,7 @@ int uman_send_user_list(struct user* target)
 }
 
 
-void uman_send_quit_message(struct user* leaving)
+void uman_send_quit_message(struct hub_info* hub, struct user* leaving)
 {
 	struct adc_message* command = adc_msg_construct(ADC_CMD_IQUI, 6);
 	adc_msg_add_argument(command, (const char*) sid_to_string(leaving->id.sid));
@@ -244,7 +244,7 @@ void uman_send_quit_message(struct user* leaving)
 		adc_msg_add_argument(command, ADC_QUI_FLAG_DISCONNECT);
 	}
 	
-	route_to_all(leaving->hub, command);
+	route_to_all(hub, command);
 	adc_msg_free(command);
 }
 

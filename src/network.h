@@ -47,7 +47,7 @@ extern int net_initialize();
  *
  * @return -1 on error, 0 on success
  */
-extern int net_shutdown();
+extern int net_destroy();
 
 /**
  * @return the number of sockets currrently being monitored.
@@ -80,6 +80,10 @@ extern int net_socket_create(int af, int type, int protocol);
  * A wrapper for the close() function call.
  */
 extern int net_close(int fd);
+
+extern int net_shutdown_r(int fd);
+extern int net_shutdown_w(int fd);
+extern int net_shutdown_rw(int fd);
 
 /**
  * A wrapper for the accept() function call.

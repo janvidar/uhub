@@ -59,7 +59,7 @@ int net_initialize()
 }
 
 
-int net_shutdown()
+int net_destroy()
 {
 	if (net_initialized)
 	{
@@ -235,6 +235,20 @@ int net_close(int fd)
 	return ret;
 }
 
+int net_shutdown_r(int fd)
+{
+	return shutdown(fd, SHUT_RD);
+}
+
+int net_shutdown_w(int fd)
+{
+	return shutdown(fd, SHUT_WR);
+}
+
+int net_shutdown_rw(int fd)
+{
+	return shutdown(fd, SHUT_RDWR);
+}
 
 int net_accept(int fd, struct ip_addr_encap* ipaddr)
 {

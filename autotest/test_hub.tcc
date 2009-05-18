@@ -67,5 +67,5 @@ EXO_TEST(hub_service_shutdown, {
 });
 
 EXO_TEST(hub_net_shutdown, {
-	return (net_shutdown() != -1);
+	return (net_destroy() != -1);
 });

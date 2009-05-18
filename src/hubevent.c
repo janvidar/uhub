@@ -52,7 +52,7 @@ void on_login_success(struct hub_info* hub, struct user* u)
 	struct timeval timeout = { TIMEOUT_IDLE, 0 };
 	
 	/* Send user list of all existing users */
-	if (!uman_send_user_list(u))
+	if (!uman_send_user_list(hub, u))
 		return;
 
 	/* Mark as being in the normal state, and add user to the user list */
@@ -64,7 +64,7 @@ void on_login_success(struct hub_info* hub, struct user* u)
 
 	/* Announce new user to all connected users */
 	if (user_is_logged_in(u))
-		route_info_message(u);
+		route_info_message(hub, u);
 	
 	/* Send message of the day (if any) */
 	if (user_is_logged_in(u)) /* Previous send() can fail! */
@@ -79,7 +79,7 @@ void on_login_failure(struct hub_info* hub, struct user* u, enum status_message 
 {
 	log_user_login_error(u, msg);
 	hub_send_status(hub, u, msg, status_level_fatal);
-	user_disconnect(u, quit_logon_error);
+	hub_disconnect_user(hub, u, quit_logon_error);
 }
 
 void on_nick_change(struct hub_info* hub, struct user* u, const char* nick)

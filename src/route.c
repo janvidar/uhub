@@ -20,35 +20,35 @@
 #include "uhub.h"
 
 
-int route_message(struct user* u, struct adc_message* msg)
+int route_message(struct hub_info* hub, struct user* u, struct adc_message* msg)
 {
 	struct user* target = NULL;
 
 	switch (msg->cache[0])
 	{
 		case 'B': /* Broadcast to all logged in clients */
-			route_to_all(u->hub, msg);
+			route_to_all(hub, msg);
 			break;
 			
 		case 'D':
-			target = uman_get_user_by_sid(u->hub, msg->target);
+			target = uman_get_user_by_sid(hub, msg->target);
 			if (target)
 			{
-				route_to_user(target, msg);
+				route_to_user(hub, target, msg);
 			}
 			break;
 			
 		case 'E':
-			target = uman_get_user_by_sid(u->hub, msg->target);
+			target = uman_get_user_by_sid(hub, msg->target);
 			if (target)
 			{
-				route_to_user(target, msg);
-				route_to_user(u, msg);
+				route_to_user(hub, target, msg);
+				route_to_user(hub, u, msg);
 			}
 			break;
 			
 		case 'F':
-			route_to_subscribers(u->hub, msg);
+			route_to_subscribers(hub, msg);
 			break;	
 		
 		default:
@@ -111,7 +111,7 @@ static int check_send_queue(struct user* user, struct adc_message* msg)
 	return 1;
 }
 
-int route_to_user(struct user* user, struct adc_message* msg)
+int route_to_user(struct hub_info* hub, struct user* user, struct adc_message* msg)
 {
 	int ret;
 	
@@ -141,7 +141,7 @@ int route_to_user(struct user* user, struct adc_message* msg)
 		else
 		{
 			/* A socket error occured */
-			user_disconnect(user, quit_socket_error);
+			hub_disconnect_user(hub, user, quit_socket_error);
 			return 0;
 		}
 	}
@@ -152,7 +152,7 @@ int route_to_user(struct user* user, struct adc_message* msg)
 		if (ret == -1)
 		{
 			/* User is not able to swallow the data, let's cut our losses and disconnect. */
-			user_disconnect(user, quit_send_queue);
+			hub_disconnect_user(hub, user, quit_send_queue);
 		}
 		else if (ret == 1)
 		{
@@ -177,7 +177,7 @@ int route_to_all(struct hub_info* hub, struct adc_message* command) /* iterate u
 	struct user* user = (struct user*) list_get_first(hub->users->list);
 	while (user)
 	{
-		route_to_user(user, command);
+		route_to_user(hub, user, command);
 		user = (struct user*) list_get_next(hub->users->list);
 	}
 	
@@ -226,7 +226,7 @@ int route_to_subscribers(struct hub_info* hub, struct adc_message* command) /* i
 			
 			if (do_send)
 			{
-				route_to_user(user, command);
+				route_to_user(hub, user, command);
 			}
 		}
 		user = (struct user*) list_get_next(hub->users->list);
@@ -235,11 +235,11 @@ int route_to_subscribers(struct hub_info* hub, struct adc_message* command) /* i
 	return 0;
 }
 
-int route_info_message(struct user* u)
+int route_info_message(struct hub_info* hub, struct user* u)
 {
 	if (!user_is_nat_override(u))
 	{
-		return route_to_all(u->hub, u->info);
+		return route_to_all(hub, u->info);
 	}
 	else
 	{
@@ -250,15 +250,15 @@ int route_info_message(struct user* u)
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
 		adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR, address);
 	
-		user = (struct user*) list_get_first(u->hub->users->list);
+		user = (struct user*) list_get_first(hub->users->list);
 		while (user)
 		{
 			if (user_is_nat_override(user))
-				route_to_user(user, cmd);
+				route_to_user(hub, user, cmd);
 			else
-				route_to_user(user, u->info);
+				route_to_user(hub, user, u->info);
 			
-			user = (struct user*) list_get_next(u->hub->users->list);
+			user = (struct user*) list_get_next(hub->users->list);
 		}
 		adc_msg_free(cmd);
 	}

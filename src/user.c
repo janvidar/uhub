@@ -232,51 +232,8 @@ void user_support_remove(struct user* user, int fourcc)
 	user->flags &= ~feature_mask;
 }
 
-void user_schedule_destroy(struct user* user)
-{
-	struct event_data post;
-	memset(&post, 0, sizeof(post));
-	post.id     = UHUB_EVENT_USER_DESTROY;
-	post.ptr    = user;
-	event_queue_post(user->hub->queue, &post);
-}
-
 void user_disconnect(struct user* user, int reason)
 {
-	struct event_data post;
-	int need_notify = 0;
-	
-	if (user_is_disconnecting(user))
-	{
-		return;
-	}
-	
-	/* dont read more data from this user */
-	if (user->ev_read)
-	{
-		event_del(user->ev_read);
-		hub_free(user->ev_read);
-		user->ev_read = 0;
-	}
-	
-	hub_log(log_trace, "user_disconnect(), user=%p, reason=%d, state=%d", user, reason, user->state);
-	
-	need_notify = user_is_logged_in(user);
-	user->quit_reason = reason;
-	user_set_state(user, state_cleanup);
-	
-	if (need_notify)
-	{
-		memset(&post, 0, sizeof(post));
-		post.id     = UHUB_EVENT_USER_QUIT;
-		post.ptr    = user;
-		event_queue_post(user->hub->queue, &post);
-	}
-	else
-	{
-		user->quit_reason = quit_unknown;
-		user_schedule_destroy(user);
-	}
 
 
 }
