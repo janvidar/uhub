@@ -201,6 +201,17 @@ extern int user_is_connecting(struct user* user);
 extern int user_is_disconnecting(struct user* user);
 
 /**
+ * Returns 1 if a user is protected, which includes users
+ * having any form of elevated privileges.
+ */
+extern int user_is_protected(struct user* user);
+
+/**
+ * Returns 1 if a user is registered, with or without privileges.
+ */
+extern int user_is_registered(struct user* user);
+
+/**
  * User supports the protocol extension as given in fourcc.
  * This is usually set while the user is connecting, but can
  * also be used to subscribe to a new class of messages from the

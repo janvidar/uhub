@@ -299,6 +299,43 @@ int user_is_disconnecting(struct user* user)
 	return 0;
 }
 
+int user_is_protected(struct user* user)
+{
+	switch (user->credentials)
+	{
+		case cred_bot:
+		case cred_operator:
+		case cred_super:
+		case cred_admin:
+		case cred_link:
+			return 1;
+		default:
+			break;
+	}
+	return 0;
+}
+
+/**
+ * Returns 1 if a user is registered.
+ * Only registered users will be let in if the hub is configured for registered
+ * users only.
+ */
+int user_is_registered(struct user* user)
+{
+	switch (user->credentials)
+	{
+		case cred_bot:
+		case cred_user:
+		case cred_operator:
+		case cred_super:
+		case cred_admin:
+		case cred_link:
+			return 1;
+		default:
+			break;
+	}
+	return 0;
+}
 
 
 

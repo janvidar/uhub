@@ -39,8 +39,6 @@ static void remove_server_restricted_flags(struct adc_message* cmd)
 	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_REFERER);
 }
 
-static int user_is_protected(struct user* user);
-
 static int set_feature_cast_supports(struct user* u, struct adc_message* cmd)
 {
 	char *it, *tmp;
@@ -583,47 +581,6 @@ static int set_credentials(struct hub_info* hub, struct user* user, struct adc_m
 	return ret;
 }
 
-
-/**
- * Determines if a user is to be let into the hub even if the hub is "full".
- */
-static int user_is_protected(struct user* user)
-{
-	switch (user->credentials)
-	{
-		case cred_bot:
-		case cred_operator:
-		case cred_super:
-		case cred_admin:
-		case cred_link:
-			return 1;
-		default:
-			break;
- 	}
-	return 0;
-}
-
-/**
- * Returns 1 if a user is registered.
- * Only registered users will be let in if the hub is configured for registered
- * users only.
- */
-static int user_is_registered(struct user* user)
-{
-	switch (user->credentials)
-	{
-		case cred_bot:
-		case cred_user:
-		case cred_operator:
-		case cred_super:
-		case cred_admin:
-		case cred_link:
-			return 1;
-		default:
-			break;
-	}
-	return 0;
-}
 
 
 static int check_is_hub_full(struct hub_info* hub, struct user* user)
