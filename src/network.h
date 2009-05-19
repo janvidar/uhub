@@ -163,7 +163,7 @@ extern ssize_t net_recv(int fd, void* buf, size_t len, int flags);
 /**
  * A wrapper for the send() function call.
  */
-extern ssize_t net_send(int fd, void* buf, size_t len, int flags);
+extern ssize_t net_send(int fd, const void* buf, size_t len, int flags);
 
 /**
  * This tries to create a AF_INET6 socket.

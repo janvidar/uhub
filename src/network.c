@@ -547,7 +547,7 @@ ssize_t net_recv(int fd, void* buf, size_t len, int flags)
 }
 
 
-ssize_t net_send(int fd, void* buf, size_t len, int flags)
+ssize_t net_send(int fd, const void* buf, size_t len, int flags)
 {
 	ssize_t ret = send(fd, buf, len, flags);
 	if (ret >= 0)
