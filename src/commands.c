@@ -187,7 +187,7 @@ int command_dipatcher(struct hub_info* hub, struct user* user, const char* messa
 	size_t n = 0;
 	for (n = 0; command_handlers[n].prefix; n++)
 	{
-		if (!strncmp(message, command_handlers[n].prefix, command_handlers[n].length))
+		if (!strncmp(&message[1], command_handlers[n].prefix, command_handlers[n].length))
 		{
 			if (command_handlers[n].cred <= user->credentials)
 			{
