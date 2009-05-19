@@ -43,14 +43,11 @@ struct user* user_create(struct hub_info* hub, int sd)
 	
 	user->sd = sd;
 	user->tm_connected = time(NULL);
-// 	user->hub = hub;
-	user->feature_cast = 0;
 	
 	user->send_queue = list_create();
-	user->send_queue_offset = 0;
-	user->send_queue_size = 0;
-	user->recv_buf_offset = 0;
-	user->recv_buf = 0;
+
+	user->send_buf = hub_iobuf_create(MAX_SEND_BUF);
+	user->recv_buf = hub_iobuf_create(MAX_RECV_BUF);
 	
 	user_set_state(user, state_protocol);
 	return user;
@@ -95,6 +92,9 @@ void user_destroy(struct user* user)
 		list_destroy(user->send_queue);
 	}
 	
+	user->send_buf = hub_iobuf_create(MAX_SEND_BUF);
+	user->recv_buf = hub_iobuf_create(MAX_RECV_BUF);
+
 	hub_free(user);
 }
 

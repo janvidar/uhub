@@ -18,18 +18,40 @@
  */
 
 #include "uhub.h"
+#include "hubio.h"
 
 /* FIXME: This should not be needed! */
 extern struct hub_info* g_hub;
 
+int net_user_send(void* ptr, const void* buf, size_t len)
+{
+	struct user* user = (struct user*) ptr;
+	int ret = net_send(user->sd, buf, len, UHUB_SEND_SIGNAL);
+	printf("net_user_send: %d/%d bytes\n", ret, (int) len);
+	if (ret == -1)
+	{
+		printf("    errno: %d - %s\n", errno, strerror(errno));
+	}
+
+	return ret;
+}
+
+int net_user_recv(void* ptr, void* buf, size_t len)
+{
+	struct user* user = (struct user*) ptr;
+	int ret = net_recv(user->sd, buf, len, 0);
+	printf("net_user_recv: %d/%d bytes\n", ret, (int) len);
+	if (ret == -1)
+	{
+		printf("    errno: %d - %s\n", errno, strerror(errno));
+	}
+	return ret;
+}
+
+
 void net_on_read(int fd, short ev, void *arg)
 {
-	static char buf[MAX_RECV_BUF];
 	struct user* user = (struct user*) arg;
-	char* pos;
-	size_t offset;
-	size_t buflen;
-	ssize_t size;
 	int more = 1;
 	int flag_close = 0;
 	
@@ -49,16 +71,9 @@ void net_on_read(int fd, short ev, void *arg)
 		}
 	}
 	
-	while (more)
+	for (;;)
 	{
-		offset = 0;
-		if (user->recv_buf)
-		{
-			memcpy(buf, user->recv_buf, user->recv_buf_offset);
-			offset = user->recv_buf_offset;
-		}
-		
-		size = net_recv(fd, &buf[offset], MAX_RECV_BUF - offset, 0);
+		ssize_t size = hub_iobuf_recv(user->recv_buf, net_user_recv, user);
 		if (size == -1)
 		{
 			if (net_error() != EWOULDBLOCK)
@@ -72,76 +87,19 @@ void net_on_read(int fd, short ev, void *arg)
 		}
 		else
 		{
-			buflen = offset + size;
-			ssize_t handled = 0;
-			
-			while ((pos = memchr(&buf[handled], '\n', (buflen - handled))))
+			size_t offset = 0;
+			size_t length;
+			char* line = 0;
+
+			while ((line = hub_iobuf_getline(user->recv_buf, &offset, &length, g_hub->config->max_recv_buffer)))
 			{
-				pos[0] = '\0';
-				size_t msglen = &pos[0] - &buf[handled];
-				
-				if (user_flag_get(user, flag_maxbuf))
+				if (hub_handle_message(g_hub, user, line, length) == -1)
 				{
-					user_flag_unset(user, flag_maxbuf);
-				}
-				else
-				{
-					if (msglen < g_hub->config->max_recv_buffer)
-					{
-						// FIXME: hub is not set????
-						if (hub_handle_message(g_hub, user, &buf[handled], msglen) == -1)
-						{
-							flag_close = quit_protocol_error;
-							more = 0;
-							break;
-						}
-					}
-				}
-				handled += msglen;
-				handled++;
-			}
-			
-			if (handled == 0 && user_flag_get(user, flag_maxbuf))
-				handled = buflen;
-			
-			if (!more)
-				break;
-			
-			if (handled < buflen)
-			{
-				if ((buflen - handled) > g_hub->config->max_recv_buffer)
-				{
-					user_flag_set(user, flag_maxbuf);
-					hub_free(user->recv_buf);
-					user->recv_buf = 0;
-					user->recv_buf_offset = 0;
-				}
-				else
-				{
-					if (!user->recv_buf)
-						user->recv_buf = hub_malloc(g_hub->config->max_recv_buffer);
-				
-					if (user->recv_buf)
-					{
-						memcpy(user->recv_buf, &buf[handled], buflen - handled);
-						user->recv_buf_offset = buflen - handled;
-					}
-					else
-					{
-						flag_close = quit_memory_error;
-						break;
-					}
+					flag_close = quit_protocol_error;
+					break;
 				}
 			}
-			else
-			{
-				if (user->recv_buf)
-				{
-					hub_free(user->recv_buf);
-					user->recv_buf = 0;
-					user->recv_buf_offset = 0;
-				}
-			}
+			hub_iobuf_remove(user->recv_buf, offset);
 		}
 	}
 	

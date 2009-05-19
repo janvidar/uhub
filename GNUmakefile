@@ -133,8 +133,9 @@ libuhub_SOURCES := \
 		src/commands.c \
 		src/config.c \
 		src/eventqueue.c \
-		src/hubevent.c \
 		src/hub.c \
+		src/hubevent.c \
+		src/hubio.c \
 		src/inf.c \
 		src/ipcalc.c \
 		src/list.c \
@@ -161,8 +162,9 @@ uhub_HEADERS := \
 		src/config.h \
 		src/eventid.h \
 		src/eventqueue.h \
-		src/hubevent.h \
 		src/hub.h \
+		src/hubevent.h \
+		src/hubio.h \
 		src/inf.h \
 		src/ipcalc.h \
 		src/list.h \

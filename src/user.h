@@ -20,9 +20,8 @@
 #ifndef HAVE_UHUB_USER_H
 #define HAVE_UHUB_USER_H
 
-
 struct hub_info;
-
+struct hub_iobuf;
 
 enum user_state
 {
@@ -111,12 +110,14 @@ struct user
 	time_t               tm_last_write;           /** time the user last sent something to the hub */
 	struct linked_list*  feature_cast;            /** Features supported by feature cast */
 	struct adc_message*  info;                    /** ADC 'INF' message (broadcasted to everyone joining the hub) */
+
+	struct hub_iobuf*    send_buf;
+	struct hub_iobuf*    recv_buf;
+
 	size_t               send_queue_offset;       /** Send queue byte offset */
 	struct linked_list*  send_queue;              /** Send queue */
 	int                  send_queue_size;         /** Size of send queue (in bytes, not messages) */
-	int                  send_queue_esize;        /** Effective send queue size */
-	char*                recv_buf;                /** Recv buffer */
-	size_t               recv_buf_offset;         /** Recv buffer offset */
+
 	struct hub_info*     hub;                     /** The hub instance this user belong to */
 	int                  quit_reason;             /** Quit reason (see user_quit_reason) */
 	struct ip_addr_encap ipaddr;                  /** IP address of connected user */

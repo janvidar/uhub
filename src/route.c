@@ -19,7 +19,6 @@
 
 #include "uhub.h"
 
-
 int route_message(struct hub_info* hub, struct user* u, struct adc_message* msg)
 {
 	struct user* target = NULL;

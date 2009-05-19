@@ -122,6 +122,7 @@
 #define TIGERSIZE    24
 
 #define MAX_RECV_BUF 65535
+#define MAX_SEND_BUF 65535
 
 #ifndef INET6_ADDRSTRLEN
 #define INET6_ADDRSTRLEN 46
@@ -145,6 +146,7 @@ extern "C" {
 #include "sid.h"
 #include "network.h"
 #include "netevent.h"
+#include "hubio.h"
 #include "auth.h"
 #include "tiger.h"
 #include "config.h"
