@@ -160,7 +160,15 @@ int uman_remove(struct hub_info* hub, struct user* user)
 		return -1;
 
 	list_remove(hub->users->list, user);
-	hub->users->count--;
+	
+	if (hub->users->count > 0)
+	{
+		hub->users->count--;
+	}
+	else
+	{
+		assert(!"negative count!");
+	}
 	
 	hub->users->shared_size  -= user->limits.shared_size;
 	hub->users->shared_files -= user->limits.shared_files;

@@ -86,10 +86,10 @@ void net_on_read(int fd, short ev, void *arg)
 				}
 				else
 				{
-					if (msglen < user->hub->config->max_recv_buffer)
+					if (msglen < g_hub->config->max_recv_buffer)
 					{
 						// FIXME: hub is not set????
-						if (hub_handle_message(user->hub, user, &buf[handled], msglen) == -1)
+						if (hub_handle_message(g_hub, user, &buf[handled], msglen) == -1)
 						{
 							flag_close = quit_protocol_error;
 							more = 0;
@@ -109,7 +109,7 @@ void net_on_read(int fd, short ev, void *arg)
 			
 			if (handled < buflen)
 			{
-				if ((buflen - handled) > user->hub->config->max_recv_buffer)
+				if ((buflen - handled) > g_hub->config->max_recv_buffer)
 				{
 					user_flag_set(user, flag_maxbuf);
 					hub_free(user->recv_buf);
@@ -119,7 +119,7 @@ void net_on_read(int fd, short ev, void *arg)
 				else
 				{
 					if (!user->recv_buf)
-						user->recv_buf = hub_malloc(user->hub->config->max_recv_buffer);
+						user->recv_buf = hub_malloc(g_hub->config->max_recv_buffer);
 				
 					if (user->recv_buf)
 					{

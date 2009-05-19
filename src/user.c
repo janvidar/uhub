@@ -43,7 +43,7 @@ struct user* user_create(struct hub_info* hub, int sd)
 	
 	user->sd = sd;
 	user->tm_connected = time(NULL);
-	user->hub = hub;
+// 	user->hub = hub;
 	user->feature_cast = 0;
 	
 	user->send_queue = list_create();
