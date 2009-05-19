@@ -492,7 +492,7 @@ int acl_check_ip_range(struct ip_addr_encap* addr, struct ip_ban_record* info)
  * seconds since the unix epoch (modulus 1 million)
  * and the SID of the user (0-1 million).
  */
-const char* password_generate_challenge(struct user* user)
+const char* acl_password_generate_challenge(struct acl_handle* acl, struct user* user)
 {
 	char buf[32];
 	uint64_t tiger_res[3];
@@ -503,15 +503,11 @@ const char* password_generate_challenge(struct user* user)
 	tiger((uint64_t*) buf, strlen(buf), (uint64_t*) tiger_res);
 	base32_encode((unsigned char*) tiger_res, TIGERSIZE, tiger_buf);
 	tiger_buf[MAX_CID_LEN] = 0;
-
-#ifdef ACL_DEBUG
-	hub_log(log_trace, "Generating challenge for user %s: '%s'", user->id.nick, tiger_buf);
-#endif
 	return (const char*) tiger_buf;
 }
 
 
-int password_verify(struct user* user, const char* password)
+int acl_password_verify(struct acl_handle* acl, struct user* user, const char* password)
 {
 	char buf[1024];
 	struct user_access_info* access;
@@ -523,14 +519,14 @@ int password_verify(struct user* user, const char* password)
 	if (!password || !user || strlen(password) != MAX_CID_LEN)
 		return password_invalid;
 
-	access = acl_get_access_info(user->hub->acl, user->id.nick);
+	access = acl_get_access_info(acl, user->id.nick);
 	if (!access || !access->password)
 		return password_invalid;
 
 	if (TIGERSIZE+strlen(access->password) >= 1024)
 		return password_invalid;
 
-	challenge = password_generate_challenge(user);
+	challenge = acl_password_generate_challenge(acl, user);
 
 	base32_decode(challenge, (unsigned char*) raw_challenge, MAX_CID_LEN);
 
@@ -541,9 +537,6 @@ int password_verify(struct user* user, const char* password)
 	base32_encode((unsigned char*) tiger_res, TIGERSIZE, password_calc);
 	password_calc[MAX_CID_LEN] = 0;
 
-#ifdef ACL_DEBUG
-	hub_log(log_trace, "Checking password %s against %s", password, password_calc);
-#endif
 	if (strcasecmp(password, password_calc) == 0)
 	{
 		return password_ok;

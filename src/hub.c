@@ -166,7 +166,7 @@ int hub_handle_password(struct hub_info* hub, struct user* u, struct adc_message
 
 	if (u->state == state_verify)
 	{
-		if (password_verify(u, password))
+		if (acl_password_verify(hub->acl, u, password))
 		{
 			on_login_success(hub, u);
 		}
@@ -330,7 +330,7 @@ void hub_send_password_challenge(struct hub_info* hub, struct user* u)
 {
 	struct adc_message* igpa;
 	igpa = adc_msg_construct(ADC_CMD_IGPA, 38);
-	adc_msg_add_argument(igpa, password_generate_challenge(u));
+	adc_msg_add_argument(igpa, acl_password_generate_challenge(hub->acl, u));
 	user_set_state(u, state_verify);
 	route_to_user(hub, u, igpa);
 	adc_msg_free(igpa);

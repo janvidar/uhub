@@ -87,7 +87,7 @@ extern int acl_is_user_denied(struct acl_handle* handle, const char* name);
 
 extern int acl_check_ip_range(struct ip_addr_encap* addr, struct ip_ban_record* info);
 
-extern const char* password_generate_challenge(struct user* user);
-extern int password_verify(struct user* user, const char* password);
+extern const char* acl_password_generate_challenge(struct acl_handle* acl, struct user* user);
+extern int acl_password_verify(struct acl_handle* acl, struct user* user, const char* password);
 
 #endif /* HAVE_UHUB_ACL_H */
