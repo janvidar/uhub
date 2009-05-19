@@ -339,41 +339,39 @@ void hub_send_password_challenge(struct hub_info* hub, struct user* u)
 static void hub_event_dispatcher(void* callback_data, struct event_data* message)
 {
 	struct hub_info* hub = (struct hub_info*) callback_data;
-/*
-	hub_log(log_trace, "hub_event_dispatcher: %x (ptr=%p)", message->id, message->ptr);
-*/
+	struct user* user = (struct user*) message->ptr;
+	assert(hub != NULL);
 	
 	switch (message->id)
 	{
 		case UHUB_EVENT_USER_JOIN:
 		{
-			if (user_is_disconnecting((struct user*) message->ptr))
+			if (user_is_disconnecting(user))
 				break;
 		
 			if (message->flags)
 			{
-				hub_send_password_challenge(hub, (struct user*) message->ptr);
+				hub_send_password_challenge(hub, user);
 			}
 			else
 			{
-				on_login_success(hub, (struct user*) message->ptr);
+				on_login_success(hub, user);
 			}
 			break;
 		}
 
 		case UHUB_EVENT_USER_QUIT:
 		{
-			uman_remove(hub, (struct user*) message->ptr);
-			uman_send_quit_message(hub, (struct user*) message->ptr);
-			on_logout_user(hub, (struct user*) message->ptr);
-			hub_schedule_destroy_user(hub, (struct user*) message->ptr);
+			uman_remove(hub, user);
+			uman_send_quit_message(hub, user);
+			on_logout_user(hub, user);
+			hub_schedule_destroy_user(hub, user);
 			break;
 		}
 		
 		case UHUB_EVENT_USER_DESTROY:
 		{
-			hub_log(log_trace, "hub_event_dispatcher: UHUB_EVENT_USER_DESTROY (ptr=%p)", message->ptr);
-			user_destroy((struct user*) message->ptr);
+			user_destroy(user);
 			break;
 		}
 		
