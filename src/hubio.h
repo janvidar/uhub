@@ -69,3 +69,4 @@ extern char* hub_iobuf_getline(struct hub_iobuf*, size_t* offset, size_t* length
 extern void hub_iobuf_remove(struct hub_iobuf* buf, size_t n);
 
 #endif /* HAVE_UHUB_HUB_IO_H */
+
