@@ -30,71 +30,51 @@ struct user* user_create(struct hub_info* hub, int sd)
 	if (user == NULL)
 		return NULL; /* OOM */
 
-	user->ev_write = hub_malloc_zero(sizeof(struct event));
-	user->ev_read  = hub_malloc_zero(sizeof(struct event));
+	user->net.ev_write = hub_malloc_zero(sizeof(struct event));
+	user->net.ev_read  = hub_malloc_zero(sizeof(struct event));
 
-	if (!user->ev_write || !user->ev_read)
+	if (!user->net.ev_write || !user->net.ev_read)
 	{
-	    hub_free(user->ev_read);
-	    hub_free(user->ev_write);
+	    hub_free(user->net.ev_read);
+	    hub_free(user->net.ev_write);
 	    hub_free(user);
 	    return NULL;
 	}
 	
-	user->sd = sd;
-	user->tm_connected = time(NULL);
-	
-	user->send_queue = list_create();
-
-	user->send_buf = hub_iobuf_create(MAX_SEND_BUF);
-	user->recv_buf = hub_iobuf_create(MAX_RECV_BUF);
+	user->net.sd = sd;
+	user->net.tm_connected = time(NULL);
+	user->net.send_queue = hub_sendq_create();
+	user->net.recv_queue = hub_recvq_create();
 	
 	user_set_state(user, state_protocol);
 	return user;
 }
 
-static void clear_send_queue_callback(void* ptr)
-{
-	adc_msg_free((struct adc_message*) ptr);
-}
 
 void user_destroy(struct user* user)
 {
 	hub_log(log_trace, "user_destroy(), user=%p", user);
 
-	if (user->ev_write)
+	if (user->net.ev_write)
 	{
-		event_del(user->ev_write);
-		hub_free(user->ev_write);
-		user->ev_write = 0;
+		event_del(user->net.ev_write);
+		hub_free(user->net.ev_write);
+		user->net.ev_write = 0;
 	}
 	
-	if (user->ev_read)
+	if (user->net.ev_read)
 	{
-		event_del(user->ev_read);
-		hub_free(user->ev_read);
-		user->ev_read = 0;
+		event_del(user->net.ev_read);
+		hub_free(user->net.ev_read);
+		user->net.ev_read = 0;
 	}
 	
-	net_close(user->sd);
+	hub_recvq_destroy(user->net.recv_queue);
+	hub_sendq_destroy(user->net.send_queue);
+	net_close(user->net.sd);
 	
 	adc_msg_free(user->info);
 	user_clear_feature_cast_support(user);
-	
-	if (user->recv_buf)
-	{
-		hub_free(user->recv_buf);
-	}
-	
-	if (user->send_queue)
-	{
-		list_clear(user->send_queue, &clear_send_queue_callback);
-		list_destroy(user->send_queue);
-	}
-	
-	user->send_buf = hub_iobuf_create(MAX_SEND_BUF);
-	user->recv_buf = hub_iobuf_create(MAX_RECV_BUF);
-
 	hub_free(user);
 }
 
@@ -337,5 +317,21 @@ int user_is_registered(struct user* user)
 	return 0;
 }
 
+void user_want_write(struct user* user)
+{
+	if (user && user->net.ev_write)
+	{
+		event_add(user->net.ev_write, 0);
+	}
+}
+
+void user_want_read(struct user* user, int timeout_s)
+{
+	struct timeval timeout = { timeout_s, 0 };
+	if (user && user->net.ev_read)
+	{
+		event_add(user->net.ev_read, &timeout);
+	}
+}
 
 

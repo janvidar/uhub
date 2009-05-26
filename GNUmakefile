@@ -156,6 +156,8 @@ uhub_SOURCES := src/main.c
 
 adcrush_SOURCES := src/adcrush.c
 
+admin_SOURCES := src/admin.c
+
 uhub_HEADERS := \
 		src/adcconst.h \
 		src/auth.h \
@@ -200,12 +202,14 @@ autotest_OBJECTS = autotest.o
 libuhub_OBJECTS := $(libuhub_SOURCES:.c=.o)
 uhub_OBJECTS    := $(uhub_SOURCES:.c=.o)
 adcrush_OBJECTS := $(adcrush_SOURCES:.c=.o)
+admin_OBJECTS   := $(admin_SOURCES:.c=.o)
 
-all_OBJECTS     := $(libuhub_OBJECTS) $(uhub_OBJECTS) $(adcrush_OBJECTS) $(autotest_OBJECTS)
+all_OBJECTS     := $(libuhub_OBJECTS) $(uhub_OBJECTS) $(adcrush_OBJECTS) $(autotest_OBJECTS) $(admin_OBJECTS)
 
 LIBUHUB=libuhub.a
 uhub_BINARY=uhub$(BIN_EXT)
 adcrush_BINARY=adcrush$(BIN_EXT)
+admin_BINARY=uhub-admin$(BIN_EXT)
 autotest_BINARY=autotest/test$(BIN_EXT)
 
 %.o: %.c
@@ -216,6 +220,10 @@ all: $(uhub_BINARY) $(PCH)
 
 $(adcrush_BINARY): $(PCH) $(LIBUHUB) $(adcrush_OBJECTS)
 	$(MSG_LD) $(CC) -o $@.tmp $(adcrush_OBJECTS) $(LIBUHUB) $(LDFLAGS) $(LDLIBS) && \
+        $(MV) $@.tmp $@
+
+$(admin_BINARY): $(PCH) $(LIBUHUB) $(admin_OBJECTS)
+	$(MSG_LD) $(CC) -o $@.tmp $(admin_OBJECTS) $(LIBUHUB) $(LDFLAGS) $(LDLIBS) && \
         $(MV) $@.tmp $@
 
 $(uhub_BINARY): $(PCH) $(LIBUHUB) $(uhub_OBJECTS)

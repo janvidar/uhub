@@ -58,23 +58,6 @@ int route_message(struct hub_info* hub, struct user* u, struct adc_message* msg)
 }
 
 
-static void queue_command(struct user* user, struct adc_message* msg__, int offset)
-{
-	struct adc_message* msg = adc_msg_incref(msg__);
-	list_append(user->send_queue, msg);
-
-#ifdef DEBUG_SENDQ
-	hub_log(log_trace, "SENDQ: user=%p, msg=%p (%zu), offset=%d, length=%d, total_length=%d", user, msg, msg->references, offset, msg->length, user->send_queue_size);
-#endif
-
-	user->send_queue_size += msg->length - offset;
-	if (list_size(user->send_queue) == 1)
-	{
-		user->send_queue_offset = offset;
-		user->tm_last_write = time(NULL);
-	}
-}
-
 // #define ALWAYS_QUEUE_MESSAGES
 static size_t get_max_send_queue(struct hub_info* hub)
 {
@@ -84,12 +67,11 @@ static size_t get_max_send_queue(struct hub_info* hub)
 	return hub->config->max_send_buffer;
 }
 
+#if 0
 static size_t get_max_send_queue_soft(struct hub_info* hub)
 {
 	return hub->config->max_send_buffer_soft;
 }
-
-
 
 /*
  * @return 1 if send queue is OK.
@@ -101,75 +83,39 @@ static int check_send_queue(struct user* user, struct adc_message* msg)
 	if (user_flag_get(user, flag_user_list))
 		return 1;
 
-	if ((user->send_queue_size + msg->length) > get_max_send_queue(user->hub))      
+	if ((user->net.send_queue->size + msg->length) > get_max_send_queue(user->hub))      
 		return -1;
 
-	if (user->send_queue_size > get_max_send_queue_soft(user->hub) && msg->priority < 0)
+	if (user->net.send_queue->size > get_max_send_queue_soft(user->hub) && msg->priority < 0)
 		return 0;
 
 	return 1;
 }
+#endif
+
 
 int route_to_user(struct hub_info* hub, struct user* user, struct adc_message* msg)
 {
-	int ret;
-	
 #if LOG_SEND_MESSAGES_WHEN_ROUTED
 	char* data = strndup(msg->cache, msg->length-1);
 	hub_log(log_protocol, "send %s: %s", sid_to_string(user->sid), data);
 	free(data);
 #endif
 
-#ifndef ALWAYS_QUEUE_MESSAGES
-	if (user->send_queue_size == 0 && !user_is_disconnecting(user))
+	int empty = hub_sendq_is_empty(user->net.send_queue);
+	hub_sendq_add(user->net.send_queue, msg);
+
+	if (empty)
 	{
-		ret = net_send(user->sd, msg->cache, msg->length, UHUB_SEND_SIGNAL);
-		
-		if (ret == msg->length)
-		{
-			return 1;
-		}
-		
-		if (ret >= 0 || (ret == -1 && net_error() == EWOULDBLOCK))
-		{
-			queue_command(user, msg, ret);
-			
-			if (user->send_queue_size && user->ev_write)
-				event_add(user->ev_write, NULL);
-		}
-		else
-		{
-			/* A socket error occured */
-			hub_disconnect_user(hub, user, quit_socket_error);
-			return 0;
-		}
+		// try oportunistic write
 	}
 	else
-#endif
 	{
-		ret = check_send_queue(user, msg);
-		if (ret == -1)
-		{
-			/* User is not able to swallow the data, let's cut our losses and disconnect. */
-			hub_disconnect_user(hub, user, quit_send_queue);
-		}
-		else if (ret == 1)
-		{
-			/* queue command */
-			queue_command(user, msg, 0);
-                        if (user->ev_write)
-				event_add(user->ev_write, NULL);
-
-		}
-		else
-		{
-			/* do not queue command as our soft-limits are exceeded */
-		}
+		user_want_write(user);
 	}
-	
+
 	return 1;
 }
-
 
 int route_to_all(struct hub_info* hub, struct adc_message* command) /* iterate users */
 {
@@ -182,7 +128,6 @@ int route_to_all(struct hub_info* hub, struct adc_message* command) /* iterate u
 	
 	return 0;
 }
-
 
 int route_to_subscribers(struct hub_info* hub, struct adc_message* command) /* iterate users */
 {
@@ -243,7 +188,7 @@ int route_info_message(struct hub_info* hub, struct user* u)
 	else
 	{
 		struct adc_message* cmd = adc_msg_copy(u->info);
-		const char* address = ip_convert_to_string(&u->ipaddr);
+		const char* address = ip_convert_to_string(&u->net.ipaddr);
 		struct user* user = 0;
 		
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);

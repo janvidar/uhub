@@ -186,7 +186,7 @@ static int check_required_login_flags(struct hub_info* hub, struct user* user, s
  */
 int check_network(struct hub_info* hub, struct user* user, struct adc_message* cmd)
 {
-	const char* address = ip_convert_to_string(&user->ipaddr);
+	const char* address = ip_convert_to_string(&user->net.ipaddr);
 	
 	/* Check for NAT override address */
 	if (acl_is_ip_nat_override(hub->acl, address))

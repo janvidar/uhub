@@ -26,32 +26,77 @@ extern struct hub_info* g_hub;
 int net_user_send(void* ptr, const void* buf, size_t len)
 {
 	struct user* user = (struct user*) ptr;
-	int ret = net_send(user->sd, buf, len, UHUB_SEND_SIGNAL);
-	printf("net_user_send: %d/%d bytes\n", ret, (int) len);
-	if (ret == -1)
-	{
-		printf("    errno: %d - %s\n", errno, strerror(errno));
-	}
+	int ret = net_send(user->net.sd, buf, len, UHUB_SEND_SIGNAL);
 
+	if (ret > 0)
+	{
+		user->net.tm_last_write = time(NULL);
+	}
+	else if (ret == -1 && net_error() == EWOULDBLOCK)
+	{
+		return -2;
+	}
+	else
+	{
+		// user->close_flag = quit_socket_error;
+		return 0;
+	}
 	return ret;
 }
 
 int net_user_recv(void* ptr, void* buf, size_t len)
 {
 	struct user* user = (struct user*) ptr;
-	int ret = net_recv(user->sd, buf, len, 0);
+	int ret = net_recv(user->net.sd, buf, len, 0);
+
+	hub_log(log_debug, "net_user_recv: sd=%d, len=%d/%d", user->net.sd, ret, (int) len);
+
+	if (ret > 0)
+	{
+		user->net.tm_last_read = time(NULL);
+	}
+
+
+#ifdef DEBUG_SENDQ
 	printf("net_user_recv: %d/%d bytes\n", ret, (int) len);
 	if (ret == -1)
 	{
 		printf("    errno: %d - %s\n", errno, strerror(errno));
 	}
+#endif
 	return ret;
+}
+
+/**
+ * @param buf buffer to extract line from
+ * @param bufsize size of buffer
+ * @param offset (in/out) offset into buffer
+ * @param len (out) length of the line returned
+ * @param max_size maximum length of line, if line is longer, it is discarded.
+ *
+ * @return line from buffer, or NULL if no line can be returned.
+ */
+static char* extract_line(char* buf, size_t bufsize, size_t* offset, size_t* len, size_t max_size)
+{
+	size_t x = *offset;
+	char* pos = memchr(&buf[x], '\n', (bufsize - x));
+	if (pos)
+	{
+		*len = &pos[0] - &buf[x];
+		pos[0] = '\0';
+		pos = &buf[x];
+		(*offset) += (*len + 1);
+	}
+	return pos;
 }
 
 
 void net_on_read(int fd, short ev, void *arg)
 {
+	static char buf[MAX_RECV_BUF];
 	struct user* user = (struct user*) arg;
+	struct hub_recvq* q = user->net.recv_queue;
+	size_t buf_size;
 	int more = 1;
 	int flag_close = 0;
 	
@@ -71,9 +116,16 @@ void net_on_read(int fd, short ev, void *arg)
 		}
 	}
 	
+	buf_size = hub_recvq_get(q, buf, MAX_RECV_BUF);
+
 	for (;;)
 	{
-		ssize_t size = hub_iobuf_recv(user->recv_buf, net_user_recv, user);
+		int size = net_user_recv(user, &buf[buf_size], MAX_RECV_BUF - buf_size);
+		if (size > 0)
+		{
+			buf_size += size;
+		}
+
 		if (size == -1)
 		{
 			if (net_error() != EWOULDBLOCK)
@@ -91,15 +143,16 @@ void net_on_read(int fd, short ev, void *arg)
 			size_t length;
 			char* line = 0;
 
-			while ((line = hub_iobuf_getline(user->recv_buf, &offset, &length, g_hub->config->max_recv_buffer)))
+			while ((line = extract_line(buf, buf_size, &offset, &length, g_hub->config->max_recv_buffer)))
 			{
+				puts(line);
 				if (hub_handle_message(g_hub, user, line, length) == -1)
 				{
 					flag_close = quit_protocol_error;
 					break;
 				}
 			}
-			hub_iobuf_remove(user->recv_buf, offset);
+			hub_recvq_set(q, buf+offset, buf_size); 
 		}
 	}
 	
@@ -111,18 +164,18 @@ void net_on_read(int fd, short ev, void *arg)
 	
 	if (user_is_logged_in(user))
 	{
-		if (user->ev_read)
+		if (user->net.ev_read)
 		{
 			struct timeval timeout = { TIMEOUT_IDLE, 0 };
-			event_add(user->ev_read, &timeout);
+			event_add(user->net.ev_read, &timeout);
 		}
 	}
 	else if (user_is_connecting(user))
 	{
-		if (user->ev_read)
+		if (user->net.ev_read)
 		{
 			struct timeval timeout = { TIMEOUT_HANDSHAKE, 0 };
-			event_add(user->ev_read, &timeout);
+			event_add(user->net.ev_read, &timeout);
 		}
 	}
 }
@@ -131,89 +184,27 @@ void net_on_read(int fd, short ev, void *arg)
 void net_on_write(int fd, short ev, void *arg)
 {
 	struct user* user = (struct user*) arg;
-	struct adc_message* msg;
-	int ret;
-	int length;
-	int close_flag = 0;
-	
-	msg = list_get_first(user->send_queue);
-	while (msg)
+	int sent = 0;
+
+	for (;;)
 	{
-		length = msg->length - user->send_queue_offset;
-		ret = net_send(user->sd, &msg->cache[user->send_queue_offset], length, UHUB_SEND_SIGNAL);
-	
-		if (ret == 0 || (ret == -1 && net_error() == EWOULDBLOCK))
-		{
-			close_flag = 0;
-			break;
-		}
-		else if (ret > 0)
-		{
-			
-			user->tm_last_write = time(NULL);
-			
-			if (ret == length)
-			{
-#ifdef DEBUG_SENDQ
-				hub_log(log_error, "SENDQ: sent=%d bytes/%d (all), send_queue_size=%d, offset=%d", ret, (int) msg->length, user->send_queue_size, user->send_queue_offset);
-#endif
-				user->send_queue_size -= ret;
-				user->send_queue_offset = 0;
-			
-#ifdef DEBUG_SENDQ
-				if ((user->send_queue_size < 0) || (user->send_queue_offset < 0))
-				{
-					hub_log(log_error, "INVALID: send_queue_size=%d, send_queue_offset=%d", user->send_queue_size, user->send_queue_offset);
-				}
-#endif
-			
-				list_remove(user->send_queue, msg);
-				
-				if (user_flag_get(user, flag_user_list) && (msg == user->info || user->send_queue_size == 0))
-				{
-				    user_flag_unset(user, flag_user_list);
-				}
-				
-				adc_msg_free(msg);
-				msg = 0;
-				
-				if (user->send_queue_size == 0)
-					break;
-			}
-			else
-			{
-#ifdef DEBUG_SENDQ
-                                hub_log(log_error, "SENDQ: sent=%d bytes/%d (part), send_queue_size=%d, offset=%d", ret, (int) msg->length, user->send_queue_size, user->send_queue_offset);
-#endif
-				user->send_queue_size -= ret;
-				user->send_queue_offset += ret;
-				
-#ifdef DEBUG_SENDQ				
-				if ((user->send_queue_size < 0) || (user->send_queue_offset < 0) || (user->send_queue_offset > msg->length))
-				{
-					hub_log(log_error, "INVALID: send_queue_size=%d, send_queue_offset=%d", user->send_queue_size, user->send_queue_offset);
-				}
-#endif
-				break;
-			}
-		}
+		int ret = hub_sendq_send(user->net.send_queue, net_user_send, user);
+		if (ret > 0)
+			sent += ret;
 		else
-		{
-			close_flag = quit_socket_error;
 			break;
-		}
-		msg = list_get_first(user->send_queue);
 	}
-	
-	
+
+#if 0
 	if (close_flag)
 	{
 		hub_disconnect_user(g_hub, user, close_flag);
 	}
 	else
+#endif
+	if (hub_sendq_get_bytes(user->net.send_queue))
 	{
-		if (user->send_queue_size > 0 && user->ev_write)
-			event_add(user->ev_write, NULL);
+		user_want_write(user);
 	}
 }
 
@@ -264,16 +255,16 @@ void net_on_accept(int server_fd, short ev, void *arg)
 		}
 		
 		/* Store IP address in user object */
-		memcpy(&user->ipaddr, &ipaddr, sizeof(ipaddr));
+		memcpy(&user->net.ipaddr, &ipaddr, sizeof(ipaddr));
 		
 		net_set_nonblocking(fd, 1);
 		net_set_nosigpipe(fd, 1);
 		
-		event_set(user->ev_read,  fd, EV_READ | EV_PERSIST, net_on_read,  user);
-		event_set(user->ev_write, fd, EV_WRITE,             net_on_write, user);
-		event_base_set(hub->evbase, user->ev_read);
-		event_base_set(hub->evbase, user->ev_write);
-		event_add(user->ev_read,  &timeout);
+		event_set(user->net.ev_read,  fd, EV_READ | EV_PERSIST, net_on_read,  user);
+		event_set(user->net.ev_write, fd, EV_WRITE,             net_on_write, user);
+		event_base_set(hub->evbase, user->net.ev_read);
+		event_base_set(hub->evbase, user->net.ev_write);
+		event_add(user->net.ev_read,  &timeout);
 	}
 }
 

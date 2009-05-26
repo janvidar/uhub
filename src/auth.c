@@ -498,7 +498,7 @@ const char* acl_password_generate_challenge(struct acl_handle* acl, struct user*
 	uint64_t tiger_res[3];
 	static char tiger_buf[MAX_CID_LEN+1];
 	
-	snprintf(buf, 32, "%d%d%d", (int) user->tm_connected, (int) user->id.sid, (int) user->sd);
+	snprintf(buf, 32, "%d%d%d", (int) user->net.tm_connected, (int) user->id.sid, (int) user->net.sd);
 	
 	tiger((uint64_t*) buf, strlen(buf), (uint64_t*) tiger_res);
 	base32_encode((unsigned char*) tiger_res, TIGERSIZE, tiger_buf);

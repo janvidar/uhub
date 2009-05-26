@@ -178,7 +178,7 @@ static int command_version(struct hub_info* hub, struct user* user, const char* 
 static int command_myip(struct hub_info* hub, struct user* user, const char* message)
 {
     char tmp[128];
-    snprintf(tmp, 128, "Your IP is \"%s\"", ip_convert_to_string(&user->ipaddr));
+    snprintf(tmp, 128, "Your IP is \"%s\"", ip_convert_to_string(&user->net.ipaddr));
     return command_status(hub, user, "myip", tmp);
 }
 

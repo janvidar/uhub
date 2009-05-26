@@ -21,6 +21,8 @@
 
 struct hub_info* g_hub = 0;
 
+#define NETWORK_DUMP_DEBUG 1
+
 int hub_handle_message(struct hub_info* hub, struct user* u, const char* line, size_t length)
 {
 	int ret = 0;
@@ -144,8 +146,8 @@ int hub_handle_support(struct hub_info* hub, struct user* u, struct adc_message*
 		if (ok)
 		{
 			hub_send_handshake(hub, u);
-			if (u->ev_read)
-				event_add(u->ev_read, &timeout);
+			if (u->net.ev_read)
+				event_add(u->net.ev_read, &timeout);
 		}
 		else
 		{
@@ -912,15 +914,15 @@ void hub_disconnect_user(struct hub_info* hub, struct user* user, int reason)
 	
 	/* dont read more data from this user */
 	/* FIXME: Remove this from here! */
-	if (user->ev_read)
+	if (user->net.ev_read)
 	{
-		event_del(user->ev_read);
-		hub_free(user->ev_read);
-		user->ev_read = 0;
+		event_del(user->net.ev_read);
+		hub_free(user->net.ev_read);
+		user->net.ev_read = 0;
 	}
 
 	/* this should be enough? */
-	net_shutdown_r(user->sd);
+	net_shutdown_r(user->net.sd);
 	
 	hub_log(log_trace, "hub_disconnect_user(), user=%p, reason=%d, state=%d", user, reason, user->state);
 	

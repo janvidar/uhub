@@ -21,71 +21,138 @@
 #include "hubio.h"
 
 
-struct hub_iobuf* hub_iobuf_create(size_t max_size)
+struct hub_recvq* hub_recvq_create()
 {
-	struct hub_iobuf* buf = hub_malloc_zero(sizeof(struct hub_iobuf));
-	if (buf)
-	{
-		buf->buf = hub_malloc(max_size);
-		buf->capacity = max_size;
-	}
-	return buf;
+	struct hub_recvq* q = hub_malloc_zero(sizeof(struct hub_recvq));
+	q->buf = hub_malloc(MAX_RECV_BUF);
+
+	return q;
 }
 
-void hub_iobuf_destroy(struct hub_iobuf* buf)
+void hub_recvq_destroy(struct hub_recvq* q)
 {
-	if (buf)
+	if (q)
 	{
-		hub_free(buf->buf);
-		hub_free(buf);
+		hub_free(q->buf);
+		hub_free(q);
 	}
 }
 
-int hub_iobuf_recv(struct hub_iobuf* buf, hub_iobuf_read r, void* data)
+size_t hub_recvq_get(struct hub_recvq* q, void* buf, size_t bufsize)
 {
-	int size = r(data, &buf->buf[buf->offset], buf->capacity - buf->offset);
-	if (size > 0)
+	assert(bufsize >= q->size);
+	if (q->size)
 	{
-		buf->size += size;
+		size_t n = q->size;
+		memcpy(buf, q->buf, n);
+		hub_free(q->buf);
+		q->buf = 0;
+		q->size = 0;
+		return n;
 	}
-	return size;
+	return 0;
 }
 
-int hub_iobuf_send(struct hub_iobuf* buf, hub_iobuf_write w, void* data)
+size_t hub_recvq_set(struct hub_recvq* q, void* buf, size_t bufsize)
 {
-	int size = w(data, &buf->buf[buf->offset], buf->size - buf->offset);
-	if (size > 0)
+	if (!bufsize)
+		return 0;
+
+	if (q->buf)
 	{
-		buf->offset += size;
+		hub_free(q->buf);
+		q->buf = 0;
+		q->size = 0;
 	}
-	return size;
+
+	q->buf = hub_malloc(bufsize);
+	if (!q->buf)
+		return 0;
+
+	q->size = bufsize;
+	memcpy(q->buf, buf, bufsize);
+	return bufsize;
 }
 
-char* hub_iobuf_getline(struct hub_iobuf* buf, size_t* offset, size_t* len, size_t max_size)
-{
-	size_t x = *offset;
-	char* pos = memchr(&buf->buf[x], '\n', (buf->size - x));
 
-	if (pos)
+struct hub_sendq* hub_sendq_create()
+{
+	struct hub_sendq* q = hub_malloc_zero(sizeof(struct hub_sendq));
+	if (!q)
+		return 0;
+
+	q->queue = list_create();
+	if (!q->queue)
 	{
-		*len = &pos[0] - &buf->buf[x];
-		pos[0] = '\0';
-		pos = &buf->buf[x];
-		(*offset) += (*len + 1);
+		hub_free(q);
+		return 0;
 	}
-	return pos;
+
+	return q;
 }
 
-void hub_iobuf_remove(struct hub_iobuf* buf, size_t n)
+static void clear_send_queue_callback(void* ptr)
 {
-	assert(buf);
-	assert(n <= buf->size);
+	adc_msg_free((struct adc_message*) ptr);
+}
 
-	buf->offset = 0;
-
-	if (n == buf->size)
+void hub_sendq_destroy(struct hub_sendq* q)
+{
+	if (q)
 	{
-		buf->size = 0;
+		list_clear(q->queue, &clear_send_queue_callback);
+		list_destroy(q->queue);
+		hub_free(q);
+	}
+}
+
+void hub_sendq_add(struct hub_sendq* q, struct adc_message* msg_)
+{
+	struct adc_message* msg = adc_msg_incref(msg_);
+	list_append(q->queue, msg);
+	q->size += msg->length;
+}
+
+void hub_sendq_remove(struct hub_sendq* q, struct adc_message* msg)
+{
+	list_remove(q->queue, msg);
+	adc_msg_free(msg);
+	q->size  -= msg->length;
+	q->offset = 0;
+}
+
+int  hub_sendq_send(struct hub_sendq* q, hub_recvq_write w, void* data)
+{
+	int ret = 0;
+	int bytes_sent = 0;
+	
+	struct adc_message* msg = list_get_first(q->queue);
+	while (msg)
+	{
+		size_t len = msg->length - q->offset;
+		ret = w(data, &msg->cache[q->offset], len);
+
+		if (ret <= 0) break;
+
+		q->offset += ret;
+		bytes_sent += ret;
+
+		if (q->offset < msg->length)
+			break;
+
+		hub_sendq_remove(q, msg);
+		msg = list_get_first(q->queue);
 	}
 
+	return bytes_sent;
+}
+
+int hub_sendq_is_empty(struct hub_sendq* q)
+{
+	return q->size == 0;
+}
+
+size_t hub_sendq_get_bytes(struct hub_sendq* q)
+{
+	return q->size - q->offset;
 }

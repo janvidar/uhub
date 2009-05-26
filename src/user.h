@@ -33,7 +33,6 @@ enum user_state
 	state_disconnected = 5,      /**<< "User is disconnected" */
 };
 
-
 enum user_flags
 {
 	feature_base    = 0x00000001, /** BASE: Basic configuration (required by all clients) */
@@ -54,7 +53,6 @@ enum user_flags
 	flag_nat        = 0x40000000, /** nat override enabled */
 };
 
-
 enum user_quit_reason
 {
 	quit_unknown        = 0,
@@ -71,7 +69,6 @@ enum user_quit_reason
 	quit_ghost_timeout  = 11,    /** The user is a ghost, and trying to login from another connection */
 };
 
-
 struct user_info
 {
 	sid_t sid;                    /** session ID */
@@ -84,7 +81,7 @@ struct user_info
  * as the number of bytes and files shared, and the number of hubs the
  * user is connected to, etc.
  */
-struct user_counts
+struct user_limits
 {
 	uint64_t             shared_size;             /** Shared size in bytes */
 	size_t               shared_files;            /** The number of shared files */
@@ -95,36 +92,40 @@ struct user_counts
 	size_t               hub_count_total;         /** The number of hubs connected to in total */
 };
 
-struct user
+struct user_net_io
 {
 	int                  sd;                      /** socket descriptor */
 	struct event*        ev_read;                 /** libevent struct for read events */
 	struct event*        ev_write;                /** libevent struct for write events */
+
+	struct hub_recvq*    recv_queue;
+	struct hub_sendq*    send_queue;
+
+	time_t               tm_connected;            /** time when user connected */
+	time_t               tm_last_read;            /** time the user last received something from the hub */
+	time_t               tm_last_write;           /** time the user last sent something to the hub */
+
+	struct ip_addr_encap ipaddr;                  /** IP address of connected user */
+
+#ifdef SSL_SUPPORT
+	SSL*                 ssl;                     /** SSL handle */
+#endif /*  SSL_SUPPORT */
+};
+
+struct user
+{
+	struct user_net_io   net;                     /** Network information data */
 	enum user_state      state;                   /** see enum user_state */
 	enum user_credentials credentials;            /** see enum user_credentials */
 	struct user_info     id;                      /** Contains nick name and CID */
 	int                  flags;                   /** see enum user_features */
 	char                 user_agent[MAX_UA_LEN+1];/** User agent string */
-	time_t               tm_connected;            /** time when user connected */
-	time_t               tm_last_read;            /** time the user last received something from the hub */
-	time_t               tm_last_write;           /** time the user last sent something to the hub */
 	struct linked_list*  feature_cast;            /** Features supported by feature cast */
 	struct adc_message*  info;                    /** ADC 'INF' message (broadcasted to everyone joining the hub) */
-
-	struct hub_iobuf*    send_buf;
-	struct hub_iobuf*    recv_buf;
-
-	size_t               send_queue_offset;       /** Send queue byte offset */
-	struct linked_list*  send_queue;              /** Send queue */
-	int                  send_queue_size;         /** Size of send queue (in bytes, not messages) */
-
 	struct hub_info*     hub;                     /** The hub instance this user belong to */
+	struct user_limits   limits;                  /** Data used for limitation */
 	int                  quit_reason;             /** Quit reason (see user_quit_reason) */
-	struct ip_addr_encap ipaddr;                  /** IP address of connected user */
-	struct user_counts   limits;                  /** Data used for limitation */
-#ifdef SSL_SUPPORT
-	SSL*                 ssl;                     /** SSL handle */
-#endif /*  SSL_SUPPORT */
+
 };
 
 
@@ -271,6 +272,16 @@ extern int user_set_feature_cast_support(struct user* u, char feature[4]);
  * Remove all feature cast support features.
  */
 extern void user_clear_feature_cast_support(struct user* u);
+
+/**
+ * Mark the user with a want-write flag, meaning it should poll for writability.
+ */
+extern void user_want_write(struct user* user);
+
+/**
+ * Mark the user with a want read flag, meaning it should poll for readability.
+ */
+extern void user_want_read(struct user* user, int timeout_s);
 
 
 

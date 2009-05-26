@@ -30,6 +30,17 @@ struct net_statistics
 	size_t errors;
 };
 
+struct net_socket_t;
+
+#define NET_WANT_READ             0x01
+#define NET_WANT_WRITE            0x02
+#define NET_WANT_ACCEPT           0x08
+#define NET_WANT_SSL_READ         0x10
+#define NET_WANT_SSL_WRITE        0x20
+#define NET_WANT_SSL_ACCEPT       0x40
+#define NET_WANT_SSL_CONNECT      0x40
+#define NET_WANT_SSL_X509_LOOKUP  0x80
+
 /**
  * Initialize the socket monitor subsystem.
  * On some operating systems this will also involve loading the TCP/IP stack
@@ -214,11 +225,6 @@ extern void net_stats_get(struct net_statistics** intermediate, struct net_stati
 
 #if defined(WINSOCK) && !defined(__CYGWIN__)
 
-// #define EINTR           WSAEINTR
-// #define EACCES          WSAEACCES
-// #define EFAULT          WSAEFAULT
-// #define EINVAL          WSAEINVAL
-// #define EMFILE          WSAEMFILE
 #define EWOULDBLOCK     WSAEWOULDBLOCK
 #define EINPROGRESS     WSAEINPROGRESS
 #define EALREADY        WSAEALREADY
@@ -247,10 +253,8 @@ extern void net_stats_get(struct net_statistics** intermediate, struct net_stati
 #define ETIMEDOUT       WSAETIMEDOUT
 #define ECONNREFUSED    WSAECONNREFUSED
 #define ELOOP           WSAELOOP
-// #define ENAMETOOLONG    WSAENAMETOOLONG
 #define EHOSTDOWN       WSAEHOSTDOWN
 #define EHOSTUNREACH    WSAEHOSTUNREACH
-// #define ENOTEMPTY       WSAENOTEMPTY
 #define EPROCLIM        WSAEPROCLIM
 #define EUSERS          WSAEUSERS
 #define EDQUOT          WSAEDQUOT

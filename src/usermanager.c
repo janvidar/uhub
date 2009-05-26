@@ -234,10 +234,13 @@ int uman_send_user_list(struct hub_info* hub, struct user* target)
 		user = (struct user*) list_get_next(hub->users->list);
 	}
 	
+#if 0
+	FIXME: FIXME FIXME handle send queue excess
 	if (!target->send_queue_size)
 	{
 	    user_flag_unset(target, flag_user_list);
 	}
+#endif
 	return ret;
 }
 
