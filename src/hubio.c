@@ -24,8 +24,6 @@
 struct hub_recvq* hub_recvq_create()
 {
 	struct hub_recvq* q = hub_malloc_zero(sizeof(struct hub_recvq));
-	q->buf = hub_malloc(MAX_RECV_BUF);
-
 	return q;
 }
 
@@ -55,15 +53,15 @@ size_t hub_recvq_get(struct hub_recvq* q, void* buf, size_t bufsize)
 
 size_t hub_recvq_set(struct hub_recvq* q, void* buf, size_t bufsize)
 {
-	if (!bufsize)
-		return 0;
-
 	if (q->buf)
 	{
 		hub_free(q->buf);
 		q->buf = 0;
 		q->size = 0;
 	}
+	
+	if (!bufsize)
+		return 0;
 
 	q->buf = hub_malloc(bufsize);
 	if (!q->buf)

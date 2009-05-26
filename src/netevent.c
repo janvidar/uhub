@@ -23,11 +23,19 @@
 /* FIXME: This should not be needed! */
 extern struct hub_info* g_hub;
 
+#define DEBUG_SENDQ 1
+
 int net_user_send(void* ptr, const void* buf, size_t len)
 {
 	struct user* user = (struct user*) ptr;
 	int ret = net_send(user->net.sd, buf, len, UHUB_SEND_SIGNAL);
-
+#ifdef DEBUG_SENDQ
+	printf("net_user_send: sd=%d, %d/%d bytes\n", user->net.sd, ret, (int) len);
+	if (ret == -1)
+	{
+		printf("    errno: %d - %s\n", errno, strerror(errno));
+	}
+#endif
 	if (ret > 0)
 	{
 		user->net.tm_last_write = time(NULL);
@@ -47,10 +55,10 @@ int net_user_send(void* ptr, const void* buf, size_t len)
 int net_user_recv(void* ptr, void* buf, size_t len)
 {
 	struct user* user = (struct user*) ptr;
-	int ret = net_recv(user->net.sd, buf, len, 0);
-
-	hub_log(log_debug, "net_user_recv: sd=%d, len=%d/%d", user->net.sd, ret, (int) len);
-
+	int ret = net_recv(user->net.sd, buf, len, 0);	
+/*
+	hub_log(log_trace, "net_user_recv: sd=%d, len=%d/%d", user->net.sd, ret, (int) len);
+*/
 	if (ret > 0)
 	{
 		user->net.tm_last_read = time(NULL);
@@ -63,33 +71,17 @@ int net_user_recv(void* ptr, void* buf, size_t len)
 	{
 		printf("    errno: %d - %s\n", errno, strerror(errno));
 	}
+	
+	if (ret > 0)
+	{
+		char* data = hub_malloc_zero(ret + 1);
+		memcpy(data, buf, ret);
+		printf("RECV: \"%s\"\n", data);
+		hub_free(data);
+	}
 #endif
 	return ret;
 }
-
-/**
- * @param buf buffer to extract line from
- * @param bufsize size of buffer
- * @param offset (in/out) offset into buffer
- * @param len (out) length of the line returned
- * @param max_size maximum length of line, if line is longer, it is discarded.
- *
- * @return line from buffer, or NULL if no line can be returned.
- */
-static char* extract_line(char* buf, size_t bufsize, size_t* offset, size_t* len, size_t max_size)
-{
-	size_t x = *offset;
-	char* pos = memchr(&buf[x], '\n', (bufsize - x));
-	if (pos)
-	{
-		*len = &pos[0] - &buf[x];
-		pos[0] = '\0';
-		pos = &buf[x];
-		(*offset) += (*len + 1);
-	}
-	return pos;
-}
-
 
 void net_on_read(int fd, short ev, void *arg)
 {
@@ -141,18 +133,38 @@ void net_on_read(int fd, short ev, void *arg)
 		{
 			size_t offset = 0;
 			size_t length;
-			char* line = 0;
-
-			while ((line = extract_line(buf, buf_size, &offset, &length, g_hub->config->max_recv_buffer)))
+			char* start = buf;
+			char* pos = 0;
+			while ((pos = memchr(start, '\n', (buf_size - offset))))
 			{
-				puts(line);
+				char* line = start;
+				length = pos - start;
+				pos[0] = '\0';
+
+#ifdef DEBUG_SENDQ
+				printf("PROC: \"%s\" (%d)\n", line, (int) length);
+#endif
+
 				if (hub_handle_message(g_hub, user, line, length) == -1)
 				{
 					flag_close = quit_protocol_error;
 					break;
 				}
+
+				start = pos;
+				start++;
+				offset += length;
 			}
-			hub_recvq_set(q, buf+offset, buf_size); 
+			
+			if (start < buf + buf_size)
+			{
+				hub_recvq_set(q, buf+offset, buf_size); 
+			}
+			else
+			{
+				hub_recvq_set(q, 0, 0);
+			}
+			
 		}
 	}
 	

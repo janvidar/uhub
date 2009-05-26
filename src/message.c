@@ -244,6 +244,7 @@ struct adc_message* adc_msg_parse_verify(struct user* u, const char* line, size_
 	
 	if (command->source && (!u || command->source != u->id.sid))
 	{
+		hub_log(log_debug, "Command does not match user's SID (command->source=%d, user->id.sid=%d)", command->source, (u ? u->id.sid : 0));
 		adc_msg_free(command);
 		return 0;
 	}

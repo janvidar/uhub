@@ -514,8 +514,20 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		return 0;
 	}
 	
+	hub->recvbuf = hub_malloc(MAX_RECV_BUF);
+	hub->sendbuf = hub_malloc(MAX_SEND_BUF);
+	if (!hub->recvbuf || !hub->sendbuf)
+	{
+		hub_free(hub->recvbuf);
+		hub_free(hub->sendbuf);
+		uman_shutdown(hub);
+		hub_free(hub);
+		net_close(server_tcp);
+		return 0;
+	}
+
 	hub->status = hub_status_running;
-	
+
 	g_hub = hub;
 	return hub;
 }

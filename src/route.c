@@ -18,6 +18,7 @@
  */
 
 #include "uhub.h"
+#define DEBUG_SENDQ 1
 
 int route_message(struct hub_info* hub, struct user* u, struct adc_message* msg)
 {
@@ -96,9 +97,9 @@ static int check_send_queue(struct user* user, struct adc_message* msg)
 
 int route_to_user(struct hub_info* hub, struct user* user, struct adc_message* msg)
 {
-#if LOG_SEND_MESSAGES_WHEN_ROUTED
+#ifdef DEBUG_SENDQ
 	char* data = strndup(msg->cache, msg->length-1);
-	hub_log(log_protocol, "send %s: %s", sid_to_string(user->sid), data);
+	hub_log(log_protocol, "send %s: \"%s\"", sid_to_string(user->id.sid), data);
 	free(data);
 #endif
 

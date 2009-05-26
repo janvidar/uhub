@@ -96,6 +96,9 @@ struct hub_info
 	struct adc_message* command_banner;  /* The default welcome message */
 	time_t tm_started;
 	int status;
+	char* recvbuf; /* Global receive buffer */
+	char* sendbuf; /* Global send buffer */
+	
 #ifdef SSL_SUPPORT
 	SSL_METHOD* ssl_method;
 	SSL_CTX* ssl_ctx;

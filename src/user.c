@@ -19,6 +19,20 @@
 
 #include "uhub.h"
 
+static const char* user_log_str(struct user* user)
+{
+	static char buf[128];
+	if (user)
+	{
+		snprintf(buf, 128, "user={ %p, \"%s\", %s/%s}", user, user->id.nick, sid_to_string(user->id.sid), user->id.cid);
+	}
+	else
+	{
+		snprintf(buf, 128, "user={ %p }", user);
+	}
+	return buf;
+}
+
 struct user* user_create(struct hub_info* hub, int sd)
 {
 	struct user* user = NULL;
@@ -319,6 +333,7 @@ int user_is_registered(struct user* user)
 
 void user_want_write(struct user* user)
 {
+	hub_log(log_trace, "user_want_write: %s", user_log_str(user));
 	if (user && user->net.ev_write)
 	{
 		event_add(user->net.ev_write, 0);
@@ -327,6 +342,8 @@ void user_want_write(struct user* user)
 
 void user_want_read(struct user* user, int timeout_s)
 {
+	hub_log(log_trace, "user_want_read: %s", user_log_str(user));
+
 	struct timeval timeout = { timeout_s, 0 };
 	if (user && user->net.ev_read)
 	{
