@@ -13,7 +13,7 @@ EXO_TEST(um_test_setup, {
 	{
 		memset(&um_user[i], 0, sizeof(struct user));
 		um_user[i].id.sid = i+1;
-		um_user[i].sd  = -1;
+		um_user[i].net.sd  = -1;
 	}
 	return 1;
 });

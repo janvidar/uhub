@@ -42,7 +42,7 @@ static void inf_create_user()
 	if (inf_user) return;
 	inf_user = (struct user*) hub_malloc_zero(sizeof(struct user));
 	inf_user->id.sid = 1;
-	inf_user->sd  = -1;
+	inf_user->net.sd = -1;
 	inf_user->limits.upload_slots = 1;
 }
 
