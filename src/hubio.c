@@ -20,6 +20,10 @@
 #include "uhub.h"
 #include "hubio.h"
 
+#define SEND_CHUNKS 1
+
+/* FIXME: This should not be needed! */
+extern struct hub_info* g_hub;
 
 struct hub_recvq* hub_recvq_create()
 {
@@ -114,13 +118,14 @@ void hub_sendq_add(struct hub_sendq* q, struct adc_message* msg_)
 void hub_sendq_remove(struct hub_sendq* q, struct adc_message* msg)
 {
 	list_remove(q->queue, msg);
-	adc_msg_free(msg);
 	q->size  -= msg->length;
+	adc_msg_free(msg);
 	q->offset = 0;
 }
 
 int  hub_sendq_send(struct hub_sendq* q, hub_recvq_write w, void* data)
 {
+#ifdef SEND_CHUNKS
 	int ret = 0;
 	int bytes_sent = 0;
 	
@@ -143,6 +148,61 @@ int  hub_sendq_send(struct hub_sendq* q, hub_recvq_write w, void* data)
 	}
 
 	return bytes_sent;
+#else
+	int ret = 0;
+	size_t sent = 0;
+	size_t bytes = 0;
+	size_t offset = q->offset; // offset into first message.
+	size_t length = 0;
+	size_t msgs = 0;
+	char* sbuf = g_hub->sendbuf;
+	size_t max_send_buf = 1000; // MAX_SEND_BUF;
+
+	/* Copy as many messages possible into global send queue */
+	struct adc_message* msg = list_get_first(q->queue);
+	
+	while (msg)
+	{
+		msgs++;
+		length = MIN(msg->length - offset, (max_send_buf-1) - bytes);
+		memcpy(sbuf + bytes, msg->cache + offset, length);
+		bytes += length;
+		
+		if (length < msg->length - offset)
+			break;
+		offset = 0;
+		msg = list_get_next(q->queue);
+	}
+
+	msg = list_get_first(q->queue);
+	printf("Queued up bytes: %d, in %d msgs (first=%d/%d)\n", (int) bytes, (int) msgs, (int) q->offset, (msg ? (int) msg->length : 0));
+	
+	/* Send as much as possible */
+	ret = w(data, sbuf, bytes);
+	
+	if (ret > 0)
+	{
+		/* Remove messages sent */
+		offset = q->offset;
+		msg = list_get_first(q->queue);
+		while (msg)
+		{
+			sent += (msg->length - offset);
+			offset = 0;
+			
+			if (sent >= bytes)
+				break;
+			
+			printf("removing msg %d [%p]\n", (int) msgs, msg);
+			
+			hub_sendq_remove(q, msg);
+			msgs--;
+			msg = list_get_next(q->queue);
+		}
+		q->offset = (bytes - sent);
+	}
+	return ret;
+#endif
 }
 
 int hub_sendq_is_empty(struct hub_sendq* q)
