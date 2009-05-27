@@ -216,7 +216,7 @@ void net_on_write(int fd, short ev, void *arg)
 #endif
 	if (hub_sendq_get_bytes(user->net.send_queue))
 	{
-		user_want_write(user);
+		user_net_io_want_write(user);
 	}
 }
 

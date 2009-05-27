@@ -276,12 +276,12 @@ extern void user_clear_feature_cast_support(struct user* u);
 /**
  * Mark the user with a want-write flag, meaning it should poll for writability.
  */
-extern void user_want_write(struct user* user);
+extern void user_net_io_want_write(struct user* user);
 
 /**
  * Mark the user with a want read flag, meaning it should poll for readability.
  */
-extern void user_want_read(struct user* user, int timeout_s);
+extern void user_net_io_want_read(struct user* user, int timeout_s);
 
 
 

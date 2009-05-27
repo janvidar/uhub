@@ -331,18 +331,18 @@ int user_is_registered(struct user* user)
 	return 0;
 }
 
-void user_want_write(struct user* user)
+void user_net_io_want_write(struct user* user)
 {
-	hub_log(log_trace, "user_want_write: %s", user_log_str(user));
+	hub_log(log_trace, "user_net_io_want_write: %s", user_log_str(user));
 	if (user && user->net.ev_write)
 	{
 		event_add(user->net.ev_write, 0);
 	}
 }
 
-void user_want_read(struct user* user, int timeout_s)
+void user_net_io_want_read(struct user* user, int timeout_s)
 {
-	hub_log(log_trace, "user_want_read: %s", user_log_str(user));
+	hub_log(log_trace, "user_net_io_want_read: %s", user_log_str(user));
 
 	struct timeval timeout = { timeout_s, 0 };
 	if (user && user->net.ev_read)

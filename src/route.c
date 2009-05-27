@@ -112,7 +112,7 @@ int route_to_user(struct hub_info* hub, struct user* user, struct adc_message* m
 	}
 	else
 	{
-		user_want_write(user);
+		user_net_io_want_write(user);
 	}
 
 	return 1;
