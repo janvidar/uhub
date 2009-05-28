@@ -103,17 +103,10 @@ int route_to_user(struct hub_info* hub, struct user* user, struct adc_message* m
 	free(data);
 #endif
 
-	int empty = hub_sendq_is_empty(user->net.send_queue);
 	hub_sendq_add(user->net.send_queue, msg);
 
-	if (empty)
-	{
-		// try oportunistic write
-	}
-	else
-	{
-		user_net_io_want_write(user);
-	}
+	/* FIXME: try oportunistic write? */
+	user_net_io_want_write(user);
 
 	return 1;
 }
