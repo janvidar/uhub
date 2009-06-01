@@ -944,7 +944,7 @@ int main(int argc, char** argv)
 	net_string_to_address(AF_INET, cfg_host, &saddr.sin_addr);
 	
 	runloop(cfg_clients);
-	net_shutdown();
+	net_destroy();
 
 	return 0;
 }
