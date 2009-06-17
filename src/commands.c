@@ -77,7 +77,7 @@ static int command_stats(struct hub_info* hub, struct user* user, const char* me
 	(int) hub->stats.net_tx_peak / 1024,
 	(int) hub->stats.net_rx_peak / 1024);
 	
-	return command_status(hub, user, "stats", message);
+	return command_status(hub, user, "stats", temp);
 }
 
 static int command_help(struct hub_info* hub, struct user* user, const char* message)
