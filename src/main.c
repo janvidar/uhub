@@ -29,6 +29,7 @@ static const char* arg_uid = 0;
 static const char* arg_gid = 0;
 static const char* arg_config  = 0;
 static const char* arg_log = 0;
+static const char* arg_pid = 0;
 static int arg_log_syslog = 0;
 
 
@@ -215,6 +216,7 @@ void print_usage(char* program)
 #ifndef WIN32
 		"   -u <user>   Run as given user\n"
 		"   -g <group>  Run with given group permissions\n"
+		"   -p <file>   Store pid in file (process id)\n"
 #endif
 		"   -V          Show version number.\n"
 	);
@@ -226,7 +228,7 @@ void print_usage(char* program)
 void parse_command_line(int argc, char** argv)
 {
 	int opt;
-	while ((opt = getopt(argc, argv, "vqfc:l:hu:g:VCsSL")) != -1)
+	while ((opt = getopt(argc, argv, "vqfc:l:hu:g:VCsSLp:")) != -1)
 	{
 		switch (opt)
 		{
@@ -284,6 +286,10 @@ void parse_command_line(int argc, char** argv)
 
 			case 'g':
 				arg_gid = optarg;
+				break;
+
+			case 'p':
+				arg_pid = optarg;
 				break;
 
 			default:
@@ -387,6 +393,33 @@ int drop_privileges()
 
 	return 0;
 }
+
+int pidfile_create()
+{
+	if (arg_pid)
+	{
+		FILE* pidfile = fopen(arg_pid, "w");
+	        if (!pidfile)
+		{
+			hub_log(log_fatal, "Unable to write pid file: %s\n", arg_pid);
+			return -1;
+		}
+
+		fprintf(pidfile, "%d", (int) getpid());
+		fclose(pidfile);
+	}
+	return 0;
+}
+
+int pidfile_destroy()
+{
+	if (arg_pid)
+	{
+		return unlink(arg_pid);
+	}
+	return 0;
+}
+
 #endif /* WIN32 */
 
 
@@ -422,11 +455,19 @@ int main(int argc, char** argv)
 		}
 	}
 
+	if (pidfile_create() == -1)
+		return -1;
+
 	if (drop_privileges() == -1)
 		return -1;
 #endif /* WIN32 */
 
 	ret = main_loop();
+
+#ifndef WIN32
+	pidfile_destroy();
+#endif
+
 	return ret;
 }
 
