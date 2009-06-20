@@ -23,7 +23,7 @@
 /* FIXME: This should not be needed! */
 extern struct hub_info* g_hub;
 
-#define DEBUG_SENDQ 1
+/* #define DEBUG_SENDQ 1 */
 
 int net_user_send(void* ptr, const void* buf, size_t len)
 {

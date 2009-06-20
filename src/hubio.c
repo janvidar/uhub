@@ -152,6 +152,9 @@ int  hub_sendq_send(struct hub_sendq* q, hub_recvq_write w, void* data)
 
 	return bytes_sent;
 #else
+
+/*	<======.....><.......><.......> */
+
 	int ret = 0;
 	size_t sent = 0;
 	size_t bytes = 0;
@@ -178,8 +181,9 @@ int  hub_sendq_send(struct hub_sendq* q, hub_recvq_write w, void* data)
 	}
 
 	msg = list_get_first(q->queue);
+#ifdef DEBUG_SENDQ
 	printf("Queued up bytes: %d, in %d msgs (first=%d/%d)\n", (int) bytes, (int) msgs, (int) q->offset, (msg ? (int) msg->length : 0));
-	
+#endif
 	/* Send as much as possible */
 	ret = w(data, sbuf, bytes);
 	
@@ -195,9 +199,9 @@ int  hub_sendq_send(struct hub_sendq* q, hub_recvq_write w, void* data)
 			
 			if (sent >= bytes)
 				break;
-			
+#ifdef DEBUG_SENDQ
 			printf("removing msg %d [%p]\n", (int) msgs, msg);
-			
+#endif
 			hub_sendq_remove(q, msg);
 			msgs--;
 			msg = list_get_next(q->queue);
