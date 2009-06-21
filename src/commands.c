@@ -19,6 +19,8 @@
 
 #include "uhub.h"
 
+#define CRASH_DEBUG 1
+
 typedef int (*command_handler)(struct hub_info* hub, struct user* user, const char* message);
 
 struct commands_handler
@@ -182,6 +184,15 @@ static int command_myip(struct hub_info* hub, struct user* user, const char* mes
     return command_status(hub, user, "myip", tmp);
 }
 
+#ifdef CRASH_DEBUG
+static int command_crash(struct hub_info* hub, struct user* user, const char* message)
+{
+	void (*crash)(void) = NULL;
+	crash();
+	return 0;
+}
+#endif
+
 int command_dipatcher(struct hub_info* hub, struct user* user, const char* message)
 {
 	size_t n = 0;
@@ -213,6 +224,9 @@ static struct commands_handler command_handlers[] = {
 	{ "reload",     6, cred_admin,     command_reload,   "Reload configuration files."  },
 	{ "shutdown",   8, cred_admin,     command_shutdown, "Shutdown hub."                },
 	{ "myip",       4, cred_guest,     command_myip,     "Show your own IP."            },
+#ifdef CRASH_DEBUG
+	{ "crash",      5, cred_admin,     command_crash,    "Crash the hub (DEBUG)."       },
+#endif
 	{ 0,            0, cred_none,      command_help,     ""                             }
 };
 
