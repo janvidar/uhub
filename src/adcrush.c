@@ -386,7 +386,7 @@ static int recv_client(struct ADC_client* client)
 
 	char* start = client->recvbuf;
 	char* pos;
-	char* lastPos;
+	char* lastPos = 0;
 	while ((pos = strchr(start, '\n')))
 	{
 		lastPos = pos;
@@ -482,9 +482,16 @@ static int recv_client(struct ADC_client* client)
 		start = &pos[1];
 	}
 	
-	client->r_offset = strlen(lastPos);
-	memmove(client->recvbuf, lastPos, strlen(lastPos));
-	memset(&client->recvbuf[client->r_offset], 0, ADC_BUFSIZE-client->r_offset);
+	if (lastPos)
+	{
+		client->r_offset = strlen(lastPos);
+		memmove(client->recvbuf, lastPos, strlen(lastPos));
+		memset(&client->recvbuf[client->r_offset], 0, ADC_BUFSIZE-client->r_offset);
+	}
+	else
+	{
+		// client->r_offset = size;
+	}
 	
 	
 	return 0;

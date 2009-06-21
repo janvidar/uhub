@@ -23,8 +23,6 @@
 /* FIXME: This should not be needed! */
 extern struct hub_info* g_hub;
 
-/* #define DEBUG_SENDQ 1 */
-
 int net_user_send(void* ptr, const void* buf, size_t len)
 {
 	struct user* user = (struct user*) ptr;
@@ -56,9 +54,7 @@ int net_user_recv(void* ptr, void* buf, size_t len)
 {
 	struct user* user = (struct user*) ptr;
 	int ret = net_recv(user->net.sd, buf, len, 0);	
-/*
-	hub_log(log_trace, "net_user_recv: sd=%d, len=%d/%d", user->net.sd, ret, (int) len);
-*/
+
 	if (ret > 0)
 	{
 		user->net.tm_last_read = time(NULL);

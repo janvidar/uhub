@@ -23,6 +23,9 @@
 /* Debugging */
 /* #define NETWORK_DUMP_DEBUG */
 /* #define MEMORY_DEBUG */
+/* #define DEBUG_SENDQ 1 */
+
+
 
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE

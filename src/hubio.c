@@ -20,7 +20,7 @@
 #include "uhub.h"
 #include "hubio.h"
 
-#define SEND_CHUNKS 1
+// #define SEND_CHUNKS 1
 
 /* FIXME: This should not be needed! */
 extern struct hub_info* g_hub;
@@ -152,29 +152,27 @@ int  hub_sendq_send(struct hub_sendq* q, hub_recvq_write w, void* data)
 
 	return bytes_sent;
 #else
-
-/*	<======.....><.......><.......> */
-
 	int ret = 0;
-	size_t sent = 0;
 	size_t bytes = 0;
 	size_t offset = q->offset; // offset into first message.
+	size_t remain = 0;
 	size_t length = 0;
-	size_t msgs = 0;
 	char* sbuf = g_hub->sendbuf;
-	size_t max_send_buf = 1000; // MAX_SEND_BUF;
+	size_t max_send_buf = 4096;
 
 	/* Copy as many messages possible into global send queue */
 	struct adc_message* msg = list_get_first(q->queue);
-	
 	while (msg)
 	{
-		msgs++;
 		length = MIN(msg->length - offset, (max_send_buf-1) - bytes);
+#ifdef DEBUG_SENDQ
+		printf("Queued: %d bytes (%d bytes)\n", (int) length, (int) msg->length);
+#endif
+		
 		memcpy(sbuf + bytes, msg->cache + offset, length);
 		bytes += length;
 		
-		if (length < msg->length - offset)
+		if (length < (msg->length - offset))
 			break;
 		offset = 0;
 		msg = list_get_next(q->queue);
@@ -182,7 +180,7 @@ int  hub_sendq_send(struct hub_sendq* q, hub_recvq_write w, void* data)
 
 	msg = list_get_first(q->queue);
 #ifdef DEBUG_SENDQ
-	printf("Queued up bytes: %d, in %d msgs (first=%d/%d)\n", (int) bytes, (int) msgs, (int) q->offset, (msg ? (int) msg->length : 0));
+	printf("Queued up bytes: %d (first=%d/%d)\n", (int) bytes, (int) q->offset, (msg ? (int) msg->length : 0));
 #endif
 	/* Send as much as possible */
 	ret = w(data, sbuf, bytes);
@@ -191,22 +189,24 @@ int  hub_sendq_send(struct hub_sendq* q, hub_recvq_write w, void* data)
 	{
 		/* Remove messages sent */
 		offset = q->offset;
-		msg = list_get_first(q->queue);
+		remain = ret;
+		
 		while (msg)
 		{
-			sent += (msg->length - offset);
-			offset = 0;
-			
-			if (sent >= bytes)
+			length = msg->length - offset;
+			if (length >= remain)
+			{
+				q->offset += remain;
 				break;
+			}
 #ifdef DEBUG_SENDQ
 			printf("removing msg %d [%p]\n", (int) msgs, msg);
 #endif
+			remain -= length;
 			hub_sendq_remove(q, msg);
-			msgs--;
 			msg = list_get_next(q->queue);
+			offset = 0;
 		}
-		q->offset = (bytes - sent);
 	}
 	return ret;
 #endif
