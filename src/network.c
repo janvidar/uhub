@@ -565,7 +565,7 @@ ssize_t net_recv(int fd, void* buf, size_t len, int flags)
 	{
 		if (net_error() != EWOULDBLOCK)
 		{
-			net_error_out(fd, "net_recv");
+			/* net_error_out(fd, "net_recv"); */
 			net_stats_add_error();
 		}
 	}
@@ -584,7 +584,7 @@ ssize_t net_send(int fd, const void* buf, size_t len, int flags)
 	{
 		if (net_error() != EWOULDBLOCK)
 		{
-			net_error_out(fd, "net_send");
+			/* net_error_out(fd, "net_send"); */
 			net_stats_add_error();
 		}
 	}
