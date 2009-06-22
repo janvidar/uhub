@@ -192,6 +192,12 @@ extern void user_set_state(struct user* user, enum user_state);
 extern int user_is_logged_in(struct user* user);
 
 /**
+ * Returns 1 if the user is in state_protocol.
+ * Returns 0 otherwise.
+ */
+extern int user_is_protocol_negotiating(struct user* user);
+
+/**
  * Returns 1 if the user is in state_protocol, state_identify or state_verify.
  * Returns 0 otherwise.
  */

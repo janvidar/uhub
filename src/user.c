@@ -286,6 +286,13 @@ int user_is_connecting(struct user* user)
 	return 0;
 }
 
+int user_is_protocol_negotiating(struct user* user)
+{
+	if (user->state == state_protocol)
+		return 1;
+	return 0;
+}
+
 int user_is_disconnecting(struct user* user)
 {
 	if (user->state == state_cleanup || user->state == state_disconnected)
