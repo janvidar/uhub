@@ -258,11 +258,10 @@ static void prepare_user_net(struct hub_info* hub, struct user* user)
 {
 		int fd = user->net.sd;
 		struct timeval timeout = { TIMEOUT_CONNECTED, 0 };
+
+#ifdef SET_SENDBUG
 		size_t sendbuf = 0;
 		size_t recvbuf = 0;
-	
-		net_set_nonblocking(fd, 1);
-		net_set_nosigpipe(fd, 1);
 
 		if (net_get_recvbuf_size(fd, &recvbuf) != -1)
 		{
@@ -275,6 +274,10 @@ static void prepare_user_net(struct hub_info* hub, struct user* user)
 			if (sendbuf > MAX_SEND_BUF || !sendbuf) sendbuf = MAX_SEND_BUF;
 			net_set_sendbuf_size(fd, sendbuf);
 		}
+#endif
+
+		net_set_nonblocking(fd, 1);
+		net_set_nosigpipe(fd, 1);
 
 		event_set(user->net.ev_read,  fd, EV_READ | EV_PERSIST, net_on_read,  user);
 		event_set(user->net.ev_write, fd, EV_WRITE,             net_on_write, user);
