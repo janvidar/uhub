@@ -23,20 +23,45 @@
 /* FIXME: This should not be needed! */
 extern struct hub_info* g_hub;
 
+#ifdef DEBUG_SENDQ
+void debug_sendq_send(struct user* user, int sent, int total)
+{
+	printf("SEND: sd=%d, %d/%d bytes\n", user->net.sd, sent, total);
+	if (sent == -1)
+	{
+		int err = net_error();
+		printf("    errno: %d - %s\n", err, net_error_string(err));
+	}
+}
+
+void debug_sendq_recv(struct user* user, int received, int max, const char* buffer)
+{
+	printf("RECV: %d/%d bytes\n", ret, (int) len);
+	if (ret == -1)
+	{
+		int err = net_error();
+		printf("    errno: %d - %s\n", err, net_error_string(err));
+	}
+	else if (ret > 0)
+	{
+		char* data = hub_malloc_zero(ret + 1);
+		memcpy(data, buf, ret);
+		printf("RECV: \"%s\"\n", data);
+		hub_free(data);
+	}
+}
+#endif
+
 int net_user_send(void* ptr, const void* buf, size_t len)
 {
 	struct user* user = (struct user*) ptr;
 	int ret = net_send(user->net.sd, buf, len, UHUB_SEND_SIGNAL);
 #ifdef DEBUG_SENDQ
-	printf("net_user_send: sd=%d, %d/%d bytes\n", user->net.sd, ret, (int) len);
-	if (ret == -1)
-	{
-		printf("    errno: %d - %s\n", errno, strerror(errno));
-	}
+	debug_sendq_send(user, ret, len);
 #endif
 	if (ret > 0)
 	{
-		user->net.tm_last_write = time(NULL);
+		user_reset_last_write(user);
 	}
 	else if (ret == -1 && net_error() == EWOULDBLOCK)
 	{
@@ -50,34 +75,61 @@ int net_user_send(void* ptr, const void* buf, size_t len)
 	return ret;
 }
 
+#ifdef SSL_SUPPORT
+int net_user_send_ssl(void* ptr, const void* buf, size_t len)
+{
+	struct user* user = (struct user*) ptr;
+	int ret = SSL_write(user->net.ssl, buf, (int) len);
+#ifdef DEBUG_SENDQ
+	debug_sendq_send(user, ret, len);
+#endif
+	if (ret > 0)
+	{
+		user_reset_last_write(user);
+	}
+	else if (ret == -1 && net_error() == EWOULDBLOCK)
+	{
+		return -2;
+	}
+	else
+	{
+		// user->close_flag = quit_socket_error;
+		return 0;
+	}
+	return ret;
+}
+#endif
+
 int net_user_recv(void* ptr, void* buf, size_t len)
 {
 	struct user* user = (struct user*) ptr;
-	int ret = net_recv(user->net.sd, buf, len, 0);	
-
+	int ret = net_recv(user->net.sd, buf, len, 0);
 	if (ret > 0)
 	{
-		user->net.tm_last_read = time(NULL);
+		user_reset_last_read(user);
 	}
-
-
 #ifdef DEBUG_SENDQ
-	printf("net_user_recv: %d/%d bytes\n", ret, (int) len);
-	if (ret == -1)
-	{
-		printf("    errno: %d - %s\n", errno, strerror(errno));
-	}
-	
-	if (ret > 0)
-	{
-		char* data = hub_malloc_zero(ret + 1);
-		memcpy(data, buf, ret);
-		printf("RECV: \"%s\"\n", data);
-		hub_free(data);
-	}
+	debug_sendq_recv(user, ret, len, buf);
 #endif
 	return ret;
 }
+
+
+#ifdef SSL_SUPPORT
+int net_user_recv_ssl(void* ptr, void* buf, size_t len)
+{
+	struct user* user = (struct user*) ptr;
+	int ret = SSL_read(user->net.ssl, buf, len);
+	if (ret > 0)
+	{
+		user_reset_last_read(user);
+	}
+#ifdef DEBUG_SENDQ
+	debug_sendq_recv(user, ret, len, buf);
+#endif
+	return ret;
+}
+#endif
 
 void net_on_read(int fd, short ev, void *arg)
 {
@@ -87,9 +139,11 @@ void net_on_read(int fd, short ev, void *arg)
 	size_t buf_size;
 	int more = 1;
 	int flag_close = 0;
-	
+
+#ifdef DEBUG_SENDQ
 	hub_log(log_trace, "net_on_read() : fd=%d, ev=%d, arg=%p", fd, (int) ev, arg);
-	
+#endif
+
 	if (ev == EV_TIMEOUT)
 	{
 		more = 0;
