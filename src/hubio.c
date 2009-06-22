@@ -125,32 +125,8 @@ void hub_sendq_remove(struct hub_sendq* q, struct adc_message* msg)
 	q->offset = 0;
 }
 
-int  hub_sendq_send(struct hub_sendq* q, hub_recvq_write w, void* data)
+int hub_sendq_send(struct hub_sendq* q, hub_recvq_write w, void* data)
 {
-#ifdef SEND_CHUNKS
-	int ret = 0;
-	int bytes_sent = 0;
-	
-	struct adc_message* msg = list_get_first(q->queue);
-	while (msg)
-	{
-		size_t len = msg->length - q->offset;
-		ret = w(data, &msg->cache[q->offset], len);
-
-		if (ret <= 0) break;
-
-		q->offset += ret;
-		bytes_sent += ret;
-
-		if (q->offset < msg->length)
-			break;
-
-		hub_sendq_remove(q, msg);
-		msg = list_get_first(q->queue);
-	}
-
-	return bytes_sent;
-#else
 	int ret = 0;
 	size_t bytes = 0;
 	size_t offset = q->offset; // offset into first message.
@@ -164,10 +140,6 @@ int  hub_sendq_send(struct hub_sendq* q, hub_recvq_write w, void* data)
 	while (msg)
 	{
 		length = MIN(msg->length - offset, (max_send_buf-1) - bytes);
-#ifdef DEBUG_SENDQ
-		printf("Queued: %d bytes (%d bytes)\n", (int) length, (int) msg->length);
-#endif
-		
 		memcpy(sbuf + bytes, msg->cache + offset, length);
 		bytes += length;
 		
@@ -178,14 +150,16 @@ int  hub_sendq_send(struct hub_sendq* q, hub_recvq_write w, void* data)
 	}
 
 	msg = list_get_first(q->queue);
-#ifdef DEBUG_SENDQ
-	printf("Queued up bytes: %d (first=%d/%d)\n", (int) bytes, (int) q->offset, (msg ? (int) msg->length : 0));
-#endif
+
 	/* Send as much as possible */
 	ret = w(data, sbuf, bytes);
-	
+
 	if (ret > 0)
 	{
+#ifdef SSL_SUPPORT
+		q->last_write_n = ret;
+#endif
+
 		/* Remove messages sent */
 		offset = q->offset;
 		remain = ret;
@@ -198,9 +172,6 @@ int  hub_sendq_send(struct hub_sendq* q, hub_recvq_write w, void* data)
 				q->offset += remain;
 				break;
 			}
-#ifdef DEBUG_SENDQ
-			printf("removing msg %d [%p]\n", (int) msgs, msg);
-#endif
 			remain -= length;
 			hub_sendq_remove(q, msg);
 			msg = list_get_next(q->queue);
@@ -208,7 +179,6 @@ int  hub_sendq_send(struct hub_sendq* q, hub_recvq_write w, void* data)
 		}
 	}
 	return ret;
-#endif
 }
 
 int hub_sendq_is_empty(struct hub_sendq* q)
