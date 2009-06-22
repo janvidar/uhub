@@ -78,6 +78,11 @@ int net_destroy()
 	return -1;
 }
 
+static void net_error_out(int fd, const char* func)
+{
+	int err = net_error();
+	hub_log(log_error, "%s, fd=%d: %s (%d)", func, fd, net_error_string(err), err);
+}
 
 int net_error()
 {
@@ -103,22 +108,42 @@ const char* net_error_string(int code)
 
 static int net_setsockopt(int fd, int level, int opt, const void* optval, socklen_t optlen)
 {
+	int ret = -1;
 #ifdef WINSOCK
-	return setsockopt(fd, level, opt, (const char*) optval, optlen);
+	ret = setsockopt(fd, level, opt, (const char*) optval, optlen);
 #else
-	return setsockopt(fd, level, opt, optval, optlen);
+	ret = setsockopt(fd, level, opt, optval, optlen);
 #endif
+
+	if (ret == -1)
+	{
+		net_error_out(fd, "net_setsockopt");
+	}
+
+	return ret;
+}
+
+static int net_getsockopt(int fd, int level, int opt, void* optval, socklen_t* optlen)
+{
+	int ret = -1;
+#ifdef WINSOCK
+	ret = getsockopt(fd, level, opt, (char*) optval, optlen);
+#else
+	ret = getsockopt(fd, level, opt, optval, optlen);
+#endif
+
+	if (ret == -1)
+	{
+		net_error_out(fd, "net_getsockopt");
+	}
+
+	return ret;
 }
 
 
 int net_set_nonblocking(int fd, int toggle)
 {
-	int ret;
-
-#ifdef NETAPI_DUMP
-	hub_log(log_dump, "net_set_nonblocking(): fd=%d", fd);
-#endif
-
+	int ret = -1;
 #ifdef WINSOCK
 	u_long on = toggle ? 1 : 0;
 	ret = ioctlsocket(fd, FIONBIO, &on);
@@ -127,36 +152,27 @@ int net_set_nonblocking(int fd, int toggle)
 #endif
 	if (ret == -1)
 	{
-		hub_log(log_error, "net_set_nonblocking(): ioctl failed (fd=%d): %s", fd, net_error_string(net_error()));
-		return -1;
+		net_error_out(fd, "net_set_nonblocking");
 	}
-	return 0;
+	return ret;
 }
-
 
 /* NOTE: Possibly only supported on BSD and OSX? */
 int net_set_nosigpipe(int fd, int toggle)
 {
+	int ret = -1;
 #ifdef SO_NOSIGPIPE
-	int ret;
-#ifdef NETAPI_DUMP
-	hub_log(log_dump, "net_set_nosigpipe(): fd=%d", fd);
-#endif
 	ret = net_setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &toggle, sizeof(toggle));
 	if (ret == -1)
 	{
-		hub_log(log_error, "net_set_linger(): setsockopt failed (fd=%d): %s", fd, net_error_string(net_error()));
-		return -1;
+		net_error_out(fd, "net_set_nosigpipe");
 	}
 #endif
-	return 0;
+	return ret;
 }
 
 int net_set_close_on_exec(int fd, int toggle)
 {
-#ifdef NETAPI_DUMP
-	hub_log(log_dump, "net_set_close_on_exec(): fd=%d", fd);
-#endif
 #ifdef WINSOCK
 	return -1; /* FIXME: How is this done on Windows? */
 #else
@@ -164,53 +180,62 @@ int net_set_close_on_exec(int fd, int toggle)
 #endif
 }
 
-
 int net_set_linger(int fd, int toggle)
 {
 	int ret;
-#ifdef NETAPI_DUMP
-	hub_log(log_dump, "net_set_linger(): fd=%d", fd);
-#endif
 	ret = net_setsockopt(fd, SOL_SOCKET, SO_LINGER, &toggle, sizeof(toggle));
 	if (ret == -1)
 	{
-		hub_log(log_error, "net_set_linger(): setsockopt failed (fd=%d): %s", fd, net_error_string(net_error()));
-		return -1;
+		net_error_out(fd, "net_set_linger");
 	}
-	return 0;
+	return ret;
 }
-
 
 int net_set_keepalive(int fd, int toggle)
 {
 	int ret;
-#ifdef NETAPI_DUMP
-	hub_log(log_dump, "net_set_keepalive(): fd=%d", fd);
-#endif
 	ret = net_setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &toggle, sizeof(toggle));
 	if (ret == -1)
 	{
-		hub_log(log_error, "net_set_keepalive(): setsockopt failed (fd=%d): %s", fd, net_error_string(net_error()));
-		return -1;
+		net_error_out(fd, "net_set_keepalive");
 	}
-	return 0;
+	return ret;
 }
 
 
 int net_set_reuseaddress(int fd, int toggle)
 {
 	int ret;
-#ifdef NETAPI_DUMP
-	hub_log(log_dump, "net_set_reuseaddress(): fd=%d", fd);
-#endif
 	ret = net_setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &toggle, sizeof(toggle));
 	if (ret == -1)
 	{
-		hub_log(log_error, "net_set_reuseaddress(): setsockopt failed (fd=%d): %s", fd, net_error_string(net_error()));
-		return -1;
+		net_error_out(fd, "net_set_reuseaddress");
 	}
-	return 0;
+	return ret;
 }
+
+int net_set_sendbuf_size(int fd, size_t size)
+{
+	return net_setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &size, sizeof(size));
+}
+
+int net_get_sendbuf_size(int fd, size_t* size)
+{
+	socklen_t sz = sizeof(*size);
+	return net_getsockopt(fd, SOL_SOCKET, SO_SNDBUF, size, &sz);
+}
+
+int net_set_recvbuf_size(int fd, size_t size)
+{
+	return net_setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &size, sizeof(size));
+}
+
+int net_get_recvbuf_size(int fd, size_t* size)
+{
+	socklen_t sz = sizeof(*size);
+	return net_getsockopt(fd, SOL_SOCKET, SO_RCVBUF, size, &sz);
+}
+
 
 
 int net_close(int fd)
@@ -282,7 +307,7 @@ int net_accept(int fd, struct ip_addr_encap* ipaddr)
 			case EWOULDBLOCK:
 				break;
 			default:
-				hub_log(log_error, "net_accept(): accept failed (fd=%d, errno=%d, msg=%s)", fd, net_error(), net_error_string(net_error()));
+				net_error_out(fd, "net_accept");
 				net_stats_add_error();
 				return -1;
 		}
@@ -317,7 +342,7 @@ int net_connect(int fd, const struct sockaddr *serv_addr, socklen_t addrlen)
 	{
 		if (net_error() != EINPROGRESS)
 		{
-			hub_log(log_error, "net_connect(): connect failed (fd=%d, errno=%d, msg=%s)", fd, net_error(), net_error_string(net_error()));
+			net_error_out(fd, "net_connect");
 			net_stats_add_error();
 		}
 	}
@@ -344,8 +369,7 @@ int net_is_ipv6_supported()
 				return 0;
 			}
 			
-			hub_log(log_error, "net_is_ipv6_supported(): Unknown error (errno=%d, msg=%s)", net_error(), net_error_string(net_error()));
-
+			net_error_out(ret, "net_is_ipv6_supported");
 		}
 		else
 		{
@@ -375,7 +399,7 @@ int net_socket_create(int af, int type, int protocol)
 	int sd = socket(af, type, protocol);
 	if (sd == -1)
 	{
-		hub_log(log_error, "net_socket_create(): socket failed (errno=%d, msg=%s)", net_error(), net_error_string(net_error()));
+		net_error_out(sd, "net_socket_create");
 	}
 
 #ifdef SOCK_DUAL_STACK_OPT
@@ -509,19 +533,18 @@ const char* net_get_peer_address(int fd)
 			{
 				return &address[7];
 			}
-			hub_log(log_trace, "net_get_peer_address(): address=%s", address);
 			return address;
 		}
 		else
 		{
 			net_address_to_string(af, (void*) &name4->sin_addr, address, INET6_ADDRSTRLEN);
-			hub_log(log_trace, "net_get_peer_address(): address=%s", address);
 			return address;
 		}
 	}
 	else
 	{
-		hub_log(log_error, "net_get_peer_address(): getsockname failed (fd=%d, errno=%d, msg=%s)", fd, net_error(), net_error_string(net_error()));
+		net_error_out(fd, "net_get_peer_address");
+		net_stats_add_error();
 	}
 
 	return "0.0.0.0";
@@ -539,7 +562,7 @@ ssize_t net_recv(int fd, void* buf, size_t len, int flags)
 	{
 		if (net_error() != EWOULDBLOCK)
 		{
-			hub_log(log_debug, "net_recv(): failed (fd=%d, errno=%d, msg=%s)", fd, net_error(), net_error_string(net_error()));
+			net_error_out(fd, "net_recv");
 			net_stats_add_error();
 		}
 	}
@@ -558,7 +581,7 @@ ssize_t net_send(int fd, const void* buf, size_t len, int flags)
 	{
 		if (net_error() != EWOULDBLOCK)
 		{
-			hub_log(log_debug, "net_send(): failed (fd=%d, errno=%d, msg=%s)", fd, net_error(), net_error_string(net_error()));
+			net_error_out(fd, "net_send");
 			net_stats_add_error();
 		}
 	}
@@ -571,7 +594,7 @@ int net_bind(int fd, const struct sockaddr *my_addr, socklen_t addrlen)
 	int ret = bind(fd, my_addr, addrlen);
 	if (ret == -1)
 	{
-		hub_log(log_error, "net_bind(): failed (fd=%d, errno=%d, msg=%s)", fd, net_error(), net_error_string(net_error()));
+		net_error_out(fd, "net_bind");
 		net_stats_add_error();
 	}
 	return ret;
@@ -583,7 +606,7 @@ int net_listen(int fd, int backlog)
 	int ret = listen(fd, backlog);
 	if (ret == -1)
 	{
-		hub_log(log_error, "net_listen(): failed (fd=%d, errno=%d, msg=%s)", fd, net_error(), net_error_string(net_error()));
+		net_error_out(fd, "net_listen");
 		net_stats_add_error();
 	}
 	return ret;
@@ -599,13 +622,11 @@ void net_stats_initialize()
 	stats.timestamp = time(NULL);
 }
 
-
 void net_stats_get(struct net_statistics** intermediate, struct net_statistics** total)
 {
 	*intermediate = &stats;
 	*total = &stats_total;
 }
-
 
 void net_stats_reset()
 {
@@ -619,36 +640,30 @@ void net_stats_reset()
 	stats.timestamp = time(NULL);
 }
 
-
 int net_stats_timeout()
 {
 	return (difftime(time(NULL), stats.timestamp) > TIMEOUT_STATS) ? 1 : 0;
 }
-
 
 void net_stats_add_tx(size_t bytes)
 {
 	stats.tx += bytes;
 }
 
-
 void net_stats_add_rx(size_t bytes)
 {
 	stats.rx += bytes;
 }
-
 
 void net_stats_add_accept()
 {
 	stats.accept++;
 }
 
-
 void net_stats_add_error()
 {
 	stats.errors++;
 }
-
 
 void net_stats_add_close()
 {
