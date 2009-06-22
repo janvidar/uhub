@@ -167,6 +167,38 @@ extern int net_set_linger(int fd, int toggle);
 extern int net_set_reuseaddress(int fd, int toggle);
 
 /**
+ * Set the send buffer size for the socket.
+ * @param fd socket descriptor
+ * @param size size to set
+ * @return -1 on error, 0 on success.
+ */
+extern int net_set_sendbuf_size(int fd, size_t size);
+
+/**
+ * Get the send buffer size for the socket.
+ * @param fd socket descriptor
+ * @param[out] size existing size, cannot be NULL.
+ * @return -1 on error, 0 on success.
+ */
+extern int net_get_sendbuf_size(int fd, size_t* size);
+
+/**
+ * Set the receive buffer size for the socket.
+ * @param fd socket descriptor
+ * @param size size to set
+ * @return -1 on error, 0 on success.
+ */
+extern int net_set_recvbuf_size(int fd, size_t size);
+
+/**
+ * Get the receive buffer size for the socket.
+ * @param fd socket descriptor
+ * @param[out] size existing size, cannot be NULL.
+ * @return -1 on error, 0 on success.
+ */
+extern int net_get_recvbuf_size(int fd, size_t* size);
+
+/**
  * A wrapper for the recv() function call.
  */
 extern ssize_t net_recv(int fd, void* buf, size_t len, int flags);
