@@ -34,7 +34,7 @@ int hub_handle_message(struct hub_info* hub, struct user* u, const char* line, s
 	
 	if (user_is_disconnecting(u))
 		return -1;
-	
+
 	cmd = adc_msg_parse_verify(u, line, length);
 	if (cmd)
 	{
