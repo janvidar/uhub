@@ -19,6 +19,7 @@
 
 #include "uhub.h"
 
+#ifdef DEBUG_SENDQ
 static const char* user_log_str(struct user* user)
 {
 	static char buf[128];
@@ -32,6 +33,7 @@ static const char* user_log_str(struct user* user)
 	}
 	return buf;
 }
+#endif
 
 struct user* user_create(struct hub_info* hub, int sd)
 {
@@ -96,7 +98,6 @@ void user_set_state(struct user* user, enum user_state state)
 {
 	if ((user->state == state_cleanup && state != state_disconnected) || (user->state == state_disconnected))
 	{
-		puts("PANIC - Ignoring new state");
 		return;
 	}
 	

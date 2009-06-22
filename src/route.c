@@ -59,7 +59,7 @@ int route_message(struct hub_info* hub, struct user* u, struct adc_message* msg)
 }
 
 
-// #define ALWAYS_QUEUE_MESSAGES
+#if 0
 static size_t get_max_send_queue(struct hub_info* hub)
 {
 	/* TODO: More dynamic send queue limit, for instance:
@@ -68,7 +68,6 @@ static size_t get_max_send_queue(struct hub_info* hub)
 	return hub->config->max_send_buffer;
 }
 
-#if 0
 static size_t get_max_send_queue_soft(struct hub_info* hub)
 {
 	return hub->config->max_send_buffer_soft;
@@ -103,11 +102,20 @@ int route_to_user(struct hub_info* hub, struct user* user, struct adc_message* m
 	free(data);
 #endif
 
+	int empty = hub_sendq_is_empty(user->net.send_queue);
 	hub_sendq_add(user->net.send_queue, msg);
 
-	/* FIXME: try oportunistic write? */
-	user_net_io_want_write(user);
+	if (empty)
+	{
+		/* Perform oportunistic write - it might work */
+		/* FIXME: This is a *BAD* hack! */
+		net_on_write(user->net.sd, EV_WRITE, user);
+	}
 
+	if (hub_sendq_get_bytes(user->net.send_queue))
+	{
+		user_net_io_want_write(user);
+	}
 	return 1;
 }
 

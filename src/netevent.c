@@ -240,14 +240,11 @@ void net_on_read(int fd, short ev, void *arg)
 void net_on_write(int fd, short ev, void *arg)
 {
 	struct user* user = (struct user*) arg;
-	int sent = 0;
 
 	for (;;)
 	{
 		int ret = hub_sendq_send(user->net.send_queue, net_user_send, user);
-		if (ret > 0)
-			sent += ret;
-		else
+		if (ret <= 0)
 			break;
 	}
 
