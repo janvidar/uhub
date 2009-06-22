@@ -49,7 +49,10 @@ int net_initialize()
 		net_stats_initialize();
 
 #ifdef SSL_SUPPORT
-		/* FIXME: Initialize OpenSSL here. */
+		hub_log(log_trace, "Initializing OpenSSL...");
+		SSL_load_error_strings();
+		SSL_library_init();
+		OpenSSL_add_all_algorithms();
 #endif /*  SSL_SUPPORT */
 
 		net_initialized = 1;
