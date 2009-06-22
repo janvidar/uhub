@@ -204,7 +204,7 @@ void net_on_read(int fd, short ev, void *arg)
 
 		if (start < buf + buf_size)
 		{
-			hub_recvq_set(q, buf+offset, buf_size);
+			hub_recvq_set(q, buf+offset, buf_size - offset);
 		}
 		else
 		{

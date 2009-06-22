@@ -66,7 +66,6 @@ size_t hub_recvq_set(struct hub_recvq* q, void* buf, size_t bufsize)
 	
 	if (!bufsize)
 	{
-		q->size = 0;
 		return 0;
 	}
 
