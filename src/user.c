@@ -333,7 +333,9 @@ int user_is_registered(struct user* user)
 
 void user_net_io_want_write(struct user* user)
 {
+#ifdef DEBUG_SENDQ
 	hub_log(log_trace, "user_net_io_want_write: %s", user_log_str(user));
+#endif
 	if (user && user->net.ev_write)
 	{
 		event_add(user->net.ev_write, 0);
@@ -342,13 +344,24 @@ void user_net_io_want_write(struct user* user)
 
 void user_net_io_want_read(struct user* user, int timeout_s)
 {
+#ifdef DEBUG_SENDQ
 	hub_log(log_trace, "user_net_io_want_read: %s", user_log_str(user));
-
+#endif
 	struct timeval timeout = { timeout_s, 0 };
 	if (user && user->net.ev_read)
 	{
 		event_add(user->net.ev_read, &timeout);
 	}
+}
+
+void user_reset_last_write(struct user* user)
+{
+	user->net.tm_last_write = time(NULL);
+}
+
+void user_reset_last_read(struct user* user)
+{
+	user->net.tm_last_read = time(NULL);
 }
 
 

@@ -283,7 +283,15 @@ extern void user_net_io_want_write(struct user* user);
  */
 extern void user_net_io_want_read(struct user* user, int timeout_s);
 
+/**
+ * Reset the last-write timer.
+ */
+extern void user_reset_last_write(struct user* user);
 
+/**
+ * Reset the last-write timer.
+ */
+extern void user_reset_last_read(struct user* user);
 
 #endif /* HAVE_UHUB_USER_H */
 
