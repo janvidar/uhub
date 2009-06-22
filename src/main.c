@@ -445,7 +445,13 @@ int main(int argc, char** argv)
 		}
 		else if (ret == 0)
 		{
-			/* child process */
+			/* child process - detatch from TTY */
+			fclose(stdin);
+			fclose(stdout);
+			fclose(stderr);
+			close(0);
+			close(1);
+			close(2);
 		}
 		else
 		{
