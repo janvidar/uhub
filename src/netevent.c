@@ -131,32 +131,11 @@ int net_user_recv_ssl(void* ptr, void* buf, size_t len)
 }
 #endif
 
-void net_on_read(int fd, short ev, void *arg)
+int handle_net_read(struct user* user)
 {
 	static char buf[MAX_RECV_BUF];
-	struct user* user = (struct user*) arg;
 	struct hub_recvq* q = user->net.recv_queue;
 	size_t buf_size;
-	int more = 1;
-	int flag_close = 0;
-
-#ifdef DEBUG_SENDQ
-	hub_log(log_trace, "net_on_read() : fd=%d, ev=%d, arg=%p", fd, (int) ev, arg);
-#endif
-
-	if (ev == EV_TIMEOUT)
-	{
-		more = 0;
-		if (user_is_connecting(user))
-		{
-			flag_close = quit_timeout;
-		}
-		else
-		{
-			// FIXME: hub is not neccesarily set!
-			// hub_send_ping(hub, user);
-		}
-	}
 	
 	buf_size = hub_recvq_get(q, buf, MAX_RECV_BUF);
 
@@ -168,12 +147,12 @@ void net_on_read(int fd, short ev, void *arg)
 
 	if (size == -1)
 	{
-		if (net_error() != EWOULDBLOCK)
-			flag_close = quit_socket_error;
+		if (net_error() != EWOULDBLOCK || net_error() != EINTR)
+			return quit_socket_error;
 	}
 	else if (size == 0)
 	{
-		flag_close = quit_disconnected;
+		return quit_disconnected;
 	}
 	else
 	{
@@ -193,7 +172,7 @@ void net_on_read(int fd, short ev, void *arg)
 
 			if (hub_handle_message(g_hub, user, line, length) == -1)
 			{
-				flag_close = quit_protocol_error;
+				return quit_protocol_error;
 				break;
 			}
 
@@ -211,7 +190,55 @@ void net_on_read(int fd, short ev, void *arg)
 			hub_recvq_set(q, 0, 0);
 		}
 	}
+	return 0;
+}
 
+int handle_net_write(struct user* user)
+{
+	for (;;)
+	{
+		int ret = hub_sendq_send(user->net.send_queue, net_user_send, user);
+		if (ret <= 0)
+			break;
+	}
+
+	if (hub_sendq_get_bytes(user->net.send_queue))
+	{
+		user_net_io_want_write(user);
+	}
+	return 0;
+}
+
+static void net_event(int fd, short ev, void *arg)
+{
+	struct user* user = (struct user*) arg;
+	int flag_close = 0;
+
+#ifdef DEBUG_SENDQ
+	hub_log(log_trace, "net_on_read() : fd=%d, ev=%d, arg=%p", fd, (int) ev, arg);
+#endif
+
+	if (ev == EV_TIMEOUT)
+	{
+		if (user_is_connecting(user))
+		{
+			flag_close = quit_timeout;
+		}
+		else
+		{
+			// FIXME: hub is not neccesarily set!
+			// hub_send_ping(hub, user);
+		}
+	}
+	else if (ev == EV_READ)
+	{
+		flag_close = handle_net_read(user);
+	}
+	else if (ev == EV_WRITE)
+	{
+		flag_close = handle_net_write(user);
+	}
+	
 	if (flag_close)
 	{
 		hub_disconnect_user(g_hub, user, flag_close);
@@ -236,23 +263,6 @@ void net_on_read(int fd, short ev, void *arg)
 	}
 }
 
-
-void net_on_write(int fd, short ev, void *arg)
-{
-	struct user* user = (struct user*) arg;
-
-	for (;;)
-	{
-		int ret = hub_sendq_send(user->net.send_queue, net_user_send, user);
-		if (ret <= 0)
-			break;
-	}
-
-	if (hub_sendq_get_bytes(user->net.send_queue))
-	{
-		user_net_io_want_write(user);
-	}
-}
 
 static void prepare_user_net(struct hub_info* hub, struct user* user)
 {
@@ -279,8 +289,8 @@ static void prepare_user_net(struct hub_info* hub, struct user* user)
 		net_set_nonblocking(fd, 1);
 		net_set_nosigpipe(fd, 1);
 
-		event_set(user->net.ev_read,  fd, EV_READ | EV_PERSIST, net_on_read,  user);
-		event_set(user->net.ev_write, fd, EV_WRITE,             net_on_write, user);
+		event_set(user->net.ev_read,  fd, EV_READ | EV_PERSIST, net_event, user);
+		event_set(user->net.ev_write, fd, EV_WRITE,             net_event, user);
 		event_base_set(hub->evbase, user->net.ev_read);
 		event_base_set(hub->evbase, user->net.ev_write);
 		event_add(user->net.ev_read,  &timeout);

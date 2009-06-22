@@ -107,9 +107,8 @@ int route_to_user(struct hub_info* hub, struct user* user, struct adc_message* m
 
 	if (empty)
 	{
-		/* Perform oportunistic write - it might work */
-		/* FIXME: This is a *BAD* hack! */
-		net_on_write(user->net.sd, EV_WRITE, user);
+		/* Perform oportunistic write */
+		handle_net_write(user);
 	}
 
 	if (hub_sendq_get_bytes(user->net.send_queue))

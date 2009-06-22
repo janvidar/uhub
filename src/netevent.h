@@ -21,26 +21,12 @@
 #define HAVE_UHUB_NET_EVENT_H
 
 /**
- * Network callback for reading data from a socket.
- */
-extern void net_on_read(int fd, short ev, void *arg);
-
-/**
- * Network callback for writing data to a socket.
- */
-extern void net_on_write(int fd, short ev, void *arg);
-
-/**
- * Network callback for timers.
- */
-extern void net_on_read_timeout(int fd, short ev, void* arg);
-
-/**
  * Network callback to accept incoming connections.
  */
 extern void net_on_accept(int fd, short ev, void *arg);
 
-
+extern int handle_net_read(struct user* user);
+extern int handle_net_write(struct user* user);
 
 
 #endif /* HAVE_UHUB_NET_EVENT_H */
