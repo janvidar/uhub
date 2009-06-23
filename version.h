@@ -11,7 +11,7 @@
 #endif
 
 #ifndef VERSION
-#define VERSION "0.3.0-rc0" GIT_REVISION
+#define VERSION "0.3.0-rc1" GIT_REVISION
 #endif
 
 #ifndef COPYRIGHT
