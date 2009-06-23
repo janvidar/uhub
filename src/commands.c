@@ -19,14 +19,13 @@
 
 #include "uhub.h"
 
-#define CRASH_DEBUG 1
-
 typedef int (*command_handler)(struct hub_info* hub, struct user* user, const char* message);
 
 struct commands_handler
 {
 	const char* prefix;
 	size_t length;
+	size_t args;
 	enum user_credentials cred;
 	command_handler handler;
 	const char* description;
@@ -160,6 +159,57 @@ static int command_kick(struct hub_info* hub, struct user* user, const char* mes
 	return command_status(hub, user, "kick", nick);
 }
 
+static int command_ban(struct hub_info* hub, struct user* user, const char* message)
+{
+	if (strlen(message) < 6)
+	{
+		return command_status(hub, user, "ban", "No nickname given");
+	}
+
+	const char* nick = &message[6];
+	struct user* target = uman_get_user_by_nick(hub, nick);
+
+	if (!target)
+	{
+		return command_status(hub, user, "ban", "No such user");
+	}
+
+	if (target == user)
+	{
+		return command_status(hub, user, "ban", "Cannot kick/ban yourself");
+	}
+
+	hub_disconnect_user(hub, target, quit_kicked);
+	acl_user_ban_nick(hub->acl, target->id.nick);
+	acl_user_ban_cid(hub->acl, target->id.cid);
+
+	return command_status(hub, user, "ban", nick);
+}
+
+static int command_unban(struct hub_info* hub, struct user* user, const char* message)
+{
+	if (strlen(message) < 8)
+	{
+		return command_status(hub, user, "unban", "No nickname given");
+	}
+
+	const char* nick = &message[8];
+	struct user* target = uman_get_user_by_nick(hub, nick);
+
+	if (!target)
+	{
+		return command_status(hub, user, "unban", "No such user");
+	}
+
+	if (target == user)
+	{
+		return command_status(hub, user, "unban", "Cannot unban yourself");
+	}
+
+	return command_status(hub, user, "unban", "Not implemented");
+}
+
+
 static int command_reload(struct hub_info* hub, struct user* user, const char* message)
 {
 	hub->status = hub_status_restart;
@@ -216,17 +266,19 @@ int command_dipatcher(struct hub_info* hub, struct user* user, const char* messa
 }
 
 static struct commands_handler command_handlers[] = {
-	{ "help",       4, cred_guest,     command_help,     "Show this help message."      },
-	{ "stats",      5, cred_super,     command_stats,    "Show hub statistics."         },
-	{ "version",    7, cred_guest,     command_version,  "Show hub version info."       },
-	{ "uptime",     6, cred_guest,     command_uptime,   "Display hub uptime info."     },
-	{ "kick",       4, cred_operator,  command_kick,     "Kick a user"                  },
-	{ "reload",     6, cred_admin,     command_reload,   "Reload configuration files."  },
-	{ "shutdown",   8, cred_admin,     command_shutdown, "Shutdown hub."                },
-	{ "myip",       4, cred_guest,     command_myip,     "Show your own IP."            },
+	{ "help",       4, 0, cred_guest,     command_help,     "Show this help message."      },
+	{ "stats",      5, 0, cred_super,     command_stats,    "Show hub statistics."         },
+	{ "version",    7, 0, cred_guest,     command_version,  "Show hub version info."       },
+	{ "uptime",     6, 0, cred_guest,     command_uptime,   "Display hub uptime info."     },
+	{ "kick",       4, 1, cred_operator,  command_kick,     "Kick a user"                  },
+	{ "ban",        3, 1, cred_operator,  command_ban,      "Ban a user"                   },
+	{ "unban",      5, 1, cred_operator,  command_unban,    "Lift ban on a user"           },
+	{ "reload",     6, 0, cred_admin,     command_reload,   "Reload configuration files."  },
+	{ "shutdown",   8, 0, cred_admin,     command_shutdown, "Shutdown hub."                },
+	{ "myip",       4, 0, cred_guest,     command_myip,     "Show your own IP."            },
 #ifdef CRASH_DEBUG
-	{ "crash",      5, cred_admin,     command_crash,    "Crash the hub (DEBUG)."       },
+	{ "crash",      5, 0, cred_admin,     command_crash,    "Crash the hub (DEBUG)."       },
 #endif
-	{ 0,            0, cred_none,      command_help,     ""                             }
+	{ 0,            0, 0, cred_none,      command_help,     ""                             }
 };
 

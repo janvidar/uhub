@@ -446,6 +446,41 @@ int acl_is_user_denied(struct acl_handle* handle, const char* data)
 	STR_LIST_CONTAINS(handle->users_denied, data);
 }
 
+int acl_user_ban_nick(struct acl_handle* handle, const char* nick)
+{
+	struct user_access_info* info = hub_malloc_zero(sizeof(struct user_access_info));
+	if (!info)
+	{
+		hub_log(log_error, "ACL error: Out of memory!");
+		return -1;
+	}
+	list_append(handle->users_banned, hub_strdup(nick));
+	return 0;
+}
+
+int acl_user_ban_cid(struct acl_handle* handle, const char* cid)
+{
+	struct user_access_info* info = hub_malloc_zero(sizeof(struct user_access_info));
+	if (!info)
+	{
+		hub_log(log_error, "ACL error: Out of memory!");
+		return -1;
+	}
+	list_append(handle->cids, hub_strdup(cid));
+	return 0;
+}
+
+int acl_user_unban_nick(struct acl_handle* handle, const char* nick)
+{
+	return -1;
+}
+
+int acl_user_unban_cid(struct acl_handle* handle, const char* cid)
+{
+	return -1;
+}
+
+
 int acl_is_ip_banned(struct acl_handle* handle, const char* ip_address)
 {
 	struct ip_addr_encap raw;

@@ -85,6 +85,11 @@ extern int acl_is_ip_nat_override(struct acl_handle* handle, const char* ip_addr
 extern int acl_is_user_banned(struct acl_handle* handle, const char* name);
 extern int acl_is_user_denied(struct acl_handle* handle, const char* name);
 
+extern int acl_user_ban_nick(struct acl_handle* handle, const char* nick);
+extern int acl_user_ban_cid(struct acl_handle* handle, const char* cid);
+extern int acl_user_unban_nick(struct acl_handle* handle, const char* nick);
+extern int acl_user_unban_cid(struct acl_handle* handle, const char* cid);
+
 extern int acl_check_ip_range(struct ip_addr_encap* addr, struct ip_ban_record* info);
 
 extern const char* acl_password_generate_challenge(struct acl_handle* acl, struct user* user);
