@@ -6,8 +6,12 @@
 #define PRODUCT_TITLE "(micro-Hub)"
 #endif
 
+#ifndef GIT_REVISION
+#define GIT_REVISION ""
+#endif
+
 #ifndef VERSION
-#define VERSION "0.3.0-rc0"
+#define VERSION "0.3.0-rc0" GIT_REVISION
 #endif
 
 #ifndef COPYRIGHT

@@ -69,8 +69,10 @@ LDFLAGS       += -L/source/libevent
 -include release_setup.mk
 ifeq ($(RELEASE),YES)
 CFLAGS        += -Os -DNDEBUG
+GIT_REVISION  ?= NO
 else
 CFLAGS        += -g -DDEBUG
+GIT_REVISION  ?= YES
 endif
 
 ifeq ($(STACK_PROTECT),YES)
@@ -125,6 +127,10 @@ endif
 ifneq ($(LIBEVENT_PATH),)
 CFLAGS        += -I$(LIBEVENT_PATH)
 LDFLAGS       += -L$(LIBEVENT_PATH)
+endif
+
+ifeq ($(GIT_REVISION),YES)
+CFLAGS        += -DGIT_REVISION=\"-git:$(shell git show --oneline | head -n 1 | cut -f 1 -d " ")\"
 endif
 
 # Sources
