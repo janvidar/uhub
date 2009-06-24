@@ -130,7 +130,7 @@ LDFLAGS       += -L$(LIBEVENT_PATH)
 endif
 
 ifeq ($(GIT_REVISION),YES)
-CFLAGS        += -DGIT_REVISION=\"-git:$(shell git show --oneline | head -n 1 | cut -f 1 -d " ")\"
+CFLAGS        += -DGIT_REVISION=\"-git:$(shell git show --abbrev-commit | head -n 1 | cut -f 2 -d " ")\"
 endif
 
 # Sources
