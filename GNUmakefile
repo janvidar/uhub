@@ -29,6 +29,7 @@ UHUB_PREFIX   ?= c:/uhub/
 CFLAGS        += -mno-cygwin
 LDFLAGS       += -mno-cygwin
 BIN_EXT       ?= .exe
+GIT_REVISION  ?= NO
 else
 DESTDIR       ?= /
 UHUB_CONF_DIR ?= $(DESTDIR)/etc/uhub
