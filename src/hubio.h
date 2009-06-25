@@ -30,7 +30,7 @@ struct hub_sendq
 	size_t               size;      /** Size of send queue (in bytes, not messages) */
 	size_t               offset;    /** Queue byte offset in the first message. Should be 0 unless a partial write. */
 #ifdef SSL_SUPPORT
-	size_t               last_write_n;
+	size_t               last_send; /** When using SSL, one have to send the exact same buffer and length if a write cannot complete. */
 #endif
 	struct linked_list*  queue;     /** List of queued messages */
 };
