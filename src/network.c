@@ -275,7 +275,7 @@ int net_shutdown_r(int fd)
 int net_shutdown_w(int fd)
 {
 #ifdef WINSOCK
-	return shutdown(fd, SD_SEND)
+	return shutdown(fd, SD_SEND);
 #else
 	return shutdown(fd, SHUT_WR);
 #endif
