@@ -19,6 +19,8 @@
 
 #include "uhub.h"
 
+#define USERMANAGER_TIMER
+
 /*
  * This callback function is used to clear user objects from the userlist.
  * Should only be used in uman_shutdown().
