@@ -543,6 +543,8 @@ void hub_shutdown_service(struct hub_info* hub)
 	uman_shutdown(hub);
 	hub->status = hub_status_stopped;
 	event_base_free(hub->evbase);
+	hub_free(hub->sendbuf);
+	hub_free(hub->recvbuf);
 	hub_free(hub);
 	hub = 0;
 	g_hub = 0;
