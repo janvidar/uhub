@@ -220,44 +220,35 @@ admin_BINARY=uhub-admin$(BIN_EXT)
 autotest_BINARY=autotest/test$(BIN_EXT)
 
 %.o: %.c
-	$(MSG_CC) $(CC) -c $(CFLAGS) -o $@.tmp $^ && \
-	$(MV) $@.tmp $@
+	$(MSG_CC) $(CC) -c $(CFLAGS) -o $@ $^
 
 all: $(uhub_BINARY) $(PCH)
 
 $(adcrush_BINARY): $(PCH) $(LIBUHUB) $(adcrush_OBJECTS)
-	$(MSG_LD) $(CC) -o $@.tmp $(adcrush_OBJECTS) $(LIBUHUB) $(LDFLAGS) $(LDLIBS) && \
-        $(MV) $@.tmp $@
+	$(MSG_LD) $(CC) -o $@ $(adcrush_OBJECTS) $(LIBUHUB) $(LDFLAGS) $(LDLIBS)
 
 $(admin_BINARY): $(PCH) $(LIBUHUB) $(admin_OBJECTS)
-	$(MSG_LD) $(CC) -o $@.tmp $(admin_OBJECTS) $(LIBUHUB) $(LDFLAGS) $(LDLIBS) && \
-        $(MV) $@.tmp $@
+	$(MSG_LD) $(CC) -o $@ $(admin_OBJECTS) $(LIBUHUB) $(LDFLAGS) $(LDLIBS)
 
 $(uhub_BINARY): $(PCH) $(LIBUHUB) $(uhub_OBJECTS)
-	$(MSG_LD) $(CC) -o $@.tmp $(uhub_OBJECTS) $(LIBUHUB) $(LDFLAGS) $(LDLIBS) && \
-	$(MV) $@.tmp $@
+	$(MSG_LD) $(CC) -o $@ $(uhub_OBJECTS) $(LIBUHUB) $(LDFLAGS) $(LDLIBS)
 
 $(LIBUHUB): $(libuhub_OBJECTS)
-	$(MSG_AR) $(AR) rc $@.tmp $^ && \
-	$(RANLIB) $@.tmp && \
-	$(MV) $@.tmp $@
+	$(MSG_AR) $(AR) rc $@ $^ && $(RANLIB) $@
 
 ifeq ($(USE_PCH),YES)
 $(PCH): $(uhub_HEADERS)
-	$(MSG_PCH) $(CC) $(CFLAGS) -o $@.tmp $(PCHSRC) && \
-	$(MV) $@.tmp $@
+	$(MSG_PCH) $(CC) $(CFLAGS) -o $@ $(PCHSRC)
 endif
 
 autotest.c: $(autotest_SOURCES)
 	$(shell exotic --standalone $(autotest_SOURCES) > $@)
 
 $(autotest_OBJECTS): autotest.c
-	$(MSG_CC) $(CC) -c $(CFLAGS) -Isrc -o $@.tmp $< && \
-	$(MV) $@.tmp $@
+	$(MSG_CC) $(CC) -c $(CFLAGS) -Isrc -o $@ $<
 
 $(autotest_BINARY): $(autotest_OBJECTS) $(LIBUHUB)
-	$(MSG_LD) $(CC) -o $@.tmp $^ $(LDFLAGS) $(LDLIBS) && \
-	$(MV) $@.tmp $@
+	$(MSG_LD) $(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 autotest: $(autotest_BINARY)
 	@./$(autotest_BINARY) -s -f
