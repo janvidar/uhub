@@ -555,14 +555,14 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 	int fd, ret;
 	char buf[MAX_RECV_BUF];
 	char* tmp;
-	
+	char* server = adc_msg_escape(SERVER); /* FIXME: OOM */
 	
 	hub->acl = acl;
-	hub->command_info = adc_msg_construct(ADC_CMD_IINF, 15 + strlen(SERVER));
+	hub->command_info = adc_msg_construct(ADC_CMD_IINF, 15 + strlen(server));
 	if (hub->command_info)
 	{
 		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_CLIENT_TYPE, ADC_CLIENT_TYPE_HUB);
-		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_USER_AGENT, SERVER);
+		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_USER_AGENT, server);
 	
 		tmp = adc_msg_escape(hub->config->hub_name);
 		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_NICK, tmp);
@@ -600,13 +600,17 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 		adc_msg_add_argument(hub->command_support, ADC_PROTO_SUPPORT);
 	}
 	
-	hub->command_banner = adc_msg_construct(ADC_CMD_ISTA, 25 + strlen(SERVER));
+	hub->command_banner = adc_msg_construct(ADC_CMD_ISTA, 25 + strlen(server));
 	if (hub->command_banner)
 	{
-		adc_msg_add_argument(hub->command_banner, "000 Powered\\sby\\s" SERVER);
+		tmp = adc_msg_escape("Powered by " SERVER);
+		adc_msg_add_argument(hub->command_banner, "000");
+		adc_msg_add_argument(hub->command_banner, tmp);
+		hub_free(tmp);
 	}
 	
 	hub->status = (hub->config->hub_enabled ? hub_status_running : hub_status_disabled);
+	hub_free(server);
 }
 
 

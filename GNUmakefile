@@ -1,6 +1,6 @@
  ##
 ## Makefile for uhub (Use GNU make)
-## Copyright (C) 2007-2008, Jan Vidar Krey <janvidar@extatic.org>
+## Copyright (C) 2007-2009, Jan Vidar Krey <janvidar@extatic.org>
  #
 
 CC            = gcc
@@ -61,13 +61,9 @@ else
 	MSG_CLEAN="Clean as a whistle"
 endif
 
-
-
-
 CFLAGS        += -I/source/libevent
 LDFLAGS       += -L/source/libevent
 
--include release_setup.mk
 ifeq ($(RELEASE),YES)
 CFLAGS        += -Os -DNDEBUG
 GIT_REVISION  ?= NO
@@ -131,7 +127,7 @@ LDFLAGS       += -L$(LIBEVENT_PATH)
 endif
 
 ifeq ($(GIT_REVISION),YES)
-CFLAGS        += -DGIT_REVISION=\"-git:$(shell git show --abbrev-commit | head -n 1 | cut -f 2 -d " ")\"
+CFLAGS        += -DGIT_REVISION=\"$(shell git show --abbrev-commit | head -n 1 | cut -f 2 -d " ")\"
 endif
 
 # Sources
@@ -274,5 +270,4 @@ clean:
 	@rm -rf $(libuhub_OBJECTS) $(PCH) *~ core $(uhub_BINARY) $(LIBUHUB) $(all_OBJECTS) && \
 	echo $(MSG_CLEAN)
 
--include release_targets.mk
 
