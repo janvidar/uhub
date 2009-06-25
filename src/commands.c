@@ -19,19 +19,72 @@
 
 #include "uhub.h"
 
-typedef int (*command_handler)(struct hub_info* hub, struct user* user, const char* message);
+struct hub_command
+{
+	const char* message;
+	char* prefix;
+	size_t prefix_len;
+	struct linked_list* args;
+};
+
+typedef int (*command_handler)(struct hub_info* hub, struct user* user, struct hub_command*);
 
 struct commands_handler
 {
 	const char* prefix;
 	size_t length;
-	size_t args;
+	const char* args;
 	enum user_credentials cred;
 	command_handler handler;
 	const char* description;
 };
 
 static struct commands_handler command_handlers[];
+
+static void command_destroy(struct hub_command* cmd)
+{
+	if (!cmd) return;
+	hub_free(cmd->prefix);
+
+	if (cmd->args)
+	{
+		list_clear(cmd->args, &hub_free);
+		list_destroy(cmd->args);
+	}
+
+	hub_free(cmd);
+}
+
+static struct hub_command* command_create(const char* message)
+{
+	struct hub_command* cmd = hub_malloc_zero(sizeof(struct hub_command));
+	if (!cmd) return 0;
+
+	cmd->message = message;
+	cmd->args = list_create();
+
+	int n = split_string(message, "\\s", cmd->args, 0);
+	if (n <= 0)
+	{
+		command_destroy(cmd);
+		return 0;
+	}
+
+	char* prefix = list_get_first(cmd->args);
+	if (prefix[0] && prefix[1])
+	{
+		cmd->prefix = hub_strdup(&prefix[1]);
+		cmd->prefix_len = strlen(cmd->prefix);
+	}
+	else
+	{
+		command_destroy(cmd);
+		return 0;
+	}
+	list_remove(cmd->args, prefix);
+	hub_free(prefix);
+	return cmd;
+}
 
 static void send_message(struct hub_info* hub, struct user* user, const char* message)
 {
@@ -43,31 +96,69 @@ static void send_message(struct hub_info* hub, struct user* user, const char* me
 	hub_free(buffer);
 }
 
-static int command_access_denied(struct hub_info* hub, struct user* user, const char* command)
+static int command_access_denied(struct hub_info* hub, struct user* user, struct hub_command* cmd)
 {
 	char temp[128];
-	snprintf(temp, 128, "*** Access denied: \"%s\"", command);
+	snprintf(temp, 128, "*** %s: Access denied!", cmd->prefix);
 	send_message(hub, user, temp);
 	return 0;
 }
 
-static int command_not_found(struct hub_info* hub, struct user* user, const char* command)
+static int command_not_found(struct hub_info* hub, struct user* user, struct hub_command* cmd)
 {
 	char temp[128];
-	snprintf(temp, 128, "*** Command not found: \"%s\"", command);
+	snprintf(temp, 128, "*** %s: Command not found", cmd->prefix);
 	send_message(hub, user, temp);
 	return 0;
 }
 
-static int command_status(struct hub_info* hub, struct user* user, const char* command, const char* message)
+static int command_status_user_not_found(struct hub_info* hub, struct user* user, struct hub_command* cmd, const char* nick)
+{
+	char temp[128];
+	snprintf(temp, 128, "*** %s: No user \"%s\"", cmd->prefix, nick);
+	send_message(hub, user, temp);
+	return 0;
+}
+
+const char* command_get_syntax(struct commands_handler* handler)
+{
+	static char args[128];
+	args[0] = 0;
+	size_t n = 0;
+	if (handler->args)
+	{
+		for (n = 0; n < strlen(handler->args); n++)
+		{
+			switch (handler->args[n])
+			{
+				case 'n': strcat(args, "<nick>"); break;
+				case 'c': strcat(args, "<cid>"); break;
+				case 'a': strcat(args, "<addr>"); break;
+			}
+		}
+	}
+	return args;
+}
+
+static int command_arg_mismatch(struct hub_info* hub, struct user* user, struct hub_command* cmd, struct commands_handler* handler)
+{
+	char temp[256];
+	const char* args = command_get_syntax(handler);
+	if (args) snprintf(temp, 256, "*** %s: Use: !%s %s", cmd->prefix, cmd->prefix, args);
+	else      snprintf(temp, 256, "*** %s: Use: !%s", cmd->prefix, cmd->prefix);
+	send_message(hub, user, temp);
+	return 0;
+}
+
+static int command_status(struct hub_info* hub, struct user* user, struct hub_command* cmd, const char* message)
 {
 	char temp[1024];
-	snprintf(temp, 1024, "*** %s: %s", command, message);
+	snprintf(temp, 1024, "*** %s: %s", cmd->prefix, message);
 	send_message(hub, user, temp);
 	return 0;
 }
 
-static int command_stats(struct hub_info* hub, struct user* user, const char* message)
+static int command_stats(struct hub_info* hub, struct user* user, struct hub_command* cmd)
 {
 	char temp[128];
 	snprintf(temp, 128, "%zu users, peak: %zu. Network (up/down): %d/%d KB/s, peak: %d/%d KB/s",
@@ -77,11 +168,10 @@ static int command_stats(struct hub_info* hub, struct user* user, const char* me
 	(int) hub->stats.net_rx / 1024,
 	(int) hub->stats.net_tx_peak / 1024,
 	(int) hub->stats.net_rx_peak / 1024);
-	
-	return command_status(hub, user, "stats", temp);
+	return command_status(hub, user, cmd, temp);
 }
 
-static int command_help(struct hub_info* hub, struct user* user, const char* message)
+static int command_help(struct hub_info* hub, struct user* user, struct hub_command* cmd)
 {
 #define MAX_HELP_MSG 1024
 	size_t n;
@@ -100,10 +190,10 @@ static int command_help(struct hub_info* hub, struct user* user, const char* mes
 			strcat(msg, "\n");
 		}
 	}
-	return command_status(hub, user, "help", msg);
+	return command_status(hub, user, cmd, msg);
 }
 
-static int command_uptime(struct hub_info* hub, struct user* user, const char* message)
+static int command_uptime(struct hub_info* hub, struct user* user, struct hub_command* cmd)
 {
 	char tmp[128];
 	size_t d;
@@ -132,110 +222,87 @@ static int command_uptime(struct hub_info* hub, struct user* user, const char* m
 	if (m < 10) strcat(tmp, "0");
 	strcat(tmp, uhub_itoa((int) m));
 
-	return command_status(hub, user, "uptime", tmp);
+	return command_status(hub, user, cmd, tmp);
 }
 
-static int command_kick(struct hub_info* hub, struct user* user, const char* message)
+static int command_kick(struct hub_info* hub, struct user* user, struct hub_command* cmd)
 {
-	if (strlen(message) < 7)
-	{
-		return command_status(hub, user, "kick", "No nickname given");
-	}
-	
-	const char* nick = &message[7];
+	char* nick = list_get_first(cmd->args);
 	struct user* target = uman_get_user_by_nick(hub, nick);
 	
 	if (!target)
-	{
-		return command_status(hub, user, "kick", "No such user");
-	}
+		return command_status_user_not_found(hub, user, cmd, nick);
 	
 	if (target == user)
-	{
-		return command_status(hub, user, "kick", "Cannot kick yourself");
-	}
+		return command_status(hub, user, cmd, "Cannot kick yourself");
 	
 	hub_disconnect_user(hub, target, quit_kicked);
-	return command_status(hub, user, "kick", nick);
+	return command_status(hub, user, cmd, nick);
 }
 
-static int command_ban(struct hub_info* hub, struct user* user, const char* message)
+static int command_ban(struct hub_info* hub, struct user* user, struct hub_command* cmd)
 {
-	if (strlen(message) < 6)
-	{
-		return command_status(hub, user, "ban", "No nickname given");
-	}
-
-	const char* nick = &message[6];
+	char* nick = list_get_first(cmd->args);
 	struct user* target = uman_get_user_by_nick(hub, nick);
 
 	if (!target)
-	{
-		return command_status(hub, user, "ban", "No such user");
-	}
+		return command_status_user_not_found(hub, user, cmd, nick);
 
 	if (target == user)
-	{
-		return command_status(hub, user, "ban", "Cannot kick/ban yourself");
-	}
+		return command_status(hub, user, cmd, "Cannot kick/ban yourself");
 
 	hub_disconnect_user(hub, target, quit_kicked);
 	acl_user_ban_nick(hub->acl, target->id.nick);
 	acl_user_ban_cid(hub->acl, target->id.cid);
 
-	return command_status(hub, user, "ban", nick);
+	return command_status(hub, user, cmd, nick);
 }
 
-static int command_unban(struct hub_info* hub, struct user* user, const char* message)
+static int command_unban(struct hub_info* hub, struct user* user, struct hub_command* cmd)
 {
-	if (strlen(message) < 8)
-	{
-		return command_status(hub, user, "unban", "No nickname given");
-	}
+	return command_status(hub, user, cmd, "Not implemented");
+}
 
-	const char* nick = &message[8];
+static int command_reload(struct hub_info* hub, struct user* user, struct hub_command* cmd)
+{
+	hub->status = hub_status_restart;
+	return command_status(hub, user, cmd, "Reloading configuration...");
+}
+
+static int command_shutdown(struct hub_info* hub, struct user* user, struct hub_command* cmd)
+{
+	hub->status = hub_status_shutdown;
+	return command_status(hub, user, cmd, "Hub shutting down...");
+}
+
+static int command_version(struct hub_info* hub, struct user* user, struct hub_command* cmd)
+{
+	return command_status(hub, user, cmd, "Powered by " PRODUCT "/" VERSION);
+}
+
+static int command_myip(struct hub_info* hub, struct user* user, struct hub_command* cmd)
+{
+	char tmp[128];
+	snprintf(tmp, 128, "Your address is \"%s\"", ip_convert_to_string(&user->net.ipaddr));
+	return command_status(hub, user, cmd, tmp);
+}
+
+static int command_getip(struct hub_info* hub, struct user* user, struct hub_command* cmd)
+{
+	char tmp[128];
+
+	char* nick = list_get_first(cmd->args);
 	struct user* target = uman_get_user_by_nick(hub, nick);
 
 	if (!target)
-	{
-		return command_status(hub, user, "unban", "No such user");
-	}
+		return command_status_user_not_found(hub, user, cmd, nick);
 
-	if (target == user)
-	{
-		return command_status(hub, user, "unban", "Cannot unban yourself");
-	}
-
-	return command_status(hub, user, "unban", "Not implemented");
-}
-
-
-static int command_reload(struct hub_info* hub, struct user* user, const char* message)
-{
-	hub->status = hub_status_restart;
-	return command_status(hub, user, "reload", "Reloading configuration...");
-}
-
-static int command_shutdown(struct hub_info* hub, struct user* user, const char* message)
-{
-	hub->status = hub_status_shutdown;
-	return command_status(hub, user, "shutdown", "Hub shutting down...");
-}
-
-static int command_version(struct hub_info* hub, struct user* user, const char* message)
-{
-    return command_status(hub, user, "version", "Powered by " PRODUCT "/" VERSION);
-}
-
-static int command_myip(struct hub_info* hub, struct user* user, const char* message)
-{
-    char tmp[128];
-    snprintf(tmp, 128, "Your IP is \"%s\"", ip_convert_to_string(&user->net.ipaddr));
-    return command_status(hub, user, "myip", tmp);
+	snprintf(tmp, 128, "%s has address \"%s\"", nick, ip_convert_to_string(&target->net.ipaddr));
+	return command_status(hub, user, cmd, tmp);
 }
 
 #ifdef CRASH_DEBUG
-static int command_crash(struct hub_info* hub, struct user* user, const char* message)
+static int command_crash(struct hub_info* hub, struct user* user, struct hub_command* cmd)
 {
 	void (*crash)(void) = NULL;
 	crash();
@@ -246,39 +313,60 @@ static int command_crash(struct hub_info* hub, struct user* user, const char* me
 int command_dipatcher(struct hub_info* hub, struct user* user, const char* message)
 {
 	size_t n = 0;
+	int rc;
+	struct hub_command* cmd = command_create(message);
+	if (!cmd) return 1;
+
 	for (n = 0; command_handlers[n].prefix; n++)
 	{
-		if (!strncmp(&message[1], command_handlers[n].prefix, command_handlers[n].length))
+		struct commands_handler* handler = &command_handlers[n];
+		if (cmd->prefix_len != handler->length)
+			continue;
+
+		if (!strncmp(cmd->prefix, handler->prefix, handler->length))
 		{
-			if (command_handlers[n].cred <= user->credentials)
+			if (handler->cred <= user->credentials)
 			{
-				return command_handlers[n].handler(hub, user, message);
+				if (!handler->args || (handler->args && list_size(cmd->args) >= strlen(handler->args)))
+				{
+					rc = handler->handler(hub, user, cmd);
+				}
+				else
+				{
+					rc = command_arg_mismatch(hub, user, cmd, handler);
+				}
+				command_destroy(cmd);
+				return rc;
 			}
 			else
 			{
-				return command_access_denied(hub, user, command_handlers[n].prefix);
+				rc = command_access_denied(hub, user, cmd);
+				command_destroy(cmd);
+				return rc;
 			}
 		}
 	}
 
-	command_not_found(hub, user, message);
+	command_not_found(hub, user, cmd);
+	command_destroy(cmd);
 	return 1;
 }
 
 static struct commands_handler command_handlers[] = {
-	{ "help",       4, 0, cred_guest,     command_help,     "Show this help message."      },
-	{ "stats",      5, 0, cred_super,     command_stats,    "Show hub statistics."         },
-	{ "version",    7, 0, cred_guest,     command_version,  "Show hub version info."       },
-	{ "uptime",     6, 0, cred_guest,     command_uptime,   "Display hub uptime info."     },
-	{ "kick",       4, 1, cred_operator,  command_kick,     "Kick a user"                  },
-	{ "ban",        3, 1, cred_operator,  command_ban,      "Ban a user"                   },
-	{ "unban",      5, 1, cred_operator,  command_unban,    "Lift ban on a user"           },
-	{ "reload",     6, 0, cred_admin,     command_reload,   "Reload configuration files."  },
-	{ "shutdown",   8, 0, cred_admin,     command_shutdown, "Shutdown hub."                },
-	{ "myip",       4, 0, cred_guest,     command_myip,     "Show your own IP."            },
+	{ "help",       4, 0,   cred_guest,     command_help,     "Show this help message."      },
+	{ "stats",      5, 0,   cred_super,     command_stats,    "Show hub statistics."         },
+	{ "version",    7, 0,   cred_guest,     command_version,  "Show hub version info."       },
+	{ "uptime",     6, 0,   cred_guest,     command_uptime,   "Display hub uptime info."     },
+	{ "kick",       4, "n", cred_operator,  command_kick,     "Kick a user"                  },
+	{ "ban",        3, "n", cred_operator,  command_ban,      "Ban a user"                   },
+	{ "unban",      5, "n", cred_operator,  command_unban,    "Lift ban on a user"           },
+	{ "reload",     6, 0,   cred_admin,     command_reload,   "Reload configuration files."  },
+	{ "shutdown",   8, 0,   cred_admin,     command_shutdown, "Shutdown hub."                },
+	{ "myip",       4, 0,   cred_guest,     command_myip,     "Show your own IP."            },
+	{ "getip",      5, "n", cred_operator,  command_getip,    "Show IP address for a user"   },
 #ifdef CRASH_DEBUG
-	{ "crash",      5, 0, cred_admin,     command_crash,    "Crash the hub (DEBUG)."       },
+	{ "crash",      5, 0,   cred_admin,     command_crash,    "Crash the hub (DEBUG)."       },
 #endif
-	{ 0,            0, 0, cred_none,      command_help,     ""                             }
+	{ 0,            0, 0,   cred_none,      command_help,     ""                             }
 };
 

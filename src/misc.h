@@ -34,7 +34,6 @@ extern char* strip_white_space(char* string);
 
 extern int file_read_lines(const char* file, void* data, file_line_handler_t handler);
 
-
 extern const char* uhub_itoa(int val);
 extern const char* uhub_ulltoa(uint64_t val);
 
@@ -52,6 +51,13 @@ extern char* strndup(const char* string, size_t n);
 #ifndef HAVE_MEMMEM
 void* memmem(const void *haystack, size_t haystacklen, const void *needle, size_t needlelen);
 #endif
+
+/**
+ * Split the string based on split, and place the different parts into list.
+ * @return the number of items in the list after split, or -1 if an error occured.
+ */
+struct linked_list;
+extern int split_string(const char* string, const char* split, struct linked_list* list, int allow_empty);
 
 
 #endif /* HAVE_UHUB_MISC_H */

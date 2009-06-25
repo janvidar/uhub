@@ -319,4 +319,45 @@ void* memmem(const void *haystack, size_t haystacklen, const void *needle, size_
 }
 #endif
 
+int split_string(const char* string, const char* split, struct linked_list* list, int allow_empty)
+{
+	char* tmp1, *tmp2;
+	int n = 0;
+
+	if (!string || !*string || !split || !*split || !list)
+		return -1;
+
+	for (;;)
+	{
+		tmp1 = strstr(string, split);
+		
+		if (tmp1) tmp2 = hub_strndup(string, tmp1 - string);
+		else      tmp2 = hub_strdup(string);
+
+		if (!tmp2)
+		{
+			list_clear(list, &hub_free);
+			return -1;
+		}
+
+		if (*tmp2 || allow_empty)
+		{
+			/* store in list */
+			list_append(list, tmp2);
+			n++;
+		}
+		else
+		{
+			/* ignore element */
+			hub_free(tmp2);
+		}
+
+		if (!tmp1) break; /* last element found */
+
+		string = tmp1;
+		string += strlen(split);
+	}
+
+	return n;
+}
 
