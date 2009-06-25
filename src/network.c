@@ -265,17 +265,29 @@ int net_close(int fd)
 
 int net_shutdown_r(int fd)
 {
+#ifdef WINSOCK
+	return shutdown(fd, SD_RECEIVE);
+#else
 	return shutdown(fd, SHUT_RD);
+#endif
 }
 
 int net_shutdown_w(int fd)
 {
+#ifdef WINSOCK
+	return shutdown(fd, SD_SEND)
+#else
 	return shutdown(fd, SHUT_WR);
+#endif
 }
 
 int net_shutdown_rw(int fd)
 {
+#ifdef WINSOCK
+	return shutdown(fd, SD_BOTH);
+#else
 	return shutdown(fd, SHUT_RDWR);
+#endif
 }
 
 int net_accept(int fd, struct ip_addr_encap* ipaddr)
