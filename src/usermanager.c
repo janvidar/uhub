@@ -108,9 +108,12 @@ int uman_init(struct hub_info* hub)
 	hub->users = users;
 
 #ifdef USERMANAGER_TIMER
-	evtimer_set(&hub->ev_timer, timer_statistics, hub);
-	event_base_set(hub->evbase, &hub->ev_timer);
-	evtimer_add(&hub->ev_timer, &timeout);
+	if (hub->evbase)
+	{
+		evtimer_set(&hub->ev_timer, timer_statistics, hub);
+		event_base_set(hub->evbase, &hub->ev_timer);
+		evtimer_add(&hub->ev_timer, &timeout);
+	}
 #endif // 0
 	return 0;
 }
