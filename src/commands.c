@@ -19,6 +19,10 @@
 
 #include "uhub.h"
 
+#ifdef DEBUG
+#define CRASH_DEBUG
+#endif
+
 struct hub_command
 {
 	const char* message;
@@ -99,7 +103,7 @@ static void send_message(struct hub_info* hub, struct user* user, const char* me
 static int command_access_denied(struct hub_info* hub, struct user* user, struct hub_command* cmd)
 {
 	char temp[128];
-	snprintf(temp, 128, "*** %s: Access denied!", cmd->prefix);
+	snprintf(temp, 128, "*** %s: Access denied.", cmd->prefix);
 	send_message(hub, user, temp);
 	return 0;
 }
@@ -314,6 +318,8 @@ int command_dipatcher(struct hub_info* hub, struct user* user, const char* messa
 {
 	size_t n = 0;
 	int rc;
+
+	/* Parse and validate the command */
 	struct hub_command* cmd = command_create(message);
 	if (!cmd) return 1;
 
