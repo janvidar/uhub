@@ -135,20 +135,18 @@ int handle_net_read(struct user* user)
 {
 	static char buf[MAX_RECV_BUF];
 	struct hub_recvq* q = user->net.recv_queue;
-	size_t buf_size;
-	
-	buf_size = hub_recvq_get(q, buf, MAX_RECV_BUF);
+	size_t buf_size = hub_recvq_get(q, buf, MAX_RECV_BUF);
+	ssize_t size = net_user_recv(user, &buf[buf_size], MAX_RECV_BUF - buf_size);
 
-	int size = net_user_recv(user, &buf[buf_size], MAX_RECV_BUF - buf_size);
 	if (size > 0)
-	{
 		buf_size += size;
-	}
 
 	if (size == -1)
 	{
-		if (net_error() != EWOULDBLOCK || net_error() != EINTR)
-			return quit_socket_error;
+		if (net_error() == EWOULDBLOCK || net_error() == EINTR)
+			return 0;
+
+		return quit_socket_error;
 	}
 	else if (size == 0)
 	{
@@ -156,34 +154,53 @@ int handle_net_read(struct user* user)
 	}
 	else
 	{
-		size_t offset = 0;
-		size_t length;
+		char* lastPos = 0;
 		char* start = buf;
 		char* pos = 0;
-		while ((pos = memchr(start, '\n', (buf_size - offset))))
+		size_t remaining = buf_size;
+
+		while ((pos = memchr(start, '\n', remaining)))
 		{
-			char* line = start;
-			length = pos - start;
+			lastPos = pos;
 			pos[0] = '\0';
 
 #ifdef DEBUG_SENDQ
-			printf("PROC: \"%s\" (%d)\n", line, (int) length);
+			printf("PROC: \"%s\" (%d)\n", start, (int) (pos - start));
 #endif
 
-			if (hub_handle_message(g_hub, user, line, length) == -1)
+			if (user_flag_get(user, flag_maxbuf))
 			{
-				return quit_protocol_error;
-				break;
+				user_flag_unset(user, flag_maxbuf);
+			}
+			else
+			{
+				if (g_hub->config->max_recv_buffer < (pos - start))
+				{
+					if (hub_handle_message(g_hub, user, start, (pos - start)) == -1)
+					{
+							return quit_protocol_error;
+							break;
+					}
+				}
 			}
 
+			pos[0] = '\n'; /* FIXME: not needed */
+			pos ++;
+			remaining -= (pos - start);
 			start = pos;
-			start++;
-			offset += length;
 		}
 
-		if (start < buf + buf_size)
+		if (lastPos)
 		{
-			hub_recvq_set(q, buf+offset, buf_size - offset);
+			if (remaining < g_hub->config->max_recv_buffer)
+			{
+				hub_recvq_set(q, lastPos, remaining);
+			}
+			else
+			{
+				hub_recvq_set(q, 0, 0);
+				user_flag_set(user, flag_maxbuf);
+			}
 		}
 		else
 		{
