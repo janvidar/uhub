@@ -23,6 +23,8 @@
 #define CRASH_DEBUG
 #endif
 
+#define MAX_HELP_MSG 1024
+
 struct hub_command
 {
 	const char* message;
@@ -133,6 +135,7 @@ const char* command_get_syntax(struct commands_handler* handler)
 	{
 		for (n = 0; n < strlen(handler->args); n++)
 		{
+			if (n > 0) strcat(args, " ");
 			switch (handler->args[n])
 			{
 				case 'n': strcat(args, "<nick>"); break;
@@ -177,12 +180,11 @@ static int command_stats(struct hub_info* hub, struct user* user, struct hub_com
 
 static int command_help(struct hub_info* hub, struct user* user, struct hub_command* cmd)
 {
-#define MAX_HELP_MSG 1024
 	size_t n;
 	char msg[MAX_HELP_MSG];
 	msg[0] = 0;
 	strcat(msg, "Available commands:\n");
-	
+
 	for (n = 0; command_handlers[n].prefix; n++)
 	{
 		if (command_handlers[n].cred <= user->credentials)
