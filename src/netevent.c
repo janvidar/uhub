@@ -174,7 +174,7 @@ int handle_net_read(struct user* user)
 			}
 			else
 			{
-				if (g_hub->config->max_recv_buffer > (pos - start))
+				if (((pos - start) > 0) && g_hub->config->max_recv_buffer > (pos - start))
 				{
 					if (hub_handle_message(g_hub, user, start, (pos - start)) == -1)
 					{
