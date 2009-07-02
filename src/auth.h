@@ -24,18 +24,6 @@ struct hub_config;
 struct user;
 struct ip_addr_encap;
 
-enum password_status
-{
-	password_invalid  = 0,
-	password_ok       = 1,
-};
-
-enum acl_status
-{
-	acl_not_found       = 0,
-	acl_found           = 1,
-};
-
 enum user_credentials
 {
 	cred_none,                 /**<<< "User has no credentials (not yet logged in)" */
@@ -93,6 +81,13 @@ extern int acl_user_unban_cid(struct acl_handle* handle, const char* cid);
 extern int acl_check_ip_range(struct ip_addr_encap* addr, struct ip_ban_record* info);
 
 extern const char* acl_password_generate_challenge(struct acl_handle* acl, struct user* user);
+
+/**
+ * Verify a password.
+ *
+ * @param password the hashed password (based on the nonce).
+ * @return 1 if the password matches, or 0 if the password is incorrect.
+ */
 extern int acl_password_verify(struct acl_handle* acl, struct user* user, const char* password);
 
 #endif /* HAVE_UHUB_ACL_H */

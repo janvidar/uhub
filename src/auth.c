@@ -552,14 +552,14 @@ int acl_password_verify(struct acl_handle* acl, struct user* user, const char* p
 	uint64_t tiger_res[3];
 	
 	if (!password || !user || strlen(password) != MAX_CID_LEN)
-		return password_invalid;
+		return 0;
 
 	access = acl_get_access_info(acl, user->id.nick);
 	if (!access || !access->password)
-		return password_invalid;
+		return 0;
 
 	if (TIGERSIZE+strlen(access->password) >= 1024)
-		return password_invalid;
+		return 0;
 
 	challenge = acl_password_generate_challenge(acl, user);
 
@@ -574,9 +574,9 @@ int acl_password_verify(struct acl_handle* acl, struct user* user, const char* p
 
 	if (strcasecmp(password, password_calc) == 0)
 	{
-		return password_ok;
+		return 1;
 	}
-	return password_invalid;
+	return 0;
 }
 
 
