@@ -65,10 +65,10 @@ CFLAGS        += -I/source/libevent
 LDFLAGS       += -L/source/libevent
 
 ifeq ($(RELEASE),YES)
-CFLAGS        += -Os -DNDEBUG
+CFLAGS        += -O3 -DNDEBUG
 GIT_REVISION  ?= NO
 else
-CFLAGS        += -g -DDEBUG
+CFLAGS        += -ggdb -DDEBUG
 GIT_REVISION  ?= YES
 endif
 
