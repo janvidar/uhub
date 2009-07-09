@@ -46,13 +46,11 @@ struct user* user_create(struct hub_info* hub, int sd)
 	if (user == NULL)
 		return NULL; /* OOM */
 
-	user->net.ev_write = hub_malloc_zero(sizeof(struct event));
 	user->net.ev_read  = hub_malloc_zero(sizeof(struct event));
 
-	if (!user->net.ev_write || !user->net.ev_read)
+	if (!user->net.ev_read)
 	{
 	    hub_free(user->net.ev_read);
-	    hub_free(user->net.ev_write);
 	    hub_free(user);
 	    return NULL;
 	}
@@ -71,13 +69,6 @@ void user_destroy(struct user* user)
 {
 	hub_log(log_trace, "user_destroy(), user=%p", user);
 
-	if (user->net.ev_write)
-	{
-		event_del(user->net.ev_write);
-		hub_free(user->net.ev_write);
-		user->net.ev_write = 0;
-	}
-	
 	if (user->net.ev_read)
 	{
 		event_del(user->net.ev_read);
@@ -344,9 +335,10 @@ void user_net_io_want_write(struct user* user)
 #ifdef DEBUG_SENDQ
 	hub_log(log_trace, "user_net_io_want_write: %s", user_log_str(user));
 #endif
-	if (user && user->net.ev_write)
+	if (user && user->net.ev_read)
 	{
-		event_add(user->net.ev_write, 0);
+		event_set(user->net.ev_read,  user->net.sd, EV_READ | EV_WRITE | EV_PERSIST, net_event, user);
+		event_add(user->net.ev_read, 0);
 	}
 }
 
@@ -358,6 +350,7 @@ void user_net_io_want_read(struct user* user, int timeout_s)
 	struct timeval timeout = { timeout_s, 0 };
 	if (user && user->net.ev_read)
 	{
+		event_set(user->net.ev_read,  user->net.sd, EV_READ | EV_PERSIST, net_event, user);
 		event_add(user->net.ev_read, &timeout);
 	}
 }

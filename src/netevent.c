@@ -226,7 +226,7 @@ int handle_net_write(struct user* user)
 	return 0;
 }
 
-static void net_event(int fd, short ev, void *arg)
+void net_event(int fd, short ev, void *arg)
 {
 	struct user* user = (struct user*) arg;
 	int flag_close = 0;
@@ -307,11 +307,8 @@ static void prepare_user_net(struct hub_info* hub, struct user* user)
 		net_set_nosigpipe(fd, 1);
 
 		event_set(user->net.ev_read,  fd, EV_READ | EV_PERSIST, net_event, user);
-		event_set(user->net.ev_write, fd, EV_WRITE,             net_event, user);
 		event_base_set(hub->evbase, user->net.ev_read);
-		event_base_set(hub->evbase, user->net.ev_write);
 		event_add(user->net.ev_read,  &timeout);
-
 }
 
 void net_on_accept(int server_fd, short ev, void *arg)

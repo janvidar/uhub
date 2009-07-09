@@ -96,7 +96,6 @@ struct user_net_io
 {
 	int                  sd;                      /** socket descriptor */
 	struct event*        ev_read;                 /** libevent struct for read events */
-	struct event*        ev_write;                /** libevent struct for write events */
 
 	struct hub_recvq*    recv_queue;
 	struct hub_sendq*    send_queue;
