@@ -25,6 +25,23 @@
 /* #define MEMORY_DEBUG */
 /* #define DEBUG_SENDQ 1 */
 
+#if USE_REGPARM && __GNUC__ >= 3
+#define REGPRM1 __attribute__((regparm(1)))
+#define REGPRM2 __attribute__((regparm(2)))
+#define REGPRM3 __attribute__((regparm(3)))
+#else
+#define REGPRM1
+#define REGPRM2
+#define REGPRM3
+#endif
+
+#ifndef FORCEINLINE
+#if __GNUC__ < 3
+#define FORCEINLINE inline
+#else
+#define FORCEINLINE inline __attribute__((always_inline))
+#endif
+#endif
 
 
 #ifndef _GNU_SOURCE
