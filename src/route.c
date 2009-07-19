@@ -57,9 +57,7 @@ int route_message(struct hub_info* hub, struct user* u, struct adc_message* msg)
 	return 0;
 }
 
-
-#if 0
-static size_t get_max_send_queue(struct hub_info* hub)
+static inline size_t get_max_send_queue(struct hub_info* hub)
 {
 	/* TODO: More dynamic send queue limit, for instance:
 	 * return MAX(hub->config->max_send_buffer, (hub->config->max_recv_buffer * hub_get_user_count(hub)));
@@ -67,7 +65,7 @@ static size_t get_max_send_queue(struct hub_info* hub)
 	return hub->config->max_send_buffer;
 }
 
-static size_t get_max_send_queue_soft(struct hub_info* hub)
+static inline size_t get_max_send_queue_soft(struct hub_info* hub)
 {
 	return hub->config->max_send_buffer_soft;
 }
@@ -77,21 +75,19 @@ static size_t get_max_send_queue_soft(struct hub_info* hub)
  *         -1 if send queue is overflowed
  *         0 if soft send queue is overflowed (not implemented at the moment)
  */
-static int check_send_queue(struct user* user, struct adc_message* msg)
+static inline int check_send_queue(struct hub_info* hub, struct user* user, struct adc_message* msg)
 {
 	if (user_flag_get(user, flag_user_list))
 		return 1;
 
-	if ((user->net.send_queue->size + msg->length) > get_max_send_queue(user->hub))      
+	if ((user->net.send_queue->size + msg->length) > get_max_send_queue(hub))
 		return -1;
 
-	if (user->net.send_queue->size > get_max_send_queue_soft(user->hub) && msg->priority < 0)
+	if (user->net.send_queue->size > get_max_send_queue_soft(hub) && msg->priority < 0)
 		return 0;
 
 	return 1;
 }
-#endif
-
 
 int route_to_user(struct hub_info* hub, struct user* user, struct adc_message* msg)
 {
@@ -101,17 +97,18 @@ int route_to_user(struct hub_info* hub, struct user* user, struct adc_message* m
 	free(data);
 #endif
 
-	int empty = hub_sendq_is_empty(user->net.send_queue);
-	hub_sendq_add(user->net.send_queue, msg);
-
-	if (empty)
+	if (hub_sendq_is_empty(user->net.send_queue))
 	{
 		/* Perform oportunistic write */
+		hub_sendq_add(user->net.send_queue, msg);
 		handle_net_write(user);
 	}
 	else
 	{
-		user_net_io_want_write(user);
+		if (check_send_queue(hub, user, msg) >= 0)
+		{
+			user_net_io_want_write(user);
+		}
 	}
 	return 1;
 }
