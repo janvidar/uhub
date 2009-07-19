@@ -218,7 +218,7 @@ int handle_net_write(struct user* user)
 		if (ret == -2)
 			break;
 		
-		if (ret < 0)
+		if (ret <= 0)
 			return quit_socket_error;
 	}
 
