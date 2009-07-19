@@ -107,6 +107,7 @@ int route_to_user(struct hub_info* hub, struct user* user, struct adc_message* m
 	{
 		if (check_send_queue(hub, user, msg) >= 0)
 		{
+			hub_sendq_add(user->net.send_queue, msg);
 			user_net_io_want_write(user);
 		}
 	}
