@@ -46,20 +46,21 @@ struct user* user_create(struct hub_info* hub, int sd)
 	if (user == NULL)
 		return NULL; /* OOM */
 
-	user->net.ev_read  = hub_malloc_zero(sizeof(struct event));
-
-	if (!user->net.ev_read)
-	{
-	    hub_free(user->net.ev_read);
-	    hub_free(user);
-	    return NULL;
-	}
-	
 	user->net.sd = sd;
 	user->net.tm_connected = time(NULL);
 	user->net.send_queue = hub_sendq_create();
 	user->net.recv_queue = hub_recvq_create();
+
+	event_set(&user->net.event, sd, EV_READ | EV_PERSIST, net_event, user);
+	event_base_set(hub->evbase, &user->net.event);
+	event_add(&user->net.event, 0);
+
+	evtimer_set(&user->net.timeout, net_event, user);
+	event_base_set(hub->evbase, &user->net.timeout);
 	
+
+	user_set_timeout(user, TIMEOUT_CONNECTED);
+
 	user_set_state(user, state_protocol);
 	return user;
 }
@@ -69,12 +70,7 @@ void user_destroy(struct user* user)
 {
 	hub_log(log_trace, "user_destroy(), user=%p", user);
 
-	if (user->net.ev_read)
-	{
-		event_del(user->net.ev_read);
-		hub_free(user->net.ev_read);
-		user->net.ev_read = 0;
-	}
+	event_del(&user->net.event);
 	
 	hub_recvq_destroy(user->net.recv_queue);
 	hub_sendq_destroy(user->net.send_queue);
@@ -335,24 +331,19 @@ void user_net_io_want_write(struct user* user)
 #ifdef DEBUG_SENDQ
 	hub_log(log_trace, "user_net_io_want_write: %s", user_log_str(user));
 #endif
-	if (user && user->net.ev_read)
-	{
-		event_set(user->net.ev_read,  user->net.sd, EV_READ | EV_WRITE | EV_PERSIST, net_event, user);
-		event_add(user->net.ev_read, 0);
-	}
+	event_del(&user->net.event);
+	event_set(&user->net.event,  user->net.sd, EV_READ | EV_WRITE | EV_PERSIST, net_event, user);
+	event_add(&user->net.event, 0);
 }
 
-void user_net_io_want_read(struct user* user, int timeout_s)
+void user_net_io_want_read(struct user* user)
 {
 #ifdef DEBUG_SENDQ
 	hub_log(log_trace, "user_net_io_want_read: %s", user_log_str(user));
 #endif
-	struct timeval timeout = { timeout_s, 0 };
-	if (user && user->net.ev_read)
-	{
-		event_set(user->net.ev_read,  user->net.sd, EV_READ | EV_PERSIST, net_event, user);
-		event_add(user->net.ev_read, &timeout);
-	}
+	event_del(&user->net.event);
+	event_set(&user->net.event,  user->net.sd, EV_READ | EV_PERSIST, net_event, user);
+	event_add(&user->net.event, 0);
 }
 
 void user_reset_last_write(struct user* user)
@@ -363,6 +354,15 @@ void user_reset_last_write(struct user* user)
 void user_reset_last_read(struct user* user)
 {
 	user->net.tm_last_read = time(NULL);
+}
+
+void user_set_timeout(struct user* user, int seconds)
+{
+#ifdef DEBUG_SENDQ
+	hub_log(log_trace, "user_set_timeout to %d seconds: %s", seconds, user_log_str(user));
+#endif
+	struct timeval timeout = { seconds, 0 };
+	evtimer_add(&user->net.timeout, &timeout);
 }
 
 

@@ -212,7 +212,7 @@ int handle_net_read(struct user* user)
 
 int handle_net_write(struct user* user)
 {
-	for (;;)
+	while (hub_sendq_get_bytes(user->net.send_queue))
 	{
 		int ret = hub_sendq_send(user->net.send_queue, net_user_send, user);
 		if (ret <= 0)
@@ -222,6 +222,10 @@ int handle_net_write(struct user* user)
 	if (hub_sendq_get_bytes(user->net.send_queue))
 	{
 		user_net_io_want_write(user);
+	}
+	else
+	{
+		user_net_io_want_read(user);
 	}
 	return 0;
 }
@@ -235,7 +239,7 @@ void net_event(int fd, short ev, void *arg)
 	hub_log(log_trace, "net_on_read() : fd=%d, ev=%d, arg=%p", fd, (int) ev, arg);
 #endif
 
-	if (ev == EV_TIMEOUT)
+	if (ev & EV_TIMEOUT)
 	{
 		if (user_is_connecting(user))
 		{
@@ -247,36 +251,21 @@ void net_event(int fd, short ev, void *arg)
 			// hub_send_ping(hub, user);
 		}
 	}
-	else if (ev == EV_READ)
+
+	if (ev & EV_READ)
 	{
 		flag_close = handle_net_read(user);
 	}
-	else if (ev == EV_WRITE)
+
+	if (ev & EV_WRITE)
 	{
 		flag_close = handle_net_write(user);
 	}
-	
+
 	if (flag_close)
 	{
 		hub_disconnect_user(g_hub, user, flag_close);
 		return;
-	}
-	
-	if (user_is_logged_in(user))
-	{
-		if (user->net.ev_read)
-		{
-			struct timeval timeout = { TIMEOUT_IDLE, 0 };
-			event_add(user->net.ev_read, &timeout);
-		}
-	}
-	else if (user_is_connecting(user))
-	{
-		if (user->net.ev_read)
-		{
-			struct timeval timeout = { TIMEOUT_HANDSHAKE, 0 };
-			event_add(user->net.ev_read, &timeout);
-		}
 	}
 }
 
@@ -284,7 +273,6 @@ void net_event(int fd, short ev, void *arg)
 static void prepare_user_net(struct hub_info* hub, struct user* user)
 {
 		int fd = user->net.sd;
-		struct timeval timeout = { TIMEOUT_CONNECTED, 0 };
 
 #ifdef SET_SENDBUG
 		size_t sendbuf = 0;
@@ -305,10 +293,6 @@ static void prepare_user_net(struct hub_info* hub, struct user* user)
 
 		net_set_nonblocking(fd, 1);
 		net_set_nosigpipe(fd, 1);
-
-		event_set(user->net.ev_read,  fd, EV_READ | EV_PERSIST, net_event, user);
-		event_base_set(hub->evbase, user->net.ev_read);
-		event_add(user->net.ev_read,  &timeout);
 }
 
 void net_on_accept(int server_fd, short ev, void *arg)

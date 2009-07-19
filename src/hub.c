@@ -102,7 +102,6 @@ int hub_handle_support(struct hub_info* hub, struct user* u, struct adc_message*
 	int index = 0;
 	int ok = 1;
 	char* arg = adc_msg_get_argument(cmd, index);
-	struct timeval timeout = { TIMEOUT_HANDSHAKE, 0 };
 
 	if (hub->status == hub_status_disabled && u->state == state_protocol)
 	{
@@ -146,8 +145,7 @@ int hub_handle_support(struct hub_info* hub, struct user* u, struct adc_message*
 		if (ok)
 		{
 			hub_send_handshake(hub, u);
-			if (u->net.ev_read)
-				event_add(u->net.ev_read, &timeout);
+			user_set_timeout(u, TIMEOUT_HANDSHAKE);
 		}
 		else
 		{
@@ -929,17 +927,8 @@ void hub_disconnect_user(struct hub_info* hub, struct user* user, int reason)
 	{
 		return;
 	}
-	
-	/* dont read more data from this user */
-	/* FIXME: Remove this from here! */
-	if (user->net.ev_read)
-	{
-		event_del(user->net.ev_read);
-		hub_free(user->net.ev_read);
-		user->net.ev_read = 0;
-	}
 
-	/* this should be enough? */
+	/* stop reading from user */
 	net_shutdown_r(user->net.sd);
 	
 	hub_log(log_trace, "hub_disconnect_user(), user=%p, reason=%d, state=%d", user, reason, user->state);

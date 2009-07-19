@@ -95,7 +95,8 @@ struct user_limits
 struct user_net_io
 {
 	int                  sd;                      /** socket descriptor */
-	struct event*        ev_read;                 /** libevent struct for read events */
+	struct event         event;                   /** libevent struct for read/write events */
+	struct event         timeout;                 /** timeout handling */
 
 	struct hub_recvq*    recv_queue;
 	struct hub_sendq*    send_queue;
@@ -286,7 +287,13 @@ extern void user_net_io_want_write(struct user* user);
 /**
  * Mark the user with a want read flag, meaning it should poll for readability.
  */
-extern void user_net_io_want_read(struct user* user, int timeout_s);
+extern void user_net_io_want_read(struct user* user);
+
+/**
+ * Set timeout for connetion.
+ * @param seconds the number of seconds into the future.
+ */
+extern void user_set_timeout(struct user* user, int seconds);
 
 /**
  * Reset the last-write timer.

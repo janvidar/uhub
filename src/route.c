@@ -18,7 +18,6 @@
  */
 
 #include "uhub.h"
-#define DEBUG_SENDQ 1
 
 int route_message(struct hub_info* hub, struct user* u, struct adc_message* msg)
 {
@@ -110,8 +109,7 @@ int route_to_user(struct hub_info* hub, struct user* user, struct adc_message* m
 		/* Perform oportunistic write */
 		handle_net_write(user);
 	}
-
-	if (hub_sendq_get_bytes(user->net.send_queue))
+	else
 	{
 		user_net_io_want_write(user);
 	}

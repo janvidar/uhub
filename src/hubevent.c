@@ -49,8 +49,6 @@ static void log_user_nick_change(struct user* u, const char* nick)
 /* Send MOTD, do logging etc */
 void on_login_success(struct hub_info* hub, struct user* u)
 {
-	struct timeval timeout = { TIMEOUT_IDLE, 0 };
-	
 	/* Send user list of all existing users */
 	if (!uman_send_user_list(hub, u))
 		return;
@@ -71,8 +69,7 @@ void on_login_success(struct hub_info* hub, struct user* u)
 		hub_send_motd(hub, u);
 		
 	/* reset to idle timeout */
-	if (u->net.ev_read)
-		event_add(u->net.ev_read, &timeout);
+	user_set_timeout(u, TIMEOUT_IDLE);
 }
 
 void on_login_failure(struct hub_info* hub, struct user* u, enum status_message msg)
