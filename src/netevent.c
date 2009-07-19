@@ -215,8 +215,11 @@ int handle_net_write(struct user* user)
 	while (hub_sendq_get_bytes(user->net.send_queue))
 	{
 		int ret = hub_sendq_send(user->net.send_queue, net_user_send, user);
-		if (ret <= 0)
+		if (ret == 0 || (ret == -1 && (net_error() == EAGAIN || net_error() == EINTR)))
 			break;
+		
+		if (ret < 0)
+			return quit_socket_error;
 	}
 
 	if (hub_sendq_get_bytes(user->net.send_queue))
@@ -256,8 +259,7 @@ void net_event(int fd, short ev, void *arg)
 	{
 		flag_close = handle_net_read(user);
 	}
-
-	if (ev & EV_WRITE)
+	else if (ev & EV_WRITE)
 	{
 		flag_close = handle_net_write(user);
 	}
