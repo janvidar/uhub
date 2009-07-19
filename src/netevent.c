@@ -63,7 +63,7 @@ int net_user_send(void* ptr, const void* buf, size_t len)
 	{
 		user_reset_last_write(user);
 	}
-	else if (ret == -1 && net_error() == EWOULDBLOCK)
+	else if (ret == -1 && (net_error() == EWOULDBLOCK || net_error() == EINTR))
 	{
 		return -2;
 	}
@@ -215,7 +215,7 @@ int handle_net_write(struct user* user)
 	while (hub_sendq_get_bytes(user->net.send_queue))
 	{
 		int ret = hub_sendq_send(user->net.send_queue, net_user_send, user);
-		if (ret == 0 || (ret == -1 && (net_error() == EAGAIN || net_error() == EINTR)))
+		if (ret == -2)
 			break;
 		
 		if (ret < 0)
