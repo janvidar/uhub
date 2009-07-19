@@ -97,6 +97,7 @@ struct user_net_io
 	int                  sd;                      /** socket descriptor */
 	struct event         event;                   /** libevent struct for read/write events */
 	struct event         timeout;                 /** timeout handling */
+	int events;                                   /** currently set events, used to reduce event_{add,del,set} calls */
 
 	struct hub_recvq*    recv_queue;
 	struct hub_sendq*    send_queue;
