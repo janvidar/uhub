@@ -86,7 +86,7 @@ void setup_signal_handlers(struct hub_info* hub)
 		{
 			hub_log(log_error, "Error setting signal handler %d", signals[i]);
 		}
-    }
+	}
 }
 
 void shutdown_signal_handlers(struct hub_info* hub)
@@ -95,7 +95,7 @@ void shutdown_signal_handlers(struct hub_info* hub)
 	for (i = 0; signals[i]; i++)
 	{
 		signal_del(&signal_events[i]);
-    }
+	}
 }
 
 #endif /* WIN32 */
