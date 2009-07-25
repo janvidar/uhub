@@ -25,6 +25,21 @@
 /* FIXME: This should not be needed! */
 extern struct hub_info* g_hub;
 
+#ifdef DEBUG_SENDQ
+static void debug_msg(const char* prefix, struct adc_message* msg)
+{
+	size_t n;
+	char* buf = strdup(msg->cache);
+	for (n = 0; n < msg->length; n++)
+	{
+		if (buf[n] == '\r' || buf[n] == '\n')
+			buf[n] = '_';
+	}
+	hub_log(log_trace, "%s: [%s] (%d bytes)", prefix, buf, (int) msg->length);
+	free(buf);
+}
+#endif
+
 struct hub_recvq* hub_recvq_create()
 {
 	struct hub_recvq* q = hub_malloc_zero(sizeof(struct hub_recvq));
@@ -113,12 +128,18 @@ void hub_sendq_destroy(struct hub_sendq* q)
 void hub_sendq_add(struct hub_sendq* q, struct adc_message* msg_)
 {
 	struct adc_message* msg = adc_msg_incref(msg_);
+#ifdef DEBUG_SENDQ
+	debug_msg("hub_sendq_add", msg);
+#endif
 	list_append(q->queue, msg);
 	q->size += msg->length;
 }
 
 void hub_sendq_remove(struct hub_sendq* q, struct adc_message* msg)
 {
+#ifdef DEBUG_SENDQ
+	debug_msg("hub_sendq_remove", msg);
+#endif
 	list_remove(q->queue, msg);
 	q->size  -= msg->length;
 	adc_msg_free(msg);
@@ -183,7 +204,7 @@ int hub_sendq_send(struct hub_sendq* q, hub_recvq_write w, void* data)
 
 int hub_sendq_is_empty(struct hub_sendq* q)
 {
-	return q->size == 0;
+	return (q->size - q->offset) == 0;
 }
 
 size_t hub_sendq_get_bytes(struct hub_sendq* q)
