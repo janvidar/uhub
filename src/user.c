@@ -331,7 +331,7 @@ int user_is_registered(struct user* user)
 void user_net_io_want_write(struct user* user)
 {
 #ifdef DEBUG_SENDQ
-	hub_log(log_trace, "user_net_io_want_write: %s", user_log_str(user));
+	hub_log(log_trace, "user_net_io_want_write: %s (pending: %d)", user_log_str(user), event_pending(&user->net.event, EV_READ | EV_WRITE, 0));
 #endif
 	if (user->net.events == (EV_READ | EV_WRITE))
 		return;
@@ -344,7 +344,7 @@ void user_net_io_want_write(struct user* user)
 void user_net_io_want_read(struct user* user)
 {
 #ifdef DEBUG_SENDQ
-	hub_log(log_trace, "user_net_io_want_read: %s", user_log_str(user));
+	hub_log(log_trace, "user_net_io_want_read: %s (pending: %d)", user_log_str(user), event_pending(&user->net.event, EV_READ | EV_WRITE, 0));
 #endif
 	if (user->net.events == EV_READ)
 		return;

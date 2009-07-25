@@ -36,16 +36,16 @@ void debug_sendq_send(struct user* user, int sent, int total)
 
 void debug_sendq_recv(struct user* user, int received, int max, const char* buffer)
 {
-	printf("RECV: %d/%d bytes\n", ret, (int) len);
-	if (ret == -1)
+	printf("RECV: %d/%d bytes\n", received, (int) max);
+	if (received == -1)
 	{
 		int err = net_error();
 		printf("    errno: %d - %s\n", err, net_error_string(err));
 	}
-	else if (ret > 0)
+	else if (received > 0)
 	{
-		char* data = hub_malloc_zero(ret + 1);
-		memcpy(data, buf, ret);
+		char* data = hub_malloc_zero(received + 1);
+		memcpy(data, buffer, received);
 		printf("RECV: \"%s\"\n", data);
 		hub_free(data);
 	}
