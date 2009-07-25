@@ -244,7 +244,7 @@ struct adc_message* adc_msg_parse_verify(struct user* u, const char* line, size_
 	
 	if (command->source && (!u || command->source != u->id.sid))
 	{
-		hub_log(log_debug, "Command does not match user's SID (command->source=%d, user->id.sid=%d)", command->source, (u ? u->id.sid : 0));
+		LOG_DEBUG("Command does not match user's SID (command->source=%d, user->id.sid=%d)", command->source, (u ? u->id.sid : 0));
 		adc_msg_free(command);
 		return 0;
 	}
@@ -268,7 +268,7 @@ struct adc_message* adc_msg_parse(const char* line, size_t length)
 		
 	if (!is_printable_utf8(line, length))
 	{
-		hub_log(log_debug, "Dropped message with non-printable UTF-8 characters.");
+		LOG_DEBUG("Dropped message with non-printable UTF-8 characters.");
 		hub_free(command);
 		return NULL;
 	}
@@ -520,7 +520,6 @@ int adc_msg_remove_named_argument(struct adc_message* cmd, const char prefix_[2]
 		{
 			
 			temp_len = &end[0] - &start[0]; // strlen(start);
-			/* hub_log(log_trace, "                     length=%d", (int) (temp_len)); */
 			endlen = strlen(end);
 			
 			memmove(start, end, endlen);

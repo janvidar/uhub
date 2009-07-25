@@ -42,12 +42,12 @@ void hub_handle_signal(int fd, short events, void* arg)
 	switch (signal)
 	{
 		case SIGINT:
-			hub_log(log_info, "Interrupted. Shutting down...");
+			LOG_INFO("Interrupted. Shutting down...");
 			hub->status = hub_status_shutdown;
 			break;
 
 		case SIGTERM:
-			hub_log(log_info, "Terminated. Shutting down...");
+			LOG_INFO("Terminated. Shutting down...");
 			hub->status = hub_status_shutdown;
 			break;
 
@@ -59,7 +59,7 @@ void hub_handle_signal(int fd, short events, void* arg)
 			break;
 
 		default:
-			hub_log(log_trace, "hub_handle_signal(): caught unknown signal: %d", signal);
+			LOG_TRACE("hub_handle_signal(): caught unknown signal: %d", signal);
 			hub->status = hub_status_shutdown;
 			break;
 	}
@@ -84,7 +84,7 @@ void setup_signal_handlers(struct hub_info* hub)
 		event_base_set(hub->evbase, &signal_events[i]);
 		if (signal_add(&signal_events[i], NULL))
 		{
-			hub_log(log_error, "Error setting signal handler %d", signals[i]);
+			LOG_ERROR("Error setting signal handler %d", signals[i]);
 		}
 	}
 }
@@ -114,8 +114,8 @@ int main_loop()
 	{
 		if (hub)
 		{
-			hub_log(log_info, "Reloading configuration files...");
-			hub_log(log_debug, "Hub status: %d", (int) hub->status);
+			LOG_INFO("Reloading configuration files...");
+			LOG_DEBUG("Hub status: %d", (int) hub->status);
 		}
 	
 		if (read_config(arg_config, &configuration, !arg_have_config) == -1)
@@ -335,15 +335,15 @@ int drop_privileges()
 
 		if (!ret)
 		{
-			hub_log(log_fatal, "Unable to determine group id, check group name.");
+			LOG_FATAL("Unable to determine group id, check group name.");
 			return -1;
 		}
 
-		hub_log(log_trace, "Setting group id %d (%s)", (int) perm_gid, arg_gid);
+		LOG_TRACE("Setting group id %d (%s)", (int) perm_gid, arg_gid);
 		ret = setgid(perm_gid);
 		if (ret == -1)
 		{
-			hub_log(log_fatal, "Unable to change group id, permission denied.");
+			LOG_FATAL("Unable to change group id, permission denied.");
 			return -1;
 		}
 		gid_ok = 1;
@@ -368,25 +368,25 @@ int drop_privileges()
 
 		if (!ret)
 		{
-			hub_log(log_fatal, "Unable to determine user id, check user name.");
+			LOG_FATAL("Unable to determine user id, check user name.");
 			return -1;
 		}
 
 		if (!gid_ok) {
-			hub_log(log_trace, "Setting group id %d (%s)", (int) perm_gid, arg_gid);
+			LOG_TRACE("Setting group id %d (%s)", (int) perm_gid, arg_gid);
 			ret = setgid(perm_gid);
 			if (ret == -1)
 			{
-				hub_log(log_fatal, "Unable to change group id, permission denied.");
+				LOG_FATAL("Unable to change group id, permission denied.");
 				return -1;
 			}
 		}
 
-		hub_log(log_trace, "Setting user id %d (%s)", (int) perm_uid, arg_uid);
+		LOG_TRACE("Setting user id %d (%s)", (int) perm_uid, arg_uid);
 		ret = setuid(perm_uid);
 		if (ret == -1)
 		{
-			hub_log(log_fatal, "Unable to change user id, permission denied.");
+			LOG_FATAL("Unable to change user id, permission denied.");
 			return -1;
 		}
 	}
@@ -401,7 +401,7 @@ int pidfile_create()
 		FILE* pidfile = fopen(arg_pid, "w");
 	        if (!pidfile)
 		{
-			hub_log(log_fatal, "Unable to write pid file: %s\n", arg_pid);
+			LOG_FATAL("Unable to write pid file: %s\n", arg_pid);
 			return -1;
 		}
 
@@ -440,7 +440,7 @@ int main(int argc, char** argv)
 		ret = fork();
 		if (ret == -1)
 		{
-			hub_log(log_fatal, "Unable to fork to background!");
+			LOG_FATAL("Unable to fork to background!");
 			return -1;
 		}
 		else if (ret == 0)
@@ -456,7 +456,7 @@ int main(int argc, char** argv)
 		else
 		{
 			/* parent process */
-			hub_log(log_debug, "Forked to background\n");
+			LOG_DEBUG("Forked to background\n");
 			return 0;
 		}
 	}

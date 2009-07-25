@@ -147,7 +147,7 @@ int ip_convert_address(const char* text_address, int port, struct sockaddr* addr
 		addr6.sin6_port = htons(port);
 		if (net_string_to_address(AF_INET6, taddr, &addr6.sin6_addr) <= 0)
 		{
-			hub_log(log_fatal, "Unable to convert socket address (ipv6)");
+			LOG_ERROR("Unable to convert socket address (ipv6)");
 			return 0;
 		}
 
@@ -163,7 +163,7 @@ int ip_convert_address(const char* text_address, int port, struct sockaddr* addr
 		addr4.sin_port = htons(port);
 		if (net_string_to_address(AF_INET, taddr, &addr4.sin_addr) <= 0)
 		{
-			hub_log(log_fatal, "Unable to convert socket address (ipv4)");
+			LOG_ERROR("Unable to convert socket address (ipv4)");
 			return 0;
 		}
 		memcpy(addr, &addr4, sockaddr_size);
@@ -219,7 +219,7 @@ int ip_mask_create_left(int af, int bits, struct ip_addr_encap* result)
 
 #ifdef IP_CALC_DEBUG
 	char* r_str = hub_strdup(ip_convert_to_string(result));
-	hub_log(log_debug, "Created left mask: %s", r_str);
+	LOG_DUMP("Created left mask: %s", r_str);
 	hub_free(r_str);
 #endif
 
@@ -272,7 +272,7 @@ int ip_mask_create_right(int af, int bits, struct ip_addr_encap* result)
 	
 #ifdef IP_CALC_DEBUG
 	char* r_str = hub_strdup(ip_convert_to_string(result));
-	hub_log(log_debug, "Created right mask: %s", r_str);
+	LOG_DUMP("Created right mask: %s", r_str);
 	hub_free(r_str);
 #endif
 	
@@ -405,7 +405,7 @@ int ip_compare(struct ip_addr_encap* a, struct ip_addr_encap* b)
 #ifdef IP_CALC_DEBUG
 	char* a_str = hub_strdup(ip_convert_to_string(a));
 	char* b_str = hub_strdup(ip_convert_to_string(b));
-	hub_log(log_debug, "Comparing IPs '%s' AND '%s' => %d", a_str, b_str, ret);
+	LOG_DUMP("Comparing IPs '%s' AND '%s' => %d", a_str, b_str, ret);
 	hub_free(a_str);
 	hub_free(b_str);
 #endif

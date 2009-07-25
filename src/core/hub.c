@@ -21,16 +21,12 @@
 
 struct hub_info* g_hub = 0;
 
-#define NETWORK_DUMP_DEBUG 1
-
 int hub_handle_message(struct hub_info* hub, struct user* u, const char* line, size_t length)
 {
 	int ret = 0;
 	struct adc_message* cmd = 0;
 	
-#ifdef NETWORK_DUMP_DEBUG
-	hub_log(log_protocol, "recv %s: %s", sid_to_string(u->id.sid), line);
-#endif
+	LOG_PROTO("recv %s: %s", sid_to_string(u->id.sid), line);
 	
 	if (user_is_disconnecting(u))
 		return -1;
@@ -399,7 +395,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	hub = hub_malloc_zero(sizeof(struct hub_info));
 	if (!hub)
 	{
-		hub_log(log_fatal, "Unable to allocate memory for hub");
+		LOG_FATAL("Unable to allocate memory for hub");
 		return 0;
 	}
 	
@@ -408,9 +404,9 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	ipv6_supported = net_is_ipv6_supported();
 	
 	if (ipv6_supported)
-		hub_log(log_debug, "IPv6 supported.");
+		LOG_DEBUG("IPv6 supported.");
 	else
-		hub_log(log_debug, "IPv6 not supported.");
+		LOG_DEBUG("IPv6 not supported.");
 	
 	if (ip_convert_address(config->server_bind_addr, config->server_port, (struct sockaddr*) &addr, &sockaddr_size) == -1)
 	{
@@ -435,13 +431,13 @@ struct hub_info* hub_start_service(struct hub_config* config)
 #endif
 	if (!hub->evbase)
 	{
-		hub_log(log_error, "Unable to initialize libevent.");
+		LOG_ERROR("Unable to initialize libevent.");
 		hub_free(hub);
 		return 0;
 	}
 
-	hub_log(log_info, "Starting " PRODUCT "/" VERSION ", listening on %s:%d...", address_buf, config->server_port);
-	hub_log(log_debug, "Using libevent %s, backend: %s", event_get_version(), event_get_method());
+	LOG_INFO("Starting " PRODUCT "/" VERSION ", listening on %s:%d...", address_buf, config->server_port);
+	LOG_DEBUG("Using libevent %s, backend: %s", event_get_version(), event_get_method());
 
 	server_tcp = net_socket_create(af, SOCK_STREAM, IPPROTO_TCP);
 	if (server_tcp == -1)
@@ -472,7 +468,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	ret = net_bind(server_tcp, (struct sockaddr*) &addr, sockaddr_size);
 	if (ret == -1)
 	{
-		hub_log(log_fatal, "hub_start_service(): Unable to bind to TCP local address. errno=%d, str=%s", net_error(), net_error_string(net_error()));
+		LOG_FATAL("hub_start_service(): Unable to bind to TCP local address. errno=%d, str=%s", net_error(), net_error_string(net_error()));
 		event_base_free(hub->evbase);
 		hub_free(hub);
 		net_close(server_tcp);
@@ -482,7 +478,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	ret = net_listen(server_tcp, SERVER_BACKLOG);
 	if (ret == -1)
 	{
-		hub_log(log_fatal, "hub_start_service(): Unable to listen to socket");
+		LOG_FATAL("hub_start_service(): Unable to listen to socket");
 		event_base_free(hub->evbase);
 		hub_free(hub);
 		net_close(server_tcp);
@@ -539,7 +535,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 
 void hub_shutdown_service(struct hub_info* hub)
 {
-	hub_log(log_trace, "hub_shutdown_service()");
+	LOG_TRACE("hub_shutdown_service()");
 
 	event_queue_shutdown(hub->queue);
 	event_del(&hub->ev_accept);
@@ -903,7 +899,7 @@ void hub_event_loop(struct hub_info* hub)
 		 
 		 if (ret != 0)
 		 {
-			 hub_log(log_debug, "event_base_loop returned: %d", (int) ret);
+			 LOG_DEBUG("event_base_loop returned: %d", (int) ret);
 		 }
 		 
 		 if (ret < 0)
@@ -937,7 +933,7 @@ void hub_disconnect_user(struct hub_info* hub, struct user* user, int reason)
 	/* stop reading from user */
 	net_shutdown_r(user->net.sd);
 	
-	hub_log(log_trace, "hub_disconnect_user(), user=%p, reason=%d, state=%d", user, reason, user->state);
+	LOG_TRACE("hub_disconnect_user(), user=%p, reason=%d, state=%d", user, reason, user->state);
 	
 	need_notify = user_is_logged_in(user);
 	user->quit_reason = reason;

@@ -93,7 +93,7 @@ int route_to_user(struct hub_info* hub, struct user* user, struct adc_message* m
 {
 #ifdef DEBUG_SENDQ
 	char* data = strndup(msg->cache, msg->length-1);
-	hub_log(log_protocol, "send %s: \"%s\"", sid_to_string(user->id.sid), data);
+	LOG_PROTO("send %s: \"%s\"", sid_to_string(user->id.sid), data);
 	free(data);
 #endif
 

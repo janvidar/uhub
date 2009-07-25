@@ -179,26 +179,26 @@ int file_read_lines(const char* file, void* data, file_line_handler_t handler)
 
 	memset(buf, 0, MAX_RECV_BUF);
 
-	hub_log(log_trace, "Opening file %s for line reading.", file);
+	LOG_TRACE("Opening file %s for line reading.", file);
 
 	fd = open(file, 0);
 	if (fd == -1)
 	{
-		hub_log(log_error, "Unable to open file %s: %s", file, strerror(errno));
+		LOG_ERROR("Unable to open file %s: %s", file, strerror(errno));
 		return -2;
 	}
 	
 	ret = read(fd, buf, MAX_RECV_BUF);
 	if (ret < 0)
 	{
-		hub_log(log_error, "Unable to read from file %s: %s", file, strerror(errno));
+		LOG_ERROR("Unable to read from file %s: %s", file, strerror(errno));
 		close(fd);
 		return -1;
 	}
 	else  if (ret == 0)
 	{
 		close(fd);
-		hub_log(log_warning, "File is empty.");
+		LOG_WARN("File is empty.");
 		return 0;
 	}
 	else
@@ -212,7 +212,7 @@ int file_read_lines(const char* file, void* data, file_line_handler_t handler)
 			pos[0] = '\0';
 			if (*start)
 			{
-				hub_log(log_dump, "Line: %s", start);
+				LOG_DUMP("Line: %s", start);
 				if (handler(start, line_count+1, data) < 0)
 					return -1;
 			}
@@ -223,7 +223,7 @@ int file_read_lines(const char* file, void* data, file_line_handler_t handler)
 		if (*start)
 		{
 			buf[strlen(start)] = 0;
-			hub_log(log_dump, "Line: %s", start);
+			LOG_DUMP("Line: %s", start);
 			if (handler(start, line_count+1, data) < 0)
 				return -1;
 		}

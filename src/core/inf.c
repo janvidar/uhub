@@ -336,7 +336,7 @@ static int check_logged_in(struct hub_info* hub, struct user* user, struct adc_m
 	{
 		if (lookup1 == lookup2)
 		{
-			hub_log(log_debug, "check_logged_in: exact same user is logged in: %s", user->id.nick);
+			LOG_DEBUG("check_logged_in: exact same user is logged in: %s", user->id.nick);
 			hub_disconnect_user(hub, lookup1, quit_ghost_timeout);
 			return 0;
 		}
@@ -344,12 +344,12 @@ static int check_logged_in(struct hub_info* hub, struct user* user, struct adc_m
 		{
 			if (lookup1)
 			{
-				hub_log(log_debug, "check_logged_in: nickname is in use: %s", user->id.nick);
+				LOG_DEBUG("check_logged_in: nickname is in use: %s", user->id.nick);
 				return status_msg_inf_error_nick_taken;
 			}
 			else
 			{
-				hub_log(log_debug, "check_logged_in: CID is in use: %s", user->id.cid);
+				LOG_DEBUG("check_logged_in: CID is in use: %s", user->id.cid);
 				return status_msg_inf_error_cid_taken;
 			}
 		}

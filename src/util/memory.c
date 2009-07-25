@@ -47,7 +47,7 @@ void internal_debug_print_leaks()
 	size_t n = 0;
 	size_t leak = 0;
 	size_t count = 0;
-	hub_log(log_memory, "--- exit (allocs: %d, size: %zu) ---", hub_alloc_count, hub_alloc_size);
+	LOG_MEMORY("--- exit (allocs: %d, size: %zu) ---", hub_alloc_count, hub_alloc_size);
 	
 	for (; n < UHUB_MAX_ALLOCS; n++)
 	{
@@ -55,11 +55,11 @@ void internal_debug_print_leaks()
 		{
 			leak += hub_allocs[n].size;
 			count++;
-			hub_log(log_memory, "leak %p size: %zu (bt: %p %p)", hub_allocs[n].ptr, hub_allocs[n].size, hub_allocs[n].stack1, hub_allocs[n].stack2);
+			LOG_MEMORY("leak %p size: %zu (bt: %p %p)", hub_allocs[n].ptr, hub_allocs[n].size, hub_allocs[n].stack1, hub_allocs[n].stack2);
 		}
 	}
 	
-	hub_log(log_memory, "--- done (allocs: %d, size: %zu, peak: %d/%zu, oom: %zu) ---", count, leak, hub_alloc_peak_count, hub_alloc_peak_size, hub_alloc_oom);
+	LOG_MEMORY("--- done (allocs: %d, size: %zu, peak: %d/%zu, oom: %zu) ---", count, leak, hub_alloc_peak_count, hub_alloc_peak_size, hub_alloc_oom);
 }
 #endif /* REALTIME_MALLOC_TRACKING */
 
@@ -73,7 +73,7 @@ void* internal_debug_mem_malloc(size_t size, const char* where)
 	/* Make sure the malloc info struct is initialized */
 	if (!hub_alloc_count)
 	{
-		hub_log(log_memory, "--- start ---");
+		LOG_MEMORY("--- start ---");
 		for (n = 0; n < UHUB_MAX_ALLOCS; n++)
 		{
 			hub_allocs[n].ptr    = 0;
@@ -107,14 +107,14 @@ void* internal_debug_mem_malloc(size_t size, const char* where)
 				hub_alloc_peak_count = MAX(hub_alloc_count, hub_alloc_peak_count);
 				hub_alloc_peak_size  = MAX(hub_alloc_size,  hub_alloc_peak_size);
 				
-				hub_log(log_memory, "%s %p (%d bytes) (bt: %p %p) {allocs: %d, size: %zu}", where, ptr, (int) size, hub_allocs[n].stack1, hub_allocs[n].stack2, hub_alloc_count, hub_alloc_size);
+				LOG_MEMORY("%s %p (%d bytes) (bt: %p %p) {allocs: %d, size: %zu}", where, ptr, (int) size, hub_allocs[n].stack1, hub_allocs[n].stack2, hub_alloc_count, hub_alloc_size);
 				break;
 			}
 		}
 	}
 	else
 	{
-		hub_log(log_memory, "%s *** OOM for %d bytes", where, size);
+		LOG_MEMORY("%s *** OOM for %d bytes", where, size);
 		hub_alloc_oom++;
 		return 0;
 	}
@@ -141,7 +141,7 @@ void internal_debug_mem_free(void* ptr)
 			hub_allocs[n].size   = 0;
 			hub_allocs[n].stack1 = 0;
 			hub_allocs[n].stack2 = 0;
-			hub_log(log_memory, "free %p (bt: %p %p) {allocs: %d, size: %zu}", ptr, stack1, stack2, hub_alloc_count, hub_alloc_size);
+			LOG_MEMORY("free %p (bt: %p %p) {allocs: %d, size: %zu}", ptr, stack1, stack2, hub_alloc_count, hub_alloc_size);
 			malloc_slot = n;
 			free(ptr);
 			return;
@@ -150,7 +150,7 @@ void internal_debug_mem_free(void* ptr)
 	
 	malloc_slot = -1;
 	abort();
-	hub_log(log_memory, "free %p *** NOT ALLOCATED *** (bt: %p %p)", ptr, stack1, stack2);
+	LOG_MEMORY("free %p *** NOT ALLOCATED *** (bt: %p %p)", ptr, stack1, stack2);
 #else
 	free(ptr);
 #endif /* REALTIME_MALLOC_TRACKING */

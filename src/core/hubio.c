@@ -35,7 +35,7 @@ static void debug_msg(const char* prefix, struct adc_message* msg)
 		if (buf[n] == '\r' || buf[n] == '\n')
 			buf[n] = '_';
 	}
-	hub_log(log_trace, "%s: [%s] (%d bytes)", prefix, buf, (int) msg->length);
+	LOG_TRACE("%s: [%s] (%d bytes)", prefix, buf, (int) msg->length);
 	free(buf);
 }
 #endif

@@ -39,7 +39,7 @@ struct user* user_create(struct hub_info* hub, int sd)
 {
 	struct user* user = NULL;
 	
-	hub_log(log_trace, "user_create(), hub=%p, sd=%d", hub, sd);
+	LOG_TRACE("user_create(), hub=%p, sd=%d", hub, sd);
 
 	user = (struct user*) hub_malloc_zero(sizeof(struct user));
 
@@ -68,7 +68,7 @@ struct user* user_create(struct hub_info* hub, int sd)
 
 void user_destroy(struct user* user)
 {
-	hub_log(log_trace, "user_destroy(), user=%p", user);
+	LOG_TRACE("user_destroy(), user=%p", user);
 
 	event_del(&user->net.event);
 	evtimer_del(&user->net.timeout);
@@ -173,7 +173,7 @@ static int convert_support_fourcc(int fourcc)
 			return feature_link;
 		
 		default:
-			hub_log(log_debug, "Unknown extension: %x", fourcc);
+			LOG_DEBUG("Unknown extension: %x", fourcc);
 			return 0;
 	}
 }
@@ -330,7 +330,7 @@ int user_is_registered(struct user* user)
 void user_net_io_want_write(struct user* user)
 {
 #ifdef DEBUG_SENDQ
-	hub_log(log_trace, "user_net_io_want_write: %s (pending: %d)", user_log_str(user), event_pending(&user->net.event, EV_READ | EV_WRITE, 0));
+	LOG_TRACE("user_net_io_want_write: %s (pending: %d)", user_log_str(user), event_pending(&user->net.event, EV_READ | EV_WRITE, 0));
 #endif
 	if (event_pending(&user->net.event, EV_READ | EV_WRITE, 0) == (EV_READ | EV_WRITE))
 		return;
@@ -342,7 +342,7 @@ void user_net_io_want_write(struct user* user)
 void user_net_io_want_read(struct user* user)
 {
 #ifdef DEBUG_SENDQ
-	hub_log(log_trace, "user_net_io_want_read: %s (pending: %d)", user_log_str(user), event_pending(&user->net.event, EV_READ | EV_WRITE, 0));
+	LOG_TRACE("user_net_io_want_read: %s (pending: %d)", user_log_str(user), event_pending(&user->net.event, EV_READ | EV_WRITE, 0));
 #endif
 	if (event_pending(&user->net.event, EV_READ | EV_WRITE, 0) == EV_READ)
 		return;
@@ -364,7 +364,7 @@ void user_reset_last_read(struct user* user)
 void user_set_timeout(struct user* user, int seconds)
 {
 #ifdef DEBUG_SENDQ
-	hub_log(log_trace, "user_set_timeout to %d seconds: %s", seconds, user_log_str(user));
+	LOG_TRACE("user_set_timeout to %d seconds: %s", seconds, user_log_str(user));
 #endif
 	struct timeval timeout = { seconds, 0 };
 	evtimer_add(&user->net.timeout, &timeout);

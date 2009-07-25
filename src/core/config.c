@@ -42,7 +42,7 @@
 		else if (strncasecmp(data, "off",   3) == 0) TARGET = 0; \
 		else\
 		{ \
-			hub_log(log_fatal, "Configuration error on line %d: '%s' must be either '1' or '0'", line_count, key); \
+			LOG_FATAL("Configuration error on line %d: '%s' must be either '1' or '0'", line_count, key); \
 			return -1; \
 		} \
 		TARGET |= 0x80000000; \
@@ -65,7 +65,7 @@
 		errno = 0; \
 		val = strtol(data, &endptr, 10); \
 		if (((errno == ERANGE && (val == INT_MAX || val == INT_MIN)) || (errno != 0 && val == 0)) || endptr == data) { \
-			hub_log(log_fatal, "Configuration error on line %d: '%s' must be a number", line_count, key); \
+			LOG_FATAL("Configuration error on line %d: '%s' must be a number", line_count, key); \
 			return -1; \
 		} \
 		TARGET = val; \
@@ -103,7 +103,7 @@
 #define IGNORED(NAME) \
     if (strcmp(#NAME, key) == 0) \
     { \
-        hub_log(log_warning, "Configuration option %s deprecated and ingnored.", key); \
+        LOG_WARN("Configuration option %s deprecated and ingnored.", key); \
         return 0; \
     } \
 
@@ -304,7 +304,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 	GET_STR (tls_private_key);
 
     /* Still here -- unknown directive */
-	hub_log(log_fatal, "Unknown configuration directive: '%s'", key);
+	LOG_ERROR("Unknown configuration directive: '%s'", key);
 	return -1;
 }
 
@@ -460,13 +460,11 @@ static int config_parse_line(char* line, int line_count, void* ptr_data)
 
 	if (!*line) return 0;
 
-#ifdef CONFIG_DUMP
-	hub_log(log_trace, "config_parse_line(): '%s'", line);
-#endif
+	LOG_DUMP("config_parse_line(): '%s'", line);
 
 	if (!is_valid_utf8(line))
 	{
-		hub_log(log_warning, "Invalid utf-8 characters on line %d", line_count);
+		LOG_WARN("Invalid utf-8 characters on line %d", line_count);
 	}
 
 	if ((pos = strchr(line, '=')) != NULL)
@@ -486,13 +484,11 @@ static int config_parse_line(char* line, int line_count, void* ptr_data)
 
 	if (!*key || !*data)
 	{
-		hub_log(log_fatal, "Configuration parse error on line %d", line_count);
+		LOG_FATAL("Configuration parse error on line %d", line_count);
 		return -1;
 	}
 
-#ifdef CONFIG_DUMP
-	hub_log(log_trace, "config_parse_line: '%s' => '%s'", key, data);
-#endif
+	LOG_DUMP("config_parse_line: '%s' => '%s'", key, data);
 
 	return apply_config(config, key, data, line_count);
 }
@@ -509,7 +505,7 @@ int read_config(const char* file, struct hub_config* config, int allow_missing)
 	{
 		if (allow_missing && ret == -2)
 		{
-			hub_log(log_debug, "Using default configuration.");
+			LOG_DUMP("Using default configuration.");
 		}
 		else
 		{

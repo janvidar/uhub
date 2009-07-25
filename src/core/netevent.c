@@ -26,27 +26,27 @@ extern struct hub_info* g_hub;
 #ifdef DEBUG_SENDQ
 void debug_sendq_send(struct user* user, int sent, int total)
 {
-	printf("SEND: sd=%d, %d/%d bytes\n", user->net.sd, sent, total);
+	LOG_DUMP("SEND: sd=%d, %d/%d bytes\n", user->net.sd, sent, total);
 	if (sent == -1)
 	{
 		int err = net_error();
-		printf("    errno: %d - %s\n", err, net_error_string(err));
+		LOG_DUMP("    errno: %d - %s\n", err, net_error_string(err));
 	}
 }
 
 void debug_sendq_recv(struct user* user, int received, int max, const char* buffer)
 {
-	printf("RECV: %d/%d bytes\n", received, (int) max);
+	LOG_DUMP("RECV: %d/%d bytes\n", received, (int) max);
 	if (received == -1)
 	{
 		int err = net_error();
-		printf("    errno: %d - %s\n", err, net_error_string(err));
+		LOG_DUMP("    errno: %d - %s\n", err, net_error_string(err));
 	}
 	else if (received > 0)
 	{
 		char* data = hub_malloc_zero(received + 1);
 		memcpy(data, buffer, received);
-		printf("RECV: \"%s\"\n", data);
+		LOG_DUMP("RECV: \"%s\"\n", data);
 		hub_free(data);
 	}
 }
@@ -165,7 +165,7 @@ int handle_net_read(struct user* user)
 			pos[0] = '\0';
 
 #ifdef DEBUG_SENDQ
-			printf("PROC: \"%s\" (%d)\n", start, (int) (pos - start));
+			LOG_DUMP("PROC: \"%s\" (%d)\n", start, (int) (pos - start));
 #endif
 
 			if (user_flag_get(user, flag_maxbuf))
@@ -239,7 +239,7 @@ void net_event(int fd, short ev, void *arg)
 	int flag_close = 0;
 
 #ifdef DEBUG_SENDQ
-	hub_log(log_trace, "net_on_read() : fd=%d, ev=%d, arg=%p", fd, (int) ev, arg);
+	LOG_TRACE("net_on_read() : fd=%d, ev=%d, arg=%p", fd, (int) ev, arg);
 #endif
 
 	if (ev & EV_TIMEOUT)
@@ -315,7 +315,7 @@ void net_on_accept(int server_fd, short ev, void *arg)
 			}
 			else
 			{
-				hub_log(log_error, "Accept error: %d %s", net_error(), strerror(net_error()));
+				LOG_ERROR("Accept error: %d %s", net_error(), strerror(net_error()));
 				break;
 			}
 		}
@@ -323,12 +323,12 @@ void net_on_accept(int server_fd, short ev, void *arg)
 		addr = ip_convert_to_string(&ipaddr); 
 
 		/* FIXME: Should have a plugin log this */
-		hub_log(log_trace, "Got connection from %s", addr);
+		LOG_TRACE("Got connection from %s", addr);
 		
 		/* FIXME: A plugin should perform this check: is IP banned? */
 		if (acl_is_ip_banned(hub->acl, addr))
 		{
-			hub_log(log_info, "Denied      [%s] (IP banned)", addr);
+			LOG_INFO("Denied      [%s] (IP banned)", addr);
 			net_close(fd);
 			continue;
 		}
@@ -336,7 +336,7 @@ void net_on_accept(int server_fd, short ev, void *arg)
 		user = user_create(hub, fd);
 		if (!user)
 		{
-			hub_log(log_error, "Unable to create user after socket accepted. Out of memory?");
+			LOG_ERROR("Unable to create user after socket accepted. Out of memory?");
 			net_close(fd);
 			break;
 		}

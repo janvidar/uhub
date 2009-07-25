@@ -22,7 +22,7 @@
 #ifdef EQ_DEBUG
 static void eq_debug(const char* prefix, struct event_data* data)
 {
-	printf(">>> %s: %p, id: %x, flags=%d\n", prefix, data, data->id, data->flags);
+	LOG_DUMP(">>> %s: %p, id: %x, flags=%d\n", prefix, data, data->id, data->flags);
 }
 #endif
 
@@ -130,7 +130,7 @@ void event_queue_post(struct event_queue* queue, struct event_data* message)
 	}
 	else
 	{
-		hub_log(log_error, "event_queue_post: OUT OF MEMORY");
+		LOG_ERROR("event_queue_post: OUT OF MEMORY");
 	}
 }
 

@@ -23,26 +23,26 @@ static void log_user_login(struct user* u)
 {
 	const char* cred = get_user_credential_string(u->credentials);
 	const char* addr = ip_convert_to_string(&u->net.ipaddr);
-	hub_log(log_user, "LoginOK     %s/%s %s \"%s\" (%s) \"%s\"", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, cred, u->user_agent);
+	LOG_USER("LoginOK     %s/%s %s \"%s\" (%s) \"%s\"", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, cred, u->user_agent);
 }
 
 static void log_user_login_error(struct user* u, enum status_message msg)
 {
 	const char* addr = ip_convert_to_string(&u->net.ipaddr);
 	const char* message = hub_get_status_message_log(u->hub, msg);
-	hub_log(log_user, "LoginError  %s/%s %s \"%s\" (%s) \"%s\"", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, message, u->user_agent);
+	LOG_USER("LoginError  %s/%s %s \"%s\" (%s) \"%s\"", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, message, u->user_agent);
 }
 
 static void log_user_logout(struct user* u, const char* message)
 {
 	const char* addr = ip_convert_to_string(&u->net.ipaddr);
-	hub_log(log_user, "Logout      %s/%s %s \"%s\" (%s)", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, message);
+	LOG_USER("Logout      %s/%s %s \"%s\" (%s)", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, message);
 }
 
 static void log_user_nick_change(struct user* u, const char* nick)
 {
 	const char* addr = ip_convert_to_string(&u->net.ipaddr);
-	hub_log(log_user, "NickChange  %s/%s %s \"%s\" -> \"%s\"", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, nick);
+	LOG_USER("NickChange  %s/%s %s \"%s\" -> \"%s\"", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, nick);
 }
 
 

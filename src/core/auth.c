@@ -55,12 +55,12 @@ static int check_cmd_bool(const char* cmd, struct linked_list* list, char* line,
 		data = strip_white_space(data);
 		if (!*data)
 		{
-			hub_log(log_fatal, "ACL parse error on line %d", line_count);
+			LOG_FATAL("ACL parse error on line %d", line_count);
 			return -1;
 		}
 		
 		list_append(list, hub_strdup(data));
-		hub_log(log_debug, "ACL: Deny access for: '%s' (%s)", data, cmd);
+		LOG_DEBUG("ACL: Deny access for: '%s' (%s)", data, cmd);
 		return 1;
 	}
 	return 0;
@@ -82,7 +82,7 @@ static int check_cmd_user(const char* cmd, int status, struct linked_list* list,
 		data = strip_white_space(data);
 		if (!*data)
 		{
-			hub_log(log_fatal, "ACL parse error on line %d", line_count);
+			LOG_FATAL("ACL parse error on line %d", line_count);
 			return -1;
 		}
 		
@@ -90,7 +90,7 @@ static int check_cmd_user(const char* cmd, int status, struct linked_list* list,
 		
 		if (!info)
 		{
-			hub_log(log_error, "ACL parse error. Out of memory!");
+			LOG_ERROR("ACL parse error. Out of memory!");
 			return -1;
 		}
 		
@@ -108,7 +108,7 @@ static int check_cmd_user(const char* cmd, int status, struct linked_list* list,
 		info->password = data_extra ? hub_strdup(data_extra) : 0;
 		info->status = status;
 		list_append(list, info);
-		hub_log(log_debug, "ACL: Added user '%s' (%s)", info->username, get_user_credential_string(info->status));
+		LOG_DEBUG("ACL: Added user '%s' (%s)", info->username, get_user_credential_string(info->status));
 		return 1;
 	}
 	return 0;
@@ -130,7 +130,7 @@ static void add_ip_range(struct linked_list* list, struct ip_ban_record* info)
 		net_address_to_string(AF_INET6, &info->lo.internal_ip_data.in6, buf1, INET6_ADDRSTRLEN);
 		net_address_to_string(AF_INET6, &info->hi.internal_ip_data.in6, buf2, INET6_ADDRSTRLEN);
 	}
-	hub_log(log_debug, "ACL: Deny access for: %s-%s", buf1, buf2);
+	LOG_DEBUG("ACL: Deny access for: %s-%s", buf1, buf2);
 	
 	list_append(list, info);
 }
@@ -157,7 +157,7 @@ static int check_ip_range(const char* lo, const char* hi, struct ip_ban_record* 
 
 static int check_ip_mask(const char* text_addr, int bits, struct ip_ban_record* info)
 {
-	hub_log(log_debug, "ACL: Deny access for: %s/%d", text_addr, bits);
+	LOG_DEBUG("ACL: Deny access for: %s/%d", text_addr, bits);
 	
 	if (ip_is_valid_ipv4(text_addr) ||
 		ip_is_valid_ipv6(text_addr))
@@ -194,7 +194,7 @@ static int check_cmd_addr(const char* cmd, struct linked_list* list, char* line,
 		data1 = strip_white_space(data1);
 		if (!*data1)
 		{
-			hub_log(log_fatal, "ACL parse error on line %d", line_count);
+			LOG_FATAL("ACL parse error on line %d", line_count);
 			return -1;
 		}
 		
@@ -202,7 +202,7 @@ static int check_cmd_addr(const char* cmd, struct linked_list* list, char* line,
 		
 		if (!info)
 		{
-			hub_log(log_error, "ACL parse error. Out of memory!");
+			LOG_ERROR("ACL parse error. Out of memory!");
 			return -1;
 		}
 		
@@ -269,20 +269,16 @@ static int acl_parse_line(char* line, int line_count, void* ptr_data)
 	if (!*line)
 		return 0;
 
-#ifdef ACL_DEBUG
-	hub_log(log_trace, "acl_parse_line(): '%s'", line);
-#endif
+	LOG_DEBUG("acl_parse_line(): '%s'", line);
 	line = strip_white_space(line);
 	
 	if (!*line)
 	{
-		hub_log(log_fatal, "ACL parse error on line %d", line_count);
+		LOG_FATAL("ACL parse error on line %d", line_count);
 		return -1;
 	}
 
-#ifdef ACL_DEBUG
-	hub_log(log_trace, "acl_parse_line: '%s'", line);
-#endif
+	LOG_DEBUG("acl_parse_line: '%s'", line);
 	
 	ACL_ADD_USER("bot",        handle->users, cred_bot);
 	ACL_ADD_USER("user_admin", handle->users, cred_admin);
@@ -296,7 +292,7 @@ static int acl_parse_line(char* line, int line_count, void* ptr_data)
 	ACL_ADD_ADDR("deny_ip",    handle->networks);
 	ACL_ADD_ADDR("nat_ip",     handle->nat_override);
 	
-	hub_log(log_error, "Unknown ACL command on line %d: '%s'", line_count, line);
+	LOG_ERROR("Unknown ACL command on line %d: '%s'", line_count, line);
 	return -1;
 }
 
@@ -315,7 +311,7 @@ int acl_initialize(struct hub_config* config, struct acl_handle* handle)
 	
 	if (!handle->users || !handle->cids || !handle->networks || !handle->users_denied || !handle->users_banned || !handle->nat_override)
 	{
-		hub_log(log_fatal, "acl_initialize: Out of memory");
+		LOG_FATAL("acl_initialize: Out of memory");
 		
 		list_destroy(handle->users);
 		list_destroy(handle->users_denied);
@@ -451,7 +447,7 @@ int acl_user_ban_nick(struct acl_handle* handle, const char* nick)
 	struct user_access_info* info = hub_malloc_zero(sizeof(struct user_access_info));
 	if (!info)
 	{
-		hub_log(log_error, "ACL error: Out of memory!");
+		LOG_ERROR("ACL error: Out of memory!");
 		return -1;
 	}
 	list_append(handle->users_banned, hub_strdup(nick));
@@ -463,7 +459,7 @@ int acl_user_ban_cid(struct acl_handle* handle, const char* cid)
 	struct user_access_info* info = hub_malloc_zero(sizeof(struct user_access_info));
 	if (!info)
 	{
-		hub_log(log_error, "ACL error: Out of memory!");
+		LOG_ERROR("ACL error: Out of memory!");
 		return -1;
 	}
 	list_append(handle->cids, hub_strdup(cid));

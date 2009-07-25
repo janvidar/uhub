@@ -40,16 +40,16 @@ int net_initialize()
 		struct WSAData wsa;
 		if (WSAStartup(MAKEWORD(2, 2), &wsa) != NO_ERROR)
 		{
-			hub_log(log_error, "Unable to initialize winsock.");
+			LOG_ERROR("Unable to initialize winsock.");
 			return -1;
 		}
 #endif /* WINSOCK */
 
-		hub_log(log_trace, "Initializing network monitor.");
+		LOG_TRACE("Initializing network monitor.");
 		net_stats_initialize();
 
 #ifdef SSL_SUPPORT
-		hub_log(log_trace, "Initializing OpenSSL...");
+		LOG_TRACE("Initializing OpenSSL...");
 		SSL_load_error_strings();
 		SSL_library_init();
 		OpenSSL_add_all_algorithms();
@@ -66,7 +66,7 @@ int net_destroy()
 {
 	if (net_initialized)
 	{
-		hub_log(log_trace, "Shutting down network monitor");
+		LOG_TRACE("Shutting down network monitor");
 
 #ifdef SSL_SUPPORT
 		/* FIXME: Shutdown OpenSSL here. */
@@ -84,7 +84,7 @@ int net_destroy()
 static void net_error_out(int fd, const char* func)
 {
 	int err = net_error();
-	hub_log(log_error, "%s, fd=%d: %s (%d)", func, fd, net_error_string(err), err);
+	LOG_ERROR("%s, fd=%d: %s (%d)", func, fd, net_error_string(err), err);
 }
 
 int net_error()
@@ -379,7 +379,7 @@ int net_is_ipv6_supported()
 			if (net_error() == EAFNOSUPPORT)
 #endif
 			{
-				hub_log(log_trace, "net_is_ipv6_supported(): IPv6 is not supported on this system.");
+				LOG_TRACE("net_is_ipv6_supported(): IPv6 is not supported on this system.");
 				is_ipv6_supported = 0;
 				return 0;
 			}
@@ -392,7 +392,7 @@ int net_is_ipv6_supported()
 			int off = 0;
 			if (net_setsockopt(ret, IPPROTO_IPV6, SOCK_DUAL_STACK_OPT, (char*) &off, sizeof(off)) < 0)
 			{
-				hub_log(log_error, "net_socket_create(): Dual stack IPv6/IPv4 is not supported.");
+				LOG_ERROR("net_socket_create(): Dual stack IPv6/IPv4 is not supported.");
 				is_ipv6_supported = 0;
 			}
 			else
@@ -424,7 +424,7 @@ int net_socket_create(int af, int type, int protocol)
 		int off = 0;
 		if (net_setsockopt(sd, IPPROTO_IPV6, SOCK_DUAL_STACK_OPT, (char*) &off, sizeof(off)) < 0)
 		{
-			hub_log(log_error, "net_socket_create():  Cannot set socket to dual stack mode IPv6/IPv4 (%d - %s).", net_error(), net_error_string(net_error()));
+			LOG_ERROR("net_socket_create():  Cannot set socket to dual stack mode IPv6/IPv4 (%d - %s).", net_error(), net_error_string(net_error()));
 		}
 	}
 #endif
