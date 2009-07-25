@@ -148,7 +148,7 @@
 #define INET6_ADDRSTRLEN 46
 #endif
 
-#include "adcconst.h"
+#include "adc/adcconst.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -157,28 +157,28 @@
 extern "C" {
 #endif
 
-#include "memory.h"
-#include "misc.h"
-#include "eventid.h"
-#include "eventqueue.h"
-#include "ipcalc.h"
-#include "list.h"
-#include "sid.h"
-#include "network.h"
-#include "netevent.h"
-#include "hubio.h"
-#include "auth.h"
-#include "tiger.h"
-#include "config.h"
-#include "log.h"
-#include "user.h"
-#include "usermanager.h"
-#include "message.h"
-#include "route.h"
-#include "hub.h"
-#include "commands.h"
-#include "inf.h"
-#include "hubevent.h"
+#include "util/memory.h"
+#include "util/misc.h"
+#include "core/eventid.h"
+#include "core/eventqueue.h"
+#include "util/ipcalc.h"
+#include "util/list.h"
+#include "adc/sid.h"
+#include "network/network.h"
+#include "core/netevent.h"
+#include "core/hubio.h"
+#include "core/auth.h"
+#include "util/tiger.h"
+#include "core/config.h"
+#include "util/log.h"
+#include "core/user.h"
+#include "core/usermanager.h"
+#include "adc/message.h"
+#include "core/route.h"
+#include "core/hub.h"
+#include "core/commands.h"
+#include "core/inf.h"
+#include "core/hubevent.h"
 
 #ifdef __cplusplus
 }

@@ -21,6 +21,9 @@ ifeq ($(OS), Windows_NT)
 WINDOWS       ?= YES
 endif
 
+
+CFLAGS        += -I./src/
+
 ifeq ($(WINDOWS),YES)
 USE_BIGENDIAN := NO
 LDLIBS        += -lws2_32
@@ -132,60 +135,60 @@ endif
 
 # Sources
 libuhub_SOURCES := \
-		src/auth.c \
-		src/commands.c \
-		src/config.c \
-		src/eventqueue.c \
-		src/hub.c \
-		src/hubevent.c \
-		src/hubio.c \
-		src/inf.c \
-		src/ipcalc.c \
-		src/list.c \
-		src/log.c \
-		src/memory.c \
-		src/message.c \
-		src/misc.c \
-		src/netevent.c \
-		src/network.c \
-		src/rbtree.c \
-		src/route.c \
-		src/sid.c \
-		src/tiger.c \
-		src/user.c \
-		src/usermanager.c
+		src/core/auth.c \
+		src/core/commands.c \
+		src/core/config.c \
+		src/core/eventqueue.c \
+		src/core/hub.c \
+		src/core/hubevent.c \
+		src/core/hubio.c \
+		src/core/inf.c \
+		src/util/ipcalc.c \
+		src/util/list.c \
+		src/util/log.c \
+		src/util/memory.c \
+		src/adc/message.c \
+		src/util/misc.c \
+		src/core/netevent.c \
+		src/network/network.c \
+		src/util/rbtree.c \
+		src/core/route.c \
+		src/adc/sid.c \
+		src/util/tiger.c \
+		src/core/user.c \
+		src/core/usermanager.c
 
-uhub_SOURCES := src/main.c
+uhub_SOURCES := src/core/main.c
 
 adcrush_SOURCES := src/adcrush.c
 
 admin_SOURCES := src/admin.c
 
 uhub_HEADERS := \
-		src/adcconst.h \
-		src/auth.h \
-		src/config.h \
-		src/eventid.h \
-		src/eventqueue.h \
-		src/hub.h \
-		src/hubevent.h \
-		src/hubio.h \
-		src/inf.h \
-		src/ipcalc.h \
-		src/list.h \
-		src/log.h \
-		src/memory.h \
-		src/message.h \
-		src/misc.h \
-		src/netevent.h \
-		src/network.h \
-		src/rbtree.h \
-		src/route.h \
-		src/sid.h \
-		src/tiger.h \
+		src/adc/adcconst.h \
+		src/core/auth.h \
+		src/core/config.h \
+		src/core/eventid.h \
+		src/core/eventqueue.h \
+		src/core/hub.h \
+		src/core/hubevent.h \
+		src/core/hubio.h \
+		src/core/inf.h \
+		src/util/ipcalc.h \
+		src/util/list.h \
+		src/util/log.h \
+		src/util/memory.h \
+		src/adc/message.h \
+		src/util/misc.h \
+		src/core/netevent.h \
+		src/network/network.h \
+		src/util/rbtree.h \
+		src/core/route.h \
+		src/adc/sid.h \
+		src/util/tiger.h \
 		src/uhub.h \
-		src/user.h \
-		src/usermanager.h
+		src/core/user.h \
+		src/core/usermanager.h
 
 autotest_SOURCES := \
 		autotest/test_message.tcc \
