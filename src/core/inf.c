@@ -767,7 +767,7 @@ int hub_handle_info(struct hub_info* hub, struct hub_user* user, const struct ad
 		 */
 		if (adc_msg_has_named_argument(cmd, ADC_INF_FLAG_NICK))
 		{
-#if ALLOW_CHANGE_NICK
+#ifdef ALLOW_CHANGE_NICK
 			if (!check_nick(hub, user, cmd))
 #endif
 				adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_NICK);
