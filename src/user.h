@@ -50,7 +50,8 @@ enum user_flags
 	flag_want_read  = 0x08000000, /** Need to read (SSL) */
 	flag_want_write = 0x10000000, /** Need to write (SSL) */
 	flag_user_list  = 0x20000000, /** Send queue bypass (when receiving the send queue) */
-	flag_nat        = 0x40000000, /** nat override enabled */
+	flag_pipeline   = 0x40000000, /** Hub message pipelining */
+	flag_nat        = 0x80000000, /** nat override enabled */
 };
 
 enum user_quit_reason

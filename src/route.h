@@ -26,6 +26,11 @@
 extern int route_message(struct hub_info* hub, struct user* u, struct adc_message* msg);
 
 /**
+ * Send queued messages.
+ */
+extern int route_flush_pipeline(struct hub_info* hub, struct user* u);
+
+/**
  * Transmit message directly to one user.
  */
 extern int route_to_user(struct hub_info* hub, struct user*, struct adc_message* command);

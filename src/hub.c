@@ -312,9 +312,11 @@ void hub_send_hubinfo(struct hub_info* hub, struct user* u)
 
 void hub_send_handshake(struct hub_info* hub, struct user* u)
 {
+	user_flag_set(u, flag_pipeline);
 	hub_send_support(hub, u);
 	hub_send_sid(hub, u);
 	hub_send_hubinfo(hub, u);
+	route_flush_pipeline(hub, u);
 
 	if (!user_is_disconnecting(u))
 	{

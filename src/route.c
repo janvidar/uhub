@@ -97,7 +97,7 @@ int route_to_user(struct hub_info* hub, struct user* user, struct adc_message* m
 	free(data);
 #endif
 
-	if (hub_sendq_is_empty(user->net.send_queue))
+	if (hub_sendq_is_empty(user->net.send_queue) && !user_flag_get(user, flag_pipeline))
 	{
 		/* Perform oportunistic write */
 		hub_sendq_add(user->net.send_queue, msg);
@@ -108,11 +108,23 @@ int route_to_user(struct hub_info* hub, struct user* user, struct adc_message* m
 		if (check_send_queue(hub, user, msg) >= 0)
 		{
 			hub_sendq_add(user->net.send_queue, msg);
-			user_net_io_want_write(user);
+			if (!user_flag_get(user, flag_pipeline))
+				user_net_io_want_write(user);
 		}
 	}
 	return 1;
 }
+
+int route_flush_pipeline(struct hub_info* hub, struct user* u)
+{
+	if (hub_sendq_is_empty(u->net.send_queue))
+		return 0;
+
+	handle_net_write(u);
+	user_flag_unset(u, flag_pipeline);
+	return 1;
+}
+
 
 int route_to_all(struct hub_info* hub, struct adc_message* command) /* iterate users */
 {
