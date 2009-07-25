@@ -188,10 +188,14 @@ int hub_handle_chat_message(struct hub_info* hub, struct user* u, struct adc_mes
 	int ret = 0;
 	int relay = 1;
 	
-	/* TODO: Check for hub-commands here. Set relay to 0 and the message will not be sent to other users. */
 	if (message[0] == '!' || message[0] == '+')
 	{
 	    relay = command_dipatcher(hub, u, message);
+	}
+
+	if (hub->config->chat_is_privileged && !user_is_protected(u) && (cmd->cache[0] == 'B' || cmd->cache[0] == 'F'))
+	{
+		relay = 0;
 	}
 
 	if (relay && user_is_logged_in(u))
