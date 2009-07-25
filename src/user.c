@@ -51,8 +51,7 @@ struct user* user_create(struct hub_info* hub, int sd)
 	user->net.send_queue = hub_sendq_create();
 	user->net.recv_queue = hub_recvq_create();
 
-	user->net.events = EV_READ;
-	event_set(&user->net.event, sd, user->net.events | EV_PERSIST, net_event, user);
+	event_set(&user->net.event, sd, EV_READ | EV_PERSIST, net_event, user);
 	event_base_set(hub->evbase, &user->net.event);
 	event_add(&user->net.event, 0);
 
@@ -333,11 +332,10 @@ void user_net_io_want_write(struct user* user)
 #ifdef DEBUG_SENDQ
 	hub_log(log_trace, "user_net_io_want_write: %s (pending: %d)", user_log_str(user), event_pending(&user->net.event, EV_READ | EV_WRITE, 0));
 #endif
-	if (user->net.events == (EV_READ | EV_WRITE))
+	if (event_pending(&user->net.event, EV_READ | EV_WRITE, 0) == (EV_READ | EV_WRITE))
 		return;
-	user->net.events = (EV_READ | EV_WRITE);
 	event_del(&user->net.event);
-	event_set(&user->net.event,  user->net.sd, user->net.events | EV_PERSIST, net_event, user);
+	event_set(&user->net.event,  user->net.sd, EV_READ | EV_WRITE | EV_PERSIST, net_event, user);
 	event_add(&user->net.event, 0);
 }
 
@@ -346,11 +344,10 @@ void user_net_io_want_read(struct user* user)
 #ifdef DEBUG_SENDQ
 	hub_log(log_trace, "user_net_io_want_read: %s (pending: %d)", user_log_str(user), event_pending(&user->net.event, EV_READ | EV_WRITE, 0));
 #endif
-	if (user->net.events == EV_READ)
+	if (event_pending(&user->net.event, EV_READ | EV_WRITE, 0) == EV_READ)
 		return;
-	user->net.events = EV_READ;
 	event_del(&user->net.event);
-	event_set(&user->net.event,  user->net.sd, user->net.events | EV_PERSIST, net_event, user);
+	event_set(&user->net.event,  user->net.sd, EV_READ | EV_PERSIST, net_event, user);
 	event_add(&user->net.event, 0);
 }
 
