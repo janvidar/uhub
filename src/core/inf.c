@@ -39,7 +39,7 @@ static void remove_server_restricted_flags(struct adc_message* cmd)
 	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_REFERER);
 }
 
-static int set_feature_cast_supports(struct user* u, struct adc_message* cmd)
+static int set_feature_cast_supports(struct hub_user* u, struct adc_message* cmd)
 {
 	char *it, *tmp;
 	
@@ -87,7 +87,7 @@ static int check_hash_tiger(const char* cid, const char* pid)
 /*
  * FIXME: Only works for tiger hash. If a client doesnt support tiger we cannot let it in!
  */
-static int check_cid(struct hub_info* hub, struct user* user, struct adc_message* cmd)
+static int check_cid(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	size_t pos;
 	char* cid = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_CLIENT_ID);
@@ -148,7 +148,7 @@ static int check_cid(struct hub_info* hub, struct user* user, struct adc_message
 }
 
 
-static int check_required_login_flags(struct hub_info* hub, struct user* user, struct adc_message* cmd)
+static int check_required_login_flags(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	int num = 0;
 	
@@ -184,7 +184,7 @@ static int check_required_login_flags(struct hub_info* hub, struct user* user, s
  * remove any wrong address, and replace it with the correct one
  * as seen by the hub.
  */
-int check_network(struct hub_info* hub, struct user* user, struct adc_message* cmd)
+int check_network(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	const char* address = ip_convert_to_string(&user->net.ipaddr);
 	
@@ -220,7 +220,7 @@ int check_network(struct hub_info* hub, struct user* user, struct adc_message* c
 	return 0;
 }
 
-void strip_network(struct user* user, struct adc_message* cmd)
+void strip_network(struct hub_user* user, struct adc_message* cmd)
 {
 	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
 	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_UDP_PORT);
@@ -274,7 +274,7 @@ static int nick_is_utf8(const char* nick)
 }
 
 
-static int check_nick(struct hub_info* hub, struct user* user, struct adc_message* cmd)
+static int check_nick(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	char* nick;
 	char* tmp;
@@ -322,10 +322,10 @@ static int check_nick(struct hub_info* hub, struct user* user, struct adc_messag
 }
 
 
-static int check_logged_in(struct hub_info* hub, struct user* user, struct adc_message* cmd)
+static int check_logged_in(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
-	struct user* lookup1 = uman_get_user_by_nick(hub, user->id.nick);
-	struct user* lookup2 = uman_get_user_by_cid(hub,  user->id.cid);
+	struct hub_user* lookup1 = uman_get_user_by_nick(hub, user->id.nick);
+	struct hub_user* lookup2 = uman_get_user_by_cid(hub,  user->id.cid);
 	
 	if (lookup1 == user)
 	{
@@ -363,7 +363,7 @@ static int check_logged_in(struct hub_info* hub, struct user* user, struct adc_m
  * But this is not something we want to do, and is deprecated in the ADC specification.
  * One should rather look at capabilities/features.
  */
-static int check_user_agent(struct hub_info* hub, struct user* user, struct adc_message* cmd)
+static int check_user_agent(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	char* ua_encoded = 0;
 	char* ua = 0;
@@ -384,7 +384,7 @@ static int check_user_agent(struct hub_info* hub, struct user* user, struct adc_
 }
 
 
-static int check_acl(struct hub_info* hub, struct user* user, struct adc_message* cmd)
+static int check_acl(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	if (acl_is_cid_banned(hub->acl, user->id.cid))
 	{
@@ -404,7 +404,7 @@ static int check_acl(struct hub_info* hub, struct user* user, struct adc_message
 	return 0;
 }
 
-static int check_limits(struct hub_info* hub, struct user* user, struct adc_message* cmd)
+static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	char* arg = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_SHARED_SIZE);
 	if (arg)
@@ -530,10 +530,10 @@ static int check_limits(struct hub_info* hub, struct user* user, struct adc_mess
  * If the hub is configured to allow only registered users and the user
  * is not recognized this will return 1.
  */
-static int set_credentials(struct hub_info* hub, struct user* user, struct adc_message* cmd)
+static int set_credentials(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	int ret = 0;
-	struct user_access_info* info = acl_get_access_info(hub->acl, user->id.nick);
+	struct hub_user_access_info* info = acl_get_access_info(hub->acl, user->id.nick);
 	
 	if (info)
 	{
@@ -583,7 +583,7 @@ static int set_credentials(struct hub_info* hub, struct user* user, struct adc_m
 
 
 
-static int check_is_hub_full(struct hub_info* hub, struct user* user)
+static int check_is_hub_full(struct hub_info* hub, struct hub_user* user)
 {
 	/*
 	 * If hub is full, don't let users in, but we still want to allow
@@ -597,7 +597,7 @@ static int check_is_hub_full(struct hub_info* hub, struct user* user)
 }
 
 
-static int check_registered_users_only(struct hub_info* hub, struct user* user)
+static int check_registered_users_only(struct hub_info* hub, struct hub_user* user)
 {
 	if (hub->config->registered_users_only && !user_is_registered(user))
 	{
@@ -606,7 +606,7 @@ static int check_registered_users_only(struct hub_info* hub, struct user* user)
 	return 0;
 }
 
-static int hub_handle_info_common(struct user* user, struct adc_message* cmd)
+static int hub_handle_info_common(struct hub_user* user, struct adc_message* cmd)
 {
 	/* Remove server restricted flags */
 	remove_server_restricted_flags(cmd);
@@ -617,7 +617,7 @@ static int hub_handle_info_common(struct user* user, struct adc_message* cmd)
 	return 0;
 }
 
-static int hub_handle_info_low_bandwidth(struct hub_info* hub, struct user* user, struct adc_message* cmd)
+static int hub_handle_info_low_bandwidth(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	if (hub->config->low_bandwidth_mode)
 	{
@@ -645,7 +645,7 @@ static int hub_handle_info_low_bandwidth(struct hub_info* hub, struct user* user
 			return ret; \
 	} while(0)
 
-int hub_perform_login_checks(struct hub_info* hub, struct user* user, struct adc_message* cmd)
+int hub_perform_login_checks(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	/* Make syntax checks.  */
 	INF_CHECK(check_required_login_flags, hub, user, cmd);
@@ -664,7 +664,7 @@ int hub_perform_login_checks(struct hub_info* hub, struct user* user, struct adc
  *
  * @return 0 if success, <0 if error, >0 if authentication needed.
  */
-int hub_handle_info_login(struct hub_info* hub, struct user* user, struct adc_message* cmd)
+int hub_handle_info_login(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	int code = 0;
 
@@ -711,7 +711,7 @@ int hub_handle_info_login(struct hub_info* hub, struct user* user, struct adc_me
  * - CID/PID (valid, not taken, etc).
  * - IP addresses (IPv4 and IPv6)
  */
-int hub_handle_info(struct hub_info* hub, struct user* user, const struct adc_message* cmd_unmodified)
+int hub_handle_info(struct hub_info* hub, struct hub_user* user, const struct adc_message* cmd_unmodified)
 {
 	struct adc_message* cmd = adc_msg_copy(cmd_unmodified);
 	if (!cmd) return -1; /* OOM */

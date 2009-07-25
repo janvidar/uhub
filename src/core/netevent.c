@@ -24,7 +24,7 @@
 extern struct hub_info* g_hub;
 
 #ifdef DEBUG_SENDQ
-void debug_sendq_send(struct user* user, int sent, int total)
+void debug_sendq_send(struct hub_user* user, int sent, int total)
 {
 	LOG_DUMP("SEND: sd=%d, %d/%d bytes\n", user->net.sd, sent, total);
 	if (sent == -1)
@@ -34,7 +34,7 @@ void debug_sendq_send(struct user* user, int sent, int total)
 	}
 }
 
-void debug_sendq_recv(struct user* user, int received, int max, const char* buffer)
+void debug_sendq_recv(struct hub_user* user, int received, int max, const char* buffer)
 {
 	LOG_DUMP("RECV: %d/%d bytes\n", received, (int) max);
 	if (received == -1)
@@ -54,7 +54,7 @@ void debug_sendq_recv(struct user* user, int received, int max, const char* buff
 
 int net_user_send(void* ptr, const void* buf, size_t len)
 {
-	struct user* user = (struct user*) ptr;
+	struct hub_user* user = (struct hub_user*) ptr;
 	int ret = net_send(user->net.sd, buf, len, UHUB_SEND_SIGNAL);
 #ifdef DEBUG_SENDQ
 	debug_sendq_send(user, ret, len);
@@ -78,7 +78,7 @@ int net_user_send(void* ptr, const void* buf, size_t len)
 #ifdef SSL_SUPPORT
 int net_user_send_ssl(void* ptr, const void* buf, size_t len)
 {
-	struct user* user = (struct user*) ptr;
+	struct hub_user* user = (struct hub_user*) ptr;
 	int ret = SSL_write(user->net.ssl, buf, (int) len);
 #ifdef DEBUG_SENDQ
 	debug_sendq_send(user, ret, len);
@@ -102,7 +102,7 @@ int net_user_send_ssl(void* ptr, const void* buf, size_t len)
 
 int net_user_recv(void* ptr, void* buf, size_t len)
 {
-	struct user* user = (struct user*) ptr;
+	struct hub_user* user = (struct hub_user*) ptr;
 	int ret = net_recv(user->net.sd, buf, len, 0);
 	if (ret > 0)
 	{
@@ -118,7 +118,7 @@ int net_user_recv(void* ptr, void* buf, size_t len)
 #ifdef SSL_SUPPORT
 int net_user_recv_ssl(void* ptr, void* buf, size_t len)
 {
-	struct user* user = (struct user*) ptr;
+	struct hub_user* user = (struct hub_user*) ptr;
 	int ret = SSL_read(user->net.ssl, buf, len);
 	if (ret > 0)
 	{
@@ -131,7 +131,7 @@ int net_user_recv_ssl(void* ptr, void* buf, size_t len)
 }
 #endif
 
-int handle_net_read(struct user* user)
+int handle_net_read(struct hub_user* user)
 {
 	static char buf[MAX_RECV_BUF];
 	struct hub_recvq* q = user->net.recv_queue;
@@ -210,7 +210,7 @@ int handle_net_read(struct user* user)
 	return 0;
 }
 
-int handle_net_write(struct user* user)
+int handle_net_write(struct hub_user* user)
 {
 	while (hub_sendq_get_bytes(user->net.send_queue))
 	{
@@ -235,7 +235,7 @@ int handle_net_write(struct user* user)
 
 void net_event(int fd, short ev, void *arg)
 {
-	struct user* user = (struct user*) arg;
+	struct hub_user* user = (struct hub_user*) arg;
 	int flag_close = 0;
 
 #ifdef DEBUG_SENDQ
@@ -272,7 +272,7 @@ void net_event(int fd, short ev, void *arg)
 }
 
 
-static void prepare_user_net(struct hub_info* hub, struct user* user)
+static void prepare_user_net(struct hub_info* hub, struct hub_user* user)
 {
 		int fd = user->net.sd;
 
@@ -300,7 +300,7 @@ static void prepare_user_net(struct hub_info* hub, struct user* user)
 void net_on_accept(int server_fd, short ev, void *arg)
 {
 	struct hub_info* hub = (struct hub_info*) arg;
-	struct user* user = 0;
+	struct hub_user* user = 0;
 	struct ip_addr_encap ipaddr;
 	const char* addr;
 	

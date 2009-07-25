@@ -3,7 +3,7 @@
 #define MAX_USERS 64
 
 static struct hub_info um_hub;
-static struct user um_user[MAX_USERS];
+static struct hub_user um_user[MAX_USERS];
 
 EXO_TEST(um_test_setup, {
 	int i = 0;
@@ -11,7 +11,7 @@ EXO_TEST(um_test_setup, {
 	
 	for (i = 0; i < MAX_USERS; i++)
 	{
-		memset(&um_user[i], 0, sizeof(struct user));
+		memset(&um_user[i], 0, sizeof(struct hub_user));
 		um_user[i].id.sid = i+1;
 		um_user[i].net.sd  = -1;
 	}

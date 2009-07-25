@@ -23,17 +23,17 @@
 /**
  * Route a message by sending it to it's final destination.
  */
-extern int route_message(struct hub_info* hub, struct user* u, struct adc_message* msg);
+extern int route_message(struct hub_info* hub, struct hub_user* u, struct adc_message* msg);
 
 /**
  * Send queued messages.
  */
-extern int route_flush_pipeline(struct hub_info* hub, struct user* u);
+extern int route_flush_pipeline(struct hub_info* hub, struct hub_user* u);
 
 /**
  * Transmit message directly to one user.
  */
-extern int route_to_user(struct hub_info* hub, struct user*, struct adc_message* command);
+extern int route_to_user(struct hub_info* hub, struct hub_user*, struct adc_message* command);
 
 /**
  * Broadcast message to all users.
@@ -50,7 +50,7 @@ extern int route_to_subscribers(struct hub_info* hub, struct adc_message* comman
  * This will ensure the correct IP is seen by other users
  * in case nat override is in use.
  */
-extern int route_info_message(struct hub_info* hub, struct user* user);
+extern int route_info_message(struct hub_info* hub, struct hub_user* user);
 
 
 #endif /* HAVE_UHUB_ROUTE_H */

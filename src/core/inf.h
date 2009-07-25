@@ -47,7 +47,7 @@ enum nick_status
  *
  * @return 0 on success, -1 on error
  */
-extern int hub_handle_info(struct hub_info* hub, struct user* u, const struct adc_message* cmd);
+extern int hub_handle_info(struct hub_info* hub, struct hub_user* u, const struct adc_message* cmd);
 
 
 #endif /* HAVE_UHUB_INF_PARSER_H */

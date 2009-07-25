@@ -21,7 +21,7 @@
 #define HAVE_UHUB_ACL_H
 
 struct hub_config;
-struct user;
+struct hub_user;
 struct ip_addr_encap;
 
 enum user_credentials
@@ -38,7 +38,7 @@ enum user_credentials
 
 const char* get_user_credential_string(enum user_credentials cred);
 
-struct user_access_info
+struct hub_user_access_info
 {
 	char* username;          /* name of user, cid or IP range */
 	char* password;          /* password */
@@ -65,7 +65,7 @@ struct acl_handle
 extern int acl_initialize(struct hub_config* config, struct acl_handle* handle);
 extern int acl_shutdown(struct acl_handle* handle);
 
-extern struct user_access_info* acl_get_access_info(struct acl_handle* handle, const char* name);
+extern struct hub_user_access_info* acl_get_access_info(struct acl_handle* handle, const char* name);
 extern int acl_is_cid_banned(struct acl_handle* handle, const char* cid);
 extern int acl_is_ip_banned(struct acl_handle* handle, const char* ip_address);
 extern int acl_is_ip_nat_override(struct acl_handle* handle, const char* ip_address);
@@ -80,7 +80,7 @@ extern int acl_user_unban_cid(struct acl_handle* handle, const char* cid);
 
 extern int acl_check_ip_range(struct ip_addr_encap* addr, struct ip_ban_record* info);
 
-extern const char* acl_password_generate_challenge(struct acl_handle* acl, struct user* user);
+extern const char* acl_password_generate_challenge(struct acl_handle* acl, struct hub_user* user);
 
 /**
  * Verify a password.
@@ -88,6 +88,6 @@ extern const char* acl_password_generate_challenge(struct acl_handle* acl, struc
  * @param password the hashed password (based on the nonce).
  * @return 1 if the password matches, or 0 if the password is incorrect.
  */
-extern int acl_password_verify(struct acl_handle* acl, struct user* user, const char* password);
+extern int acl_password_verify(struct acl_handle* acl, struct hub_user* user, const char* password);
 
 #endif /* HAVE_UHUB_ACL_H */

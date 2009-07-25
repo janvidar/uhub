@@ -29,7 +29,7 @@ static void clear_user_list_callback(void* ptr)
 {
 	if (ptr)
 	{
-		struct user* u = (struct user*) ptr;
+		struct hub_user* u = (struct hub_user*) ptr;
 		
 		/* Mark the user as already being disconnected.
 		 * This prevents the hub from trying to send
@@ -85,14 +85,14 @@ static void timer_statistics(int fd, short ev, void *arg)
 
 int uman_init(struct hub_info* hub)
 {
-	struct user_manager* users = NULL;
+	struct hub_user_manager* users = NULL;
 #ifdef USERMANAGER_TIMER
 	struct timeval timeout = { TIMEOUT_STATS, 0 };
 #endif
 	if (!hub)
 		return -1;
 
-	users = (struct user_manager*) hub_malloc_zero(sizeof(struct user_manager));
+	users = (struct hub_user_manager*) hub_malloc_zero(sizeof(struct hub_user_manager));
 	if (!users)
 		return -1;
 
@@ -140,7 +140,7 @@ int uman_shutdown(struct hub_info* hub)
 }
 
 
-int uman_add(struct hub_info* hub, struct user* user)
+int uman_add(struct hub_info* hub, struct hub_user* user)
 {
 	if (!hub || !user)
 		return -1;
@@ -159,7 +159,7 @@ int uman_add(struct hub_info* hub, struct user* user)
 	return 0;
 }
 
-int uman_remove(struct hub_info* hub, struct user* user)
+int uman_remove(struct hub_info* hub, struct hub_user* user)
 {
 	if (!hub || !user)
 		return -1;
@@ -184,50 +184,50 @@ int uman_remove(struct hub_info* hub, struct user* user)
 }
 
 
-struct user* uman_get_user_by_sid(struct hub_info* hub, sid_t sid)
+struct hub_user* uman_get_user_by_sid(struct hub_info* hub, sid_t sid)
 {
-	struct user* user = (struct user*) list_get_first(hub->users->list); /* iterate users */
+	struct hub_user* user = (struct hub_user*) list_get_first(hub->users->list); /* iterate users */
 	while (user)
 	{
 		if (user->id.sid == sid)
 			return user;
-		user = (struct user*) list_get_next(hub->users->list);
+		user = (struct hub_user*) list_get_next(hub->users->list);
 	}
 	return NULL;
 }
 
 
-struct user* uman_get_user_by_cid(struct hub_info* hub, const char* cid)
+struct hub_user* uman_get_user_by_cid(struct hub_info* hub, const char* cid)
 {
-	struct user* user = (struct user*) list_get_first(hub->users->list); /* iterate users - only on incoming INF msg */
+	struct hub_user* user = (struct hub_user*) list_get_first(hub->users->list); /* iterate users - only on incoming INF msg */
 	while (user)
 	{
 		if (strcmp(user->id.cid, cid) == 0)
 			return user;
-		user = (struct user*) list_get_next(hub->users->list);
+		user = (struct hub_user*) list_get_next(hub->users->list);
 	}
 	return NULL;
 }
 
 
-struct user* uman_get_user_by_nick(struct hub_info* hub, const char* nick)
+struct hub_user* uman_get_user_by_nick(struct hub_info* hub, const char* nick)
 {
-	struct user* user = (struct user*) list_get_first(hub->users->list); /* iterate users - only on incoming INF msg */
+	struct hub_user* user = (struct hub_user*) list_get_first(hub->users->list); /* iterate users - only on incoming INF msg */
 	while (user)
 	{
 		if (strcmp(user->id.nick, nick) == 0)
 			return user;
-		user = (struct user*) list_get_next(hub->users->list);
+		user = (struct hub_user*) list_get_next(hub->users->list);
 	}
 	return NULL;
 }
 
 
-int uman_send_user_list(struct hub_info* hub, struct user* target)
+int uman_send_user_list(struct hub_info* hub, struct hub_user* target)
 {
 	int ret = 1;
 	user_flag_set(target, flag_user_list);
-	struct user* user = (struct user*) list_get_first(hub->users->list); /* iterate users - only on INF or PAS msg */
+	struct hub_user* user = (struct hub_user*) list_get_first(hub->users->list); /* iterate users - only on INF or PAS msg */
 	while (user)
 	{
 		if (user_is_logged_in(user))
@@ -236,7 +236,7 @@ int uman_send_user_list(struct hub_info* hub, struct user* target)
 			if (!ret)
 				break;
 		}
-		user = (struct user*) list_get_next(hub->users->list);
+		user = (struct hub_user*) list_get_next(hub->users->list);
 	}
 	
 #if 0
@@ -250,7 +250,7 @@ int uman_send_user_list(struct hub_info* hub, struct user* target)
 }
 
 
-void uman_send_quit_message(struct hub_info* hub, struct user* leaving)
+void uman_send_quit_message(struct hub_info* hub, struct hub_user* leaving)
 {
 	struct adc_message* command = adc_msg_construct(ADC_CMD_IQUI, 6);
 	adc_msg_add_argument(command, (const char*) sid_to_string(leaving->id.sid));
@@ -268,8 +268,8 @@ void uman_send_quit_message(struct hub_info* hub, struct user* leaving)
 sid_t uman_get_free_sid(struct hub_info* hub)
 {
 #if 0
-	struct user* user;
-	user = (struct user*) list_get_first(hub->users->list); /* iterate normal users */
+	struct hub_user* user;
+	user = (struct hub_user*) list_get_first(hub->users->list); /* iterate normal users */
 	while (user)
 	{
 		if (user->sid == hub->users->free_sid)
@@ -278,7 +278,7 @@ sid_t uman_get_free_sid(struct hub_info* hub)
 			if (hub->users->free_sid >= SID_MAX) hub->users->free_sid = 1;
 			break;
 		}
-		user = (struct user*) list_get_next(hub->users->list);
+		user = (struct hub_user*) list_get_next(hub->users->list);
 	}
 #endif
 	return hub->users->free_sid++;

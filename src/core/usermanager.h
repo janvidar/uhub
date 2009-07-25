@@ -20,7 +20,7 @@
 #ifndef HAVE_UHUB_USER_MANAGER_H
 #define HAVE_UHUB_USER_MANAGER_H
 
-struct user_manager
+struct hub_user_manager
 {
 	size_t count;                   /**<< "Number of all fully connected and logged in users" */
 	size_t count_peak;              /**<< "Peak number of users" */
@@ -56,7 +56,7 @@ extern void uman_print_stats(struct hub_info* hub);
  * @param hub The hub to add the user to
  * @param user The user to be added to the hub.
  */
-extern int uman_add(struct hub_info* hub, struct user* user);
+extern int uman_add(struct hub_info* hub, struct hub_user* user);
 
 /**
  * Remove a user from the user manager.
@@ -65,7 +65,7 @@ extern int uman_add(struct hub_info* hub, struct user* user);
  *
  * @return 0 if successfully removed, -1 if error.
  */
-extern int uman_remove(struct hub_info* hub, struct user* user);
+extern int uman_remove(struct hub_info* hub, struct hub_user* user);
 
 /**
  * Returns and allocates an unused session ID (SID).
@@ -85,19 +85,19 @@ extern sid_t uman_get_free_sid(struct hub_info* hub);
  *
  * @return a user if found, or NULL if not found
  */
-extern struct user* uman_get_user_by_sid(struct hub_info* hub, sid_t sid);
+extern struct hub_user* uman_get_user_by_sid(struct hub_info* hub, sid_t sid);
 
 /**
  * Lookup a user based on the client ID (CID).
  * @return a user if found, or NULL if not found
  */
-extern struct user* uman_get_user_by_cid(struct hub_info* hub, const char* cid);
+extern struct hub_user* uman_get_user_by_cid(struct hub_info* hub, const char* cid);
 
 /**
  * Lookup a user based on the nick name.
  * @return a user if found, or NULL if not found
  */
-extern struct user* uman_get_user_by_nick(struct hub_info* hub, const char* nick);
+extern struct hub_user* uman_get_user_by_nick(struct hub_info* hub, const char* nick);
 
 /**
  * Send the user list of connected clients to 'user'.
@@ -105,13 +105,13 @@ extern struct user* uman_get_user_by_nick(struct hub_info* hub, const char* nick
  *
  * @return 1 if sending the user list succeeded, 0 otherwise.
  */
-extern int uman_send_user_list(struct hub_info* hub, struct user* user);
+extern int uman_send_user_list(struct hub_info* hub, struct hub_user* user);
 
 /**
  * Send a quit message to all connected users when 'user' is
  * leaving the hub (for whatever reason).
  */
-extern void uman_send_quit_message(struct hub_info* hub, struct user* user);
+extern void uman_send_quit_message(struct hub_info* hub, struct hub_user* user);
 
 
 #endif /* HAVE_UHUB_USER_MANAGER_H */

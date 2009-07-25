@@ -5,15 +5,15 @@
 #define USER_NICK "Friend"
 #define USER_SID "AAAB"
 
-static struct user* inf_user       = 0;
+static struct hub_user* inf_user       = 0;
 static struct hub_info* inf_hub    = 0;
 
-extern int hub_handle_info_login(struct hub_info* hub, struct user* user, struct adc_message* cmd);
+extern int hub_handle_info_login(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd);
 
 static void inf_create_hub()
 {
 	inf_hub = (struct hub_info*) hub_malloc_zero(sizeof(struct hub_info));
-	inf_hub->users = (struct user_manager*) hub_malloc_zero(sizeof(struct user_manager));
+	inf_hub->users = (struct hub_user_manager*) hub_malloc_zero(sizeof(struct hub_user_manager));
 	inf_hub->users->list = list_create();
 	inf_hub->users->free_sid = 1;
 	
@@ -40,7 +40,7 @@ static void inf_destroy_hub()
 static void inf_create_user()
 {
 	if (inf_user) return;
-	inf_user = (struct user*) hub_malloc_zero(sizeof(struct user));
+	inf_user = (struct hub_user*) hub_malloc_zero(sizeof(struct hub_user));
 	inf_user->id.sid = 1;
 	inf_user->net.sd = -1;
 	inf_user->limits.upload_slots = 1;

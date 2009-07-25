@@ -70,7 +70,7 @@ enum user_quit_reason
 	quit_ghost_timeout  = 11,    /** The user is a ghost, and trying to login from another connection */
 };
 
-struct user_info
+struct hub_user_info
 {
 	sid_t sid;                    /** session ID */
 	char cid[MAX_CID_LEN+1];      /** global client ID */
@@ -82,7 +82,7 @@ struct user_info
  * as the number of bytes and files shared, and the number of hubs the
  * user is connected to, etc.
  */
-struct user_limits
+struct hub_user_limits
 {
 	uint64_t             shared_size;             /** Shared size in bytes */
 	size_t               shared_files;            /** The number of shared files */
@@ -93,7 +93,7 @@ struct user_limits
 	size_t               hub_count_total;         /** The number of hubs connected to in total */
 };
 
-struct user_net_io
+struct hub_user_net_io
 {
 	int                  sd;                      /** socket descriptor */
 	struct event         event;                   /** libevent struct for read/write events */
@@ -111,18 +111,18 @@ struct user_net_io
 #endif /*  SSL_SUPPORT */
 };
 
-struct user
+struct hub_user
 {
-	struct user_net_io   net;                     /** Network information data */
+	struct hub_user_net_io   net;                     /** Network information data */
 	enum user_state      state;                   /** see enum user_state */
 	enum user_credentials credentials;            /** see enum user_credentials */
-	struct user_info     id;                      /** Contains nick name and CID */
+	struct hub_user_info     id;                      /** Contains nick name and CID */
 	int                  flags;                   /** see enum user_features */
 	char                 user_agent[MAX_UA_LEN+1];/** User agent string */
 	struct linked_list*  feature_cast;            /** Features supported by feature cast */
 	struct adc_message*  info;                    /** ADC 'INF' message (broadcasted to everyone joining the hub) */
 	struct hub_info*     hub;                     /** The hub instance this user belong to */
-	struct user_limits   limits;                  /** Data used for limitation */
+	struct hub_user_limits   limits;                  /** Data used for limitation */
 	int                  quit_reason;             /** Quit reason (see user_quit_reason) */
 
 };
@@ -138,14 +138,14 @@ struct user
  * @param sd socket descriptor associated with the user
  * @return User object or NULL if not enough memory is available.
  */
-extern struct user* user_create(struct hub_info* hub, int sd);
+extern struct hub_user* user_create(struct hub_info* hub, int sd);
 
 /**
  * Delete a user.
  *
  * !WRONG! If the user is logged in a quit message is issued.
  */
-extern void user_destroy(struct user* user);
+extern void user_destroy(struct hub_user* user);
 
 /**
  * Disconnect a user.
@@ -161,7 +161,7 @@ extern void user_destroy(struct user* user);
  * @param user User to disconnect
  * @param reason See enum user_quit_reason
  */
-extern void user_disconnect(struct user* user, int reason);
+extern void user_disconnect(struct hub_user* user, int reason);
 
 /**
  * This associates a INF message to the user.
@@ -170,53 +170,53 @@ extern void user_disconnect(struct user* user, int reason);
  * 
  * @param info new inf message (can be NULL)
  */
-extern void user_set_info(struct user* user, struct adc_message* info);
+extern void user_set_info(struct hub_user* user, struct adc_message* info);
 
 /**
  * Update a user's INF message.
  * Will parse replace all ellements in the user's inf message with
  * the parameters from the cmd (merge operation).
  */
-extern void user_update_info(struct user* user, struct adc_message* cmd);
+extern void user_update_info(struct hub_user* user, struct adc_message* cmd);
 
 /**
  * Specify a user's state.
  * NOTE: DON'T, unless you know what you are doing.
  */
-extern void user_set_state(struct user* user, enum user_state);
+extern void user_set_state(struct hub_user* user, enum user_state);
 
 /**
  * Returns 1 if the user is in state state_normal, or 0 otherwise.
  */
-extern int user_is_logged_in(struct user* user);
+extern int user_is_logged_in(struct hub_user* user);
 
 /**
  * Returns 1 if the user is in state_protocol.
  * Returns 0 otherwise.
  */
-extern int user_is_protocol_negotiating(struct user* user);
+extern int user_is_protocol_negotiating(struct hub_user* user);
 
 /**
  * Returns 1 if the user is in state_protocol, state_identify or state_verify.
  * Returns 0 otherwise.
  */
-extern int user_is_connecting(struct user* user);
+extern int user_is_connecting(struct hub_user* user);
 
 /**
  * Returns 1 only if the user is in state_cleanup or state_disconnected.
  */
-extern int user_is_disconnecting(struct user* user);
+extern int user_is_disconnecting(struct hub_user* user);
 
 /**
  * Returns 1 if a user is protected, which includes users
  * having any form of elevated privileges.
  */
-extern int user_is_protected(struct user* user);
+extern int user_is_protected(struct hub_user* user);
 
 /**
  * Returns 1 if a user is registered, with or without privileges.
  */
-extern int user_is_registered(struct user* user);
+extern int user_is_registered(struct hub_user* user);
 
 /**
  * User supports the protocol extension as given in fourcc.
@@ -226,7 +226,7 @@ extern int user_is_registered(struct user* user);
  *
  * @see enum user_flags
  */
-extern void user_support_add(struct user* user, int fourcc);
+extern void user_support_add(struct hub_user* user, int fourcc);
 
 /**
  * User no longer supports the protocol extension as given in fourcc.
@@ -234,26 +234,26 @@ extern void user_support_add(struct user* user, int fourcc);
  * the hub.
  * @see enum user_flags
  */
-extern void user_support_remove(struct user* user, int fourcc);
+extern void user_support_remove(struct hub_user* user, int fourcc);
 
 /**
  * Sets the nat override flag for a user, this allows users on the same
  * subnet as a natted hub to spoof their IP in order to use active mode
  * on a natted hub.
  */
-extern void user_set_nat_override(struct user* user);
-extern int user_is_nat_override(struct user* user);
+extern void user_set_nat_override(struct hub_user* user);
+extern int user_is_nat_override(struct hub_user* user);
 
 /**
  * Set a flag. @see enum user_flags
  */
-extern void user_flag_set(struct user* user, enum user_flags flag);
-extern void user_flag_unset(struct user* user, enum user_flags flag);
+extern void user_flag_set(struct hub_user* user, enum user_flags flag);
+extern void user_flag_unset(struct hub_user* user, enum user_flags flag);
 
 /**
  * Get a flag. @see enum user_flags
  */
-extern int user_flag_get(struct user* user, enum user_flags flag);
+extern int user_flag_get(struct hub_user* user, enum user_flags flag);
 
 /**
  * Check if a user supports 'feature' for feature casting (basis for 'Fxxx' messages)
@@ -263,7 +263,7 @@ extern int user_flag_get(struct user* user, enum user_flags flag);
  * @param feature a feature to lookup (example: 'TCP4' or 'UDP4')
  * @return 1 if 'feature' supported, or 0 otherwise
  */
-extern int user_have_feature_cast_support(struct user* user, char feature[4]);
+extern int user_have_feature_cast_support(struct hub_user* user, char feature[4]);
 
 /**
  * Set feature cast support for feature.
@@ -271,38 +271,38 @@ extern int user_have_feature_cast_support(struct user* user, char feature[4]);
  * @param feature a feature to lookup (example: 'TCP4' or 'UDP4')
  * @return 1 if 'feature' supported, or 0 otherwise
  */
-extern int user_set_feature_cast_support(struct user* u, char feature[4]);
+extern int user_set_feature_cast_support(struct hub_user* u, char feature[4]);
 
 /**
  * Remove all feature cast support features.
  */
-extern void user_clear_feature_cast_support(struct user* u);
+extern void user_clear_feature_cast_support(struct hub_user* u);
 
 /**
  * Mark the user with a want-write flag, meaning it should poll for writability.
  */
-extern void user_net_io_want_write(struct user* user);
+extern void user_net_io_want_write(struct hub_user* user);
 
 /**
  * Mark the user with a want read flag, meaning it should poll for readability.
  */
-extern void user_net_io_want_read(struct user* user);
+extern void user_net_io_want_read(struct hub_user* user);
 
 /**
  * Set timeout for connetion.
  * @param seconds the number of seconds into the future.
  */
-extern void user_set_timeout(struct user* user, int seconds);
+extern void user_set_timeout(struct hub_user* user, int seconds);
 
 /**
  * Reset the last-write timer.
  */
-extern void user_reset_last_write(struct user* user);
+extern void user_reset_last_write(struct hub_user* user);
 
 /**
  * Reset the last-write timer.
  */
-extern void user_reset_last_read(struct user* user);
+extern void user_reset_last_read(struct hub_user* user);
 
 #endif /* HAVE_UHUB_USER_H */
 

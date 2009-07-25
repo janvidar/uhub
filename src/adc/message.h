@@ -20,7 +20,7 @@
 #ifndef HAVE_UHUB_COMMAND_H
 #define HAVE_UHUB_COMMAND_H
 
-struct user;
+struct hub_user;
 
 struct adc_message
 {
@@ -70,7 +70,7 @@ extern struct adc_message* adc_msg_copy(const struct adc_message* cmd);
  * The message is only considered valid if the user who sent it
  * is the rightful origin of the message.
  */
-extern struct adc_message* adc_msg_parse_verify(struct user* u, const char* string, size_t length);
+extern struct adc_message* adc_msg_parse_verify(struct hub_user* u, const char* string, size_t length);
 
 /**
  * This will parse 'string' and return it as a adc_message struct, or

@@ -88,7 +88,7 @@ struct hub_info
 	struct event_queue* queue;
 	struct event_base* evbase;
 	struct hub_config* config;
-	struct user_manager* users;
+	struct hub_user_manager* users;
 	struct acl_handle* acl;
 	struct adc_message* command_info;    /* The hub's INF command */
 	struct adc_message* command_support; /* The hub's SUP command */
@@ -113,87 +113,87 @@ struct hub_info
  *
  * @return 0 on success, -1 on error
  */
-extern int hub_handle_message(struct hub_info* hub, struct user* u, const char* message, size_t length);
+extern int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* message, size_t length);
 
 /**
  * Handle protocol support/subscription messages received clients.
  *
  * @return 0 on success, -1 on error
  */
-extern int hub_handle_support(struct hub_info* hub, struct user* u, struct adc_message* cmd);
+extern int hub_handle_support(struct hub_info* hub, struct hub_user* u, struct adc_message* cmd);
 
 /**
  * Handle password messages received from clients.
  *
  * @return 0 on success, -1 on error
  */
-extern int hub_handle_password(struct hub_info* hub, struct user* u, struct adc_message* cmd);
+extern int hub_handle_password(struct hub_info* hub, struct hub_user* u, struct adc_message* cmd);
 
 /**
  * Handle chat messages received from clients.
  * @return 0 on success, -1 on error.
  */
-extern int hub_handle_chat_message(struct hub_info* hub, struct user* u, struct adc_message* cmd);
+extern int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc_message* cmd);
 
 /**
  * Used internally by hub_handle_info
  * @return 1 if nickname is OK, or 0 if nickname is not accepted.
  */
-extern int  hub_handle_info_check_nick(struct hub_info* hub, struct user* u, struct adc_message* cmd);
+extern int  hub_handle_info_check_nick(struct hub_info* hub, struct hub_user* u, struct adc_message* cmd);
 
 /**
  * Used internally by hub_handle_info
  * @return 1 if CID/PID is OK, or 0 if not valid.
  */
-extern int  hub_handle_info_check_cid(struct hub_info* hub, struct user* u, struct adc_message* cmd);
+extern int  hub_handle_info_check_cid(struct hub_info* hub, struct hub_user* u, struct adc_message* cmd);
 
 /**
  * Send the support line for the hub to a particular user.
  * Only used during the initial handshake.
  */
-extern void hub_send_support(struct hub_info* hub, struct user* u);
+extern void hub_send_support(struct hub_info* hub, struct hub_user* u);
 
 /**
  * Send a message assigning a SID for a user.
  * This is only sent after hub_send_support() during initial handshake.
  */
-extern void hub_send_sid(struct hub_info* hub, struct user* u);
+extern void hub_send_sid(struct hub_info* hub, struct hub_user* u);
 
 /**
  * Send a 'ping' message to user.
  */
-extern void hub_send_ping(struct hub_info* hub, struct user* user);
+extern void hub_send_ping(struct hub_info* hub, struct hub_user* user);
 
 /**
  * Send a message containing hub information to a particular user.
  * This is sent during user connection, but can safely be sent at any
  * point later.
  */
-extern void hub_send_hubinfo(struct hub_info* hub, struct user* u);
+extern void hub_send_hubinfo(struct hub_info* hub, struct hub_user* u);
 
 /**
  * Send handshake. This basically calls
  * hub_send_support() and hub_send_sid()
  */
-extern void hub_send_handshake(struct hub_info* hub, struct user* u);
+extern void hub_send_handshake(struct hub_info* hub, struct hub_user* u);
 
 /**
  * Send a welcome message containing the message of the day to 
  * one particular user. This can be sent in any point in time.
  */
-extern void hub_send_motd(struct hub_info* hub, struct user* u);
+extern void hub_send_motd(struct hub_info* hub, struct hub_user* u);
 
 /**
  * Send a password challenge to a user.
  * This is only used if the user tries to access the hub using a
  * password protected nick name.
  */
-extern void hub_send_password_challenge(struct hub_info* hub, struct user* u);
+extern void hub_send_password_challenge(struct hub_info* hub, struct hub_user* u);
 
 /**
  * Sends a status_message to a user.
  */
-extern void hub_send_status(struct hub_info*, struct user* user, enum status_message msg, enum msg_status_level level);
+extern void hub_send_status(struct hub_info*, struct hub_user* user, enum status_message msg, enum msg_status_level level);
 
 /**
  * Allocates memory, initializes the hub based on the configuration,
@@ -324,12 +324,12 @@ extern void hub_event_loop(struct hub_info* hub);
 /**
  * Schedule destroying a user.
  */
-extern void hub_schedule_destroy_user(struct hub_info* hub, struct user* user);
+extern void hub_schedule_destroy_user(struct hub_info* hub, struct hub_user* user);
 
 /**
  * Disconnect a user from the hub.
  */
-extern void hub_disconnect_user(struct hub_info* hub, struct user* user, int reason);
+extern void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason);
 
 
 #endif /* HAVE_UHUB_HUB_H */

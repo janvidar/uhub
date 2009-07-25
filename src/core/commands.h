@@ -23,7 +23,7 @@
 #define CHAT_MSG_IGNORED  0
 #define CHAT_MSG_INVALID -1
 
-typedef int (*plugin_event_chat_message)(struct hub_info*, struct user*, struct adc_message*);
+typedef int (*plugin_event_chat_message)(struct hub_info*, struct hub_user*, struct adc_message*);
 
 struct command_info
 {
@@ -32,4 +32,4 @@ struct command_info
 	plugin_event_chat_message function;
 };
 
-int command_dipatcher(struct hub_info* hub, struct user* user, const char* message);
+int command_dipatcher(struct hub_info* hub, struct hub_user* user, const char* message);

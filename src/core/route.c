@@ -19,9 +19,9 @@
 
 #include "uhub.h"
 
-int route_message(struct hub_info* hub, struct user* u, struct adc_message* msg)
+int route_message(struct hub_info* hub, struct hub_user* u, struct adc_message* msg)
 {
-	struct user* target = NULL;
+	struct hub_user* target = NULL;
 
 	switch (msg->cache[0])
 	{
@@ -75,7 +75,7 @@ static inline size_t get_max_send_queue_soft(struct hub_info* hub)
  *         -1 if send queue is overflowed
  *         0 if soft send queue is overflowed (not implemented at the moment)
  */
-static inline int check_send_queue(struct hub_info* hub, struct user* user, struct adc_message* msg)
+static inline int check_send_queue(struct hub_info* hub, struct hub_user* user, struct adc_message* msg)
 {
 	if (user_flag_get(user, flag_user_list))
 		return 1;
@@ -89,7 +89,7 @@ static inline int check_send_queue(struct hub_info* hub, struct user* user, stru
 	return 1;
 }
 
-int route_to_user(struct hub_info* hub, struct user* user, struct adc_message* msg)
+int route_to_user(struct hub_info* hub, struct hub_user* user, struct adc_message* msg)
 {
 #ifdef DEBUG_SENDQ
 	char* data = strndup(msg->cache, msg->length-1);
@@ -115,7 +115,7 @@ int route_to_user(struct hub_info* hub, struct user* user, struct adc_message* m
 	return 1;
 }
 
-int route_flush_pipeline(struct hub_info* hub, struct user* u)
+int route_flush_pipeline(struct hub_info* hub, struct hub_user* u)
 {
 	if (hub_sendq_is_empty(u->net.send_queue))
 		return 0;
@@ -128,11 +128,11 @@ int route_flush_pipeline(struct hub_info* hub, struct user* u)
 
 int route_to_all(struct hub_info* hub, struct adc_message* command) /* iterate users */
 {
-	struct user* user = (struct user*) list_get_first(hub->users->list);
+	struct hub_user* user = (struct hub_user*) list_get_first(hub->users->list);
 	while (user)
 	{
 		route_to_user(hub, user, command);
-		user = (struct user*) list_get_next(hub->users->list);
+		user = (struct hub_user*) list_get_next(hub->users->list);
 	}
 	
 	return 0;
@@ -143,7 +143,7 @@ int route_to_subscribers(struct hub_info* hub, struct adc_message* command) /* i
 	int do_send;
 	char* tmp;
 	
-	struct user* user = (struct user*) list_get_first(hub->users->list);
+	struct hub_user* user = (struct hub_user*) list_get_first(hub->users->list);
 	while (user)
 	{
 		if (user->feature_cast)
@@ -162,7 +162,7 @@ int route_to_subscribers(struct hub_info* hub, struct adc_message* command) /* i
 			}
 			
 			if (!do_send) {
-				user = (struct user*) list_get_next(hub->users->list);
+				user = (struct hub_user*) list_get_next(hub->users->list);
 				continue;
 			}
 			
@@ -182,13 +182,13 @@ int route_to_subscribers(struct hub_info* hub, struct adc_message* command) /* i
 				route_to_user(hub, user, command);
 			}
 		}
-		user = (struct user*) list_get_next(hub->users->list);
+		user = (struct hub_user*) list_get_next(hub->users->list);
 	}
 	
 	return 0;
 }
 
-int route_info_message(struct hub_info* hub, struct user* u)
+int route_info_message(struct hub_info* hub, struct hub_user* u)
 {
 	if (!user_is_nat_override(u))
 	{
@@ -198,12 +198,12 @@ int route_info_message(struct hub_info* hub, struct user* u)
 	{
 		struct adc_message* cmd = adc_msg_copy(u->info);
 		const char* address = ip_convert_to_string(&u->net.ipaddr);
-		struct user* user = 0;
+		struct hub_user* user = 0;
 		
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
 		adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR, address);
 	
-		user = (struct user*) list_get_first(hub->users->list);
+		user = (struct hub_user*) list_get_first(hub->users->list);
 		while (user)
 		{
 			if (user_is_nat_override(user))
@@ -211,7 +211,7 @@ int route_info_message(struct hub_info* hub, struct user* u)
 			else
 				route_to_user(hub, user, u->info);
 			
-			user = (struct user*) list_get_next(hub->users->list);
+			user = (struct hub_user*) list_get_next(hub->users->list);
 		}
 		adc_msg_free(cmd);
 	}

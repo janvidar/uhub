@@ -10,8 +10,8 @@ static void create_test_user()
 	if (g_user)
 		return;
 
-	g_user = (struct user*) malloc(sizeof(struct user));
-	memset(g_user, 0, sizeof(struct user));
+	g_user = (struct hub_user*) malloc(sizeof(struct hub_user));
+	memset(g_user, 0, sizeof(struct hub_user));
 	memcpy(g_user->id.nick, "exotic-tester", 13);
 	g_user->sid = 1;
 }

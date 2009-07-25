@@ -70,7 +70,7 @@ static int check_cmd_user(const char* cmd, int status, struct linked_list* list,
 {
 	char* data;
 	char* data_extra;
-	struct user_access_info* info = 0;
+	struct hub_user_access_info* info = 0;
 	
 	if (!strncmp(line, cmd, strlen(cmd)))
 	{
@@ -86,7 +86,7 @@ static int check_cmd_user(const char* cmd, int status, struct linked_list* list,
 			return -1;
 		}
 		
-		info = hub_malloc_zero(sizeof(struct user_access_info));
+		info = hub_malloc_zero(sizeof(struct hub_user_access_info));
 		
 		if (!info)
 		{
@@ -336,7 +336,7 @@ int acl_initialize(struct hub_config* config, struct acl_handle* handle)
 
 static void acl_free_access_info(void* ptr)
 {
-	struct user_access_info* info = (struct user_access_info*) ptr;
+	struct hub_user_access_info* info = (struct hub_user_access_info*) ptr;
 	if (info)
 	{
 		hub_free(info->username);
@@ -400,16 +400,16 @@ int acl_shutdown(struct acl_handle* handle)
 }
 
 
-struct user_access_info* acl_get_access_info(struct acl_handle* handle, const char* name)
+struct hub_user_access_info* acl_get_access_info(struct acl_handle* handle, const char* name)
 {
-	struct user_access_info* info = (struct user_access_info*) list_get_first(handle->users);
+	struct hub_user_access_info* info = (struct hub_user_access_info*) list_get_first(handle->users);
 	while (info)
 	{
 		if (strcasecmp(info->username, name) == 0)
 		{
 			return info;
 		}
-		info = (struct user_access_info*) list_get_next(handle->users);
+		info = (struct hub_user_access_info*) list_get_next(handle->users);
 	}
 	return NULL;
 }
@@ -444,7 +444,7 @@ int acl_is_user_denied(struct acl_handle* handle, const char* data)
 
 int acl_user_ban_nick(struct acl_handle* handle, const char* nick)
 {
-	struct user_access_info* info = hub_malloc_zero(sizeof(struct user_access_info));
+	struct hub_user_access_info* info = hub_malloc_zero(sizeof(struct hub_user_access_info));
 	if (!info)
 	{
 		LOG_ERROR("ACL error: Out of memory!");
@@ -456,7 +456,7 @@ int acl_user_ban_nick(struct acl_handle* handle, const char* nick)
 
 int acl_user_ban_cid(struct acl_handle* handle, const char* cid)
 {
-	struct user_access_info* info = hub_malloc_zero(sizeof(struct user_access_info));
+	struct hub_user_access_info* info = hub_malloc_zero(sizeof(struct hub_user_access_info));
 	if (!info)
 	{
 		LOG_ERROR("ACL error: Out of memory!");
@@ -523,7 +523,7 @@ int acl_check_ip_range(struct ip_addr_encap* addr, struct ip_ban_record* info)
  * seconds since the unix epoch (modulus 1 million)
  * and the SID of the user (0-1 million).
  */
-const char* acl_password_generate_challenge(struct acl_handle* acl, struct user* user)
+const char* acl_password_generate_challenge(struct acl_handle* acl, struct hub_user* user)
 {
 	char buf[32];
 	uint64_t tiger_res[3];
@@ -538,10 +538,10 @@ const char* acl_password_generate_challenge(struct acl_handle* acl, struct user*
 }
 
 
-int acl_password_verify(struct acl_handle* acl, struct user* user, const char* password)
+int acl_password_verify(struct acl_handle* acl, struct hub_user* user, const char* password)
 {
 	char buf[1024];
-	struct user_access_info* access;
+	struct hub_user_access_info* access;
 	const char* challenge;
 	char raw_challenge[64];
 	char password_calc[64];

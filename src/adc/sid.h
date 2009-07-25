@@ -28,7 +28,7 @@ extern sid_t string_to_sid(const char* sid);
 
 struct sid_map
 {
-	struct user* ptr;
+	struct hub_user* ptr;
 	struct sid_map* next;
 };
 
@@ -58,7 +58,7 @@ struct sid_pool
 
 
 extern void sid_initialize(struct sid_pool*);
-extern sid_t sid_alloc(struct sid_pool*, struct user*);
+extern sid_t sid_alloc(struct sid_pool*, struct hub_user*);
 extern void sid_free(struct sid_pool*, sid_t);
 
 

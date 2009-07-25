@@ -20,7 +20,7 @@
 #include "uhub.h"
 
 #ifdef DEBUG_SENDQ
-static const char* user_log_str(struct user* user)
+static const char* user_log_str(struct hub_user* user)
 {
 	static char buf[128];
 	if (user)
@@ -35,13 +35,13 @@ static const char* user_log_str(struct user* user)
 }
 #endif
 
-struct user* user_create(struct hub_info* hub, int sd)
+struct hub_user* user_create(struct hub_info* hub, int sd)
 {
-	struct user* user = NULL;
+	struct hub_user* user = NULL;
 	
 	LOG_TRACE("user_create(), hub=%p, sd=%d", hub, sd);
 
-	user = (struct user*) hub_malloc_zero(sizeof(struct user));
+	user = (struct hub_user*) hub_malloc_zero(sizeof(struct hub_user));
 
 	if (user == NULL)
 		return NULL; /* OOM */
@@ -66,7 +66,7 @@ struct user* user_create(struct hub_info* hub, int sd)
 }
 
 
-void user_destroy(struct user* user)
+void user_destroy(struct hub_user* user)
 {
 	LOG_TRACE("user_destroy(), user=%p", user);
 
@@ -82,7 +82,7 @@ void user_destroy(struct user* user)
 	hub_free(user);
 }
 
-void user_set_state(struct user* user, enum user_state state)
+void user_set_state(struct hub_user* user, enum user_state state)
 {
 	if ((user->state == state_cleanup && state != state_disconnected) || (user->state == state_disconnected))
 	{
@@ -92,13 +92,13 @@ void user_set_state(struct user* user, enum user_state state)
 	user->state = state;
 }
 
-void user_set_info(struct user* user, struct adc_message* cmd)
+void user_set_info(struct hub_user* user, struct adc_message* cmd)
 {
 	adc_msg_free(user->info);
 	user->info = adc_msg_incref(cmd);
 }
 
-void user_update_info(struct user* u, struct adc_message* cmd)
+void user_update_info(struct hub_user* u, struct adc_message* cmd)
 {
 	char prefix[2];
 	char* argument;
@@ -178,50 +178,50 @@ static int convert_support_fourcc(int fourcc)
 	}
 }
 
-void user_support_add(struct user* user, int fourcc)
+void user_support_add(struct hub_user* user, int fourcc)
 {
 	int feature_mask = convert_support_fourcc(fourcc);
 	user->flags |= feature_mask;
 }
 
-int user_flag_get(struct user* user, enum user_flags flag)
+int user_flag_get(struct hub_user* user, enum user_flags flag)
 {
     return user->flags & flag;
 }
 
-void user_flag_set(struct user* user, enum user_flags flag)
+void user_flag_set(struct hub_user* user, enum user_flags flag)
 {
     user->flags |= flag;
 }
 
-void user_flag_unset(struct user* user, enum user_flags flag)
+void user_flag_unset(struct hub_user* user, enum user_flags flag)
 {
     user->flags &= ~flag;
 }
 
-void user_set_nat_override(struct user* user)
+void user_set_nat_override(struct hub_user* user)
 {
 	user_flag_set(user, flag_nat);
 }
 
-int user_is_nat_override(struct user* user)
+int user_is_nat_override(struct hub_user* user)
 {
 	return user_flag_get(user, flag_nat);
 }
 
-void user_support_remove(struct user* user, int fourcc)
+void user_support_remove(struct hub_user* user, int fourcc)
 {
 	int feature_mask = convert_support_fourcc(fourcc);
 	user->flags &= ~feature_mask;
 }
 
-void user_disconnect(struct user* user, int reason)
+void user_disconnect(struct hub_user* user, int reason)
 {
 
 
 }
 
-int user_have_feature_cast_support(struct user* user, char feature[4])
+int user_have_feature_cast_support(struct hub_user* user, char feature[4])
 {
 	char* tmp = list_get_first(user->feature_cast);
 	while (tmp)
@@ -235,7 +235,7 @@ int user_have_feature_cast_support(struct user* user, char feature[4])
 	return 0;
 }
 
-int user_set_feature_cast_support(struct user* u, char feature[4])
+int user_set_feature_cast_support(struct hub_user* u, char feature[4])
 {
 	if (!u->feature_cast)
 	{
@@ -251,7 +251,7 @@ int user_set_feature_cast_support(struct user* u, char feature[4])
 	return 1;
 }
 
-void user_clear_feature_cast_support(struct user* u)
+void user_clear_feature_cast_support(struct hub_user* u)
 {
 	if (u->feature_cast)
 	{
@@ -261,35 +261,35 @@ void user_clear_feature_cast_support(struct user* u)
 	}
 }
 
-int user_is_logged_in(struct user* user)
+int user_is_logged_in(struct hub_user* user)
 {
 	if (user->state == state_normal)
 		return 1;
 	return 0;
 }
 
-int user_is_connecting(struct user* user)
+int user_is_connecting(struct hub_user* user)
 {
 	if (user->state == state_protocol || user->state == state_identify || user->state == state_verify)
 		return 1;
 	return 0;
 }
 
-int user_is_protocol_negotiating(struct user* user)
+int user_is_protocol_negotiating(struct hub_user* user)
 {
 	if (user->state == state_protocol)
 		return 1;
 	return 0;
 }
 
-int user_is_disconnecting(struct user* user)
+int user_is_disconnecting(struct hub_user* user)
 {
 	if (user->state == state_cleanup || user->state == state_disconnected)
 		return 1;
 	return 0;
 }
 
-int user_is_protected(struct user* user)
+int user_is_protected(struct hub_user* user)
 {
 	switch (user->credentials)
 	{
@@ -310,7 +310,7 @@ int user_is_protected(struct user* user)
  * Only registered users will be let in if the hub is configured for registered
  * users only.
  */
-int user_is_registered(struct user* user)
+int user_is_registered(struct hub_user* user)
 {
 	switch (user->credentials)
 	{
@@ -327,7 +327,7 @@ int user_is_registered(struct user* user)
 	return 0;
 }
 
-void user_net_io_want_write(struct user* user)
+void user_net_io_want_write(struct hub_user* user)
 {
 #ifdef DEBUG_SENDQ
 	LOG_TRACE("user_net_io_want_write: %s (pending: %d)", user_log_str(user), event_pending(&user->net.event, EV_READ | EV_WRITE, 0));
@@ -339,7 +339,7 @@ void user_net_io_want_write(struct user* user)
 	event_add(&user->net.event, 0);
 }
 
-void user_net_io_want_read(struct user* user)
+void user_net_io_want_read(struct hub_user* user)
 {
 #ifdef DEBUG_SENDQ
 	LOG_TRACE("user_net_io_want_read: %s (pending: %d)", user_log_str(user), event_pending(&user->net.event, EV_READ | EV_WRITE, 0));
@@ -351,17 +351,17 @@ void user_net_io_want_read(struct user* user)
 	event_add(&user->net.event, 0);
 }
 
-void user_reset_last_write(struct user* user)
+void user_reset_last_write(struct hub_user* user)
 {
 	user->net.tm_last_write = time(NULL);
 }
 
-void user_reset_last_read(struct user* user)
+void user_reset_last_read(struct hub_user* user)
 {
 	user->net.tm_last_read = time(NULL);
 }
 
-void user_set_timeout(struct user* user, int seconds)
+void user_set_timeout(struct hub_user* user, int seconds)
 {
 #ifdef DEBUG_SENDQ
 	LOG_TRACE("user_set_timeout to %d seconds: %s", seconds, user_log_str(user));

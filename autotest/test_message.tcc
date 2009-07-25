@@ -1,5 +1,5 @@
 #include <uhub.h>
-static struct user* g_user = 0;
+static struct hub_user* g_user = 0;
 static const char* test_string1 = "IINF AAfoo BBbar CCwhat\n";
 static const char* test_string2 = "BMSG AAAB Hello\\sWorld!\n";
 static const char* test_string3 = "BINF AAAB IDAN7ZMSLIEBL53OPTM7WXGSTXUS3XOY6KQS5LBGX NIFriend DEstuff SL3 SS0 SF0 VEQuickDC/0.4.17 US6430 SUADC0,TCP4,UDP4 I4127.0.0.1 HO5 HN1 AW\n";
@@ -11,8 +11,8 @@ static void create_test_user()
 	if (g_user)
 		return;
 
-	g_user = (struct user*) malloc(sizeof(struct user));
-	memset(g_user, 0, sizeof(struct user));
+	g_user = (struct hub_user*) malloc(sizeof(struct hub_user));
+	memset(g_user, 0, sizeof(struct hub_user));
 	memcpy(g_user->id.nick, "exotic-tester", 13);
 	g_user->id.sid = 1;
 }

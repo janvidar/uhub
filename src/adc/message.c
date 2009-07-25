@@ -235,7 +235,7 @@ struct adc_message* adc_msg_copy(const struct adc_message* cmd)
 }
 
 
-struct adc_message* adc_msg_parse_verify(struct user* u, const char* line, size_t length)
+struct adc_message* adc_msg_parse_verify(struct hub_user* u, const char* line, size_t length)
 {
 	struct adc_message* command = adc_msg_parse(line, length);
 	

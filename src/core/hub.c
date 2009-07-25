@@ -21,7 +21,7 @@
 
 struct hub_info* g_hub = 0;
 
-int hub_handle_message(struct hub_info* hub, struct user* u, const char* line, size_t length)
+int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* line, size_t length)
 {
 	int ret = 0;
 	struct adc_message* cmd = 0;
@@ -92,7 +92,7 @@ int hub_handle_message(struct hub_info* hub, struct user* u, const char* line, s
 }
 
 
-int hub_handle_support(struct hub_info* hub, struct user* u, struct adc_message* cmd)
+int hub_handle_support(struct hub_info* hub, struct hub_user* u, struct adc_message* cmd)
 {
 	int ret = 0;
 	int index = 0;
@@ -155,7 +155,7 @@ int hub_handle_support(struct hub_info* hub, struct user* u, struct adc_message*
 }
 
 
-int hub_handle_password(struct hub_info* hub, struct user* u, struct adc_message* cmd)
+int hub_handle_password(struct hub_info* hub, struct hub_user* u, struct adc_message* cmd)
 {
 	char* password = adc_msg_get_argument(cmd, 0);
 	int ret = 0;
@@ -178,7 +178,7 @@ int hub_handle_password(struct hub_info* hub, struct user* u, struct adc_message
 }
 
 
-int hub_handle_chat_message(struct hub_info* hub, struct user* u, struct adc_message* cmd)
+int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc_message* cmd)
 {
 	char* message = adc_msg_get_argument(cmd, 0);
 	int ret = 0;
@@ -204,7 +204,7 @@ int hub_handle_chat_message(struct hub_info* hub, struct user* u, struct adc_mes
 	return ret;
 }
 
-void hub_send_support(struct hub_info* hub, struct user* u)
+void hub_send_support(struct hub_info* hub, struct hub_user* u)
 {
 	if (user_is_connecting(u) || user_is_logged_in(u))
 	{
@@ -213,7 +213,7 @@ void hub_send_support(struct hub_info* hub, struct user* u)
 }
 
 
-void hub_send_sid(struct hub_info* hub, struct user* u)
+void hub_send_sid(struct hub_info* hub, struct hub_user* u)
 {
 	struct adc_message* command;
 	if (user_is_connecting(u))
@@ -227,7 +227,7 @@ void hub_send_sid(struct hub_info* hub, struct user* u)
 }
 
 
-void hub_send_ping(struct hub_info* hub, struct user* user)
+void hub_send_ping(struct hub_info* hub, struct hub_user* user)
 {
 	/* This will just send a newline, despite appearing to do more below. */
 	struct adc_message* ping = adc_msg_construct(0, 0);
@@ -240,7 +240,7 @@ void hub_send_ping(struct hub_info* hub, struct user* user)
 }
 
 
-void hub_send_hubinfo(struct hub_info* hub, struct user* u)
+void hub_send_hubinfo(struct hub_info* hub, struct hub_user* u)
 {
 	struct adc_message* info = adc_msg_copy(hub->command_info);
 	int value = 0;
@@ -306,7 +306,7 @@ void hub_send_hubinfo(struct hub_info* hub, struct user* u)
 	}
 }
 
-void hub_send_handshake(struct hub_info* hub, struct user* u)
+void hub_send_handshake(struct hub_info* hub, struct hub_user* u)
 {
 	user_flag_set(u, flag_pipeline);
 	hub_send_support(hub, u);
@@ -320,7 +320,7 @@ void hub_send_handshake(struct hub_info* hub, struct user* u)
 	}
 }
 
-void hub_send_motd(struct hub_info* hub, struct user* u)
+void hub_send_motd(struct hub_info* hub, struct hub_user* u)
 {
 	if (hub->command_motd)
 	{
@@ -328,7 +328,7 @@ void hub_send_motd(struct hub_info* hub, struct user* u)
 	}
 }
 
-void hub_send_password_challenge(struct hub_info* hub, struct user* u)
+void hub_send_password_challenge(struct hub_info* hub, struct hub_user* u)
 {
 	struct adc_message* igpa;
 	igpa = adc_msg_construct(ADC_CMD_IGPA, 38);
@@ -341,7 +341,7 @@ void hub_send_password_challenge(struct hub_info* hub, struct user* u)
 static void hub_event_dispatcher(void* callback_data, struct event_data* message)
 {
 	struct hub_info* hub = (struct hub_info*) callback_data;
-	struct user* user = (struct user*) message->ptr;
+	struct hub_user* user = (struct hub_user*) message->ptr;
 	assert(hub != NULL);
 	
 	switch (message->id)
@@ -633,7 +633,7 @@ void hub_free_variables(struct hub_info* hub)
  */
 static inline int is_nick_in_use(struct hub_info* hub, const char* nick)
 {
-	struct user* lookup = uman_get_user_by_nick(hub, nick);
+	struct hub_user* lookup = uman_get_user_by_nick(hub, nick);
 	if (lookup)
 	{
 		return 1;
@@ -647,7 +647,7 @@ static inline int is_nick_in_use(struct hub_info* hub, const char* nick)
  */
 static inline int is_cid_in_use(struct hub_info* hub, const char* cid)
 {
-	struct user* lookup = uman_get_user_by_cid(hub, cid);
+	struct hub_user* lookup = uman_get_user_by_cid(hub, cid);
 	if (lookup)
 	{
 		return 1;
@@ -672,7 +672,7 @@ static void set_status_code(enum msg_status_level level, int code, char buffer[4
  * @param msg See enum status_message
  * @param level See enum status_level
  */
-void hub_send_status(struct hub_info* hub, struct user* user, enum status_message msg, enum msg_status_level level)
+void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_message msg, enum msg_status_level level)
 {
 	struct hub_config* cfg = hub->config;
 	struct adc_message* cmd = adc_msg_construct(ADC_CMD_ISTA, 6);
@@ -910,7 +910,7 @@ void hub_event_loop(struct hub_info* hub)
 	while (hub->status == hub_status_running || hub->status == hub_status_disabled);
 }
 
-void hub_schedule_destroy_user(struct hub_info* hub, struct user* user)
+void hub_schedule_destroy_user(struct hub_info* hub, struct hub_user* user)
 {
 	struct event_data post;
 	memset(&post, 0, sizeof(post));
@@ -919,7 +919,7 @@ void hub_schedule_destroy_user(struct hub_info* hub, struct user* user)
 	event_queue_post(hub->queue, &post);
 }
 
-void hub_disconnect_user(struct hub_info* hub, struct user* user, int reason)
+void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason)
 {
 	struct event_data post;
 	int need_notify = 0;
