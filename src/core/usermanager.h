@@ -100,6 +100,13 @@ extern struct hub_user* uman_get_user_by_cid(struct hub_info* hub, const char* c
 extern struct hub_user* uman_get_user_by_nick(struct hub_info* hub, const char* nick);
 
 /**
+ * Lookup users based on an ip address range.
+ *
+ * @return The number of users matching the addressess, or -1 on error (mask is wrong).
+ */
+extern size_t uman_get_user_by_addr(struct hub_info* hub, struct linked_list* users, struct ip_range* range);
+
+/**
  * Send the user list of connected clients to 'user'.
  * Usually part of the login process.
  *

@@ -337,7 +337,18 @@ int net_accept(int fd, struct ip_addr_encap* ipaddr)
 			ipaddr->af = addr4->sin_family;
 			if (ipaddr->af == AF_INET6)
 			{
-				memcpy(&ipaddr->internal_ip_data.in6, &addr6->sin6_addr, sizeof(struct in6_addr));	
+				char address[INET6_ADDRSTRLEN+1] = { 0, };
+				net_address_to_string(AF_INET6, (void*) &addr6->sin6_addr, address, INET6_ADDRSTRLEN+1);
+				if (!strncmp(address, "::ffff:", 7))
+				{
+					/* Hack to convert IPv6 mapped IPv4 addresses to true IPv4 addresses */
+					net_string_to_address(AF_INET, address + 7, (void*) &ipaddr->internal_ip_data.in);
+					ipaddr->af = AF_INET;
+				}
+				else
+				{
+					memcpy(&ipaddr->internal_ip_data.in6, &addr6->sin6_addr, sizeof(struct in6_addr));
+				}
 			}
 			else
 			{

@@ -139,7 +139,7 @@ const char* command_get_syntax(struct commands_handler* handler)
 			switch (handler->args[n])
 			{
 				case 'n': strcat(args, "<nick>"); break;
-				case 'c': strcat(args, "<cid>"); break;
+				case 'c': strcat(args, "<cid>");  break;
 				case 'a': strcat(args, "<addr>"); break;
 			}
 		}
@@ -307,6 +307,49 @@ static int command_getip(struct hub_info* hub, struct hub_user* user, struct hub
 	return command_status(hub, user, cmd, tmp);
 }
 
+static int command_whoip(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
+{
+	char* address = list_get_first(cmd->args);
+	struct ip_range range;
+	struct linked_list* users;
+	struct hub_user* u;
+	int ret = 0;
+
+	ret = ip_convert_address_to_range(address, &range);
+	if (!ret)
+		return command_status(hub, user, cmd, "Invalid IP address/range/mask");
+
+	users = (struct linked_list*) list_create();
+	ret = uman_get_user_by_addr(hub, users, &range);
+
+	if (!ret)
+	{
+		list_destroy(users);
+		return command_status(hub, user, cmd, "No users found.");
+	}
+
+	char tmp[128];
+	snprintf(tmp, 128, "Found %d match%s:", (int) ret, ((ret != 1) ? "es" : ""));
+
+	char* buffer = hub_malloc(((MAX_NICK_LEN + 1) * ret) + strlen(tmp) + 2);
+	buffer[0] = 0;
+	strcat(buffer, tmp);
+	strcat(buffer, "\n");
+	
+	u = (struct hub_user*) list_get_first(users);
+	while (u)
+	{
+		strcat(buffer, u->id.nick);
+		strcat(buffer, "\n");
+		u = (struct hub_user*) list_get_next(users);
+	}
+
+	ret = command_status(hub, user, cmd, buffer);
+	hub_free(buffer);
+	return ret;
+}
+
+
 #ifdef CRASH_DEBUG
 static int command_crash(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
 {
@@ -372,6 +415,7 @@ static struct commands_handler command_handlers[] = {
 	{ "shutdown",   8, 0,   cred_admin,     command_shutdown, "Shutdown hub."                },
 	{ "myip",       4, 0,   cred_guest,     command_myip,     "Show your own IP."            },
 	{ "getip",      5, "n", cred_operator,  command_getip,    "Show IP address for a user"   },
+	{ "whoip",      5, "a", cred_operator,  command_whoip,    "Show users matching IP range" },
 #ifdef CRASH_DEBUG
 	{ "crash",      5, 0,   cred_admin,     command_crash,    "Crash the hub (DEBUG)."       },
 #endif

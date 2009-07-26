@@ -223,6 +223,21 @@ struct hub_user* uman_get_user_by_nick(struct hub_info* hub, const char* nick)
 	return NULL;
 }
 
+size_t uman_get_user_by_addr(struct hub_info* hub, struct linked_list* users, struct ip_range* range)
+{
+	size_t num = 0;
+	struct hub_user* user = (struct hub_user*) list_get_first(hub->users->list); /* iterate users - only on incoming INF msg */
+	while (user)
+	{
+		if (ip_in_range(&user->net.ipaddr, range))
+		{
+			list_append(users, user);
+			num++;
+		}
+		user = (struct hub_user*) list_get_next(hub->users->list);
+	}
+	return num;
+}
 
 int uman_send_user_list(struct hub_info* hub, struct hub_user* target)
 {
