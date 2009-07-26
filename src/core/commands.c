@@ -332,7 +332,7 @@ static int command_whoip(struct hub_info* hub, struct hub_user* user, struct hub
 	char tmp[128];
 	snprintf(tmp, 128, "Found %d match%s:", (int) ret, ((ret != 1) ? "es" : ""));
 
-	char* buffer = hub_malloc(((MAX_NICK_LEN + 1) * ret) + strlen(tmp) + 3);
+	char* buffer = hub_malloc(((MAX_NICK_LEN + INET6_ADDRSTRLEN + 5) * ret) + strlen(tmp) + 3);
 	buffer[0] = 0;
 	strcat(buffer, tmp);
 	strcat(buffer, "\n");
@@ -341,7 +341,9 @@ static int command_whoip(struct hub_info* hub, struct hub_user* user, struct hub
 	while (u)
 	{
 		strcat(buffer, u->id.nick);
-		strcat(buffer, "\n");
+		strcat(buffer, "(");
+		strcat(buffer, ip_convert_to_string(&u->net.ipaddr));
+		strcat(buffer, ")\n");
 		u = (struct hub_user*) list_get_next(users);
 	}
 	strcat(buffer, "\n");
