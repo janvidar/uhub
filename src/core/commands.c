@@ -141,6 +141,7 @@ const char* command_get_syntax(struct commands_handler* handler)
 				case 'n': strcat(args, "<nick>"); break;
 				case 'c': strcat(args, "<cid>");  break;
 				case 'a': strcat(args, "<addr>"); break;
+				case 'M': strcat(args, "<message>"); break;
 			}
 		}
 	}
@@ -331,7 +332,7 @@ static int command_whoip(struct hub_info* hub, struct hub_user* user, struct hub
 	char tmp[128];
 	snprintf(tmp, 128, "Found %d match%s:", (int) ret, ((ret != 1) ? "es" : ""));
 
-	char* buffer = hub_malloc(((MAX_NICK_LEN + 1) * ret) + strlen(tmp) + 2);
+	char* buffer = hub_malloc(((MAX_NICK_LEN + 1) * ret) + strlen(tmp) + 3);
 	buffer[0] = 0;
 	strcat(buffer, tmp);
 	strcat(buffer, "\n");
@@ -343,12 +344,21 @@ static int command_whoip(struct hub_info* hub, struct hub_user* user, struct hub
 		strcat(buffer, "\n");
 		u = (struct hub_user*) list_get_next(users);
 	}
+	strcat(buffer, "\n");
 
 	ret = command_status(hub, user, cmd, buffer);
 	hub_free(buffer);
 	return ret;
 }
 
+static int command_broadcast(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
+{
+	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen((cmd->message + 10)) + 6);
+	adc_msg_add_argument(command, (cmd->message + 10));
+	route_to_all(hub, command);
+	adc_msg_free(command);
+	return 0;
+}
 
 #ifdef CRASH_DEBUG
 static int command_crash(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
@@ -416,6 +426,7 @@ static struct commands_handler command_handlers[] = {
 	{ "myip",       4, 0,   cred_guest,     command_myip,     "Show your own IP."            },
 	{ "getip",      5, "n", cred_operator,  command_getip,    "Show IP address for a user"   },
 	{ "whoip",      5, "a", cred_operator,  command_whoip,    "Show users matching IP range" },
+	{ "broadcast",  9, "M", cred_operator,  command_broadcast,"Send a message to all users"  },
 #ifdef CRASH_DEBUG
 	{ "crash",      5, 0,   cred_admin,     command_crash,    "Crash the hub (DEBUG)."       },
 #endif
