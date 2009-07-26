@@ -197,7 +197,8 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 	if (relay && user_is_logged_in(u))
 	{
 		/* adc_msg_remove_named_argument(cmd, "PM"); */
-		hub_chat_history_add(hub, u, cmd);
+		if (cmd->cache[0] == 'B')
+			hub_chat_history_add(hub, u, cmd);
 		ret = route_message(hub, u, cmd);
 	}
 	hub_free(message);
