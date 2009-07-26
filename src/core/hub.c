@@ -207,7 +207,8 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 
 void hub_chat_history_add(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
-	char* message = adc_msg_get_argument(cmd, 0);
+	char* msg_esc   = adc_msg_get_argument(cmd, 0);
+	char* message = adc_msg_unescape(msg_esc);
 	char* log = hub_malloc(strlen(message) + strlen(user->id.nick) + 14);
 	sprintf(log, "%s <%s> %s\n", get_timestamp(time(NULL)), user->id.nick, message);
 	list_append(hub->chat_history, log);
@@ -218,6 +219,7 @@ void hub_chat_history_add(struct hub_info* hub, struct hub_user* user, struct ad
 		hub_free(msg);
 	}
 	hub_free(message);
+	hub_free(msg_esc);
 }
 
 void hub_chat_history_clear(struct hub_info* hub)
