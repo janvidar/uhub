@@ -115,7 +115,7 @@ static int check_cmd_user(const char* cmd, int status, struct linked_list* list,
 }
 
 
-static void add_ip_range(struct linked_list* list, struct ip_ban_record* info)
+static void add_ip_range(struct linked_list* list, struct ip_range* info)
 {
 	char buf1[INET6_ADDRSTRLEN+1];
 	char buf2[INET6_ADDRSTRLEN+1];
@@ -136,119 +136,38 @@ static void add_ip_range(struct linked_list* list, struct ip_ban_record* info)
 }
 
 
-static int check_ip_range(const char* lo, const char* hi, struct ip_ban_record* info)
-{
-	int ret1, ret2;
-	
-	if ((ip_is_valid_ipv4(lo) && ip_is_valid_ipv4(hi)) ||
-		(ip_is_valid_ipv6(lo) && ip_is_valid_ipv6(hi)))
-	{
-		ret1 = ip_convert_to_binary(lo, &info->lo);
-		ret2 = ip_convert_to_binary(hi, &info->hi);
-		if (ret1 == -1 || ret2 == -1 || ret1 != ret2)
-		{
-			return -1;
-		}
-		return 0;
-	}
-	return -1;
-}
-
-
-static int check_ip_mask(const char* text_addr, int bits, struct ip_ban_record* info)
-{
-	LOG_DEBUG("ACL: Deny access for: %s/%d", text_addr, bits);
-	
-	if (ip_is_valid_ipv4(text_addr) ||
-		ip_is_valid_ipv6(text_addr))
-	{
-		struct ip_addr_encap addr;
-		struct ip_addr_encap mask1;
-		struct ip_addr_encap mask2;
-		int af = ip_convert_to_binary(text_addr, &addr);  /* 192.168.1.2 */
-		int maxbits = af == AF_INET6 ? 128 : 32;
-		ip_mask_create_left(af, bits, &mask1);            /* 255.255.255.0 */
-		ip_mask_create_right(af, maxbits - bits, &mask2); /* 0.0.0.255 */
-		ip_mask_apply_AND(&addr, &mask1, &info->lo);      /* 192.168.1.0 */
-		ip_mask_apply_OR(&info->lo, &mask2, &info->hi);   /* 192.168.1.255 */
-		return 0;
-	}
-	return -1;
-}
-
-
 static int check_cmd_addr(const char* cmd, struct linked_list* list, char* line, int line_count)
 {
-	char* data1;
-	char* data2;
-	struct ip_ban_record* info = 0;
-	int cidr_bits = 0;
-		
+	char* data;
+	struct ip_range* range = 0;
+
 	if (!strncmp(line, cmd, strlen(cmd)))
 	{
-		data1 = &line[strlen(cmd)];
-		data2 = 0;
-		data1[0] = '\0';
-		data1++;
-		
-		data1 = strip_white_space(data1);
-		if (!*data1)
+		data = &line[strlen(cmd)];
+		data[0] = '\0';
+		data++;
+
+		data = strip_white_space(data);
+		if (!*data)
 		{
 			LOG_FATAL("ACL parse error on line %d", line_count);
 			return -1;
 		}
-		
-		info = hub_malloc_zero(sizeof(struct ip_ban_record));
-		
-		if (!info)
+
+		range = hub_malloc_zero(sizeof(struct ip_range));
+
+		if (!range)
 		{
 			LOG_ERROR("ACL parse error. Out of memory!");
 			return -1;
 		}
-		
-		/* Extract IP-range */
-		data2 = strrchr(data1, '-');
-		if (data2)
-		{
-			cidr_bits = -1;
-			data2[0] = 0;
-			data2++;
-			
-			if (check_ip_range(data1, data2, info) == -1)
-			{
-				hub_free(info);
-				return 0;
-			}
-			
-			add_ip_range(list, info);
 
-			return 1;
-		}
-		else
+		if (ip_convert_address_to_range(data, range))
 		{
-			/* Extract IP-bitmask */
-			data2 = strrchr(data1, '/');
-			if (data2)
-			{
-				data2[0] = 0;
-				data2++;
-				cidr_bits = uhub_atoi(data2);
-			}
-			else
-			{
-				cidr_bits = 128;
-			}
-			
-			if (check_ip_mask(data1, cidr_bits, info) == -1)
-			{
-				hub_free(info);
-				return 0;
-			}
-			
-			add_ip_range(list, info);
-			
+			add_ip_range(list, range);
 			return 1;
 		}
+		hub_free(range);
 	}
 	return 0;
 }
@@ -480,16 +399,16 @@ int acl_user_unban_cid(struct acl_handle* handle, const char* cid)
 int acl_is_ip_banned(struct acl_handle* handle, const char* ip_address)
 {
 	struct ip_addr_encap raw;
-	struct ip_ban_record* info = (struct ip_ban_record*) list_get_first(handle->networks);
+	struct ip_range* info = (struct ip_range*) list_get_first(handle->networks);
 	ip_convert_to_binary(ip_address, &raw);
 	
 	while (info)
 	{
-		if (acl_check_ip_range(&raw, info))
+		if (ip_in_range(&raw, info))
 		{
 			return 1;
 		}
-		info = (struct ip_ban_record*) list_get_next(handle->networks);
+		info = (struct ip_range*) list_get_next(handle->networks);
 	}
 	return 0;
 }
@@ -497,25 +416,20 @@ int acl_is_ip_banned(struct acl_handle* handle, const char* ip_address)
 int acl_is_ip_nat_override(struct acl_handle* handle, const char* ip_address)
 {
 	struct ip_addr_encap raw;
-	struct ip_ban_record* info = (struct ip_ban_record*) list_get_first(handle->nat_override);
+	struct ip_range* info = (struct ip_range*) list_get_first(handle->nat_override);
 	ip_convert_to_binary(ip_address, &raw);
 	
 	while (info)
 	{
-		if (acl_check_ip_range(&raw, info))
+		if (ip_in_range(&raw, info))
 		{
 			return 1;
 		}
-		info = (struct ip_ban_record*) list_get_next(handle->nat_override);
+		info = (struct ip_range*) list_get_next(handle->nat_override);
 	}
 	return 0;
 }
 
-
-int acl_check_ip_range(struct ip_addr_encap* addr, struct ip_ban_record* info)
-{
-	return (addr->af == info->lo.af && ip_compare(&info->lo, addr) <= 0 && ip_compare(addr, &info->hi) <= 0);
-}
 
 /*
  * This will generate the same challenge to the same user, always.

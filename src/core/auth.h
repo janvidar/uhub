@@ -45,12 +45,6 @@ struct hub_user_access_info
 	enum user_credentials status;
 };
 
-struct ip_ban_record
-{
-	struct ip_addr_encap lo;
-	struct ip_addr_encap hi;
-};
-
 struct acl_handle
 {
 	struct linked_list* users;          /* Known users. See enum user_status */
@@ -77,8 +71,6 @@ extern int acl_user_ban_nick(struct acl_handle* handle, const char* nick);
 extern int acl_user_ban_cid(struct acl_handle* handle, const char* cid);
 extern int acl_user_unban_nick(struct acl_handle* handle, const char* nick);
 extern int acl_user_unban_cid(struct acl_handle* handle, const char* cid);
-
-extern int acl_check_ip_range(struct ip_addr_encap* addr, struct ip_ban_record* info);
 
 extern const char* acl_password_generate_challenge(struct acl_handle* acl, struct hub_user* user);
 

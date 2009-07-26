@@ -9,8 +9,8 @@ static struct ip_addr_encap ip6_a;
 static struct ip_addr_encap ip6_b;
 static struct ip_addr_encap ip6_c;
 static struct ip_addr_encap mask;
-static struct ip_ban_record ban6;
-static struct ip_ban_record ban4;
+static struct ip_range ban6;
+static struct ip_range ban4;
 
 EXO_TEST(prepare_network, {
     return net_initialize() == 0;

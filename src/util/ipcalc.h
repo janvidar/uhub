@@ -33,26 +33,57 @@ struct ip_addr_encap {
 	} internal_ip_data;
 };
 
+struct ip_range
+{
+	struct ip_addr_encap lo;
+	struct ip_addr_encap hi;
+};
 
 extern int ip_convert_to_binary(const char* text_addr, struct ip_addr_encap* raw);
 
 extern const char* ip_convert_to_string(struct ip_addr_encap* raw);
 
+/**
+ * Convert a string on the form:
+ * ip-ip or ip/mask to an iprange.
+ *
+ * Note: both IPv4 and IPv6 addresses are valid, but if a range is given
+ * both addresses must be of the same address family.
+ *
+ * Valid examples of address
+ * IPv4:
+ * 192.168.2.1
+ * 192.168.0.0/16
+ * 192.168.0.0-192.168.255.255
+ *
+ * IPv6:
+ * 2001:4860:A005::68
+ * 2001:4860:A005::0/80
+ * 2001:4860:A005::0-2001:4860:A005:ffff:ffff:ffff:ffff:ffff
+ *
+ * @return 0 if invalid, 1 if OK
+ */
+extern int ip_convert_address_to_range(const char* address, struct ip_range* range);
 
-/*
+/**
+ * @return 1 if addr is inside range, 0 otherwise
+ */
+extern int ip_in_range(struct ip_addr_encap* addr, struct ip_range* range);
+
+/**
  * @return 1 if address is a valid IPv4 address in text notation
  *         0 if invalid
  */
 extern int ip_is_valid_ipv4(const char* address);
 
-/*
+/**
  * @return 1 if address is a valid IPv6 address in text notation
  *         0 if invalid
  */
 extern int ip_is_valid_ipv6(const char* address);
 
 
-/*
+/**
  * This function converts an IP address in text_address to a binary
  * struct sockaddr.
  * This will auto-detect if the IP-address is IPv6 (and that is supported),
@@ -65,7 +96,6 @@ extern int ip_is_valid_ipv6(const char* address);
  * @param port      Fill the struct sockaddr* with the given port, can safely be ignored.
  */
 extern int ip_convert_address(const char* text_address, int port, struct sockaddr* addr, socklen_t* addr_len);
-
 
 extern int ip_mask_create_left(int af, int bits, struct ip_addr_encap* result);
 extern int ip_mask_create_right(int af, int bits, struct ip_addr_encap* result);

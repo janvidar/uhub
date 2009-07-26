@@ -19,7 +19,6 @@
 
 #include "uhub.h"
 
-
 int ip_is_valid_ipv4(const char* address)
 {
 	int i = 0; /* address index */
@@ -413,13 +412,80 @@ int ip_compare(struct ip_addr_encap* a, struct ip_addr_encap* b)
 	return ret;
 }
 
+static int check_ip_mask(const char* text_addr, int bits, struct ip_range* range)
+{
+	if (ip_is_valid_ipv4(text_addr) || ip_is_valid_ipv6(text_addr))
+	{
+		struct ip_addr_encap addr;
+		struct ip_addr_encap mask1;
+		struct ip_addr_encap mask2;
+		int af = ip_convert_to_binary(text_addr, &addr);  /* 192.168.1.2 */
+		int maxbits = (af == AF_INET6 ? 128 : 32);
+		bits = MIN(MAX(bits, 0), maxbits);
+		ip_mask_create_left(af, bits, &mask1);            /* 255.255.255.0 */
+		ip_mask_create_right(af, maxbits - bits, &mask2); /* 0.0.0.255 */
+		ip_mask_apply_AND(&addr, &mask1, &range->lo);     /* 192.168.1.0 */
+		ip_mask_apply_OR(&range->lo, &mask2, &range->hi); /* 192.168.1.255 */
+		return 1;
+	}
+	return 0;
+}
 
+static int check_ip_range(const char* lo, const char* hi, struct ip_range* range)
+{
+	int ret1, ret2;
+	if ((ip_is_valid_ipv4(lo) && ip_is_valid_ipv4(hi)) || (ip_is_valid_ipv6(lo) && ip_is_valid_ipv6(hi)))
+	{
+		ret1 = ip_convert_to_binary(lo, &range->lo);
+		ret2 = ip_convert_to_binary(hi, &range->hi);
+		if (ret1 == -1 || ret2 == -1 || ret1 != ret2)
+		{
+			return 0;
+		}
+		return 1;
+	}
+	return 0;
+}
 
+int ip_convert_address_to_range(const char* address, struct ip_range* range)
+{
+	int ret = 0;
+	char* addr = 0;
 
+	if (!address || !range)
+		return 0;
 
+	const char* split = strrchr(address, '/');
+	if (split)
+	{
+		int mask = uhub_atoi(split+1);
+		if (mask == 0 && split[1] != '0') return 0;
+		addr = hub_strndup(address, split - address);
+		ret = check_ip_mask(addr, mask, range);
+		hub_free(addr);
+		return ret;
+	}
 
+	split = strrchr(address, '-');
+	if (split)
+	{
+		addr = hub_strndup(address, split - address);
+		ret = check_ip_range(addr, split+1, range);
+		hub_free(addr);
+		return ret;
+	}
 
+	if (ip_is_valid_ipv4(address) || ip_is_valid_ipv6(address))
+	{
+		if (ip_convert_to_binary(address, &range->lo) == -1)
+			return 0;
+		memcpy(&range->hi, &range->lo, sizeof(struct ip_addr_encap));
+		return 1;
+	}
+	return 0;
+}
 
-
-
-
+int ip_in_range(struct ip_addr_encap* addr, struct ip_range* range)
+{
+	return (addr->af == range->lo.af && ip_compare(&range->lo, addr) <= 0 && ip_compare(addr, &range->hi) <= 0);
+}
