@@ -594,6 +594,28 @@ EXO_TEST(ip6_bitwise_OR_3, {
 	return !strcmp(ip_convert_to_string(&ip6_c), "7777:cccc:3333:1111:ffff:ffff:ffff:1c1c");
 });
 
+EXO_TEST(ip_range_1, {
+	struct ip_range range; memset(&range, 0, sizeof(range));
+	return ip_convert_address_to_range("192.168.0.1", &range) && memcmp(&range.lo, &range.hi, sizeof(struct ip_addr_encap)) == 0;
+});
+
+EXO_TEST(ip_range_2, {
+	struct ip_range range; memset(&range, 0, sizeof(range));
+	return ip_convert_address_to_range("192.168.0.0-192.168.255.255", &range) && range.lo.af == range.hi.af && memcmp(&range.lo, &range.hi, sizeof(struct ip_addr_encap)) != 0;
+});
+
+EXO_TEST(ip_range_3, {
+	struct ip_range range; memset(&range, 0, sizeof(range));
+	return ip_convert_address_to_range("192.168.0.0/24", &range) && range.lo.af == range.hi.af && memcmp(&range.lo, &range.hi, sizeof(struct ip_addr_encap)) != 0;
+});
+
+EXO_TEST(ip_range_4, {
+	struct ip_range range1; memset(&range1, 0, sizeof(range1));
+	struct ip_range range2; memset(&range2, 0, sizeof(range2));
+	return ip_convert_address_to_range("192.168.0.0/24", &range1) && ip_convert_address_to_range("192.168.0.0-192.168.255.255", &range2) && memcmp(&range1, &range2, sizeof(struct ip_range)) == 0;
+});
+
+
 EXO_TEST(shutdown_network, {
     return net_destroy() == 0;
 });
