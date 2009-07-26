@@ -125,7 +125,8 @@ int uman_shutdown(struct hub_info* hub)
 		return -1;
 
 #ifdef USERMANAGER_TIMER
-	event_del(&hub->ev_timer);
+	if (evtimer_pending(&hub->ev_timer, 0)
+		event_del(&hub->ev_timer);
 #endif
 
 	if (hub->users->list)
