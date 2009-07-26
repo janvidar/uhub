@@ -114,6 +114,7 @@ void on_logout_user(struct hub_info* hub, struct hub_user* user)
 	}
 	
 	log_user_logout(user, reason);
+	hub_logout_log(hub, user);
 	user->quit_reason = 0;
 }
 

@@ -200,7 +200,6 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 		hub_chat_history_add(hub, u, cmd);
 		ret = route_message(hub, u, cmd);
 	}
-
 	hub_free(message);
 	return ret;
 }
@@ -209,9 +208,7 @@ void hub_chat_history_add(struct hub_info* hub, struct hub_user* user, struct ad
 {
 	char* message = adc_msg_get_argument(cmd, 0);
 	char* log = hub_malloc(strlen(message) + strlen(user->id.nick) + 14);
-	time_t now = time(NULL);
-	struct tm* t  = localtime(&now);
-	sprintf(log, "[%02d:%02d] <%s> %s\n", t->tm_hour, t->tm_min, user->id.nick, message);
+	sprintf(log, "%s <%s> %s\n", get_timestamp(time(NULL)), user->id.nick, message);
 	list_append(hub->chat_history, log);
 	while (list_size(hub->chat_history) > (size_t) hub->config->max_chat_history)
 	{
@@ -550,8 +547,11 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	}
 
 	hub->chat_history = (struct linked_list*) list_create();
+	hub->logout_info  = (struct linked_list*) list_create();
 	if (!hub->chat_history)
 	{
+		list_destroy(hub->chat_history);
+		list_destroy(hub->logout_info);
 		hub_free(hub->recvbuf);
 		hub_free(hub->sendbuf);
 		uman_shutdown(hub);
@@ -581,6 +581,8 @@ void hub_shutdown_service(struct hub_info* hub)
 	hub_free(hub->recvbuf);
 	hub_chat_history_clear(hub);
 	list_destroy(hub->chat_history);
+	list_clear(hub->logout_info, &hub_free);
+	list_destroy(hub->logout_info);
 	hub_free(hub);
 	hub = 0;
 	g_hub = 0;
@@ -986,6 +988,25 @@ void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason
 	{
 		user->quit_reason = quit_unknown;
 		hub_schedule_destroy_user(hub, user);
+	}
+}
+
+void hub_logout_log(struct hub_info* hub, struct hub_user* user)
+{
+	struct hub_logout_info* loginfo = hub_malloc_zero(sizeof(struct hub_logout_info));
+	if (!loginfo) return;
+	loginfo->time = time(NULL);
+	strcpy(loginfo->cid, user->id.cid);
+	strcpy(loginfo->nick, user->id.nick);
+	memcpy(&loginfo->addr, &user->net.ipaddr, sizeof(struct ip_addr_encap));
+	loginfo->reason = user->quit_reason;
+
+	list_append(hub->logout_info, loginfo);
+	while (list_size(hub->logout_info) > (size_t) hub->config->max_logout_log)
+	{
+		struct hub_logout_info* entry = list_get_first(hub->logout_info);
+		list_remove(hub->logout_info, entry);
+		hub_free(entry);
 	}
 }
 

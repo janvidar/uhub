@@ -40,6 +40,7 @@ struct hub_config
 	int low_bandwidth_mode;      /**<<< "If this is enabled, the hub will strip off elements from each user's info message to reduce bandwidth usage" */
 
 	int max_chat_history;        /**<<< "Number of chat messages kept in history (default: 20)" */
+	int max_logout_log;          /**<<< "Number of log entries for people leaving the hub. (default: 100) */
 
 	/* Limits enforced on users */
 	int limit_max_hubs_user;     /**<<< "Max concurrent hubs as a user. (0=off, default: 10)" */

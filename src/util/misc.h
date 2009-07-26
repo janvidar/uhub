@@ -22,6 +22,8 @@
 
 typedef int (*file_line_handler_t)(char* line, int line_number, void* data);
 
+extern const char* get_timestamp(time_t time);
+
 extern int is_num(char c);
 extern int is_space(char c);
 extern int is_white_space(char c);

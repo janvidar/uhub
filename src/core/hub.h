@@ -79,6 +79,15 @@ struct hub_stats
 	size_t net_rx_total;
 };
 
+struct hub_logout_info
+{
+	time_t time;
+	char cid[MAX_CID_LEN+1];
+	char nick[MAX_NICK_LEN+1];
+	struct ip_addr_encap addr;
+	int reason;
+};
+
 struct hub_info
 {
 	int fd_tcp;
@@ -100,6 +109,7 @@ struct hub_info
 	char* sendbuf; /* Global send buffer */
 
 	struct linked_list* chat_history;    /* Chat history */
+	struct linked_list* logout_info;     /* Log of people logging out. */
 
 #ifdef SSL_SUPPORT
 	SSL_METHOD* ssl_method;
@@ -343,6 +353,10 @@ extern void hub_schedule_destroy_user(struct hub_info* hub, struct hub_user* use
  */
 extern void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason);
 
+/**
+ * Log a user logging out.
+ */
+extern void hub_logout_log(struct hub_info* hub, struct hub_user* user);
 
 #endif /* HAVE_UHUB_HUB_H */
 
