@@ -116,6 +116,7 @@
 #define DEF_FILE_ACL                        ""
 #define DEF_FILE_MOTD                       ""
 #define DEF_MAX_USERS                       500
+#define DEF_MAX_CHAT_HISTORY                20
 #define DEF_MAX_RECV_BUFFER                 4096
 #define DEF_MAX_SEND_BUFFER                 131072
 #define DEF_MAX_SEND_BUFFER_SOFT            98304
@@ -175,6 +176,7 @@ void config_defaults(struct hub_config* config)
 	DEFAULT_STRING (file_motd,             DEF_FILE_MOTD);
 	DEFAULT_INTEGER(server_port,           DEF_SERVER_PORT);
 	DEFAULT_INTEGER(max_users,             DEF_MAX_USERS);
+	DEFAULT_INTEGER(max_chat_history,      DEF_MAX_CHAT_HISTORY);
 	DEFAULT_INTEGER(max_recv_buffer,       DEF_MAX_RECV_BUFFER);
 	DEFAULT_INTEGER(max_send_buffer,       DEF_MAX_SEND_BUFFER);
 	DEFAULT_INTEGER(max_send_buffer_soft,  DEF_MAX_SEND_BUFFER_SOFT);
@@ -245,6 +247,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 	GET_STR (hub_description);
 	GET_BOOL(hub_enabled);
 	GET_INT (max_users);
+	GET_INT (max_chat_history);
 	GET_INT (max_recv_buffer);
 	GET_INT (max_send_buffer);
 	GET_INT (max_send_buffer_soft);
@@ -391,6 +394,7 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 	DUMP_STR (hub_description, DEF_HUB_DESCRIPTION);
 	DUMP_BOOL(hub_enabled, DEF_HUB_ENABLED);
 	DUMP_INT (max_users, DEF_MAX_USERS);
+	DUMP_INT (max_chat_history, DEF_MAX_CHAT_HISTORY);
 	DUMP_INT (max_recv_buffer, DEF_MAX_RECV_BUFFER);
 	DUMP_INT (max_send_buffer, DEF_MAX_SEND_BUFFER);
 	DUMP_INT (max_send_buffer_soft, DEF_MAX_SEND_BUFFER_SOFT);

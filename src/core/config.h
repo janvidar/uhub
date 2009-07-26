@@ -38,7 +38,9 @@ struct hub_config
 	int max_send_buffer;         /**<<< "Max send buffer before disconnect, per user (default: 128K)" */
 	int max_send_buffer_soft;    /**<<< "Max send buffer before message drops, per user (default: 96K)" */
 	int low_bandwidth_mode;      /**<<< "If this is enabled, the hub will strip off elements from each user's info message to reduce bandwidth usage" */
-	
+
+	int max_chat_history;        /**<<< "Number of chat messages kept in history (default: 20)" */
+
 	/* Limits enforced on users */
 	int limit_max_hubs_user;     /**<<< "Max concurrent hubs as a user. (0=off, default: 10)" */
 	int limit_max_hubs_reg;      /**<<< "Max concurrent hubs as registered user. (0=off, default: 10)" */
@@ -51,7 +53,7 @@ struct hub_config
 	int limit_max_share;         /**<<< "Limit maximum share size in megabytes (MiB) (0=off, default: 0)" */
 	int limit_min_slots;         /**<<< "Limit minimum number of slots open per user (0=off, default: 0)" */
 	int limit_max_slots;         /**<<< "Limit maximum number of slots open per user (0=off, default: 0)" */
-	
+
 	/* Messages that can be sent to a user */
 	char* msg_hub_full;                   /**<<< "hub is full" */
 	char* msg_hub_disabled;               /**<<< "hub is disabled" */

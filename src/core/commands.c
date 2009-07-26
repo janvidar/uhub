@@ -360,6 +360,47 @@ static int command_broadcast(struct hub_info* hub, struct hub_user* user, struct
 	return 0;
 }
 
+static int command_history(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
+{
+	char* buffer;
+	struct linked_list* messages = hub->chat_history;
+	char* message = 0;
+	int ret = (int) list_size(messages);
+	size_t bufsize;
+
+	if (!ret)
+	{
+		return command_status(hub, user, cmd, "No messages.");
+	}
+
+	char tmp[128];
+	snprintf(tmp, 128, "Found %d message%s:", (int) ret, ((ret != 1) ? "s" : ""));
+	bufsize = strlen(tmp);
+	message = (char*) list_get_first(messages);
+	while (message)
+	{
+		bufsize += strlen(message);
+		message = (char*) list_get_next(messages);
+	}
+
+	buffer = hub_malloc(bufsize+4);
+	buffer[0] = 0;
+	strcat(buffer, tmp);
+	strcat(buffer, "\n");
+
+	message = (char*) list_get_first(messages);
+	while (message)
+	{
+		strcat(buffer, message);
+		message = (char*) list_get_next(messages);
+	}
+	strcat(buffer, "\n");
+
+	ret = command_status(hub, user, cmd, buffer);
+	hub_free(buffer);
+	return ret;
+}
+
 #ifdef CRASH_DEBUG
 static int command_crash(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
 {
@@ -417,6 +458,7 @@ static struct commands_handler command_handlers[] = {
 	{ "help",       4, 0,   cred_guest,     command_help,     "Show this help message."      },
 	{ "stats",      5, 0,   cred_super,     command_stats,    "Show hub statistics."         },
 	{ "version",    7, 0,   cred_guest,     command_version,  "Show hub version info."       },
+	{ "history",    7, 0,   cred_guest,     command_history,  "Show hub version info."       },
 	{ "uptime",     6, 0,   cred_guest,     command_uptime,   "Display hub uptime info."     },
 	{ "kick",       4, "n", cred_operator,  command_kick,     "Kick a user"                  },
 	{ "ban",        3, "n", cred_operator,  command_ban,      "Ban a user"                   },

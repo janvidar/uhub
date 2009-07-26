@@ -19,17 +19,4 @@
 
 #include "uhub.h"
 
-#define CHAT_MSG_HANDLED  1
-#define CHAT_MSG_IGNORED  0
-#define CHAT_MSG_INVALID -1
-
-typedef int (*plugin_event_chat_message)(struct hub_info*, struct hub_user*, struct adc_message*);
-
-struct command_info
-{
-	const char* prefix;
-	enum user_credentials cred;
-	plugin_event_chat_message function;
-};
-
-int command_dipatcher(struct hub_info* hub, struct hub_user* user, const char* message);
+extern int command_dipatcher(struct hub_info* hub, struct hub_user* user, const char* message);

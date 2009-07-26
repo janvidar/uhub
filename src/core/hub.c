@@ -197,11 +197,34 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 	if (relay && user_is_logged_in(u))
 	{
 		/* adc_msg_remove_named_argument(cmd, "PM"); */
+		hub_chat_history_add(hub, u, cmd);
 		ret = route_message(hub, u, cmd);
 	}
-	
-	free(message);
+
+	hub_free(message);
 	return ret;
+}
+
+void hub_chat_history_add(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
+{
+	char* message = adc_msg_get_argument(cmd, 0);
+	char* log = hub_malloc(strlen(message) + strlen(user->id.nick) + 14);
+	time_t now = time(NULL);
+	struct tm* t  = localtime(&now);
+	sprintf(log, "[%02d:%02d] <%s> %s\n", t->tm_hour, t->tm_min, user->id.nick, message);
+	list_append(hub->chat_history, log);
+	while (list_size(hub->chat_history) > (size_t) hub->config->max_chat_history)
+	{
+		char* msg = list_get_first(hub->chat_history);
+		list_remove(hub->chat_history, msg);
+		hub_free(msg);
+	}
+	hub_free(message);
+}
+
+void hub_chat_history_clear(struct hub_info* hub)
+{
+	list_clear(hub->chat_history, &hub_free);
 }
 
 void hub_send_support(struct hub_info* hub, struct hub_user* u)
@@ -526,6 +549,17 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		return 0;
 	}
 
+	hub->chat_history = (struct linked_list*) list_create();
+	if (!hub->chat_history)
+	{
+		hub_free(hub->recvbuf);
+		hub_free(hub->sendbuf);
+		uman_shutdown(hub);
+		hub_free(hub);
+		net_close(server_tcp);
+		return 0;
+	}
+
 	hub->status = hub_status_running;
 
 	g_hub = hub;
@@ -545,6 +579,8 @@ void hub_shutdown_service(struct hub_info* hub)
 	event_base_free(hub->evbase);
 	hub_free(hub->sendbuf);
 	hub_free(hub->recvbuf);
+	hub_chat_history_clear(hub);
+	list_destroy(hub->chat_history);
 	hub_free(hub);
 	hub = 0;
 	g_hub = 0;
