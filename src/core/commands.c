@@ -341,7 +341,7 @@ static int command_whoip(struct hub_info* hub, struct hub_user* user, struct hub
 	while (u)
 	{
 		strcat(buffer, u->id.nick);
-		strcat(buffer, "(");
+		strcat(buffer, " (");
 		strcat(buffer, ip_convert_to_string(&u->net.ipaddr));
 		strcat(buffer, ")\n");
 		u = (struct hub_user*) list_get_next(users);
