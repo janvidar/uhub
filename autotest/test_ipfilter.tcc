@@ -405,74 +405,74 @@ EXO_TEST(check_ban_setup_1, {
 
 EXO_TEST(check_ban_ipv4_1, {
 	struct ip_addr_encap addr; ip_convert_to_binary("192.168.0.0", &addr);
-	return acl_check_ip_range(&addr, &ban4);
+	return ip_in_range(&addr, &ban4);
 });
 
 EXO_TEST(check_ban_ipv4_2, {
 	struct ip_addr_encap addr; ip_convert_to_binary("192.168.0.1", &addr);
-	return acl_check_ip_range(&addr, &ban4);
+	return ip_in_range(&addr, &ban4);
 });
 
 EXO_TEST(check_ban_ipv4_3, {
 	struct ip_addr_encap addr; ip_convert_to_binary("192.168.0.255", &addr);
-	return acl_check_ip_range(&addr, &ban4);
+	return ip_in_range(&addr, &ban4);
 });
 
 EXO_TEST(check_ban_ipv4_4, {
 	struct ip_addr_encap addr; ip_convert_to_binary("192.168.1.0", &addr);
-	return !acl_check_ip_range(&addr, &ban4);
+	return !ip_in_range(&addr, &ban4);
 });
 
 EXO_TEST(check_ban_ipv4_5, {
 	struct ip_addr_encap addr; ip_convert_to_binary("192.167.255.255", &addr);
-	return !acl_check_ip_range(&addr, &ban4);
+	return !ip_in_range(&addr, &ban4);
 });
 
 EXO_TEST(check_ban_ipv6_1, {
 	if (!ipv6) return 1;
 	struct ip_addr_encap addr; ip_convert_to_binary("2001::201:2ff:fefa:0", &addr);
-	return acl_check_ip_range(&addr, &ban6);
+	return ip_in_range(&addr, &ban6);
 });
 
 EXO_TEST(check_ban_ipv6_2, {
 	if (!ipv6) return 1;
 	struct ip_addr_encap addr; ip_convert_to_binary("2001::201:2ff:fefa:1", &addr);
-	return acl_check_ip_range(&addr, &ban6);
+	return ip_in_range(&addr, &ban6);
 });
 
 EXO_TEST(check_ban_ipv6_3, {
 	if (!ipv6) return 1;
 	struct ip_addr_encap addr; ip_convert_to_binary("2001::201:2ff:fefa:fffe", &addr);
-	return acl_check_ip_range(&addr, &ban6);
+	return ip_in_range(&addr, &ban6);
 });
 
 EXO_TEST(check_ban_ipv6_4, {
 	if (!ipv6) return 1;
 	struct ip_addr_encap addr; ip_convert_to_binary("2001::201:2ff:fefa:ffff", &addr);
-	return acl_check_ip_range(&addr, &ban6);
+	return ip_in_range(&addr, &ban6);
 });
 
 EXO_TEST(check_ban_ipv6_5, {
 	if (!ipv6) return 1;
 	struct ip_addr_encap addr; ip_convert_to_binary("2001::201:2ff:fefb:0", &addr);
-	return !acl_check_ip_range(&addr, &ban6);
+	return !ip_in_range(&addr, &ban6);
 });
 
 EXO_TEST(check_ban_ipv6_6, {
 	if (!ipv6) return 1;
 	struct ip_addr_encap addr; ip_convert_to_binary("2001::201:2ff:fef9:ffff", &addr);
-	return !acl_check_ip_range(&addr, &ban6);
+	return !ip_in_range(&addr, &ban6);
 });
 
 EXO_TEST(check_ban_afmix_1, {
 	if (!ipv6) return 1;
 	struct ip_addr_encap addr; ip_convert_to_binary("2001::201:2ff:fef9:ffff", &addr);
-	return !acl_check_ip_range(&addr, &ban4);
+	return !ip_in_range(&addr, &ban4);
 });
 
 EXO_TEST(check_ban_afmix_2, {
 	struct ip_addr_encap addr; ip_convert_to_binary("10.20.30.40", &addr);
-	return !acl_check_ip_range(&addr, &ban6);
+	return !ip_in_range(&addr, &ban6);
 });
 
 EXO_TEST(ip4_bitwise_AND_1, {
