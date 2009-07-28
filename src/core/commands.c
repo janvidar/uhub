@@ -436,7 +436,7 @@ static int command_log(struct hub_info* hub, struct hub_user* user, struct hub_c
 	{
 		sprintf(tmp, "Logged entries: %d", (int) list_size(messages));
 	}
-	send_message(hub, user, tmp);
+	command_status(hub, user, cmd, tmp);
 
 	log = (struct hub_logout_info*) list_get_first(messages);
 	while (log)
@@ -468,7 +468,7 @@ static int command_log(struct hub_info* hub, struct hub_user* user, struct hub_c
 	if (search_len)
 	{
 		sprintf(tmp, "%d entries shown.", (int) search_hits);
-		send_message(hub, user, tmp);
+		command_status(hub, user, cmd, tmp);
 	}
 
 	return 0;
