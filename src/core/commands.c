@@ -410,39 +410,68 @@ static int command_history(struct hub_info* hub, struct hub_user* user, struct h
 
 static int command_log(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
 {
-	char* buffer;
 	struct linked_list* messages = hub->logout_info;
 	struct hub_logout_info* log;
-	int ret = 0;
 	char tmp[1024];
+	char* search = 0;
+	size_t search_len = 0;
+	size_t search_hits = 0;
 
 	if (!list_size(messages))
 	{
 		return command_status(hub, user, cmd, "No entries logged.");
 	}
 
-	buffer = hub_malloc(32 + (list_size(messages) * (sizeof(struct hub_logout_info) + 25)));
-	if (!buffer)
+	search = list_get_first(cmd->args);
+	if (search)
 	{
-		return command_status(hub, user, cmd, "Not enough memory.");
+		search_len = strlen(search);
 	}
 
-	buffer[0] = 0;
-	strcat(buffer, "Log entries");
-	strcat(buffer, "\n");
+	if (search_len)
+	{
+		sprintf(tmp, "Logged entries: %d, searching for \"%s\"", (int) list_size(messages), search);
+	}
+	else
+	{
+		sprintf(tmp, "Logged entries: %d", (int) list_size(messages));
+	}
+	send_message(hub, user, tmp);
 
 	log = (struct hub_logout_info*) list_get_first(messages);
 	while (log)
 	{
-		sprintf(tmp, "%s %s, %s (%s)\n", get_timestamp(log->time), log->cid, log->nick, ip_convert_to_string(&log->addr));
-		strcat(buffer, tmp);
+		const char* address = ip_convert_to_string(&log->addr);
+		int show = 0;
+
+		if (search_len)
+		{
+			if (memmem(log->cid, MAX_CID_LEN, search, search_len) || memmem(log->nick, MAX_NICK_LEN, search, search_len) || memmem(address, strlen(address), search, search_len))
+			{
+				search_hits++;
+				show = 1;
+			}
+		}
+		else
+		{
+			show = 1;
+		}
+
+		if (show)
+		{
+			sprintf(tmp, "* %s %s, %s (%s)", get_timestamp(log->time), log->cid, log->nick, ip_convert_to_string(&log->addr));
+			send_message(hub, user, tmp);
+		}
 		log = (struct hub_logout_info*) list_get_next(messages);
 	}
-	strcat(buffer, "\n");
 
-	ret = command_status(hub, user, cmd, buffer);
-	hub_free(buffer);
-	return ret;
+	if (search_len)
+	{
+		sprintf(tmp, "%d entries shown.", (int) search_hits);
+		send_message(hub, user, tmp);
+	}
+
+	return 0;
 }
 
 #ifdef CRASH_DEBUG
