@@ -46,14 +46,11 @@ struct hub_user* user_create(struct hub_info* hub, int sd)
 	if (user == NULL)
 		return NULL; /* OOM */
 
-	user->net.sd = sd;
 	user->net.tm_connected = time(NULL);
 	user->net.send_queue = hub_sendq_create();
 	user->net.recv_queue = hub_recvq_create();
 
-	event_set(&user->net.event, sd, EV_READ | EV_PERSIST, net_event, user);
-	event_base_set(hub->evbase, &user->net.event);
-	event_add(&user->net.event, 0);
+	net_con_initialize(&user->net.connection, sd, user, EV_READ);
 
 	evtimer_set(&user->net.timeout, net_event, user);
 	event_base_set(hub->evbase, &user->net.timeout);
@@ -69,13 +66,12 @@ void user_destroy(struct hub_user* user)
 {
 	LOG_TRACE("user_destroy(), user=%p", user);
 
-	event_del(&user->net.event);
+	net_con_close(&user->net.connection);
 	evtimer_del(&user->net.timeout);
 	
 	hub_recvq_destroy(user->net.recv_queue);
 	hub_sendq_destroy(user->net.send_queue);
-	net_close(user->net.sd);
-	
+
 	adc_msg_free(user->info);
 	user_clear_feature_cast_support(user);
 	hub_free(user);
@@ -325,11 +321,7 @@ void user_net_io_want_write(struct hub_user* user)
 #ifdef DEBUG_SENDQ
 	LOG_TRACE("user_net_io_want_write: %s (pending: %d)", user_log_str(user), event_pending(&user->net.event, EV_READ | EV_WRITE, 0));
 #endif
-	if (event_pending(&user->net.event, EV_READ | EV_WRITE, 0) == (EV_READ | EV_WRITE))
-		return;
-	event_del(&user->net.event);
-	event_set(&user->net.event,  user->net.sd, EV_READ | EV_WRITE | EV_PERSIST, net_event, user);
-	event_add(&user->net.event, 0);
+	net_con_update(&user->net.connection, EV_READ | EV_WRITE);
 }
 
 void user_net_io_want_read(struct hub_user* user)
@@ -337,11 +329,7 @@ void user_net_io_want_read(struct hub_user* user)
 #ifdef DEBUG_SENDQ
 	LOG_TRACE("user_net_io_want_read: %s (pending: %d)", user_log_str(user), event_pending(&user->net.event, EV_READ | EV_WRITE, 0));
 #endif
-	if (event_pending(&user->net.event, EV_READ | EV_WRITE, 0) == EV_READ)
-		return;
-	event_del(&user->net.event);
-	event_set(&user->net.event,  user->net.sd, EV_READ | EV_PERSIST, net_event, user);
-	event_add(&user->net.event, 0);
+	net_con_update(&user->net.connection, EV_READ);
 }
 
 void user_reset_last_write(struct hub_user* user)

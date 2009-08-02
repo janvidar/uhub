@@ -95,20 +95,14 @@ struct hub_user_limits
 
 struct hub_user_net_io
 {
-	int                  sd;                      /** socket descriptor */
-	struct event         event;                   /** libevent struct for read/write events */
+	struct net_connection connection;             /** Connection data */
 	struct event         timeout;                 /** timeout handling */
 	struct hub_recvq*    recv_queue;
 	struct hub_sendq*    send_queue;
 	time_t               tm_connected;            /** time when user connected */
 	time_t               tm_last_read;            /** time the user last received something from the hub */
 	time_t               tm_last_write;           /** time the user last sent something to the hub */
-
 	struct ip_addr_encap ipaddr;                  /** IP address of connected user */
-
-#ifdef SSL_SUPPORT
-	SSL*                 ssl;                     /** SSL handle */
-#endif /*  SSL_SUPPORT */
 };
 
 struct hub_user

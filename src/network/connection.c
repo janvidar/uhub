@@ -46,6 +46,7 @@ void net_con_close(struct net_connection* con)
 	if (!event_pending(&con->event, EV_READ | EV_WRITE, 0))
 		return;
 	event_del(&con->event);
+	net_close(con->sd);
+	con->sd = -1;
 }
-
 

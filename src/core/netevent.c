@@ -26,7 +26,7 @@ extern struct hub_info* g_hub;
 #ifdef DEBUG_SENDQ
 void debug_sendq_send(struct hub_user* user, int sent, int total)
 {
-	LOG_DUMP("SEND: sd=%d, %d/%d bytes\n", user->net.sd, sent, total);
+	LOG_DUMP("SEND: sd=%d, %d/%d bytes\n", user->net.connection.sd, sent, total);
 	if (sent == -1)
 	{
 		int err = net_error();
@@ -55,7 +55,7 @@ void debug_sendq_recv(struct hub_user* user, int received, int max, const char* 
 int net_user_send(void* ptr, const void* buf, size_t len)
 {
 	struct hub_user* user = (struct hub_user*) ptr;
-	int ret = net_send(user->net.sd, buf, len, UHUB_SEND_SIGNAL);
+	int ret = net_send(user->net.connection.sd, buf, len, UHUB_SEND_SIGNAL);
 #ifdef DEBUG_SENDQ
 	debug_sendq_send(user, ret, len);
 #endif
@@ -103,7 +103,7 @@ int net_user_send_ssl(void* ptr, const void* buf, size_t len)
 int net_user_recv(void* ptr, void* buf, size_t len)
 {
 	struct hub_user* user = (struct hub_user*) ptr;
-	int ret = net_recv(user->net.sd, buf, len, 0);
+	int ret = net_recv(user->net.connection.sd, buf, len, 0);
 	if (ret > 0)
 	{
 		user_reset_last_read(user);
@@ -274,7 +274,7 @@ void net_event(int fd, short ev, void *arg)
 
 static void prepare_user_net(struct hub_info* hub, struct hub_user* user)
 {
-		int fd = user->net.sd;
+		int fd = user->net.connection.sd;
 
 #ifdef SET_SENDBUG
 		size_t sendbuf = 0;
