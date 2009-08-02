@@ -150,6 +150,7 @@ libuhub_SOURCES := \
 		src/adc/message.c \
 		src/util/misc.c \
 		src/core/netevent.c \
+		src/network/connection.c \
 		src/network/network.c \
 		src/util/rbtree.c \
 		src/core/route.c \
@@ -181,6 +182,7 @@ uhub_HEADERS := \
 		src/adc/message.h \
 		src/util/misc.h \
 		src/core/netevent.h \
+		src/network/connection.h \
 		src/network/network.h \
 		src/util/rbtree.h \
 		src/core/route.h \

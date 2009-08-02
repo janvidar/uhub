@@ -167,6 +167,7 @@ extern "C" {
 #include "adc/sid.h"
 #include "adc/message.h"
 #include "network/network.h"
+#include "network/connection.h"
 
 #include "core/auth.h"
 #include "core/config.h"
