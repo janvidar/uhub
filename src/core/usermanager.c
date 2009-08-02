@@ -97,7 +97,7 @@ int uman_init(struct hub_info* hub)
 		return -1;
 
 	users->list = list_create();
-	users->sids = sid_pool_create(MAX(1024, (hub->config->max_users + 24)));
+	users->sids = sid_pool_create(net_get_max_sockets());
 	
 	if (!users->list)
 	{
