@@ -83,8 +83,10 @@
 #ifndef WIN32
 #include <grp.h>
 #include <pwd.h>
+#include <sys/resource.h>
 #define HAVE_STRNDUP
 #define HAVE_MEMMEM
+#define HAVE_GETRLIMIT
 #endif
 
 #ifdef SSL_SUPPORT

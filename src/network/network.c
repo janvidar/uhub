@@ -61,6 +61,21 @@ int net_initialize()
 	return -1;
 }
 
+size_t net_get_max_sockets()
+{
+#ifdef HAVE_GETRLIMIT
+	struct rlimit limits;
+	if (getrlimit(RLIMIT_NOFILE, &limits) == 0)
+	{
+		return limits.rlim_max;
+	}
+	LOG_ERROR("getrlimit() failed");
+#else
+	LOG_ERROR("System does not have getrlimit(): constrained to 1024 sockets");
+#endif /* HAVE_GETRLIMIT */
+	return 1024;
+}
+
 
 int net_destroy()
 {

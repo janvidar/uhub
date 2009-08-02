@@ -88,6 +88,11 @@ extern const char* net_error_string(int code);
 extern int net_socket_create(int af, int type, int protocol);
 
 /**
+ * Returns the maximum number of file/socket descriptors.
+ */
+extern size_t net_get_max_sockets();
+
+/**
  * A wrapper for the close() function call.
  */
 extern int net_close(int fd);
