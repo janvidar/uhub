@@ -59,3 +59,72 @@ sid_t string_to_sid(const char* sid)
 	return nsid;
 }
 
+/*
+ * Session IDs are heavily reused, since they are a fairly scarce
+ * resource. Only one (2^10)-1 exist, since it is a four byte base32-encoded
+ * value and 'AAAA' (0) is reserved for the hub.
+ *
+ * Initialize with sid_initialize(), which sets min and max to one, and count to 0.
+ *
+ * When allocating a session ID:
+ * - If 'count' is less than the pool size (max-min), then allocate within the pool
+ * - Increase the pool size (see below)
+ * - If unable to do that, hub is really full - don't let anyone in!
+ *
+ * When freeing a session ID:
+ * - If the session ID being freed is 'max', then decrease the pool size by one.
+ *
+ */
+
+struct sid_pool
+{
+	sid_t min;
+	sid_t max;
+	sid_t count;
+	struct hub_user** map;
+};
+
+
+struct sid_pool* sid_pool_create(sid_t max)
+{
+	struct sid_pool* pool = hub_malloc(sizeof(struct sid_pool));
+	pool->min = 1;
+	pool->max = max + 1;
+	pool->count = 0;
+	pool->map = hub_malloc_zero(sizeof(struct hub_user*) * pool->max);
+	pool->map[0] = (struct hub_user*) pool; /* hack to reserve the first sid. */
+
+	LOG_DUMP("SID_POOL:  max=%d", (int) pool->max);
+	return pool;
+}
+
+void sid_pool_destroy(struct sid_pool* pool)
+{
+	LOG_DUMP("SID_POOL:  destroying, current allocs=%d", (int) pool->count);
+	hub_free(pool->map);
+	hub_free(pool);
+}
+
+sid_t sid_alloc(struct sid_pool* pool, struct hub_user* user)
+{
+	sid_t n = (++pool->count);
+	for (; (pool->map[n % pool->max]); n++) ;
+
+	LOG_DUMP("SID_ALLOC: %d, user=%p", (int) n, user);
+	pool->map[n] = user;
+	return n;
+}
+
+void sid_free(struct sid_pool* pool, sid_t sid)
+{
+	LOG_DUMP("SID_FREE:  %d", (int) sid);
+	pool->map[sid] = 0;
+	pool->count--;
+}
+
+struct hub_user* sid_lookup(struct sid_pool* pool, sid_t sid)
+{
+	if (!sid || (sid > pool->max))
+		return 0;
+	return pool->map[sid];
+}

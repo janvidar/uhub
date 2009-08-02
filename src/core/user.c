@@ -57,7 +57,6 @@ struct hub_user* user_create(struct hub_info* hub, int sd)
 
 	evtimer_set(&user->net.timeout, net_event, user);
 	event_base_set(hub->evbase, &user->net.timeout);
-	
 
 	user_set_timeout(user, TIMEOUT_CONNECTED);
 
@@ -213,12 +212,6 @@ void user_support_remove(struct hub_user* user, int fourcc)
 {
 	int feature_mask = convert_support_fourcc(fourcc);
 	user->flags &= ~feature_mask;
-}
-
-void user_disconnect(struct hub_user* user, int reason)
-{
-
-
 }
 
 int user_have_feature_cast_support(struct hub_user* user, char feature[4])

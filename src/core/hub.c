@@ -238,12 +238,13 @@ void hub_send_support(struct hub_info* hub, struct hub_user* u)
 
 void hub_send_sid(struct hub_info* hub, struct hub_user* u)
 {
+	sid_t sid;
 	struct adc_message* command;
 	if (user_is_connecting(u))
 	{
 		command = adc_msg_construct(ADC_CMD_ISID, 10);
-		u->id.sid = uman_get_free_sid(hub);
-		adc_msg_add_argument(command, (const char*) sid_to_string(u->id.sid));
+		sid = uman_get_free_sid(hub, u);
+		adc_msg_add_argument(command, (const char*) sid_to_string(sid));
 		route_to_user(hub, u, command);
 		adc_msg_free(command);
 	}
@@ -958,6 +959,11 @@ void hub_schedule_destroy_user(struct hub_info* hub, struct hub_user* user)
 	post.id = UHUB_EVENT_USER_DESTROY;
 	post.ptr = user;
 	event_queue_post(hub->queue, &post);
+
+	if (user->id.sid)
+	{
+		sid_free(hub->users->sids, user->id.sid);
+	}
 }
 
 void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason)

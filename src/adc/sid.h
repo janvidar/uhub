@@ -22,44 +22,19 @@
 
 #define SID_MAX 1048576
 
+struct sid_pool;
+struct hub_user;
+
 extern const char* BASE32_ALPHABET;
 extern char* sid_to_string(sid_t sid_);
 extern sid_t string_to_sid(const char* sid);
 
-struct sid_map
-{
-	struct hub_user* ptr;
-	struct sid_map* next;
-};
+extern struct sid_pool* sid_pool_create(sid_t max);
+extern void sid_pool_destroy(struct sid_pool*);
 
-/**
- * Session IDs are heavily reused, since they are a fairly scarce
- * resource. Only one (2^10)-1 exist, since it is a four byte base32-encoded
- * value and 'AAAA' (0) is reserved for the hub.
- *
- * Initialize with sid_initialize(), which sets min and max to one, and count to 0.
- *
- * When allocating a session ID:
- * - If 'count' is less than the pool size (max-min), then allocate within the pool
- * - Increase the pool size (see below)
- * - If unable to do that, hub is really full - don't let anyone in!
- *
- * When freeing a session ID:
- * - If the session ID being freed is 'max', then decrease the pool size by one.
- *
- */
-struct sid_pool
-{
-	sid_t min;
-	sid_t max;
-	sid_t count;
-	struct sid_map* map;
-};
-
-
-extern void sid_initialize(struct sid_pool*);
 extern sid_t sid_alloc(struct sid_pool*, struct hub_user*);
 extern void sid_free(struct sid_pool*, sid_t);
+extern struct hub_user* sid_lookup(struct sid_pool*, sid_t);
 
 
 

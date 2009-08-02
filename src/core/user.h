@@ -148,22 +148,6 @@ extern struct hub_user* user_create(struct hub_info* hub, int sd);
 extern void user_destroy(struct hub_user* user);
 
 /**
- * Disconnect a user.
- * This will mark the user connection ready for being terminated.
- * A reason can be given using the enum user_quit_reason.
- *
- * Things to be done when calling this:
- * - Mark the user with state_cleanup
- *
- * If the user is logged in to the hub:
- * - post message: UHUB_EVENT_USER_QUIT
- *
- * @param user User to disconnect
- * @param reason See enum user_quit_reason
- */
-extern void user_disconnect(struct hub_user* user, int reason);
-
-/**
  * This associates a INF message to the user.
  * If the user already has a INF message associated, then this is
  * released before setting the new one.

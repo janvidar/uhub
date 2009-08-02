@@ -24,7 +24,7 @@ struct hub_user_manager
 {
 	size_t count;                   /**<< "Number of all fully connected and logged in users" */
 	size_t count_peak;              /**<< "Peak number of users" */
-	sid_t free_sid;                 /**<< "The next available SID." */
+	struct sid_pool* sids;
 	uint64_t shared_size;           /**<< "The total number of shared bytes among fully connected users." */
 	uint64_t shared_files;          /**<< "The total number of shared files among fully connected users." */
 	struct linked_list* list;       /**<< "Contains all users" */
@@ -70,7 +70,7 @@ extern int uman_remove(struct hub_info* hub, struct hub_user* user);
 /**
  * Returns and allocates an unused session ID (SID).
  */
-extern sid_t uman_get_free_sid(struct hub_info* hub);
+extern sid_t uman_get_free_sid(struct hub_info* hub, struct hub_user* user);
 
 /**
  * Lookup a user based on the session ID (SID).

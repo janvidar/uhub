@@ -97,7 +97,7 @@ int uman_init(struct hub_info* hub)
 		return -1;
 
 	users->list = list_create();
-	users->free_sid = 1;
+	users->sids = sid_pool_create(MAX(1024, (hub->config->max_users + 24)));
 	
 	if (!users->list)
 	{
@@ -134,6 +134,7 @@ int uman_shutdown(struct hub_info* hub)
 		list_clear(hub->users->list, &clear_user_list_callback);
 		list_destroy(hub->users->list);
 	}
+	sid_pool_destroy(hub->users->sids);
 	hub_free(hub->users);
 	hub->users = 0;
 
@@ -187,14 +188,7 @@ int uman_remove(struct hub_info* hub, struct hub_user* user)
 
 struct hub_user* uman_get_user_by_sid(struct hub_info* hub, sid_t sid)
 {
-	struct hub_user* user = (struct hub_user*) list_get_first(hub->users->list); /* iterate users */
-	while (user)
-	{
-		if (user->id.sid == sid)
-			return user;
-		user = (struct hub_user*) list_get_next(hub->users->list);
-	}
-	return NULL;
+	return sid_lookup(hub->users->sids, sid);
 }
 
 
@@ -275,28 +269,15 @@ void uman_send_quit_message(struct hub_info* hub, struct hub_user* leaving)
 	{
 		adc_msg_add_argument(command, ADC_QUI_FLAG_DISCONNECT);
 	}
-	
 	route_to_all(hub, command);
 	adc_msg_free(command);
 }
 
 
-sid_t uman_get_free_sid(struct hub_info* hub)
+sid_t uman_get_free_sid(struct hub_info* hub, struct hub_user* user)
 {
-#if 0
-	struct hub_user* user;
-	user = (struct hub_user*) list_get_first(hub->users->list); /* iterate normal users */
-	while (user)
-	{
-		if (user->sid == hub->users->free_sid)
-		{
-			hub->users->free_sid++;
-			if (hub->users->free_sid >= SID_MAX) hub->users->free_sid = 1;
-			break;
-		}
-		user = (struct hub_user*) list_get_next(hub->users->list);
-	}
-#endif
-	return hub->users->free_sid++;
+	sid_t sid = sid_alloc(hub->users->sids, user);
+	user->id.sid = sid;
+	return sid;
 }
 
