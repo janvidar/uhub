@@ -89,32 +89,8 @@ void on_nick_change(struct hub_info* hub, struct hub_user* u, const char* nick)
 
 void on_logout_user(struct hub_info* hub, struct hub_user* user)
 {
-	const char* reason = "";
-	
-	/* These are used for logging purposes */
-	switch (user->quit_reason)
-	{
-		case quit_disconnected:     reason = "disconnected";   break;
-		case quit_kicked:           reason = "kicked";         break;
-		case quit_banned:           reason = "banned";         break;
-		case quit_timeout:          reason = "timeout";        break;
-		case quit_send_queue:       reason = "send queue";     break;
-		case quit_memory_error:     reason = "out of memory";  break;
-		case quit_socket_error:     reason = "socket error";   break;
-		case quit_protocol_error:   reason = "protocol error"; break;
-		case quit_logon_error:      reason = "login error";    break;
-		case quit_hub_disabled:     reason = "hub disabled";   break;
-		case quit_ghost_timeout:    reason = "ghost";          break;
-		default:
-			if (hub->status == hub_status_shutdown)
-				reason = "hub shutdown";
-			else
-				reason = "unknown error";
-			break;
-	}
-	
+	const char* reason = user_get_quit_reason_string(user->quit_reason);
 	log_user_logout(user, reason);
 	hub_logout_log(hub, user);
-	user->quit_reason = 0;
 }
 

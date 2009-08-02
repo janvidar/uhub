@@ -995,7 +995,6 @@ void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason
 	}
 	else
 	{
-		user->quit_reason = quit_unknown;
 		hub_schedule_destroy_user(hub, user);
 	}
 }

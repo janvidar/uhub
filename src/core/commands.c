@@ -459,7 +459,7 @@ static int command_log(struct hub_info* hub, struct hub_user* user, struct hub_c
 
 		if (show)
 		{
-			sprintf(tmp, "* %s %s, %s (%s)", get_timestamp(log->time), log->cid, log->nick, ip_convert_to_string(&log->addr));
+			sprintf(tmp, "* %s %s, %s [%s] - %s", get_timestamp(log->time), log->cid, log->nick, ip_convert_to_string(&log->addr), user_get_quit_reason_string(log->reason));
 			send_message(hub, user, tmp);
 		}
 		log = (struct hub_logout_info*) list_get_next(messages);

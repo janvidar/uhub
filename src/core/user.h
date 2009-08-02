@@ -70,6 +70,9 @@ enum user_quit_reason
 	quit_ghost_timeout  = 11,    /** The user is a ghost, and trying to login from another connection */
 };
 
+/** Returns an apropriate string for the given quit reason */
+extern const char* user_get_quit_reason_string(enum user_quit_reason);
+
 struct hub_user_info
 {
 	sid_t sid;                    /** session ID */
@@ -117,7 +120,7 @@ struct hub_user
 	struct adc_message*  info;                    /** ADC 'INF' message (broadcasted to everyone joining the hub) */
 	struct hub_info*     hub;                     /** The hub instance this user belong to */
 	struct hub_user_limits   limits;                  /** Data used for limitation */
-	int                  quit_reason;             /** Quit reason (see user_quit_reason) */
+	enum user_quit_reason quit_reason;            /** Quit reason (see user_quit_reason) */
 
 };
 
@@ -281,6 +284,8 @@ extern void user_reset_last_write(struct hub_user* user);
  * Reset the last-write timer.
  */
 extern void user_reset_last_read(struct hub_user* user);
+
+
 
 #endif /* HAVE_UHUB_USER_H */
 

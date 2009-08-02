@@ -85,7 +85,7 @@ struct hub_logout_info
 	char cid[MAX_CID_LEN+1];
 	char nick[MAX_NICK_LEN+1];
 	struct ip_addr_encap addr;
-	int reason;
+	enum user_quit_reason reason;
 };
 
 struct hub_info
@@ -357,6 +357,7 @@ extern void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int
  * Log a user logging out.
  */
 extern void hub_logout_log(struct hub_info* hub, struct hub_user* user);
+
 
 #endif /* HAVE_UHUB_HUB_H */
 
