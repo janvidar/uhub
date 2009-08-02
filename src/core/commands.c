@@ -531,7 +531,7 @@ static struct commands_handler command_handlers[] = {
 	{ "help",       4, 0,   cred_guest,     command_help,     "Show this help message."      },
 	{ "stats",      5, 0,   cred_super,     command_stats,    "Show hub statistics."         },
 	{ "version",    7, 0,   cred_guest,     command_version,  "Show hub version info."       },
-	{ "history",    7, 0,   cred_guest,     command_history,  "Show hub version info."       },
+	{ "history",    7, 0,   cred_guest,     command_history,  "Show the last chat messages." },
 	{ "uptime",     6, 0,   cred_guest,     command_uptime,   "Display hub uptime info."     },
 	{ "kick",       4, "n", cred_operator,  command_kick,     "Kick a user"                  },
 	{ "ban",        3, "n", cred_operator,  command_ban,      "Ban a user"                   },
