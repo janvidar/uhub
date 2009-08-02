@@ -160,7 +160,7 @@ libuhub_SOURCES := \
 
 uhub_SOURCES := src/core/main.c
 
-adcrush_SOURCES := src/adcrush.c
+adcrush_SOURCES := src/tools/adcrush.c
 
 admin_SOURCES := src/admin.c
 
