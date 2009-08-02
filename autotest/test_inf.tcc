@@ -15,7 +15,7 @@ static void inf_create_hub()
 	inf_hub = (struct hub_info*) hub_malloc_zero(sizeof(struct hub_info));
 	inf_hub->users = (struct hub_user_manager*) hub_malloc_zero(sizeof(struct hub_user_manager));
 	inf_hub->users->list = list_create();
-	inf_hub->users->free_sid = 1;
+	inf_hub->users->sids = sid_pool_create(500);
 	
 	inf_hub->acl = (struct acl_handle*) hub_malloc_zero(sizeof(struct acl_handle));
 	inf_hub->config = (struct hub_config*) hub_malloc_zero(sizeof(struct hub_config));
@@ -28,6 +28,7 @@ static void inf_destroy_hub()
 {
 	/* FIXME */
 	list_destroy(inf_hub->users->list);
+	sid_pool_destroy(inf_hub->users->sids);
 	acl_shutdown(inf_hub->acl);
 	free_config(inf_hub->config);
 	hub_free(inf_hub->users);
@@ -42,7 +43,7 @@ static void inf_create_user()
 	if (inf_user) return;
 	inf_user = (struct hub_user*) hub_malloc_zero(sizeof(struct hub_user));
 	inf_user->id.sid = 1;
-	inf_user->net.sd = -1;
+	inf_user->net.connection.sd = -1;
 	inf_user->limits.upload_slots = 1;
 }
 
