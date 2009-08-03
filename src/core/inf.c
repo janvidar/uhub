@@ -192,7 +192,7 @@ int check_network(struct hub_info* hub, struct hub_user* user, struct adc_messag
 	if (acl_is_ip_nat_override(hub->acl, address))
 	{
 		char* client_given_ip = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
-		if (strcmp(client_given_ip, "0.0.0.0") != 0)
+		if (client_given_ip && strcmp(client_given_ip, "0.0.0.0") != 0)
 		{
 			user_set_nat_override(user);
 			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
