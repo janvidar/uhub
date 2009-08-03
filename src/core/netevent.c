@@ -256,16 +256,13 @@ void net_on_accept(int server_fd, short ev, void *arg)
 			continue;
 		}
 
-		user = user_create(hub, fd);
+		user = user_create(hub, fd, &ipaddr);
 		if (!user)
 		{
 			LOG_ERROR("Unable to create user after socket accepted. Out of memory?");
 			net_close(fd);
 			break;
 		}
-
-		/* Store IP address in user object */
-		memcpy(&user->net.ipaddr, &ipaddr, sizeof(ipaddr));
 
 #ifdef SSL_SUPPORT
 		net_con_ssl_accept(&user->net.connection);

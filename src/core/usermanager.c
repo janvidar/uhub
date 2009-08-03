@@ -223,7 +223,7 @@ size_t uman_get_user_by_addr(struct hub_info* hub, struct linked_list* users, st
 	struct hub_user* user = (struct hub_user*) list_get_first(hub->users->list); /* iterate users - only on incoming INF msg */
 	while (user)
 	{
-		if (ip_in_range(&user->net.ipaddr, range))
+		if (ip_in_range(&user->net.connection.ipaddr, range))
 		{
 			list_append(users, user);
 			num++;

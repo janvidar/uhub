@@ -82,7 +82,7 @@ static void net_con_event(int fd, short ev, void *arg)
 #endif
 }
 
-void net_con_initialize(struct net_connection* con, int sd, const void* ptr, int events)
+void net_con_initialize(struct net_connection* con, int sd, struct ip_addr_encap* addr, const void* ptr, int events)
 {
 	LOG_DEBUG("net_con_initialize: sd=%d, ptr=%p", sd, ptr);
 	con->sd = sd;
@@ -90,6 +90,12 @@ void net_con_initialize(struct net_connection* con, int sd, const void* ptr, int
 	con->last_send = time(0);
 	con->last_recv = con->last_send;
 
+	/** IP address of peer */
+	if (addr)
+	{
+		memcpy(&con->ipaddr, addr, sizeof(struct ip_addr_encap));
+	}
+	
 	if (events & EV_READ)  net_con_flag_set(con, NET_WANT_READ);
 	if (events & EV_WRITE) net_con_flag_set(con, NET_WANT_WRITE);
 

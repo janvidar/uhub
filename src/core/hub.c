@@ -1034,7 +1034,7 @@ void hub_logout_log(struct hub_info* hub, struct hub_user* user)
 	loginfo->time = time(NULL);
 	strcpy(loginfo->cid, user->id.cid);
 	strcpy(loginfo->nick, user->id.nick);
-	memcpy(&loginfo->addr, &user->net.ipaddr, sizeof(struct ip_addr_encap));
+	memcpy(&loginfo->addr, &user->net.connection.ipaddr, sizeof(struct ip_addr_encap));
 	loginfo->reason = user->quit_reason;
 
 	list_append(hub->logout_info, loginfo);

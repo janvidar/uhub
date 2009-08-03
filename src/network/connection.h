@@ -28,6 +28,7 @@ struct net_connection
 	unsigned int         flags;     /** Connection flags */
 	void*                ptr;       /** data pointer */
 	struct event         event;     /** libevent struct for read/write events */
+	struct ip_addr_encap ipaddr;    /** IP address of peer */
 	time_t               last_recv; /** Timestamp for last recv() */
 	time_t               last_send; /** Timestamp for last send() */
 #ifdef SSL_SUPPORT
@@ -37,7 +38,7 @@ struct net_connection
 #endif /*  SSL_SUPPORT */
 };
 
-extern void net_con_initialize(struct net_connection* con, int sd, const void* ptr, int events);
+extern void net_con_initialize(struct net_connection* con, int sd, struct ip_addr_encap*, const void* ptr, int events);
 extern void net_con_update(struct net_connection* con, int events);
 extern void net_con_close(struct net_connection* con);
 

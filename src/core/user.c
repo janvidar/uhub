@@ -35,7 +35,7 @@ static const char* user_log_str(struct hub_user* user)
 }
 #endif
 
-struct hub_user* user_create(struct hub_info* hub, int sd)
+struct hub_user* user_create(struct hub_info* hub, int sd, struct ip_addr_encap* addr)
 {
 	struct hub_user* user = NULL;
 	
@@ -50,7 +50,7 @@ struct hub_user* user_create(struct hub_info* hub, int sd)
 	user->net.send_queue = hub_sendq_create();
 	user->net.recv_queue = hub_recvq_create();
 
-	net_con_initialize(&user->net.connection, sd, user, EV_READ);
+	net_con_initialize(&user->net.connection, sd, addr, user, EV_READ);
 
 	evtimer_set(&user->net.timeout, net_event, user);
 	event_base_set(hub->evbase, &user->net.timeout);
@@ -333,16 +333,6 @@ void user_net_io_want_read(struct hub_user* user)
 	LOG_TRACE("user_net_io_want_read: %s (pending: %d)", user_log_str(user), event_pending(&user->net.event, EV_READ | EV_WRITE, 0));
 #endif
 	net_con_update(&user->net.connection, EV_READ);
-}
-
-void user_reset_last_write(struct hub_user* user)
-{
-	user->net.tm_last_write = time(NULL);
-}
-
-void user_reset_last_read(struct hub_user* user)
-{
-	user->net.tm_last_read = time(NULL);
 }
 
 void user_set_timeout(struct hub_user* user, int seconds)

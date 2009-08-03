@@ -104,9 +104,6 @@ struct hub_user_net_io
 	struct hub_recvq*    recv_queue;
 	struct hub_sendq*    send_queue;
 	time_t               tm_connected;            /** time when user connected */
-	time_t               tm_last_read;            /** time the user last received something from the hub */
-	time_t               tm_last_write;           /** time the user last sent something to the hub */
-	struct ip_addr_encap ipaddr;                  /** IP address of connected user */
 };
 
 struct hub_user
@@ -136,7 +133,7 @@ struct hub_user
  * @param sd socket descriptor associated with the user
  * @return User object or NULL if not enough memory is available.
  */
-extern struct hub_user* user_create(struct hub_info* hub, int sd);
+extern struct hub_user* user_create(struct hub_info* hub, int sd, struct ip_addr_encap* addr);
 
 /**
  * Delete a user.
@@ -275,18 +272,6 @@ extern void user_net_io_want_read(struct hub_user* user);
  * @param seconds the number of seconds into the future.
  */
 extern void user_set_timeout(struct hub_user* user, int seconds);
-
-/**
- * Reset the last-write timer.
- */
-extern void user_reset_last_write(struct hub_user* user);
-
-/**
- * Reset the last-write timer.
- */
-extern void user_reset_last_read(struct hub_user* user);
-
-
 
 #endif /* HAVE_UHUB_USER_H */
 
