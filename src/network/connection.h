@@ -58,5 +58,17 @@ extern ssize_t net_con_send(struct net_connection* con, const void* buf, size_t 
  */
 extern ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len);
 
+#ifdef SSL_SUPPORT
+/**
+ * Start SSL_accept()
+ */
+extern ssize_t net_con_ssl_accept(struct net_connection*);
+
+/**
+ * Start SSL_connect()
+ */
+extern ssize_t net_con_ssl_connect(struct net_connection*);
+#endif /* SSL_SUPPORT */
+
 #endif /* HAVE_UHUB_NETWORK_CONNECTION_H */
 

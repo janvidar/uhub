@@ -21,11 +21,6 @@
 
 extern struct hub_info* g_hub;
 
-#ifdef SSL_SUPPORT
-static ssize_t net_con_ssl_accept(struct net_connection* con);
-static ssize_t net_con_ssl_connect(struct net_connection* con);
-#endif
-
 static inline int net_con_flag_get(struct net_connection* con, unsigned int flag)
 {
     return con->flags & flag;
@@ -253,7 +248,7 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 }
 
 #ifdef SSL_SUPPORT
-static ssize_t net_con_ssl_accept(struct net_connection* con)
+ssize_t net_con_ssl_accept(struct net_connection* con)
 {
 	ssize_t ret = SSL_accept(con->ssl);
 	if (ret > 0)
@@ -267,7 +262,7 @@ static ssize_t net_con_ssl_accept(struct net_connection* con)
 	return ret;
 }
 
-static ssize_t net_con_ssl_connect(struct net_connection* con)
+ssize_t net_con_ssl_connect(struct net_connection* con)
 {
 	ssize_t ret = SSL_connect(con->ssl);
 	if (ret > 0)
@@ -280,5 +275,6 @@ static ssize_t net_con_ssl_connect(struct net_connection* con)
 	}
 	return ret;
 }
-#endif
+#endif /* SSL_SUPPORT */
+
 
