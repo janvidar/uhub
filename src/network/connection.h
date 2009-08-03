@@ -25,10 +25,14 @@
 struct net_connection
 {
 	int                  sd;        /** socket descriptor */
+	unsigned int         flags;     /** Connection flags */
 	void*                ptr;       /** data pointer */
 	struct event         event;     /** libevent struct for read/write events */
+	time_t               last_recv; /** Timestamp for last recv() */
+	time_t               last_send; /** Timestamp for last send() */
 #ifdef SSL_SUPPORT
 	SSL*                 ssl;       /** SSL handle */
+	size_t               write_len; /** Length of last SSL_write(), only used if flags is NET_WANT_SSL_READ. */
 #endif /*  SSL_SUPPORT */
 };
 
@@ -36,6 +40,23 @@ extern void net_con_initialize(struct net_connection* con, int sd, const void* p
 extern void net_con_update(struct net_connection* con, int events);
 extern void net_con_close(struct net_connection* con);
 
+/**
+ * Send data
+ *
+ * @return returns the number of bytes sent.
+ *         0 if no data is sent, and this function should be called again
+ *        -1 if an error occured, and the socket should be considered dead or closed.
+ */
+extern ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len);
+
+/**
+ * Receive data
+ *
+ * @return returns the number of bytes sent.
+ *         0 if no data is sent, and this function should be called again
+ *        -1 if an error occured, and the socket should be considered dead or closed.
+ */
+extern ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len);
 
 #endif /* HAVE_UHUB_NETWORK_CONNECTION_H */
 

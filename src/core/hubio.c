@@ -178,7 +178,7 @@ int hub_sendq_send(struct hub_sendq* q, hub_recvq_write w, void* data)
 	if (ret > 0)
 	{
 #ifdef SSL_SUPPORT
-		q->last_write_n = ret;
+		q->last_send = ret;
 #endif
 
 		/* Remove messages sent */

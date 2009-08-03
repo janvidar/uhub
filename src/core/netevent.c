@@ -75,7 +75,7 @@ int net_user_send(void* ptr, const void* buf, size_t len)
 	return ret;
 }
 
-#ifdef SSL_SUPPORT
+#if 0
 int net_user_send_ssl(void* ptr, const void* buf, size_t len)
 {
 	struct hub_user* user = (struct hub_user*) ptr;
@@ -114,8 +114,7 @@ int net_user_recv(void* ptr, void* buf, size_t len)
 	return ret;
 }
 
-
-#ifdef SSL_SUPPORT
+#if 0
 int net_user_recv_ssl(void* ptr, void* buf, size_t len)
 {
 	struct hub_user* user = (struct hub_user*) ptr;
