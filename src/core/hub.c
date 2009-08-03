@@ -141,7 +141,7 @@ int hub_handle_support(struct hub_info* hub, struct hub_user* u, struct adc_mess
 		if (ok)
 		{
 			hub_send_handshake(hub, u);
-			user_set_timeout(u, TIMEOUT_HANDSHAKE);
+			net_con_set_timeout(&u->net.connection, TIMEOUT_HANDSHAKE);
 		}
 		else
 		{

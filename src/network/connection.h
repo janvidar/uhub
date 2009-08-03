@@ -22,12 +22,17 @@
 
 #include "uhub.h"
 
+struct net_connection;
+typedef void (*net_connection_cb)(struct net_connection*, int event, void* ptr);
+
 struct net_connection
 {
 	int                  sd;        /** socket descriptor */
 	unsigned int         flags;     /** Connection flags */
 	void*                ptr;       /** data pointer */
+	net_connection_cb    callback;  /** Callback function */
 	struct event         event;     /** libevent struct for read/write events */
+	struct event         timeout;   /** timeout handling */
 	struct ip_addr_encap ipaddr;    /** IP address of peer */
 	time_t               last_recv; /** Timestamp for last recv() */
 	time_t               last_send; /** Timestamp for last send() */
@@ -37,7 +42,7 @@ struct net_connection
 #endif /*  SSL_SUPPORT */
 };
 
-extern void net_con_initialize(struct net_connection* con, int sd, struct ip_addr_encap*, const void* ptr, int events);
+extern void net_con_initialize(struct net_connection* con, int sd, struct ip_addr_encap*, net_connection_cb callback, const void* ptr, int events);
 extern void net_con_update(struct net_connection* con, int events);
 extern void net_con_close(struct net_connection* con);
 
@@ -58,6 +63,14 @@ extern ssize_t net_con_send(struct net_connection* con, const void* buf, size_t 
  *        <0 if an error occured, the negative number contains the error code.
  */
 extern ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len);
+
+/**
+ * Set timeout for connetion.
+ *
+ * @param seconds the number of seconds into the future.
+ */
+extern void net_con_set_timeout(struct net_connection* con, int seconds);
+extern void net_con_clear_timeout(struct net_connection* con);
 
 #ifdef SSL_SUPPORT
 /**

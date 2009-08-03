@@ -100,7 +100,6 @@ struct hub_user_limits
 struct hub_user_net_io
 {
 	struct net_connection connection;             /** Connection data */
-	struct event         timeout;                 /** timeout handling */
 	struct hub_recvq*    recv_queue;
 	struct hub_sendq*    send_queue;
 	time_t               tm_connected;            /** time when user connected */
@@ -266,12 +265,6 @@ extern void user_net_io_want_write(struct hub_user* user);
  * Mark the user with a want read flag, meaning it should poll for readability.
  */
 extern void user_net_io_want_read(struct hub_user* user);
-
-/**
- * Set timeout for connetion.
- * @param seconds the number of seconds into the future.
- */
-extern void user_set_timeout(struct hub_user* user, int seconds);
 
 #endif /* HAVE_UHUB_USER_H */
 

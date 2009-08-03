@@ -67,9 +67,9 @@ void on_login_success(struct hub_info* hub, struct hub_user* u)
 	/* Send message of the day (if any) */
 	if (user_is_logged_in(u)) /* Previous send() can fail! */
 		hub_send_motd(hub, u);
-		
-	/* reset to idle timeout */
-	user_set_timeout(u, TIMEOUT_IDLE);
+
+	/* reset timeout */
+	net_con_clear_timeout(&u->net.connection);
 }
 
 void on_login_failure(struct hub_info* hub, struct hub_user* u, enum status_message msg)

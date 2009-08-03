@@ -39,54 +39,61 @@ static inline void net_con_flag_unset(struct net_connection* con, unsigned int f
 static void net_con_event(int fd, short ev, void *arg)
 {
 	struct net_connection* con = (struct net_connection*) arg;
+	int events = 0;
+
+	if (ev & EV_READ)  events |= NET_EVENT_READ;
+	if (ev & EV_WRITE) events |= NET_EVENT_WRITE;
+	if (ev == EV_TIMEOUT) events = NET_EVENT_TIMEOUT;
+
 #ifdef SSL_SUPPORT
 	if (!con->ssl)
 	{
 #endif
-		net_event(fd, ev, con->ptr);
+		con->callback(con, events, con->ptr);
 #ifdef SSL_SUPPORT
 	}
 	else
 	{
-		LOG_DUMP("net_con_event: ev=%d, con=%p", ev, con);
+		LOG_DUMP("net_con_event: events=%d, con=%p", ev, con);
 		if (ev & (EV_READ | EV_WRITE))
 		{
 			if (net_con_flag_get(con, NET_WANT_SSL_ACCEPT))
 			{
 				if (net_con_ssl_accept(con) < 0)
-					net_event(fd, EV_READ, con->ptr);
+					net_event(con, NET_EVENT_SOCKERROR, con->ptr);
 			}
 			else if (net_con_flag_get(con, NET_WANT_SSL_CONNECT))
 			{
 				if (net_con_ssl_connect(con) < 0)
-					net_event(fd, EV_READ, con->ptr);
+					con->callback(con, NET_EVENT_SOCKERROR, con->ptr);
 			}
 			else if (ev == EV_READ && net_con_flag_get(con, NET_WANT_SSL_READ))
 			{
-				net_event(fd, EV_WRITE, con->ptr);
+				con->callback(con, NET_EVENT_WRITE, con->ptr);
 			}
 			else if (ev == EV_WRITE && net_con_flag_get(con, NET_WANT_SSL_WRITE))
 			{
-				net_event(fd, ev & EV_READ, con->ptr);
+				con->callback(con, events & NET_EVENT_READ, con->ptr);
 			}
 			else
 			{
-				net_event(fd, ev, con->ptr);
+				con->callback(con, events, con->ptr);
 			}
 		}
 		else
 		{
-			net_event(fd, ev, con->ptr);
+			con->callback(con, events, con->ptr);
 		}
 	}
 #endif
 }
 
-void net_con_initialize(struct net_connection* con, int sd, struct ip_addr_encap* addr, const void* ptr, int events)
+void net_con_initialize(struct net_connection* con, int sd, struct ip_addr_encap* addr, net_connection_cb callback, const void* ptr, int events)
 {
 	LOG_DUMP("net_con_initialize: sd=%d, ptr=%p", sd, ptr);
 	con->sd = sd;
 	con->ptr = (void*) ptr;
+	con->callback = callback;
 	con->last_send = time(0);
 	con->last_recv = con->last_send;
 
@@ -279,6 +286,24 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 	}
 #endif
 }
+
+void net_con_set_timeout(struct net_connection* con, int seconds)
+{
+	struct timeval timeout = { seconds, 0 };
+	evtimer_set(&con->timeout, net_con_event, con);
+	event_base_set(g_hub->evbase, &con->timeout);
+	evtimer_add(&con->timeout, &timeout);
+}
+
+void net_con_clear_timeout(struct net_connection* con)
+{
+	if (evtimer_pending(&con->timeout, 0))
+	{
+		evtimer_del(&con->timeout);
+		memset(&con->timeout, 0, sizeof(&con->timeout));
+	}
+}
+
 
 #ifdef SSL_SUPPORT
 ssize_t net_con_ssl_accept(struct net_connection* con)

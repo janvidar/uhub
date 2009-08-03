@@ -25,7 +25,7 @@
  */
 extern void net_on_accept(int fd, short ev, void *arg);
 
-extern void net_event(int fd, short ev, void *arg);
+extern void net_event(struct net_connection* con, int event, void *arg);
 
 extern int handle_net_read(struct hub_user* user);
 extern int handle_net_write(struct hub_user* user);

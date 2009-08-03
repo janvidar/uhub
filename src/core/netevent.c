@@ -182,33 +182,38 @@ int handle_net_write(struct hub_user* user)
 	return 0;
 }
 
-void net_event(int fd, short ev, void *arg)
+void net_event(struct net_connection* con, int event, void *arg)
 {
 	struct hub_user* user = (struct hub_user*) arg;
 	int flag_close = 0;
 
 #ifdef DEBUG_SENDQ
-	LOG_TRACE("net_on_read() : fd=%d, ev=%d, arg=%p", fd, (int) ev, arg);
+	LOG_TRACE("net_event() : fd=%d, ev=%d, arg=%p", fd, (int) event, arg);
 #endif
 
-	if (ev & EV_TIMEOUT)
+	if (event == NET_EVENT_SOCKERROR)
+	{
+		hub_disconnect_user(g_hub, user, quit_socket_error);
+		return;
+	}
+	else if (event == NET_EVENT_CLOSED)
+	{
+		hub_disconnect_user(g_hub, user, quit_disconnected);
+		return;
+	}
+	else if (event == NET_EVENT_TIMEOUT)
 	{
 		if (user_is_connecting(user))
 		{
-			flag_close = quit_timeout;
-		}
-		else
-		{
-			// FIXME: hub is not neccesarily set!
-			// hub_send_ping(hub, user);
+			hub_disconnect_user(g_hub, user, quit_timeout);
+			return;
 		}
 	}
-
-	if (ev & EV_READ)
+	else if (event & NET_EVENT_READ)
 	{
 		flag_close = handle_net_read(user);
 	}
-	else if (ev & EV_WRITE)
+	else if (event & NET_EVENT_WRITE)
 	{
 		flag_close = handle_net_write(user);
 	}
@@ -220,7 +225,7 @@ void net_event(int fd, short ev, void *arg)
 	}
 }
 
-void net_on_accept(int server_fd, short ev, void *arg)
+void net_on_accept(int server_fd, short event, void *arg)
 {
 	struct hub_info* hub = (struct hub_info*) arg;
 	struct hub_user* user = 0;

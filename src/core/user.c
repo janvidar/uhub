@@ -50,12 +50,8 @@ struct hub_user* user_create(struct hub_info* hub, int sd, struct ip_addr_encap*
 	user->net.send_queue = hub_sendq_create();
 	user->net.recv_queue = hub_recvq_create();
 
-	net_con_initialize(&user->net.connection, sd, addr, user, EV_READ);
-
-	evtimer_set(&user->net.timeout, net_event, user);
-	event_base_set(hub->evbase, &user->net.timeout);
-
-	user_set_timeout(user, TIMEOUT_CONNECTED);
+	net_con_initialize(&user->net.connection, sd, addr, net_event, user, EV_READ);
+	net_con_set_timeout(&user->net.connection, TIMEOUT_CONNECTED);
 
 	user_set_state(user, state_protocol);
 	return user;
@@ -67,8 +63,8 @@ void user_destroy(struct hub_user* user)
 	LOG_TRACE("user_destroy(), user=%p", user);
 
 	net_con_close(&user->net.connection);
-	evtimer_del(&user->net.timeout);
-	
+	net_con_clear_timeout(&user->net.connection);
+
 	hub_recvq_destroy(user->net.recv_queue);
 	hub_sendq_destroy(user->net.send_queue);
 
@@ -333,15 +329,6 @@ void user_net_io_want_read(struct hub_user* user)
 	LOG_TRACE("user_net_io_want_read: %s (pending: %d)", user_log_str(user), event_pending(&user->net.event, EV_READ | EV_WRITE, 0));
 #endif
 	net_con_update(&user->net.connection, EV_READ);
-}
-
-void user_set_timeout(struct hub_user* user, int seconds)
-{
-#ifdef DEBUG_SENDQ
-	LOG_TRACE("user_set_timeout to %d seconds: %s", seconds, user_log_str(user));
-#endif
-	struct timeval timeout = { seconds, 0 };
-	evtimer_add(&user->net.timeout, &timeout);
 }
 
 const char* user_get_quit_reason_string(enum user_quit_reason reason)
