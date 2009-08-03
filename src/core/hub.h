@@ -95,7 +95,6 @@ struct hub_info
 	struct event ev_timer;
 	struct hub_stats stats;
 	struct event_queue* queue;
-	struct event_base* evbase;
 	struct hub_config* config;
 	struct hub_user_manager* users;
 	struct acl_handle* acl;

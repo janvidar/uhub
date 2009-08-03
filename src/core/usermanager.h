@@ -27,7 +27,7 @@ struct hub_user_manager
 	struct sid_pool* sids;
 	uint64_t shared_size;           /**<< "The total number of shared bytes among fully connected users." */
 	uint64_t shared_files;          /**<< "The total number of shared files among fully connected users." */
-	struct linked_list* list;       /**<< "Contains all users" */
+	struct linked_list* list;       /**<< "Contains all logged in users" */
 };
 
 /**

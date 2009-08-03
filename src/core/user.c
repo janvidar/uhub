@@ -62,9 +62,6 @@ void user_destroy(struct hub_user* user)
 {
 	LOG_TRACE("user_destroy(), user=%p", user);
 
-	net_con_close(&user->net.connection);
-	net_con_clear_timeout(&user->net.connection);
-
 	hub_recvq_destroy(user->net.recv_queue);
 	hub_sendq_destroy(user->net.send_queue);
 

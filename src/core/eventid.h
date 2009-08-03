@@ -28,10 +28,14 @@
 /* Send a broadcast message */
 #define UHUB_EVENT_BROADCAST         0x2000
 
+/* Shutdown hub */
+#define UHUB_EVENT_HUB_SHUTDOWN      0x3001
+
 /* Statistics, OOM, reconfigure */
 #define UHUB_EVENT_STATISTICS        0x4000
 #define UHUB_EVENT_OUT_OF_MEMORY     0x4001
 #define UHUB_EVENT_RECONFIGURE       0x4002
+
 
 #endif /* HAVE_UHUB_EVENT_ID_H */
 

@@ -77,7 +77,7 @@ static void timer_statistics(int fd, short ev, void *arg)
 	struct timeval timeout = { TIMEOUT_STATS, 0 };
 	uman_update_stats(hub);
 	evtimer_set(&hub->ev_timer, timer_statistics, hub);
-	event_base_set(hub->evbase, &hub->ev_timer);
+	event_base_set(net_get_evbase(), &hub->ev_timer);
 	evtimer_add(&hub->ev_timer, &timeout);
 }
 #endif
@@ -108,10 +108,10 @@ int uman_init(struct hub_info* hub)
 	hub->users = users;
 
 #ifdef USERMANAGER_TIMER
-	if (hub->evbase)
+	if (net_get_evbase())
 	{
 		evtimer_set(&hub->ev_timer, timer_statistics, hub);
-		event_base_set(hub->evbase, &hub->ev_timer);
+		event_base_set(net_get_evbase(), &hub->ev_timer);
 		evtimer_add(&hub->ev_timer, &timeout);
 	}
 #endif // 0
@@ -126,7 +126,7 @@ int uman_shutdown(struct hub_info* hub)
 
 #ifdef USERMANAGER_TIMER
 	if (evtimer_pending(&hub->ev_timer, 0))
-		event_del(&hub->ev_timer);
+		evtimer_del(&hub->ev_timer);
 #endif
 
 	if (hub->users->list)

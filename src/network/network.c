@@ -21,6 +21,7 @@
 
 static int is_ipv6_supported = -1; /* -1 = CHECK, 0 = NO, 1 = YES */
 static int net_initialized = 0;
+static struct event_base* net_evbase = 0;
 static struct net_statistics stats;
 static struct net_statistics stats_total;
 
@@ -35,6 +36,7 @@ int net_initialize()
 {
 	if (!net_initialized)
 	{
+		LOG_TRACE("Initializing network monitor.");
 
 #ifdef WINSOCK
 		struct WSAData wsa;
@@ -45,7 +47,18 @@ int net_initialize()
 		}
 #endif /* WINSOCK */
 
-		LOG_TRACE("Initializing network monitor.");
+#ifdef LIBEVENT_1_4
+		net_evbase = event_base_new();
+#else
+		net_evbase = event_init();
+#endif
+		if (!net_evbase)
+		{
+			LOG_ERROR("Unable to initialize libevent.");
+			return 0;
+		}
+		LOG_DEBUG("Using libevent %s, backend: %s", event_get_version(), event_get_method());
+
 		net_stats_initialize();
 
 #ifdef SSL_SUPPORT
@@ -83,6 +96,9 @@ int net_destroy()
 	{
 		LOG_TRACE("Shutting down network monitor");
 
+		event_base_free(net_evbase);
+		net_evbase = 0;
+
 #ifdef SSL_SUPPORT
 		/* FIXME: Shutdown OpenSSL here. */
 #endif
@@ -94,6 +110,11 @@ int net_destroy()
 		return 0;
 	}
 	return -1;
+}
+
+struct event_base* net_get_evbase()
+{
+	return net_evbase;
 }
 
 static void net_error_out(int fd, const char* func)

@@ -104,10 +104,9 @@ int hub_handle_support(struct hub_info* hub, struct hub_user* u, struct adc_mess
 		on_login_failure(hub, u, status_msg_hub_disabled);
 		return -1;
 	}
-	
+
 	while (arg)
 	{
-	
 		if (strlen(arg) == 6)
 		{
 			fourcc_t fourcc = FOURCC(arg[2], arg[3], arg[4], arg[5]);
@@ -133,7 +132,7 @@ int hub_handle_support(struct hub_info* hub, struct hub_user* u, struct adc_mess
 		hub_free(arg);
 		arg = adc_msg_get_argument(cmd, index);
 	}
-	
+
 	if (u->state == state_protocol)
 	{
 		if (index == 0) ok = 0; /* Need to support *SOMETHING*, at least BASE */
@@ -150,7 +149,7 @@ int hub_handle_support(struct hub_info* hub, struct hub_user* u, struct adc_mess
 			ret = -1;
 		}
 	}
-	
+
 	return ret;
 }
 
@@ -400,7 +399,20 @@ static void hub_event_dispatcher(void* callback_data, struct event_data* message
 			user_destroy(user);
 			break;
 		}
-		
+
+		case UHUB_EVENT_HUB_SHUTDOWN:
+		{
+			struct hub_user* u = (struct hub_user*) list_get_first(hub->users->list);
+			while (u)
+			{
+				uman_remove(hub, u);
+				user_destroy(u);
+				u = (struct hub_user*) list_get_first(hub->users->list);
+			}
+			break;
+		}
+
+
 		default:
 			/* FIXME: ignored */
 			break;
@@ -448,25 +460,11 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		net_address_to_string(AF_INET6, &((struct sockaddr_in6*) &addr)->sin6_addr, address_buf, INET6_ADDRSTRLEN);
 	}
 
-#ifdef LIBEVENT_1_4
-	hub->evbase = event_base_new();
-#else
-	hub->evbase = event_init();
-#endif
-	if (!hub->evbase)
-	{
-		LOG_ERROR("Unable to initialize libevent.");
-		hub_free(hub);
-		return 0;
-	}
-
 	LOG_INFO("Starting " PRODUCT "/" VERSION ", listening on %s:%d...", address_buf, config->server_port);
-	LOG_DEBUG("Using libevent %s, backend: %s", event_get_version(), event_get_method());
 
 	server_tcp = net_socket_create(af, SOCK_STREAM, IPPROTO_TCP);
 	if (server_tcp == -1)
 	{
-		event_base_free(hub->evbase);
 		hub_free(hub);
 		return 0;
 	}
@@ -474,7 +472,6 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	ret = net_set_reuseaddress(server_tcp, 1);
 	if (ret == -1)
 	{
-		event_base_free(hub->evbase);
 		hub_free(hub);
 		net_close(server_tcp);
 		return 0;
@@ -483,7 +480,6 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	ret = net_set_nonblocking(server_tcp, 1);
 	if (ret == -1)
 	{
-		event_base_free(hub->evbase);
 		hub_free(hub);
 		net_close(server_tcp);
 		return 0;
@@ -493,7 +489,6 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	if (ret == -1)
 	{
 		LOG_FATAL("hub_start_service(): Unable to bind to TCP local address. errno=%d, str=%s", net_error(), net_error_string(net_error()));
-		event_base_free(hub->evbase);
 		hub_free(hub);
 		net_close(server_tcp);
 		return 0;
@@ -503,7 +498,6 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	if (ret == -1)
 	{
 		LOG_FATAL("hub_start_service(): Unable to listen to socket");
-		event_base_free(hub->evbase);
 		hub_free(hub);
 		net_close(server_tcp);
 		return 0;
@@ -549,7 +543,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	}
 	
 	event_set(&hub->ev_accept, hub->fd_tcp, EV_READ | EV_PERSIST, net_on_accept, hub);
-	event_base_set(hub->evbase, &hub->ev_accept);
+	event_base_set(net_get_evbase(), &hub->ev_accept);
 	if (event_add(&hub->ev_accept, NULL) == -1)
 	{
 		uman_shutdown(hub);
@@ -601,14 +595,13 @@ struct hub_info* hub_start_service(struct hub_config* config)
 
 void hub_shutdown_service(struct hub_info* hub)
 {
-	LOG_TRACE("hub_shutdown_service()");
+	LOG_DEBUG("hub_shutdown_service()");
 
 	event_queue_shutdown(hub->queue);
 	event_del(&hub->ev_accept);
 	net_close(hub->fd_tcp);
 	uman_shutdown(hub);
 	hub->status = hub_status_stopped;
-	event_base_free(hub->evbase);
 	hub_free(hub->sendbuf);
 	hub_free(hub->recvbuf);
 	hub_chat_history_clear(hub);
@@ -959,27 +952,6 @@ size_t hub_get_min_hubs_op(struct hub_info* hub)
 	return hub->config->limit_min_hubs_op;
 }
 
-
-void hub_event_loop(struct hub_info* hub)
-{
-	int ret;
-	do
-	{
-		 ret = event_base_loop(hub->evbase, EVLOOP_ONCE);
-		 
-		 if (ret != 0)
-		 {
-			 LOG_DEBUG("event_base_loop returned: %d", (int) ret);
-		 }
-		 
-		 if (ret < 0)
-			break;
-		 
-		 event_queue_process(hub->queue);
-	}
-	while (hub->status == hub_status_running || hub->status == hub_status_disabled);
-}
-
 void hub_schedule_destroy_user(struct hub_info* hub, struct hub_user* user)
 {
 	struct event_data post;
@@ -988,11 +960,68 @@ void hub_schedule_destroy_user(struct hub_info* hub, struct hub_user* user)
 	post.ptr = user;
 	event_queue_post(hub->queue, &post);
 
+	net_con_close(&user->net.connection);
+
 	if (user->id.sid)
 	{
 		sid_free(hub->users->sids, user->id.sid);
 	}
 }
+
+void hub_disconnect_all(struct hub_info* hub)
+{
+	struct event_data post;
+	memset(&post, 0, sizeof(post));
+	post.id = UHUB_EVENT_HUB_SHUTDOWN;
+	post.ptr = 0;
+	event_queue_post(hub->queue, &post);
+}
+
+
+void hub_schedule_destroy_all(struct hub_info* hub)
+{
+	struct hub_user* user = (struct hub_user*) list_get_first(hub->users->list);
+	while (user)
+	{
+
+		hub_schedule_destroy_user(hub, user);
+		user = (struct hub_user*) list_get_next(hub->users->list);
+	}
+}
+
+
+
+void hub_event_loop(struct hub_info* hub)
+{
+	int ret;
+	do
+	{
+		ret = event_base_loop(net_get_evbase(), EVLOOP_ONCE);
+
+		if (ret != 0)
+		{
+			LOG_DEBUG("event_base_loop returned: %d", (int) ret);
+		}
+
+		if (ret < 0)
+			break;
+
+		 event_queue_process(hub->queue);
+	}
+	while (hub->status == hub_status_running || hub->status == hub_status_disabled);
+	
+
+	if (hub->status == hub_status_shutdown)
+	{
+		LOG_DEBUG("Removing all users...");
+		event_queue_process(hub->queue);
+		event_queue_process(hub->queue);
+		hub_disconnect_all(hub);
+		event_queue_process(hub->queue);
+		hub->status = hub_status_stopped;
+	}
+}
+
 
 void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason)
 {
@@ -1010,7 +1039,7 @@ void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason
 	
 	LOG_TRACE("hub_disconnect_user(), user=%p, reason=%d, state=%d", user, reason, user->state);
 	
-	need_notify = user_is_logged_in(user);
+	need_notify = user_is_logged_in(user) && hub->status == hub_status_running;
 	user->quit_reason = reason;
 	user_set_state(user, state_cleanup);
 	

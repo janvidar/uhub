@@ -81,7 +81,7 @@ void setup_signal_handlers(struct hub_info* hub)
 	for (i = 0; signals[i]; i++)
 	{
 		signal_set(&signal_events[i], signals[i], hub_handle_signal, hub);
-		event_base_set(hub->evbase, &signal_events[i]);
+		event_base_set(net_get_evbase(), &signal_events[i]);
 		if (signal_add(&signal_events[i], NULL))
 		{
 			LOG_ERROR("Error setting signal handler %d", signals[i]);
@@ -147,7 +147,7 @@ int main_loop()
 		acl_shutdown(&acl);
 		free_config(&configuration);
 
-	} while(hub->status != hub_status_shutdown);
+	} while (hub->status == hub_status_restart);
 
 #ifndef WIN32
 	shutdown_signal_handlers(hub);
