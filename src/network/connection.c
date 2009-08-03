@@ -221,15 +221,20 @@ ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 	}
 	else
 	{
+		if (net_con_flag_get(con, NET_WANT_SSL_READ) && con->write_len)
+			len = con->write_len;
+
 		int ret = SSL_write(con->ssl, buf, len);
 		LOG_DEBUG("net_send: ret=%d", ret);
 		if (ret > 0)
 		{
 			con->last_send = time(0);
 			net_con_flag_unset(con, NET_WANT_SSL_READ);
+			con->write_len = 0;
 		}
 		else
 		{
+			con->write_len = len;
 			return handle_openssl_error(con, ret);
 		}
 		return ret;
