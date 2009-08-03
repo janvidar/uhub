@@ -47,11 +47,7 @@ int net_initialize()
 		}
 #endif /* WINSOCK */
 
-#ifdef LIBEVENT_1_4
-		net_evbase = event_base_new();
-#else
 		net_evbase = event_init();
-#endif
 		if (!net_evbase)
 		{
 			LOG_ERROR("Unable to initialize libevent.");
