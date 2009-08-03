@@ -147,7 +147,7 @@ static int handle_openssl_error(struct net_connection* con, int ret)
 	{
 		case SSL_ERROR_ZERO_RETURN:
 			LOG_DEBUG("SSL_get_error: ret=%d, error=%d: SSL_ERROR_ZERO_RETURN", ret, error);
-			return ret;
+			return -1;
 
 		case SSL_ERROR_WANT_READ:
 			LOG_DEBUG("SSL_get_error: ret=%d, error=%d: SSL_ERROR_WANT_READ", ret, error);
