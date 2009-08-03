@@ -265,7 +265,7 @@ void net_on_accept(int server_fd, short ev, void *arg)
 		}
 
 #ifdef SSL_SUPPORT
-		net_con_ssl_accept(&user->net.connection);
+		net_con_ssl_handshake(&user->net.connection, NET_CON_SSL_MODE_SERVER);
 #endif
 	}
 }

@@ -33,7 +33,6 @@ struct net_connection
 	time_t               last_send; /** Timestamp for last send() */
 #ifdef SSL_SUPPORT
 	SSL*                 ssl;       /** SSL handle */
-	SSL_CTX*             ctx;       /** FIXME: Should have a global one instead */
 	size_t               write_len; /** Length of last SSL_write(), only used if flags is NET_WANT_SSL_READ. */
 #endif /*  SSL_SUPPORT */
 };
@@ -70,6 +69,11 @@ extern ssize_t net_con_ssl_accept(struct net_connection*);
  * Start SSL_connect()
  */
 extern ssize_t net_con_ssl_connect(struct net_connection*);
+
+#define NET_CON_SSL_MODE_SERVER 1
+#define NET_CON_SSL_MODE_CLIENT 2
+extern ssize_t net_con_ssl_handshake(struct net_connection* con, int ssl_mode);
+
 #endif /* SSL_SUPPORT */
 
 #endif /* HAVE_UHUB_NETWORK_CONNECTION_H */

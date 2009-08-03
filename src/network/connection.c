@@ -109,11 +109,6 @@ void net_con_initialize(struct net_connection* con, int sd, struct ip_addr_encap
 #ifdef SSL_SUPPORT
 	con->ssl = NULL;
 	con->write_len = 0;
-
-	con->ssl = SSL_new(g_hub->ssl_ctx);
-        LOG_DUMP("SSL_new");
-        SSL_set_fd(con->ssl, con->sd);
-        LOG_DUMP("SSL_set_fd");
 #endif
 }
 
@@ -318,6 +313,22 @@ ssize_t net_con_ssl_connect(struct net_connection* con)
 		return handle_openssl_error(con, ret);
 	}
 	return ret;
+}
+
+ssize_t net_con_ssl_handshake(struct net_connection* con, int ssl_mode)
+{
+	if (ssl_mode == NET_CON_SSL_MODE_SERVER)
+	{
+		con->ssl = SSL_new(g_hub->ssl_ctx);
+		SSL_set_fd(con->ssl, con->sd);
+		return net_con_ssl_accept(con);
+	}
+	else
+	{
+		con->ssl = SSL_new(SSL_CTX_new(TLSv1_method()));
+		SSL_set_fd(con->ssl, con->sd);
+		return net_con_ssl_connect(con);
+	}
 }
 #endif /* SSL_SUPPORT */
 
