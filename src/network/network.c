@@ -50,8 +50,8 @@ int net_initialize()
 
 #ifdef SSL_SUPPORT
 		LOG_TRACE("Initializing OpenSSL...");
-		SSL_load_error_strings();
 		SSL_library_init();
+		SSL_load_error_strings();
 		OpenSSL_add_all_algorithms();
 #endif /*  SSL_SUPPORT */
 

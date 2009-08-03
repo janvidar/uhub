@@ -55,80 +55,27 @@ void debug_sendq_recv(struct hub_user* user, int received, int max, const char* 
 int net_user_send(void* ptr, const void* buf, size_t len)
 {
 	struct hub_user* user = (struct hub_user*) ptr;
-	int ret = net_send(user->net.connection.sd, buf, len, UHUB_SEND_SIGNAL);
+	int ret = net_con_send(&user->net.connection, buf, len);
 #ifdef DEBUG_SENDQ
 	debug_sendq_send(user, ret, len);
 #endif
 	if (ret > 0)
-	{
-		user_reset_last_write(user);
-	}
-	else if (ret == -1 && (net_error() == EWOULDBLOCK || net_error() == EINTR))
-	{
+		return ret;
+	if (ret == 0)
 		return -2;
-	}
 	else
-	{
-		// user->close_flag = quit_socket_error;
-		return 0;
-	}
-	return ret;
+		return -1;
 }
-
-#if 0
-int net_user_send_ssl(void* ptr, const void* buf, size_t len)
-{
-	struct hub_user* user = (struct hub_user*) ptr;
-	int ret = SSL_write(user->net.ssl, buf, (int) len);
-#ifdef DEBUG_SENDQ
-	debug_sendq_send(user, ret, len);
-#endif
-	if (ret > 0)
-	{
-		user_reset_last_write(user);
-	}
-	else if (ret == -1 && net_error() == EWOULDBLOCK)
-	{
-		return -2;
-	}
-	else
-	{
-		// user->close_flag = quit_socket_error;
-		return 0;
-	}
-	return ret;
-}
-#endif
 
 int net_user_recv(void* ptr, void* buf, size_t len)
 {
 	struct hub_user* user = (struct hub_user*) ptr;
-	int ret = net_recv(user->net.connection.sd, buf, len, 0);
-	if (ret > 0)
-	{
-		user_reset_last_read(user);
-	}
+	int ret = net_con_recv(&user->net.connection, buf, len);
 #ifdef DEBUG_SENDQ
 	debug_sendq_recv(user, ret, len, buf);
 #endif
 	return ret;
 }
-
-#if 0
-int net_user_recv_ssl(void* ptr, void* buf, size_t len)
-{
-	struct hub_user* user = (struct hub_user*) ptr;
-	int ret = SSL_read(user->net.ssl, buf, len);
-	if (ret > 0)
-	{
-		user_reset_last_read(user);
-	}
-#ifdef DEBUG_SENDQ
-	debug_sendq_recv(user, ret, len, buf);
-#endif
-	return ret;
-}
-#endif
 
 int handle_net_read(struct hub_user* user)
 {
@@ -140,16 +87,16 @@ int handle_net_read(struct hub_user* user)
 	if (size > 0)
 		buf_size += size;
 
-	if (size == -1)
+	if (size < 0)
 	{
-		if (net_error() == EWOULDBLOCK || net_error() == EINTR)
-			return 0;
-
-		return quit_socket_error;
+		if (size == -1)
+			return quit_disconnected;
+		else
+			return quit_socket_error;
 	}
 	else if (size == 0)
 	{
-		return quit_disconnected;
+		return 0;
 	}
 	else
 	{
@@ -211,15 +158,18 @@ int handle_net_read(struct hub_user* user)
 
 int handle_net_write(struct hub_user* user)
 {
+	int ret = 0;
 	while (hub_sendq_get_bytes(user->net.send_queue))
 	{
-		int ret = hub_sendq_send(user->net.send_queue, net_user_send, user);
-		if (ret == -2)
-			break;
-		
+		ret = hub_sendq_send(user->net.send_queue, net_user_send, user);
 		if (ret <= 0)
-			return quit_socket_error;
+			break;
 	}
+
+	if (ret == -1)
+		return quit_disconnected;
+	if (ret < 0)
+		return quit_socket_error;
 
 	if (hub_sendq_get_bytes(user->net.send_queue))
 	{
@@ -270,39 +220,13 @@ void net_event(int fd, short ev, void *arg)
 	}
 }
 
-
-static void prepare_user_net(struct hub_info* hub, struct hub_user* user)
-{
-		int fd = user->net.connection.sd;
-
-#ifdef SET_SENDBUG
-		size_t sendbuf = 0;
-		size_t recvbuf = 0;
-
-		if (net_get_recvbuf_size(fd, &recvbuf) != -1)
-		{
-			if (recvbuf > MAX_RECV_BUF || !recvbuf) recvbuf = MAX_RECV_BUF;
-			net_set_recvbuf_size(fd, recvbuf);
-		}
-
-		if (net_get_sendbuf_size(fd, &sendbuf) != -1)
-		{
-			if (sendbuf > MAX_SEND_BUF || !sendbuf) sendbuf = MAX_SEND_BUF;
-			net_set_sendbuf_size(fd, sendbuf);
-		}
-#endif
-
-		net_set_nonblocking(fd, 1);
-		net_set_nosigpipe(fd, 1);
-}
-
 void net_on_accept(int server_fd, short ev, void *arg)
 {
 	struct hub_info* hub = (struct hub_info*) arg;
 	struct hub_user* user = 0;
 	struct ip_addr_encap ipaddr;
 	const char* addr;
-	
+
 	for (;;)
 	{
 		int fd = net_accept(server_fd, &ipaddr);
@@ -318,12 +242,12 @@ void net_on_accept(int server_fd, short ev, void *arg)
 				break;
 			}
 		}
-		
+
 		addr = ip_convert_to_string(&ipaddr); 
 
 		/* FIXME: Should have a plugin log this */
 		LOG_TRACE("Got connection from %s", addr);
-		
+
 		/* FIXME: A plugin should perform this check: is IP banned? */
 		if (acl_is_ip_banned(hub->acl, addr))
 		{
@@ -331,7 +255,7 @@ void net_on_accept(int server_fd, short ev, void *arg)
 			net_close(fd);
 			continue;
 		}
-		
+
 		user = user_create(hub, fd);
 		if (!user)
 		{
@@ -339,11 +263,13 @@ void net_on_accept(int server_fd, short ev, void *arg)
 			net_close(fd);
 			break;
 		}
-		
+
 		/* Store IP address in user object */
 		memcpy(&user->net.ipaddr, &ipaddr, sizeof(ipaddr));
 
-		prepare_user_net(hub, user);
+#ifdef SSL_SUPPORT
+		net_con_ssl_accept(&user->net.connection);
+#endif
 	}
 }
 

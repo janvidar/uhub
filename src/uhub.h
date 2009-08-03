@@ -91,6 +91,7 @@
 
 #ifdef SSL_SUPPORT
 #include <openssl/ssl.h>
+#include <openssl/err.h>
 #endif
 
 #include "../version.h"

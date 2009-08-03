@@ -48,15 +48,18 @@ static void net_con_event(int fd, short ev, void *arg)
 	}
 	else
 	{
+		LOG_DEBUG("net_con_event: ev=%d, con=%p", ev, con);
 		if (ev & (EV_READ | EV_WRITE))
 		{
 			if (net_con_flag_get(con, NET_WANT_SSL_ACCEPT))
 			{
-				net_con_ssl_accept(con);
+				if (net_con_ssl_accept(con) < 0)
+					net_event(fd, EV_READ, con->ptr);
 			}
 			else if (net_con_flag_get(con, NET_WANT_SSL_CONNECT))
 			{
-				net_con_ssl_connect(con);
+				if (net_con_ssl_connect(con) < 0)
+					net_event(fd, EV_READ, con->ptr);
 			}
 			else if (ev == EV_READ && net_con_flag_get(con, NET_WANT_SSL_READ))
 			{
@@ -81,15 +84,11 @@ static void net_con_event(int fd, short ev, void *arg)
 
 void net_con_initialize(struct net_connection* con, int sd, const void* ptr, int events)
 {
+	LOG_DEBUG("net_con_initialize: sd=%d, ptr=%p", sd, ptr);
 	con->sd = sd;
 	con->ptr = (void*) ptr;
 	con->last_send = time(0);
 	con->last_recv = con->last_send;
-
-#ifdef SSL_SUPPORT
-	con->ssl = NULL;
-	con->write_len = 0;
-#endif
 
 	if (events & EV_READ)  net_con_flag_set(con, NET_WANT_READ);
 	if (events & EV_WRITE) net_con_flag_set(con, NET_WANT_WRITE);
@@ -97,6 +96,19 @@ void net_con_initialize(struct net_connection* con, int sd, const void* ptr, int
 	event_set(&con->event, con->sd, events | EV_PERSIST, net_con_event, con);
 	event_base_set(g_hub->evbase, &con->event);
 	event_add(&con->event, 0);
+
+	net_set_nonblocking(sd, 1);
+	net_set_nosigpipe(sd, 1);
+
+#ifdef SSL_SUPPORT
+	con->ssl = NULL;
+	con->write_len = 0;
+
+	con->ssl = SSL_new(g_hub->ssl_ctx);
+        LOG_DEBUG("SSL_new");
+        SSL_set_fd(con->ssl, con->sd);
+        LOG_DEBUG("SSL_set_fd");
+#endif
 }
 
 void net_con_update(struct net_connection* con, int events)
@@ -128,36 +140,47 @@ static int handle_openssl_error(struct net_connection* con, int ret)
 	switch (error)
 	{
 		case SSL_ERROR_ZERO_RETURN:
+			LOG_DEBUG("SSL_get_error: ret=%d, error=%d: SSL_ERROR_ZERO_RETURN", ret, error);
 			return ret;
 
 		case SSL_ERROR_WANT_READ:
+			LOG_DEBUG("SSL_get_error: ret=%d, error=%d: SSL_ERROR_WANT_READ", ret, error);
 			net_con_update(con, EV_READ);
 			net_con_flag_set(con, NET_WANT_SSL_READ);
 			return 0;
 
 		case SSL_ERROR_WANT_WRITE:
+			LOG_DEBUG("SSL_get_error: ret=%d, error=%d: SSL_ERROR_WANT_WRITE", ret, error);
 			net_con_update(con, EV_READ | EV_WRITE);
 			net_con_flag_set(con, NET_WANT_SSL_WRITE);
 			return 0;
 
 		case SSL_ERROR_WANT_CONNECT:
+			LOG_DEBUG("SSL_get_error: ret=%d, error=%d: SSL_ERROR_WANT_CONNECT", ret, error);
 			net_con_update(con, EV_READ | EV_WRITE);
 			net_con_flag_set(con, NET_WANT_SSL_CONNECT);
 			return 0;
 
 		case SSL_ERROR_WANT_ACCEPT:
+			LOG_DEBUG("SSL_get_error: ret=%d, error=%d: SSL_ERROR_WANT_ACCEPT", ret, error);
 			net_con_update(con, EV_READ | EV_WRITE);
 			net_con_flag_set(con, NET_WANT_SSL_ACCEPT);
 			return 0;
 
 		case SSL_ERROR_WANT_X509_LOOKUP:
+			LOG_DEBUG("SSL_get_error: ret=%d, error=%d: SSL_ERROR_WANT_X509_LOOKUP", ret, error);
 			return 0;
 
 		case SSL_ERROR_SYSCALL:
+			LOG_DEBUG("SSL_get_error: ret=%d, error=%d: SSL_ERROR_SYSCALL", ret, error);
 			/* if ret == 0, connection closed, if ret == -1, check with errno */
-			return -1;
+			if (ret == 0)
+				return -1;
+			else
+				return -net_error();
 
 		case SSL_ERROR_SSL:
+			LOG_DEBUG("SSL_get_error: ret=%d, error=%d: SSL_ERROR_SSL", ret, error);
 			/* internal openssl error */
 			return -1;
 	}
@@ -174,6 +197,7 @@ ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 	{
 #endif
 		int ret = net_send(con->sd, buf, len, UHUB_SEND_SIGNAL);
+		LOG_DEBUG("net_send: ret=%d", ret);
 		if (ret > 0)
 		{
 			con->last_send = time(0);
@@ -192,6 +216,7 @@ ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 	else
 	{
 		int ret = SSL_write(con->ssl, buf, len);
+		LOG_DEBUG("net_send: ret=%d", ret);
 		if (ret > 0)
 		{
 			con->last_send = time(0);
@@ -215,6 +240,7 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 	{
 #endif
 		int ret = net_recv(con->sd, buf, len, 0);
+		LOG_DEBUG("net_send: ret=%d", ret);
 		if (ret > 0)
 		{
 			con->last_recv = time(0);
@@ -233,6 +259,7 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 	else
 	{
 		int ret = SSL_read(con->ssl, buf, len);
+		LOG_DEBUG("net_send: ret=%d", ret);
 		if (ret > 0)
 		{
 			con->last_recv = time(0);
@@ -250,10 +277,13 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 #ifdef SSL_SUPPORT
 ssize_t net_con_ssl_accept(struct net_connection* con)
 {
+	net_con_flag_set(con, NET_WANT_SSL_ACCEPT);
 	ssize_t ret = SSL_accept(con->ssl);
+	LOG_DEBUG("SSL_accept() ret=%d", ret);
 	if (ret > 0)
 	{
 		net_con_flag_unset(con, NET_WANT_SSL_ACCEPT);
+		net_con_flag_unset(con, NET_WANT_SSL_READ);
 	}
 	else
 	{
@@ -264,6 +294,7 @@ ssize_t net_con_ssl_accept(struct net_connection* con)
 
 ssize_t net_con_ssl_connect(struct net_connection* con)
 {
+	net_con_flag_set(con, NET_WANT_SSL_CONNECT);
 	ssize_t ret = SSL_connect(con->ssl);
 	if (ret > 0)
 	{

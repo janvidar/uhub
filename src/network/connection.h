@@ -32,6 +32,7 @@ struct net_connection
 	time_t               last_send; /** Timestamp for last send() */
 #ifdef SSL_SUPPORT
 	SSL*                 ssl;       /** SSL handle */
+	SSL_CTX*             ctx;       /** FIXME: Should have a global one instead */
 	size_t               write_len; /** Length of last SSL_write(), only used if flags is NET_WANT_SSL_READ. */
 #endif /*  SSL_SUPPORT */
 };
@@ -44,8 +45,8 @@ extern void net_con_close(struct net_connection* con);
  * Send data
  *
  * @return returns the number of bytes sent.
- *         0 if no data is sent, and this function should be called again
- *        -1 if an error occured, and the socket should be considered dead or closed.
+ *         0 if no data is sent, and this function should be called again (EWOULDBLOCK/EINTR)
+ *        <0 if an error occured, the negative number contains the error code.
  */
 extern ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len);
 
@@ -53,8 +54,8 @@ extern ssize_t net_con_send(struct net_connection* con, const void* buf, size_t 
  * Receive data
  *
  * @return returns the number of bytes sent.
- *         0 if no data is sent, and this function should be called again
- *        -1 if an error occured, and the socket should be considered dead or closed.
+ *         0 if no data is sent, and this function should be called again (EWOULDBLOCK/EINTR)
+ *        <0 if an error occured, the negative number contains the error code.
  */
 extern ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len);
 

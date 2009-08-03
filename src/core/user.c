@@ -140,33 +140,36 @@ static int convert_support_fourcc(int fourcc)
 #endif
 		case FOURCC('B','A','S','E'):
 			return feature_base;
-			
+
 		case FOURCC('A','U','T','0'):
 			return  feature_auto;
-		
+
 		case FOURCC('U','C','M','0'):
 		case FOURCC('U','C','M','D'):
 			return feature_ucmd;
-			
+
 		case FOURCC('Z','L','I','F'):
 			return feature_zlif;
-			
+
 		case FOURCC('B','B','S','0'):
 			return feature_bbs;
-			
+
 		case FOURCC('T','I','G','R'):
 			return feature_tiger;
-			
+
 		case FOURCC('B','L','O','M'):
 		case FOURCC('B','L','O','0'):
 			return feature_bloom;
-		
+
 		case FOURCC('P','I','N','G'):
 			return feature_ping;
-		
+
 		case FOURCC('L','I','N','K'):
 			return feature_link;
-		
+
+		case FOURCC('A','D','C','S'):
+			return feature_adcs;
+
 		default:
 			LOG_DEBUG("Unknown extension: %x", fourcc);
 			return 0;

@@ -44,6 +44,7 @@ enum user_flags
 	feature_bloom   = 0x00000040, /** BLO0: Bloom filter (not supported) */
 	feature_ping    = 0x00000080, /** PING: Hub pinger information extension */
 	feature_link    = 0x00000100, /** LINK: Hub link (not supported) */
+	feature_adcs    = 0x00000200, /** ADCS: ADC over TLS/SSL */
 	flag_ignore     = 0x01000000, /** Ignore further reads */
 	flag_maxbuf     = 0x02000000, /** Hit max buf read, ignore msg */
 	flag_choke      = 0x04000000, /** Choked: Cannot send, waiting for write event */ 
