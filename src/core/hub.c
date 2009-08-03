@@ -543,7 +543,6 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	}
 	
 	event_set(&hub->ev_accept, hub->fd_tcp, EV_READ | EV_PERSIST, net_on_accept, hub);
-	event_base_set(net_get_evbase(), &hub->ev_accept);
 	if (event_add(&hub->ev_accept, NULL) == -1)
 	{
 		uman_shutdown(hub);

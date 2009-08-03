@@ -107,7 +107,6 @@ void net_con_initialize(struct net_connection* con, int sd, struct ip_addr_encap
 	if (events & EV_WRITE) net_con_flag_set(con, NET_WANT_WRITE);
 
 	event_set(&con->event, con->sd, events | EV_PERSIST, net_con_event, con);
-	event_base_set(net_get_evbase(), &con->event);
 	event_add(&con->event, 0);
 
 	net_set_nonblocking(sd, 1);
@@ -294,7 +293,6 @@ void net_con_set_timeout(struct net_connection* con, int seconds)
 {
 	struct timeval timeout = { seconds, 0 };
 	evtimer_set(&con->timeout, net_con_event, con);
-	event_base_set(net_get_evbase(), &con->timeout);
 	evtimer_add(&con->timeout, &timeout);
 }
 

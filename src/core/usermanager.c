@@ -77,7 +77,6 @@ static void timer_statistics(int fd, short ev, void *arg)
 	struct timeval timeout = { TIMEOUT_STATS, 0 };
 	uman_update_stats(hub);
 	evtimer_set(&hub->ev_timer, timer_statistics, hub);
-	event_base_set(net_get_evbase(), &hub->ev_timer);
 	evtimer_add(&hub->ev_timer, &timeout);
 }
 #endif
@@ -111,7 +110,6 @@ int uman_init(struct hub_info* hub)
 	if (net_get_evbase())
 	{
 		evtimer_set(&hub->ev_timer, timer_statistics, hub);
-		event_base_set(net_get_evbase(), &hub->ev_timer);
 		evtimer_add(&hub->ev_timer, &timeout);
 	}
 #endif // 0
