@@ -69,7 +69,7 @@ void on_login_success(struct hub_info* hub, struct hub_user* u)
 		hub_send_motd(hub, u);
 
 	/* reset timeout */
-	net_con_clear_timeout(&u->net.connection);
+	net_con_set_timeout(&u->net.connection, TIMEOUT_IDLE);
 }
 
 void on_login_failure(struct hub_info* hub, struct hub_user* u, enum status_message msg)
