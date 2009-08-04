@@ -30,13 +30,68 @@
 	uhub_assert(X->references >= 0);
 #else
 #define ADC_MSG_ASSERT(X) do { } while(0)
-#endif
+#endif /* DEBUG */
+
+#ifdef MSG_MEMORY_DEBUG
+#undef msg_malloc
+#undef msg_malloc_zero
+#undef msg_free
+
+static void* msg_malloc(size_t size)
+{
+	void* ptr = valloc(size);
+	LOG_MEMORY("msg_malloc: %p %d", ptr, (int) size);
+	return ptr;
+}
+
+static void* msg_malloc_zero(size_t size)
+{
+	void* ptr = msg_malloc(size);
+	memset(ptr, 0, size);
+	return ptr;
+}
+
+static void msg_free(void* ptr)
+{
+	LOG_MEMORY("msg_free:   %p", ptr);
+	// hub_free(ptr);
+}
+
+#include <sys/mman.h>
+static void adc_msg_protect(struct adc_message* cmd)
+{
+	LOG_MEMORY("msg_prot:   %p %d", cmd, cmd->capacity);
+	mprotect(cmd,        sizeof(cmd),           PROT_READ);
+	mprotect(cmd->cache, sizeof(cmd->capacity), PROT_READ);
+}
+
+static void adc_msg_unprotect(struct adc_message* cmd)
+{
+	LOG_MEMORY("msg_unprot: %p %d", cmd, cmd->capacity);
+	mprotect(cmd,        sizeof(cmd),           PROT_READ | PROT_WRITE);
+	mprotect(cmd->cache, sizeof(cmd->capacity), PROT_READ | PROT_WRITE);
+}
+
+#else
+
+#define msg_malloc(X)       hub_malloc(X)
+#define msg_malloc_zero(X)  hub_malloc_zero(X)
+#define msg_free(X)         hub_free(X)
+
+#endif /* MSG_MEMORY_DEBUG */
+
 
 struct adc_message* adc_msg_incref(struct adc_message* msg)
 {
 	if (!msg) return 0;
 #ifndef ADC_MESSAGE_INCREF
+#ifdef MSG_MEMORY_DEBUG
+	adc_msg_unprotect(msg);
+#endif
 	msg->references++;
+#ifdef MSG_MEMORY_DEBUG
+	adc_msg_protect(msg);
+#endif
 	return msg;
 #else
 	struct adc_message* copy = adc_msg_copy(msg);
@@ -62,18 +117,19 @@ static int adc_msg_grow(struct adc_message* msg, size_t size)
 	newsize += 2; /* termination */
 	newsize += (newsize % sizeof(size_t)); /* alignment padding */
 	
-	buf = hub_malloc_zero(newsize);
+	buf = msg_malloc_zero(newsize);
 	if (!buf)
 		return 0;
-	
+
 	if (msg->cache)
 	{
 		memcpy(buf, msg->cache, msg->length);
-		hub_free(msg->cache);
+		msg_free(msg->cache);
 	}
 	
 	msg->cache = buf;
 	msg->capacity = newsize;
+
 	return 1;
 }
 
@@ -85,7 +141,7 @@ static int adc_msg_cache_append(struct adc_message* msg, const char* string, siz
 		/* FIXME: OOM! */
 		return 0;
 	}
-	
+
 	memcpy(&msg->cache[msg->length], string, len);
 	adc_msg_set_length(msg, msg->length + len);
 	
@@ -148,14 +204,23 @@ void adc_msg_free(struct adc_message* msg)
 	if (!msg) return;
 	
 	ADC_MSG_ASSERT(msg);
-	
+
 	if (msg->references > 0)
 	{
+#ifdef MSG_MEMORY_DEBUG
+		adc_msg_unprotect(msg);
+#endif
 		msg->references--;
+#ifdef MSG_MEMORY_DEBUG
+		adc_msg_protect(msg);
+#endif
 	}
 	else
 	{
-		hub_free(msg->cache);
+#ifdef MSG_MEMORY_DEBUG
+		adc_msg_unprotect(msg);
+#endif
+		msg_free(msg->cache);
 		
 		if (msg->feature_cast_include)
 		{
@@ -171,7 +236,7 @@ void adc_msg_free(struct adc_message* msg)
 			msg->feature_cast_exclude = 0;
 		}
 		
-		hub_free(msg);
+		msg_free(msg);
 	}
 }
 
@@ -179,11 +244,11 @@ void adc_msg_free(struct adc_message* msg)
 struct adc_message* adc_msg_copy(const struct adc_message* cmd)
 {
 	char* tmp = 0;
-	struct adc_message* copy = (struct adc_message*) hub_malloc_zero(sizeof(struct adc_message));
+	struct adc_message* copy = (struct adc_message*) msg_malloc_zero(sizeof(struct adc_message));
 	if (!copy) return NULL; /* OOM */
 
 	ADC_MSG_ASSERT(cmd);
-	
+
 	/* deep copy */
 	copy->cmd                  = cmd->cmd;
 	copy->source               = cmd->source;
@@ -195,7 +260,7 @@ struct adc_message* adc_msg_copy(const struct adc_message* cmd)
 	copy->references           = 0;
 	copy->feature_cast_include = 0;
 	copy->feature_cast_exclude = 0;
-	
+
 	if (cmd->cache)
 	{
 		if (!adc_msg_grow(copy, copy->length))
@@ -206,7 +271,7 @@ struct adc_message* adc_msg_copy(const struct adc_message* cmd)
 		memcpy(copy->cache, cmd->cache, cmd->length);
 		copy->cache[copy->length] = 0;
 	}
-	
+
 	if (cmd->feature_cast_include)
 	{
 		copy->feature_cast_include = list_create();
@@ -217,7 +282,7 @@ struct adc_message* adc_msg_copy(const struct adc_message* cmd)
 			tmp = list_get_next(cmd->feature_cast_include);
 		}
 	}
-	
+
 	if (cmd->feature_cast_exclude)
 	{
 		copy->feature_cast_exclude = list_create();
@@ -228,9 +293,12 @@ struct adc_message* adc_msg_copy(const struct adc_message* cmd)
 			tmp = list_get_next(cmd->feature_cast_exclude);
 		}
 	}
-	
+
 	ADC_MSG_ASSERT(copy);
-	
+
+#ifdef MSG_MEMORY_DEBUG
+	adc_msg_protect(copy);
+#endif
 	return copy;
 }
 
@@ -255,7 +323,7 @@ struct adc_message* adc_msg_parse_verify(struct hub_user* u, const char* line, s
 
 struct adc_message* adc_msg_parse(const char* line, size_t length)
 {
-	struct adc_message* command = (struct adc_message*) hub_malloc_zero(sizeof(struct adc_message));
+	struct adc_message* command = (struct adc_message*) msg_malloc_zero(sizeof(struct adc_message));
 	char prefix = line[0];
 	size_t n = 0;
 	char temp_sid[5];
@@ -269,7 +337,7 @@ struct adc_message* adc_msg_parse(const char* line, size_t length)
 	if (!is_printable_utf8(line, length))
 	{
 		LOG_DEBUG("Dropped message with non-printable UTF-8 characters.");
-		hub_free(command);
+		msg_free(command);
 		return NULL;
 	}
 
@@ -280,7 +348,7 @@ struct adc_message* adc_msg_parse(const char* line, size_t length)
 
 	if (!adc_msg_grow(command, length + need_terminate))
 	{
-		hub_free(command);
+		msg_free(command);
 		return NULL; /* OOM */
 	}
 	
@@ -352,8 +420,8 @@ struct adc_message* adc_msg_parse(const char* line, size_t length)
 			{
 				list_destroy(command->feature_cast_include);
 				list_destroy(command->feature_cast_exclude);
-				hub_free(command->cache);
-				hub_free(command);
+				msg_free(command->cache);
+				msg_free(command);
 				return NULL; /* OOM */
 			}
 			
@@ -443,7 +511,10 @@ struct adc_message* adc_msg_parse(const char* line, size_t length)
 	}
 	
 	ADC_MSG_ASSERT(command);
-	
+
+#ifdef MSG_MEMORY_DEBUG
+	adc_msg_protect(command);
+#endif
 	return command;
 }
 
@@ -456,7 +527,7 @@ struct adc_message* adc_msg_create(const char* line)
 
 struct adc_message* adc_msg_construct(fourcc_t fourcc, size_t size)
 {
-	struct adc_message* msg = (struct adc_message*) hub_malloc_zero(sizeof(struct adc_message));
+	struct adc_message* msg = (struct adc_message*) msg_malloc_zero(sizeof(struct adc_message));
 	
 	if (!msg)
 		return NULL; /* OOM */
@@ -465,7 +536,7 @@ struct adc_message* adc_msg_construct(fourcc_t fourcc, size_t size)
 
 	if (!adc_msg_grow(msg, size+1))
 	{
-		hub_free(msg);
+		msg_free(msg);
 		return NULL; /* OOM */
 	}
 	
@@ -484,7 +555,11 @@ struct adc_message* adc_msg_construct(fourcc_t fourcc, size_t size)
 	
 	msg->cmd = fourcc;
 	msg->priority = 0;
-	
+
+#ifdef MSG_MEMORY_DEBUG
+	adc_msg_protect(msg);
+#endif
+
 	return msg;
 }
 
@@ -624,12 +699,20 @@ void adc_msg_terminate(struct adc_message* cmd)
 		adc_msg_cache_append(cmd, "\n", 1);
 	}
 	ADC_MSG_ASSERT(cmd);
+
+#ifdef MSG_MEMORY_DEBUG
+	adc_msg_protect(cmd);
+#endif
 }
 
 /* FIXME: this looks bogus */
 void adc_msg_unterminate(struct adc_message* cmd)
 {
 	ADC_MSG_ASSERT(cmd);
+
+#ifdef MSG_MEMORY_DEBUG
+	adc_msg_unprotect(cmd);
+#endif
 	
 	if (cmd->length > 0 && cmd->cache[cmd->length-1] == '\n')
 	{
@@ -781,7 +864,7 @@ int adc_msg_unescape_length(const char* str)
 
 char* adc_msg_unescape(const char* string)
 {
-	char* new_string = hub_malloc(adc_msg_unescape_length(string)+1);
+	char* new_string = msg_malloc(adc_msg_unescape_length(string)+1);
 	char* ptr = (char*) new_string;
 	char* str = (char*) string;
 	int escaped = 0;
