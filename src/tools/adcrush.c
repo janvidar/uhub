@@ -11,7 +11,7 @@
 #define ADC_SIDSIZE 4
 #define ADC_CID_SIZE 39
 
-#define BIG_BUFSIZE 131072
+#define BIG_BUFSIZE 32768
 #define TIGERSIZE 24
 
 #define ADC_HANDSHAKE "HSUP ADBASE ADTIGR\n"
@@ -157,7 +157,6 @@ const char* search_messages[MAX_SEARCH_MSGS] = {
 
 struct ADC_client
 {
-	int  sd;
 	int  num;
 	sid_t sid;
 	enum protocolState state;
@@ -166,10 +165,8 @@ struct ADC_client
 	char sendbuf[BIG_BUFSIZE];
 	size_t s_offset;
 	size_t r_offset;
-	struct event ev_read;
-	struct event ev_write;
-	struct event ev_timer;
 	size_t timeout;
+	struct net_connection con;
 };
 
 
@@ -229,7 +226,6 @@ static size_t get_wait_rand(size_t max)
 static void client_reschedule_timeout(struct ADC_client* client)
 {
 	size_t next_timeout = 0;
-	struct timeval timeout = { 0, 0 };
 	
 	switch (client->state)
 	{
@@ -272,9 +268,7 @@ static void client_reschedule_timeout(struct ADC_client* client)
 		client->timeout = get_wait_rand(MAX(next_timeout, 1));
 
 	if (!client->timeout) client->timeout++;
-
-	timeout.tv_sec = (time_t) client->timeout;
-	evtimer_add(&client->ev_timer, &timeout);
+	net_con_set_timeout(&client->con, client->timeout);
 }
 
 static void set_state_timeout(struct ADC_client* client, enum protocolState state)
@@ -285,7 +279,7 @@ static void set_state_timeout(struct ADC_client* client, enum protocolState stat
 
 static void send_client(struct ADC_client* client, char* msg)
 {
-	int ret = net_send(client->sd, msg, strlen(msg), UHUB_SEND_SIGNAL);
+	int ret = net_con_send(&client->con, msg, strlen(msg));
 	
 	if (cfg_debug > 1)
 	{
@@ -313,6 +307,7 @@ static void send_client(struct ADC_client* client, char* msg)
 
 static void ADC_client_on_connected(struct ADC_client* client)
 {
+	net_con_update(&client->con, NET_EVENT_READ);
 	send_client(client, ADC_HANDSHAKE);
 	set_state_timeout(client, ps_protocol);
 	bot_output(client, "connected.");
@@ -320,12 +315,7 @@ static void ADC_client_on_connected(struct ADC_client* client)
 
 static void ADC_client_on_disconnected(struct ADC_client* client)
 {
-	event_del(&client->ev_read);
-	event_del(&client->ev_write);
-	
-	net_close(client->sd);
-	client->sd = -1;
-	
+	net_con_close(&client->con);
 	bot_output(client, "disconnected.");
 	set_state_timeout(client, ps_none);
 }
@@ -371,7 +361,7 @@ static int recv_client(struct ADC_client* client)
 	ssize_t size = 0;
 	if (cfg_mode != mode_performance || (cfg_mode == mode_performance && (get_wait_rand(100) < (90 - (15 * cfg_level)))))
 	{
-		size = net_recv(client->sd, &client->recvbuf[client->r_offset], ADC_BUFSIZE - client->r_offset, 0);
+		size = net_con_recv(&client->con, &client->recvbuf[client->r_offset], ADC_BUFSIZE - client->r_offset);
 	}
 	else
 	{
@@ -499,12 +489,24 @@ static int recv_client(struct ADC_client* client)
 
 void ADC_client_connect(struct ADC_client* client)
 {
-	struct timeval timeout = { TIMEOUT_IDLE, 0 };
-	net_connect(client->sd, (struct sockaddr*) &saddr, sizeof(struct sockaddr_in));
-	set_state_timeout(client, ps_conn);
-	event_add(&client->ev_read, &timeout);
-	event_add(&client->ev_write, &timeout);
-	bot_output(client, "connecting...");
+	int ret = net_connect(client->con.sd, (struct sockaddr*) &saddr, sizeof(struct sockaddr_in));
+	if (ret == 0 || (ret == -1 && net_error() == EISCONN))
+	{
+		ADC_client_on_connected(client);
+	}
+	else if (ret == -1 && (net_error() == EALREADY || net_error() == EINPROGRESS || net_error() == EWOULDBLOCK || net_error() == EINTR))
+	{
+		if (client->state != ps_conn)
+		{
+			net_con_update(&client->con, NET_EVENT_READ | NET_EVENT_WRITE);
+			set_state_timeout(client, ps_conn);
+			bot_output(client, "connecting...");
+		}
+	}
+	else
+	{
+		ADC_client_on_disconnected(client);
+	}
 }
 
 void ADC_client_wait_connect(struct ADC_client* client)
@@ -517,12 +519,9 @@ void ADC_client_wait_connect(struct ADC_client* client)
 
 void ADC_client_disconnect(struct ADC_client* client)
 {
-	if (client->sd != -1)
+	if (client->con.sd != -1)
 	{
-		net_close(client->sd);
-		client->sd = -1;
-		event_del(&client->ev_read);
-		event_del(&client->ev_write);
+		net_con_close(&client->con);
 		bot_output(client, "disconnected.");
 		
 		if (running)
@@ -684,80 +683,64 @@ static void perf_normal_action(struct ADC_client* client)
 	client_reschedule_timeout(client);
 }
 
-void event_callback(int fd, short ev, void *arg)
+void event_callback(struct net_connection* con, int events, void *arg)
 {
 	struct ADC_client* client = (struct ADC_client*) arg;
-
-	if (ev & EV_READ)
+	if (events == NET_EVENT_SOCKERROR || events == NET_EVENT_CLOSED)
 	{
-		if (recv_client(client) == -1)
-		{
-			ADC_client_on_disconnected(client);
-		}
+		ADC_client_on_disconnected(client);
 	}
-	
-	if (ev & EV_TIMEOUT)
+
+	if (events == NET_EVENT_TIMEOUT)
 	{
 		if (client->state == ps_none)
 		{
-			if (client->sd == -1)
+			if (client->con.sd == -1)
 			{
 				ADC_client_create(client, client->num);
 			}
 
 			ADC_client_connect(client);
 		}
+	}
 
-		if (fd == -1)
+	if (events & NET_EVENT_READ)
+	{
+		if (recv_client(client) == -1)
 		{
-			if (client->state == ps_normal && cfg_mode == mode_performance)
-			{
-				perf_normal_action(client);
-			}
+			ADC_client_on_disconnected(client);
 		}
 	}
-	
-	if (ev & EV_WRITE)
+
+	if (events & NET_EVENT_WRITE)
 	{
 		if (client->state == ps_conn)
 		{
-			ADC_client_on_connected(client);
+			ADC_client_connect(client);
 		}
 		else
 		{
 			/* FIXME: Call send again */
 		}
-
 	}
 }
 
 int ADC_client_create(struct ADC_client* client, int num)
 {
-	struct timeval timeout = { 0, 0 };
-	
 	memset(client, 0, sizeof(struct ADC_client));
 	client->num = num;
-	
-	client->sd = net_socket_create(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (client->sd == -1) return -1;
-	
-	event_set(&client->ev_write, client->sd, EV_WRITE, event_callback, client);
-	event_set(&client->ev_read,  client->sd, EV_READ | EV_PERSIST, event_callback, client);
-	
-	net_set_nonblocking(client->sd, 1);
-	
-	timeout.tv_sec = client->timeout;
-	evtimer_set(&client->ev_timer, event_callback, client);
 
+	int sd = net_socket_create(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (sd == -1) return -1;
+
+	net_con_initialize(&client->con, sd, 0, event_callback, client, NET_EVENT_READ);
 	set_state_timeout(client, ps_none);
-
 	return 0;
 }
 
 void ADC_client_destroy(struct ADC_client* client)
 {
 	ADC_client_disconnect(client);
-	evtimer_del(&client->ev_timer);
 }
 
 
@@ -943,16 +926,17 @@ int main(int argc, char** argv)
 	parse_command_line(argc, argv);
 	
 	net_initialize();
-	event_init();
-	
+	hub_log_initialize(NULL, 0);
+	hub_set_log_verbosity(1000);
+
 	memset(&saddr, 0, sizeof(saddr));
 	saddr.sin_family = AF_INET;
 	saddr.sin_port   = htons(cfg_port);
 	net_string_to_address(AF_INET, cfg_host, &saddr.sin_addr);
-	
-	runloop(cfg_clients);
-	net_destroy();
 
+	runloop(cfg_clients);
+
+	net_destroy();
 	return 0;
 }
 
