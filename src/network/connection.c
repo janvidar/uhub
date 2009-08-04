@@ -140,7 +140,7 @@ void net_con_update(struct net_connection* con, int ev)
 	if (events & EV_READ)  net_con_flag_set(con, NET_WANT_READ);
 	if (events & EV_WRITE) net_con_flag_set(con, NET_WANT_WRITE);
 
-	if (event_pending(&con->event, EV_READ | EV_WRITE, 0) == events)
+	if (con->sd == -1 || event_pending(&con->event, EV_READ | EV_WRITE, 0) == events)
 		return;
 
 	event_del(&con->event);

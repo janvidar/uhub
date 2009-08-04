@@ -959,8 +959,6 @@ void hub_schedule_destroy_user(struct hub_info* hub, struct hub_user* user)
 	post.ptr = user;
 	event_queue_post(hub->queue, &post);
 
-	net_con_close(&user->net.connection);
-
 	if (user->id.sid)
 	{
 		sid_free(hub->users->sids, user->id.sid);
@@ -975,20 +973,6 @@ void hub_disconnect_all(struct hub_info* hub)
 	post.ptr = 0;
 	event_queue_post(hub->queue, &post);
 }
-
-
-void hub_schedule_destroy_all(struct hub_info* hub)
-{
-	struct hub_user* user = (struct hub_user*) list_get_first(hub->users->list);
-	while (user)
-	{
-
-		hub_schedule_destroy_user(hub, user);
-		user = (struct hub_user*) list_get_next(hub->users->list);
-	}
-}
-
-
 
 void hub_event_loop(struct hub_info* hub)
 {
@@ -1026,7 +1010,7 @@ void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason
 {
 	struct event_data post;
 	int need_notify = 0;
-	
+
 	/* is user already being disconnected ? */
 	if (user_is_disconnecting(user))
 	{
@@ -1035,7 +1019,8 @@ void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason
 
 	/* stop reading from user */
 	net_shutdown_r(user->net.connection.sd);
-	
+	net_con_close(&user->net.connection);
+
 	LOG_TRACE("hub_disconnect_user(), user=%p, reason=%d, state=%d", user, reason, user->state);
 	
 	need_notify = user_is_logged_in(user) && hub->status == hub_status_running;
