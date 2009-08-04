@@ -94,13 +94,17 @@ struct sid_pool* sid_pool_create(sid_t max)
 	pool->map = hub_malloc_zero(sizeof(struct hub_user*) * pool->max);
 	pool->map[0] = (struct hub_user*) pool; /* hack to reserve the first sid. */
 
+#ifdef DEBUG_SID
 	LOG_DUMP("SID_POOL:  max=%d", (int) pool->max);
+#endif
 	return pool;
 }
 
 void sid_pool_destroy(struct sid_pool* pool)
 {
+#ifdef DEBUG_SID
 	LOG_DUMP("SID_POOL:  destroying, current allocs=%d", (int) pool->count);
+#endif
 	hub_free(pool->map);
 	hub_free(pool);
 }
@@ -110,14 +114,18 @@ sid_t sid_alloc(struct sid_pool* pool, struct hub_user* user)
 	sid_t n = (++pool->count);
 	for (; (pool->map[n % pool->max]); n++) ;
 
+#ifdef DEBUG_SID
 	LOG_DUMP("SID_ALLOC: %d, user=%p", (int) n, user);
+#endif
 	pool->map[n] = user;
 	return n;
 }
 
 void sid_free(struct sid_pool* pool, sid_t sid)
 {
+#ifdef DEBUG_SID
 	LOG_DUMP("SID_FREE:  %d", (int) sid);
+#endif
 	pool->map[sid] = 0;
 	pool->count--;
 }
