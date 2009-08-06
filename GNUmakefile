@@ -13,7 +13,7 @@ USE_SSL       ?= NO
 USE_BIGENDIAN ?= AUTO
 BITS          ?= AUTO
 SILENT        ?= YES
-LDLIBS        += -levent
+LDLIBS        += -lev
 TERSE         ?= NO
 STACK_PROTECT ?= NO
 

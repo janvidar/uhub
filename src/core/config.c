@@ -137,6 +137,10 @@
 #define DEF_LIMIT_MAX_SHARE                 0
 #define DEF_LIMIT_MIN_SLOTS                 0
 #define DEF_LIMIT_MAX_SLOTS                 0
+#define DEF_TLS_ENABLE                      0
+#define DEF_TLS_REQUIRE                     1
+#define DEF_TLS_PRIVATE_KEY                 ""
+#define DEF_TLS_CERTIFICATE                 ""
 #define DEF_MSG_HUB_FULL                    "Hub is full"
 #define DEF_MSG_HUB_DISABLED                "Hub is disabled"
 #define DEF_MSG_HUB_REGISTERED_USERS_ONLY   "Hub is for registered users only"
@@ -232,10 +236,10 @@ void config_defaults(struct hub_config* config)
 	DEFAULT_STRING (msg_user_hub_limit_low,        DEF_MSG_USER_HUB_LIMIT_LOW);
 	DEFAULT_STRING (msg_user_hub_limit_high,       DEF_MSG_USER_HUB_LIMIT_HIGH);
 
-	DEFAULT_INTEGER(tls_enable,             0);
-	DEFAULT_INTEGER(tls_require,            0);
-	DEFAULT_STRING (tls_certificate,       "");
-	DEFAULT_STRING (tls_private_key,       "");
+	DEFAULT_INTEGER(tls_enable,                    DEF_TLS_ENABLE);
+	DEFAULT_INTEGER(tls_require,                   DEF_TLS_REQUIRE);
+	DEFAULT_STRING (tls_certificate,               DEF_TLS_CERTIFICATE);
+	DEFAULT_STRING (tls_private_key,               DEF_TLS_PRIVATE_KEY);
 }
 
 
@@ -407,6 +411,13 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 	DUMP_BOOL(chat_is_privileged, DEF_CHAT_IS_PRIVILEGED);
 	DUMP_BOOL(low_bandwidth_mode, DEF_LOW_BANDWIDTH_MODE);
 	DUMP_BOOL(registered_users_only, DEF_REGISTERED_USERS_ONLY);
+
+#ifdef SSL_SUPPORT
+        DUMP_BOOL(tls_enable, DEF_TLS_ENABLE);
+	DUMP_BOOL(tls_require, DEF_TLS_REQUIRE);
+	DUMP_STR (tls_certificate, DEF_TLS_CERTIFICATE);
+	DUMP_STR (tls_private_key, DEF_TLS_PRIVATE_KEY);
+#endif
 
 	/* Limits enforced on users */
 	DUMP_INT(limit_max_hubs_user, DEF_LIMIT_MAX_HUBS_USER);
