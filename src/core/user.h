@@ -97,17 +97,8 @@ struct hub_user_limits
 	size_t               hub_count_total;         /** The number of hubs connected to in total */
 };
 
-struct hub_user_net_io
-{
-	struct net_connection connection;             /** Connection data */
-	struct hub_recvq*    recv_queue;
-	struct hub_sendq*    send_queue;
-	time_t               tm_connected;            /** time when user connected */
-};
-
 struct hub_user
 {
-	struct hub_user_net_io   net;                     /** Network information data */
 	enum user_state      state;                   /** see enum user_state */
 	enum user_credentials credentials;            /** see enum user_credentials */
 	struct hub_user_info     id;                      /** Contains nick name and CID */
@@ -116,6 +107,10 @@ struct hub_user
 	struct linked_list*  feature_cast;            /** Features supported by feature cast */
 	struct adc_message*  info;                    /** ADC 'INF' message (broadcasted to everyone joining the hub) */
 	struct hub_info*     hub;                     /** The hub instance this user belong to */
+	struct hub_recvq*    recv_queue;
+	struct hub_sendq*    send_queue;
+	struct net_connection* connection;            /** Connection data */
+	time_t               tm_connected;            /** time when user connected */
 	struct hub_user_limits   limits;                  /** Data used for limitation */
 	enum user_quit_reason quit_reason;            /** Quit reason (see user_quit_reason) */
 

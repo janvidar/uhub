@@ -104,6 +104,11 @@ static void net_con_event(int fd, short ev, void *arg)
 #endif
 }
 
+const char* net_con_get_peer_address(struct net_connection* con)
+{
+	 return ip_convert_to_string(&con->ipaddr);
+}
+
 void net_con_initialize(struct net_connection* con, int sd, struct ip_addr_encap* addr, net_connection_cb callback, const void* ptr, int ev)
 {
 	int events = net_con_convert_to_libevent_mask(ev);

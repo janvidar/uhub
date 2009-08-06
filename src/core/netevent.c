@@ -55,7 +55,7 @@ void debug_sendq_recv(struct hub_user* user, int received, int max, const char* 
 int net_user_send(void* ptr, const void* buf, size_t len)
 {
 	struct hub_user* user = (struct hub_user*) ptr;
-	int ret = net_con_send(&user->net.connection, buf, len);
+	int ret = net_con_send(user->connection, buf, len);
 #ifdef DEBUG_SENDQ
 	debug_sendq_send(user, ret, len);
 #endif
@@ -70,7 +70,7 @@ int net_user_send(void* ptr, const void* buf, size_t len)
 int net_user_recv(void* ptr, void* buf, size_t len)
 {
 	struct hub_user* user = (struct hub_user*) ptr;
-	int ret = net_con_recv(&user->net.connection, buf, len);
+	int ret = net_con_recv(user->connection, buf, len);
 #ifdef DEBUG_SENDQ
 	debug_sendq_recv(user, ret, len, buf);
 #endif
@@ -80,7 +80,7 @@ int net_user_recv(void* ptr, void* buf, size_t len)
 int handle_net_read(struct hub_user* user)
 {
 	static char buf[MAX_RECV_BUF];
-	struct hub_recvq* q = user->net.recv_queue;
+	struct hub_recvq* q = user->recv_queue;
 	size_t buf_size = hub_recvq_get(q, buf, MAX_RECV_BUF);
 	ssize_t size = net_user_recv(user, &buf[buf_size], MAX_RECV_BUF - buf_size);
 
@@ -159,9 +159,9 @@ int handle_net_read(struct hub_user* user)
 int handle_net_write(struct hub_user* user)
 {
 	int ret = 0;
-	while (hub_sendq_get_bytes(user->net.send_queue))
+	while (hub_sendq_get_bytes(user->send_queue))
 	{
-		ret = hub_sendq_send(user->net.send_queue, net_user_send, user);
+		ret = hub_sendq_send(user->send_queue, net_user_send, user);
 		if (ret <= 0)
 			break;
 	}
@@ -171,7 +171,7 @@ int handle_net_write(struct hub_user* user)
 	if (ret < 0)
 		return quit_socket_error;
 
-	if (hub_sendq_get_bytes(user->net.send_queue))
+	if (hub_sendq_get_bytes(user->send_queue))
 	{
 		user_net_io_want_write(user);
 	}

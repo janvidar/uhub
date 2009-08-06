@@ -22,26 +22,26 @@
 static void log_user_login(struct hub_user* u)
 {
 	const char* cred = get_user_credential_string(u->credentials);
-	const char* addr = ip_convert_to_string(&u->net.connection.ipaddr);
+	const char* addr = net_con_get_peer_address(u->connection);
 	LOG_USER("LoginOK     %s/%s %s \"%s\" (%s) \"%s\"", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, cred, u->user_agent);
 }
 
 static void log_user_login_error(struct hub_user* u, enum status_message msg)
 {
-	const char* addr = ip_convert_to_string(&u->net.connection.ipaddr);
+	const char* addr = net_con_get_peer_address(u->connection);
 	const char* message = hub_get_status_message_log(u->hub, msg);
 	LOG_USER("LoginError  %s/%s %s \"%s\" (%s) \"%s\"", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, message, u->user_agent);
 }
 
 static void log_user_logout(struct hub_user* u, const char* message)
 {
-	const char* addr = ip_convert_to_string(&u->net.connection.ipaddr);
+	const char* addr = net_con_get_peer_address(u->connection);
 	LOG_USER("Logout      %s/%s %s \"%s\" (%s)", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, message);
 }
 
 static void log_user_nick_change(struct hub_user* u, const char* nick)
 {
-	const char* addr = ip_convert_to_string(&u->net.connection.ipaddr);
+	const char* addr = net_con_get_peer_address(u->connection);
 	LOG_USER("NickChange  %s/%s %s \"%s\" -> \"%s\"", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, nick);
 }
 
@@ -69,7 +69,7 @@ void on_login_success(struct hub_info* hub, struct hub_user* u)
 		hub_send_motd(hub, u);
 
 	/* reset timeout */
-	net_con_set_timeout(&u->net.connection, TIMEOUT_IDLE);
+	net_con_set_timeout(u->connection, TIMEOUT_IDLE);
 }
 
 void on_login_failure(struct hub_info* hub, struct hub_user* u, enum status_message msg)

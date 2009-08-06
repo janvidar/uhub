@@ -46,12 +46,13 @@ struct hub_user* user_create(struct hub_info* hub, int sd, struct ip_addr_encap*
 	if (user == NULL)
 		return NULL; /* OOM */
 
-	user->net.tm_connected = time(NULL);
-	user->net.send_queue = hub_sendq_create();
-	user->net.recv_queue = hub_recvq_create();
+	user->tm_connected = time(NULL);
+	user->send_queue = hub_sendq_create();
+	user->recv_queue = hub_recvq_create();
 
-	net_con_initialize(&user->net.connection, sd, addr, net_event, user, NET_EVENT_READ);
-	net_con_set_timeout(&user->net.connection, TIMEOUT_CONNECTED);
+	user->connection = (struct net_connection*) hub_malloc(sizeof(struct net_connection));
+	net_con_initialize(user->connection, sd, addr, net_event, user, NET_EVENT_READ);
+	net_con_set_timeout(user->connection, TIMEOUT_CONNECTED);
 
 	user_set_state(user, state_protocol);
 	return user;
@@ -62,8 +63,8 @@ void user_destroy(struct hub_user* user)
 {
 	LOG_TRACE("user_destroy(), user=%p", user);
 
-	hub_recvq_destroy(user->net.recv_queue);
-	hub_sendq_destroy(user->net.send_queue);
+	hub_recvq_destroy(user->recv_queue);
+	hub_sendq_destroy(user->send_queue);
 
 	adc_msg_free(user->info);
 	user_clear_feature_cast_support(user);
@@ -314,12 +315,12 @@ int user_is_registered(struct hub_user* user)
 
 void user_net_io_want_write(struct hub_user* user)
 {
-	net_con_update(&user->net.connection, NET_EVENT_READ | NET_EVENT_WRITE);
+	net_con_update(user->connection, NET_EVENT_READ | NET_EVENT_WRITE);
 }
 
 void user_net_io_want_read(struct hub_user* user)
 {
-	net_con_update(&user->net.connection, NET_EVENT_READ);
+	net_con_update(user->connection, NET_EVENT_READ);
 }
 
 const char* user_get_quit_reason_string(enum user_quit_reason reason)

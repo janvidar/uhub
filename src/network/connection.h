@@ -72,6 +72,12 @@ extern ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len);
 extern void net_con_set_timeout(struct net_connection* con, int seconds);
 extern void net_con_clear_timeout(struct net_connection* con);
 
+/**
+ * Returns a string representation of the ipaddr member.
+ * NOTE: Static buffer.
+ */
+extern const char* net_con_get_peer_address(struct net_connection* con);
+
 #ifdef SSL_SUPPORT
 /**
  * Start SSL_accept()

@@ -4,6 +4,7 @@
 
 static struct hub_info um_hub;
 static struct hub_user um_user[MAX_USERS];
+static struct net_connection um_cons[MAX_USERS];
 
 EXO_TEST(um_test_setup, {
 	int i = 0;
@@ -11,9 +12,12 @@ EXO_TEST(um_test_setup, {
 	
 	for (i = 0; i < MAX_USERS; i++)
 	{
+		memset(&um_cons[i], 0, sizeof(struct net_connection));
+		um_cons[i].sd = -1;
+
 		memset(&um_user[i], 0, sizeof(struct hub_user));
 		um_user[i].id.sid = i+1;
-		um_user[i].net.connection.sd = -1;
+		um_user[i].connection = &um_cons[i];
 	}
 	return 1;
 });

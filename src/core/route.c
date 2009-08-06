@@ -80,10 +80,10 @@ static inline int check_send_queue(struct hub_info* hub, struct hub_user* user, 
 	if (user_flag_get(user, flag_user_list))
 		return 1;
 
-	if ((user->net.send_queue->size + msg->length) > get_max_send_queue(hub))
+	if ((user->send_queue->size + msg->length) > get_max_send_queue(hub))
 		return -1;
 
-	if (user->net.send_queue->size > get_max_send_queue_soft(hub) && msg->priority < 0)
+	if (user->send_queue->size > get_max_send_queue_soft(hub) && msg->priority < 0)
 		return 0;
 
 	return 1;
@@ -97,17 +97,17 @@ int route_to_user(struct hub_info* hub, struct hub_user* user, struct adc_messag
 	free(data);
 #endif
 
-	if (hub_sendq_is_empty(user->net.send_queue) && !user_flag_get(user, flag_pipeline))
+	if (hub_sendq_is_empty(user->send_queue) && !user_flag_get(user, flag_pipeline))
 	{
 		/* Perform oportunistic write */
-		hub_sendq_add(user->net.send_queue, msg);
+		hub_sendq_add(user->send_queue, msg);
 		handle_net_write(user);
 	}
 	else
 	{
 		if (check_send_queue(hub, user, msg) >= 0)
 		{
-			hub_sendq_add(user->net.send_queue, msg);
+			hub_sendq_add(user->send_queue, msg);
 			if (!user_flag_get(user, flag_pipeline))
 				user_net_io_want_write(user);
 		}
@@ -117,7 +117,7 @@ int route_to_user(struct hub_info* hub, struct hub_user* user, struct adc_messag
 
 int route_flush_pipeline(struct hub_info* hub, struct hub_user* u)
 {
-	if (hub_sendq_is_empty(u->net.send_queue))
+	if (hub_sendq_is_empty(u->send_queue))
 		return 0;
 
 	handle_net_write(u);
@@ -197,7 +197,7 @@ int route_info_message(struct hub_info* hub, struct hub_user* u)
 	else
 	{
 		struct adc_message* cmd = adc_msg_copy(u->info);
-		const char* address = ip_convert_to_string(&u->net.connection.ipaddr);
+		const char* address = net_con_get_peer_address(u->connection);
 		struct hub_user* user = 0;
 		
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);

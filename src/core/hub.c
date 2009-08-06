@@ -140,7 +140,7 @@ int hub_handle_support(struct hub_info* hub, struct hub_user* u, struct adc_mess
 		if (ok)
 		{
 			hub_send_handshake(hub, u);
-			net_con_set_timeout(&u->net.connection, TIMEOUT_HANDSHAKE);
+			net_con_set_timeout(u->connection, TIMEOUT_HANDSHAKE);
 		}
 		else
 		{
@@ -1018,8 +1018,8 @@ void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason
 	}
 
 	/* stop reading from user */
-	net_shutdown_r(user->net.connection.sd);
-	net_con_close(&user->net.connection);
+	net_shutdown_r(user->connection->sd);
+	net_con_close(user->connection);
 
 	LOG_TRACE("hub_disconnect_user(), user=%p, reason=%d, state=%d", user, reason, user->state);
 	
@@ -1047,7 +1047,7 @@ void hub_logout_log(struct hub_info* hub, struct hub_user* user)
 	loginfo->time = time(NULL);
 	strcpy(loginfo->cid, user->id.cid);
 	strcpy(loginfo->nick, user->id.nick);
-	memcpy(&loginfo->addr, &user->net.connection.ipaddr, sizeof(struct ip_addr_encap));
+	memcpy(&loginfo->addr, &user->connection->ipaddr, sizeof(struct ip_addr_encap));
 	loginfo->reason = user->quit_reason;
 
 	list_append(hub->logout_info, loginfo);

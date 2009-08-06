@@ -290,7 +290,7 @@ static int command_version(struct hub_info* hub, struct hub_user* user, struct h
 static int command_myip(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
 {
 	char tmp[128];
-	snprintf(tmp, 128, "Your address is \"%s\"", ip_convert_to_string(&user->net.connection.ipaddr));
+	snprintf(tmp, 128, "Your address is \"%s\"", net_con_get_peer_address(user->connection));
 	return command_status(hub, user, cmd, tmp);
 }
 
@@ -304,7 +304,7 @@ static int command_getip(struct hub_info* hub, struct hub_user* user, struct hub
 	if (!target)
 		return command_status_user_not_found(hub, user, cmd, nick);
 
-	snprintf(tmp, 128, "%s has address \"%s\"", nick, ip_convert_to_string(&target->net.connection.ipaddr));
+	snprintf(tmp, 128, "%s has address \"%s\"", nick, net_con_get_peer_address(user->connection));
 	return command_status(hub, user, cmd, tmp);
 }
 
@@ -342,7 +342,7 @@ static int command_whoip(struct hub_info* hub, struct hub_user* user, struct hub
 	{
 		strcat(buffer, u->id.nick);
 		strcat(buffer, " (");
-		strcat(buffer, ip_convert_to_string(&u->net.connection.ipaddr));
+		strcat(buffer, net_con_get_peer_address(u->connection));
 		strcat(buffer, ")\n");
 		u = (struct hub_user*) list_get_next(users);
 	}
