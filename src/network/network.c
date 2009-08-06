@@ -183,7 +183,17 @@ int net_set_nonblocking(int fd, int toggle)
 	u_long on = toggle ? 1 : 0;
 	ret = ioctlsocket(fd, FIONBIO, &on);
 #else
+#ifdef __sun__
+	int flags = fcntl(fd, F_GETFL, 0);
+	if (flags != -1)
+	{
+		if (toggle) flags |= O_NONBLOCK;
+		else        flags &= ~O_NONBLOCK;
+		ret = fcntl(fd, F_SETFL, flags);
+	}
+#else
 	ret = ioctl(fd, FIONBIO, &toggle);
+#endif
 #endif
 	if (ret == -1)
 	{
