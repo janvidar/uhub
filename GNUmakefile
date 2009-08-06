@@ -13,7 +13,7 @@ USE_SSL       ?= NO
 USE_BIGENDIAN ?= AUTO
 BITS          ?= AUTO
 SILENT        ?= YES
-LDLIBS        += -lev
+LDLIBS        += -levent
 TERSE         ?= NO
 STACK_PROTECT ?= NO
 
@@ -21,6 +21,9 @@ ifeq ($(OS), Windows_NT)
 WINDOWS       ?= YES
 endif
 
+ifeq (SOLARIS,YES)
+LDLIBS        += -lsocket -lnsl
+endif
 
 CFLAGS        += -I./src/
 

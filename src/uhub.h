@@ -80,7 +80,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#ifndef WIN32
+#if !defined(WIN32)
 #include <grp.h>
 #include <pwd.h>
 #include <sys/resource.h>
@@ -100,7 +100,7 @@
 
 #include <event.h>
 
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__sun__)
 #undef HAVE_STRNDUP
 #undef HAVE_MEMMEM
 #endif
@@ -114,7 +114,6 @@
 #define UHUB_SEND_SIGNAL 0
 #endif
 #endif
-
 
 #define SERVER_PORT      1511
 #define SERVER_ADDR_IPV6 "::"
