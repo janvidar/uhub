@@ -155,6 +155,12 @@ void net_con_update(struct net_connection* con, int ev)
 
 void net_con_close(struct net_connection* con)
 {
+	if (net_con_flag_get(con, NET_CLEANUP))
+	{
+		LOG_INFO("Running net_con_close, but we already have closed...");
+		return;
+	}
+
 	if (event_pending(&con->event, EV_READ | EV_WRITE, 0))
 	{
 		event_del(&con->event);
@@ -163,6 +169,8 @@ void net_con_close(struct net_connection* con)
 	net_con_clear_timeout(con);
 	net_close(con->sd);
 	con->sd = -1;
+
+	net_con_flag_set(con, NET_CLEANUP);
 }
 
 #ifdef SSL_SUPPORT

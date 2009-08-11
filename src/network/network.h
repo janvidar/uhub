@@ -32,21 +32,6 @@ struct net_statistics
 
 struct net_socket_t;
 
-#define NET_WANT_READ             0x0001
-#define NET_WANT_WRITE            0x0002
-#define NET_WANT_ACCEPT           0x0008
-#define NET_WANT_SSL_READ         0x0010
-#define NET_WANT_SSL_WRITE        0x0020
-#define NET_WANT_SSL_ACCEPT       0x0040
-#define NET_WANT_SSL_CONNECT      0x0080
-#define NET_WANT_SSL_X509_LOOKUP  0x0100
-
-#define NET_EVENT_TIMEOUT         0x0001
-#define NET_EVENT_READ            0x0002
-#define NET_EVENT_WRITE           0x0004
-#define NET_EVENT_SOCKERROR       0x1000 /* Socket error, closed */
-#define NET_EVENT_CLOSED          0x2000 /* Socket closed */
-
 /**
  * Initialize the socket monitor subsystem.
  * On some operating systems this will also involve loading the TCP/IP stack
