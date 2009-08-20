@@ -169,7 +169,7 @@ static int command_status(struct hub_info* hub, struct hub_user* user, struct hu
 static int command_stats(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
 {
 	char temp[128];
-	snprintf(temp, 128, "%zu users, peak: %zu. Network (up/down): %d/%d KB/s, peak: %d/%d KB/s",
+	snprintf(temp, 128, PRINTF_SIZE_T " users, peak: " PRINTF_SIZE_T ". Network (up/down): %d/%d KB/s, peak: %d/%d KB/s",
 	hub->users->count,
 	hub->users->count_peak,
 	(int) hub->stats.net_tx / 1024,
@@ -330,7 +330,7 @@ static int command_whoip(struct hub_info* hub, struct hub_user* user, struct hub
 	}
 
 	char tmp[128];
-	snprintf(tmp, 128, "*** %s: Found %d match%s:", cmd->prefix, (int) ret, ((ret != 1) ? "es" : ""));
+	snprintf(tmp, 128, "*** %s: Found %d match%s:", cmd->prefix, ret, ((ret != 1) ? "es" : ""));
 
 	char* buffer = hub_malloc(((MAX_NICK_LEN + INET6_ADDRSTRLEN + 5) * ret) + strlen(tmp) + 3);
 	buffer[0] = 0;
@@ -376,7 +376,7 @@ static int command_history(struct hub_info* hub, struct hub_user* user, struct h
 	}
 
 	char tmp[128];
-	snprintf(tmp, 128, "*** %s: Found %d message%s:", cmd->prefix, (int) ret, ((ret != 1) ? "s" : ""));
+	snprintf(tmp, 128, "*** %s: Found %d message%s:", cmd->prefix, ret, ((ret != 1) ? "s" : ""));
 	bufsize = strlen(tmp);
 	message = (char*) list_get_first(messages);
 	while (message)
@@ -430,11 +430,11 @@ static int command_log(struct hub_info* hub, struct hub_user* user, struct hub_c
 
 	if (search_len)
 	{
-		sprintf(tmp, "Logged entries: %d, searching for \"%s\"", (int) list_size(messages), search);
+		sprintf(tmp, "Logged entries: " PRINTF_SIZE_T ", searching for \"%s\"", list_size(messages), search);
 	}
 	else
 	{
-		sprintf(tmp, "Logged entries: %d", (int) list_size(messages));
+		sprintf(tmp, "Logged entries: " PRINTF_SIZE_T, list_size(messages));
 	}
 	command_status(hub, user, cmd, tmp);
 
@@ -467,7 +467,7 @@ static int command_log(struct hub_info* hub, struct hub_user* user, struct hub_c
 
 	if (search_len)
 	{
-		sprintf(tmp, "%d entries shown.", (int) search_hits);
+		sprintf(tmp, PRINTF_SIZE_T " entries shown.", search_hits);
 		command_status(hub, user, cmd, tmp);
 	}
 

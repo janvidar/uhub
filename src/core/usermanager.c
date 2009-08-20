@@ -61,7 +61,7 @@ void uman_update_stats(struct hub_info* hub)
 
 void uman_print_stats(struct hub_info* hub)
 {
-	LOG_INFO("Statistics  users=%zu (peak_users=%zu), net_tx=%d KB/s, net_rx=%d KB/s (peak_tx=%d KB/s, peak_rx=%d KB/s)",
+	LOG_INFO("Statistics  users=" PRINTF_SIZE_T " (peak_users=" PRINTF_SIZE_T "), net_tx=%d KB/s, net_rx=%d KB/s (peak_tx=%d KB/s, peak_rx=%d KB/s)",
 		hub->users->count,
 		hub->users->count_peak,
 		(int) hub->stats.net_tx / 1024,

@@ -89,6 +89,14 @@
 #define HAVE_GETRLIMIT
 #endif
 
+/* printf and size_t support */
+#if defined(WIN32)
+/* Windows uses %Iu for size_t */
+#define PRINTF_SIZE_T "%Iu"
+#else
+#define PRINTF_SIZE_T "%zu"
+#endif
+
 #ifdef SSL_SUPPORT
 #include <openssl/ssl.h>
 #include <openssl/err.h>
