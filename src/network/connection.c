@@ -19,6 +19,19 @@
 
 #include "uhub.h"
 
+#define NET_WANT_READ             0x0001
+#define NET_WANT_WRITE            0x0002
+#define NET_WANT_ACCEPT           0x0008
+#define NET_WANT_SSL_READ         0x0010
+#define NET_WANT_SSL_WRITE        0x0020
+#define NET_WANT_SSL_ACCEPT       0x0040
+#define NET_WANT_SSL_CONNECT      0x0080
+#define NET_WANT_SSL_X509_LOOKUP  0x0100
+
+#define NET_PROCESSING_BUSY       0x8000
+#define NET_CLEANUP               0x4000
+#define NET_INITIALIZED           0x2000
+
 extern struct hub_info* g_hub;
 
 static inline int net_con_flag_get(struct net_connection* con, unsigned int flag)
@@ -58,6 +71,8 @@ static void net_con_event(int fd, short ev, void *arg)
 {
 	struct net_connection* con = (struct net_connection*) arg;
 	int events = net_con_convert_from_libevent_mask(ev);
+
+	net_con_flag_set(con, NET_PROCESSING_BUSY);
 
 #ifdef SSL_SUPPORT
 	if (!con->ssl)
@@ -102,6 +117,22 @@ static void net_con_event(int fd, short ev, void *arg)
 		}
 	}
 #endif
+	net_con_flag_unset(con, NET_PROCESSING_BUSY);
+
+	if (net_con_flag_get(con, NET_CLEANUP))
+	{
+		printf("SHOULD SCHEDULE SHUTTING DOWN SOCKET.");
+		net_con_flag_unset(con, NET_INITIALIZED);
+	}
+	else
+	{
+		int set_ev = 0;
+		if (net_con_flag_get(con, NET_WANT_READ))  set_ev |= EV_READ;
+		if (net_con_flag_get(con, NET_WANT_WRITE)) set_ev |= EV_WRITE;
+		event_set(&con->event, con->sd, set_ev, net_con_event, con);
+		event_add(&con->event, 0);
+		net_con_flag_set(con, NET_INITIALIZED);
+	}
 }
 
 const char* net_con_get_peer_address(struct net_connection* con)
@@ -116,6 +147,7 @@ void net_con_initialize(struct net_connection* con, int sd, struct ip_addr_encap
 	if (ev & NET_EVENT_WRITE) net_con_flag_set(con, NET_WANT_WRITE);
 
 	con->sd = sd;
+	con->flags = 0;
 	con->ptr = (void*) ptr;
 	con->callback = callback;
 	con->last_send = time(0);
@@ -127,8 +159,12 @@ void net_con_initialize(struct net_connection* con, int sd, struct ip_addr_encap
 		memcpy(&con->ipaddr, addr, sizeof(struct ip_addr_encap));
 	}
 
-	event_set(&con->event, con->sd, events | EV_PERSIST, net_con_event, con);
-	event_add(&con->event, 0);
+	if (ev)
+	{
+		event_set(&con->event, con->sd, events, net_con_event, con);
+		event_add(&con->event, 0);
+		net_con_flag_set(con, NET_INITIALIZED);
+	}
 
 	net_set_nonblocking(sd, 1);
 	net_set_nosigpipe(sd, 1);
@@ -141,16 +177,15 @@ void net_con_initialize(struct net_connection* con, int sd, struct ip_addr_encap
 
 void net_con_update(struct net_connection* con, int ev)
 {
-	int events = net_con_convert_to_libevent_mask(ev);
-	if (events & EV_READ)  net_con_flag_set(con, NET_WANT_READ);
-	if (events & EV_WRITE) net_con_flag_set(con, NET_WANT_WRITE);
+	if (ev & NET_EVENT_READ)
+		net_con_flag_set(con, NET_EVENT_READ);
+	else
+		net_con_flag_unset(con, NET_EVENT_READ);
 
-	if (con->sd == -1 || event_pending(&con->event, EV_READ | EV_WRITE, 0) == events)
-		return;
-
-	event_del(&con->event);
-	event_set(&con->event, con->sd, events | EV_PERSIST, net_con_event, con);
-	event_add(&con->event, 0);
+	if (ev & NET_EVENT_WRITE)
+		net_con_flag_set(con, NET_EVENT_WRITE);
+	else
+		net_con_flag_unset(con, NET_EVENT_WRITE);
 }
 
 void net_con_close(struct net_connection* con)
@@ -161,9 +196,16 @@ void net_con_close(struct net_connection* con)
 		return;
 	}
 
-	if (event_pending(&con->event, EV_READ | EV_WRITE, 0))
+	if (net_con_flag_get(con, NET_PROCESSING_BUSY))
+	{
+		LOG_INFO("Trying to close socket while processing it, will need to post a message about it...");
+		return;
+	}
+
+	if (net_con_flag_get(con, NET_INITIALIZED))
 	{
 		event_del(&con->event);
+		net_con_flag_unset(con, NET_INITIALIZED);
 	}
 
 	net_con_clear_timeout(con);
