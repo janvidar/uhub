@@ -19,6 +19,10 @@
 #define ADC_NICK "[BOT]adcrush"
 #define ADC_DESC "crash\\stest\\sdummy"
 
+#define LVL_INFO 1
+#define LVL_DEBUG 2
+#define LVL_VERBOSE 3
+
 struct ADC_client;
 
 static void ADC_client_on_disconnected(struct ADC_client*);
@@ -171,20 +175,21 @@ struct ADC_client
 
 
 
-static void bot_output(struct ADC_client* client, const char* format, ...)
+static void bot_output(struct ADC_client* client, int level, const char* format, ...)
 {
 	char logmsg[1024];
 	va_list args;
 	va_start(args, format);
 	vsnprintf(logmsg, 1024, format, args);
 	va_end(args);
+
 	if (cfg_mode == mode_log)
 	{
 	    fprintf(stdout, "%s\n", logmsg);
 	}
 	else
 	{
-	    if (cfg_debug)
+	    if (cfg_debug >= level)
 		fprintf(stdout, "* [%4d] %s\n", client->num, logmsg);
 	}
 }
@@ -199,7 +204,7 @@ static void adc_cid_pid(struct ADC_client* client)
 
 	/* create cid+pid pair */
 	memset(seed, 0, 64);
-	snprintf(seed, 64, ADCRUSH "%p/%d", client, (int) client->num);
+	snprintf(seed, 64, ADCRUSH "%p/%d", client, client->num);
 	
 	tiger((uint64_t*) seed, strlen(seed), tiger_res1);
 	base32_encode((unsigned char*) tiger_res1, TIGERSIZE, pid);
@@ -285,7 +290,7 @@ static void send_client(struct ADC_client* client, char* msg)
 	{
 		char* dump = strdup(msg);
 		dump[strlen(msg) - 1] = 0;
-		bot_output(client, "- SEND: '%s'", dump);
+		bot_output(client, LVL_INFO, "- SEND: '%s'", dump);
 		free(dump);
 	}
 	
@@ -310,19 +315,19 @@ static void ADC_client_on_connected(struct ADC_client* client)
 	net_con_update(&client->con, NET_EVENT_READ);
 	send_client(client, ADC_HANDSHAKE);
 	set_state_timeout(client, ps_protocol);
-	bot_output(client, "connected.");
+	bot_output(client, LVL_INFO, "connected.");
 }
 
 static void ADC_client_on_disconnected(struct ADC_client* client)
 {
 	net_con_close(&client->con);
-	bot_output(client, "disconnected.");
+	bot_output(client, LVL_INFO, "disconnected.");
 	set_state_timeout(client, ps_none);
 }
 
 static void ADC_client_on_login(struct ADC_client* client)
 {
-	bot_output(client, "logged in.");
+	bot_output(client, LVL_INFO, "logged in.");
 	set_state_timeout(client, ps_normal);
 }
 
@@ -382,15 +387,12 @@ static int recv_client(struct ADC_client* client)
 		lastPos = pos;
 		pos[0] = 0;
 		
-		if (cfg_debug > 1)
-		{
-			bot_output(client, "- RECV: '%s'", start);
-		}
+		bot_output(client, LVL_VERBOSE, "- RECV: '%s'", start);
 		
 		fourcc_t cmd = 0;
 		if (strlen(start) < 4)
 		{
-			bot_output(client, "Unexpected response from hub: '%s'", start);
+			bot_output(client, LVL_INFO, "Unexpected response from hub: '%s'", start);
 			start = &pos[1];
 			continue;
 		}
@@ -461,7 +463,7 @@ static int recv_client(struct ADC_client* client)
 			case ADC_CMD_ISTA:
 				if (strncmp(start, "ISTA 000", 8))
 				{
-					bot_output(client, "status: '%s'\n", (start + 9));
+					bot_output(client, LVL_INFO, "status: '%s'\n", (start + 9));
 				}
 				break;
 				
@@ -500,7 +502,7 @@ void ADC_client_connect(struct ADC_client* client)
 		{
 			net_con_update(&client->con, NET_EVENT_READ | NET_EVENT_WRITE);
 			set_state_timeout(client, ps_conn);
-			bot_output(client, "connecting...");
+			bot_output(client, LVL_INFO, "connecting...");
 		}
 	}
 	else
@@ -522,7 +524,7 @@ void ADC_client_disconnect(struct ADC_client* client)
 	if (client->con.sd != -1)
 	{
 		net_con_close(&client->con);
-		bot_output(client, "disconnected.");
+		bot_output(client, LVL_INFO, "disconnected.");
 		
 		if (running)
 		{
@@ -644,7 +646,7 @@ static void perf_normal_action(struct ADC_client* client)
 		case 0:
 			if (p > (90 - (10 * cfg_level)))
 			{
-				if (cfg_debug > 1) bot_output(client, "timeout -> disconnect");
+				bot_output(client, LVL_VERBOSE, "timeout -> disconnect");
 				ADC_client_disconnect(client);
 			}
 			break;
@@ -652,29 +654,29 @@ static void perf_normal_action(struct ADC_client* client)
 		case 1:
 			if (cfg_chat)
 			{
-				if (cfg_debug > 1) bot_output(client, "timeout -> chat");
+				bot_output(client, LVL_VERBOSE, "timeout -> chat");
 				perf_chat(client, 0);
 				
 			}
 			break;
 
 		case 2:
-			if (cfg_debug > 1) bot_output(client, "timeout -> search");
+			bot_output(client, LVL_VERBOSE, "timeout -> search");
 			perf_search(client);
 			break;
 
 		case 3:
-			if (cfg_debug > 1) bot_output(client, "timeout -> update");
+			bot_output(client, LVL_VERBOSE, "timeout -> update");
 			perf_update(client);
 			break;
 
 		case 4:
-			if (cfg_debug > 1) bot_output(client, "timeout -> privmsg");
+			bot_output(client, LVL_VERBOSE, "timeout -> privmsg");
 			perf_chat(client, 1);
 			break;
 
 		case 5:
-			if (cfg_debug > 1) bot_output(client, "timeout -> ctm/rcm");
+			bot_output(client, LVL_VERBOSE, "timeout -> ctm/rcm");
 			perf_ctm(client);
 			break;
 
@@ -733,7 +735,7 @@ int ADC_client_create(struct ADC_client* client, int num)
 	int sd = net_socket_create(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sd == -1) return -1;
 
-	net_con_initialize(&client->con, sd, 0, event_callback, client, NET_EVENT_READ);
+	net_con_initialize(&client->con, sd, 0, event_callback, client, 0);
 	set_state_timeout(client, ps_none);
 	return 0;
 }
@@ -926,6 +928,7 @@ int main(int argc, char** argv)
 	parse_command_line(argc, argv);
 	
 	net_initialize();
+
 	hub_log_initialize(NULL, 0);
 	hub_set_log_verbosity(1000);
 
