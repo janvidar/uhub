@@ -19,8 +19,8 @@
 
 #include "uhub.h"
 
-#define NET_WANT_READ             0x0001
-#define NET_WANT_WRITE            0x0002
+#define NET_WANT_READ             NET_EVENT_READ
+#define NET_WANT_WRITE            NET_EVENT_WRITE
 #define NET_WANT_ACCEPT           0x0008
 #define NET_WANT_SSL_READ         0x0010
 #define NET_WANT_SSL_WRITE        0x0020
@@ -31,6 +31,7 @@
 #define NET_PROCESSING_BUSY       0x8000
 #define NET_CLEANUP               0x4000
 #define NET_INITIALIZED           0x2000
+#define NET_TIMER_ENABLED         0x1000
 
 extern struct hub_info* g_hub;
 
@@ -64,6 +65,19 @@ static inline int net_con_convert_from_libevent_mask(int ev)
 	if (ev & EV_READ)       events |= NET_EVENT_READ;
 	if (ev & EV_WRITE)      events |= NET_EVENT_WRITE;
 	return events;
+}
+
+static void net_con_event(int fd, short ev, void *arg);
+
+void net_con_set(struct net_connection* con)
+{
+	int ev = 0;
+	if (net_con_flag_get(con, NET_WANT_READ | NET_WANT_SSL_READ))   ev |= EV_READ;
+	if (net_con_flag_get(con, NET_WANT_WRITE | NET_WANT_SSL_WRITE)) ev |= EV_WRITE;
+
+	event_set(&con->event, con->sd, ev, net_con_event, con);
+	event_add(&con->event, 0);
+	net_con_flag_set(con, NET_INITIALIZED);
 }
 
 
@@ -126,12 +140,7 @@ static void net_con_event(int fd, short ev, void *arg)
 	}
 	else
 	{
-		int set_ev = 0;
-		if (net_con_flag_get(con, NET_WANT_READ))  set_ev |= EV_READ;
-		if (net_con_flag_get(con, NET_WANT_WRITE)) set_ev |= EV_WRITE;
-		event_set(&con->event, con->sd, set_ev, net_con_event, con);
-		event_add(&con->event, 0);
-		net_con_flag_set(con, NET_INITIALIZED);
+		net_con_set(con);
 	}
 }
 
@@ -174,6 +183,8 @@ void net_con_initialize(struct net_connection* con, int sd, struct ip_addr_encap
 	con->write_len = 0;
 #endif
 }
+
+
 
 void net_con_update(struct net_connection* con, int ev)
 {
@@ -372,15 +383,19 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 void net_con_set_timeout(struct net_connection* con, int seconds)
 {
 	struct timeval timeout = { seconds, 0 };
+	net_con_clear_timeout(con);
+
 	evtimer_set(&con->timeout, net_con_event, con);
 	evtimer_add(&con->timeout, &timeout);
+	net_con_flag_set(con, NET_TIMER_ENABLED);
 }
 
 void net_con_clear_timeout(struct net_connection* con)
 {
-	if (evtimer_initialized(&con->timeout) && evtimer_pending(&con->timeout, 0))
+	if (net_con_flag_get(con, NET_TIMER_ENABLED))
 	{
 		evtimer_del(&con->timeout);
+		net_con_flag_unset(con, NET_TIMER_ENABLED);
 	}
 }
 
@@ -441,4 +456,38 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, int ssl_mode)
 }
 #endif /* SSL_SUPPORT */
 
+static void net_timer_event(int fd, short ev, void *arg)
+{
+	struct net_timer* timer = (struct net_timer*) arg;
+	timer->callback(timer, timer->ptr);
+}
 
+void net_timer_initialize(struct net_timer* timer, net_timeout_cb callback, void* ptr)
+{
+	timer->initialized = 0;
+	timer->callback = callback;
+	timer->ptr = ptr;
+}
+
+void net_timer_reset(struct net_timer* timer, int seconds)
+{
+	struct timeval timeout = { seconds, 0 };
+	if (timer->initialized)
+	{
+		evtimer_del(&timer->timeout);
+		timer->initialized = 0;
+	}
+	evtimer_set(&timer->timeout, net_timer_event, timer);
+	evtimer_add(&timer->timeout, &timeout);
+}
+
+void net_timer_shutdown(struct net_timer* timer)
+{
+	if (timer->initialized)
+	{
+		evtimer_del(&timer->timeout);
+		timer->initialized = 0;
+	}
+	timer->callback = 0;
+	timer->ptr = 0;
+}

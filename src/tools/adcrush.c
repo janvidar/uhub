@@ -170,7 +170,8 @@ struct ADC_client
 	size_t s_offset;
 	size_t r_offset;
 	size_t timeout;
-	struct net_connection con;
+	struct net_connection* con;
+	struct net_timer* timer;
 };
 
 
@@ -273,7 +274,7 @@ static void client_reschedule_timeout(struct ADC_client* client)
 		client->timeout = get_wait_rand(MAX(next_timeout, 1));
 
 	if (!client->timeout) client->timeout++;
-	net_con_set_timeout(&client->con, client->timeout);
+	net_timer_reset(client->timer, client->timeout);
 }
 
 static void set_state_timeout(struct ADC_client* client, enum protocolState state)
@@ -284,7 +285,7 @@ static void set_state_timeout(struct ADC_client* client, enum protocolState stat
 
 static void send_client(struct ADC_client* client, char* msg)
 {
-	int ret = net_con_send(&client->con, msg, strlen(msg));
+	int ret = net_con_send(client->con, msg, strlen(msg));
 	
 	if (cfg_debug > 1)
 	{
@@ -312,7 +313,7 @@ static void send_client(struct ADC_client* client, char* msg)
 
 static void ADC_client_on_connected(struct ADC_client* client)
 {
-	net_con_update(&client->con, NET_EVENT_READ);
+	net_con_update(client->con, NET_EVENT_READ);
 	send_client(client, ADC_HANDSHAKE);
 	set_state_timeout(client, ps_protocol);
 	bot_output(client, LVL_INFO, "connected.");
@@ -320,7 +321,10 @@ static void ADC_client_on_connected(struct ADC_client* client)
 
 static void ADC_client_on_disconnected(struct ADC_client* client)
 {
-	net_con_close(&client->con);
+	net_con_close(client->con);
+	hub_free(client->con);
+	client->con = 0;
+
 	bot_output(client, LVL_INFO, "disconnected.");
 	set_state_timeout(client, ps_none);
 }
@@ -366,7 +370,7 @@ static int recv_client(struct ADC_client* client)
 	ssize_t size = 0;
 	if (cfg_mode != mode_performance || (cfg_mode == mode_performance && (get_wait_rand(100) < (90 - (15 * cfg_level)))))
 	{
-		size = net_con_recv(&client->con, &client->recvbuf[client->r_offset], ADC_BUFSIZE - client->r_offset);
+		size = net_con_recv(client->con, &client->recvbuf[client->r_offset], ADC_BUFSIZE - client->r_offset);
 	}
 	else
 	{
@@ -491,7 +495,7 @@ static int recv_client(struct ADC_client* client)
 
 void ADC_client_connect(struct ADC_client* client)
 {
-	int ret = net_connect(client->con.sd, (struct sockaddr*) &saddr, sizeof(struct sockaddr_in));
+	int ret = net_connect(client->con->sd, (struct sockaddr*) &saddr, sizeof(struct sockaddr_in));
 	if (ret == 0 || (ret == -1 && net_error() == EISCONN))
 	{
 		ADC_client_on_connected(client);
@@ -500,7 +504,7 @@ void ADC_client_connect(struct ADC_client* client)
 	{
 		if (client->state != ps_conn)
 		{
-			net_con_update(&client->con, NET_EVENT_READ | NET_EVENT_WRITE);
+			net_con_update(client->con, NET_EVENT_READ | NET_EVENT_WRITE);
 			set_state_timeout(client, ps_conn);
 			bot_output(client, LVL_INFO, "connecting...");
 		}
@@ -521,9 +525,9 @@ void ADC_client_wait_connect(struct ADC_client* client)
 
 void ADC_client_disconnect(struct ADC_client* client)
 {
-	if (client->con.sd != -1)
+	if (client->con->sd != -1)
 	{
-		net_con_close(&client->con);
+		net_con_close(client->con);
 		bot_output(client, LVL_INFO, "disconnected.");
 		
 		if (running)
@@ -685,6 +689,16 @@ static void perf_normal_action(struct ADC_client* client)
 	client_reschedule_timeout(client);
 }
 
+void timer_callback(struct net_timer* t, void* arg)
+{
+	struct ADC_client* client = (struct ADC_client*) arg;
+	if (client->state == ps_none)
+	{
+		ADC_client_create(client, client->num);
+		ADC_client_connect(client);
+	}
+}
+
 void event_callback(struct net_connection* con, int events, void *arg)
 {
 	struct ADC_client* client = (struct ADC_client*) arg;
@@ -697,11 +711,6 @@ void event_callback(struct net_connection* con, int events, void *arg)
 	{
 		if (client->state == ps_none)
 		{
-			if (client->con.sd == -1)
-			{
-				ADC_client_create(client, client->num);
-			}
-
 			ADC_client_connect(client);
 		}
 	}
@@ -735,7 +744,10 @@ int ADC_client_create(struct ADC_client* client, int num)
 	int sd = net_socket_create(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sd == -1) return -1;
 
-	net_con_initialize(&client->con, sd, 0, event_callback, client, 0);
+	client->con = hub_malloc(sizeof(struct net_connection));
+	client->timer = hub_malloc(sizeof(struct net_timer));
+	net_con_initialize(client->con, sd, 0, event_callback, client, 0);
+	net_timer_initialize(client->timer, timer_callback, client);
 	set_state_timeout(client, ps_none);
 	return 0;
 }
@@ -743,6 +755,7 @@ int ADC_client_create(struct ADC_client* client, int num)
 void ADC_client_destroy(struct ADC_client* client)
 {
 	ADC_client_disconnect(client);
+	net_timer_shutdown(client->timer);
 }
 
 

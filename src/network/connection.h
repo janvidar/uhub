@@ -29,7 +29,22 @@
 #define NET_EVENT_CLOSED          0x2000 /* Socket closed */
 
 struct net_connection;
+struct net_timer;
+
 typedef void (*net_connection_cb)(struct net_connection*, int event, void* ptr);
+typedef void (*net_timeout_cb)(struct net_timer*, void* ptr);
+
+struct net_timer
+{
+	unsigned int         initialized;
+	struct event         timeout;
+	net_timeout_cb       callback;
+	void*                ptr;
+};
+
+extern void net_timer_initialize(struct net_timer* timer, net_timeout_cb callback, void* ptr);
+extern void net_timer_reset(struct net_timer* timer, int seconds);
+extern void net_timer_shutdown(struct net_timer* timer);
 
 struct net_connection
 {
@@ -38,7 +53,7 @@ struct net_connection
 	void*                ptr;       /** data pointer */
 	net_connection_cb    callback;  /** Callback function */
 	struct event         event;     /** libevent struct for read/write events */
-	struct event         timeout;   /** timeout handling */
+	struct event         timeout;   /** Used for internal timeout handling */
 	struct ip_addr_encap ipaddr;    /** IP address of peer */
 	time_t               last_recv; /** Timestamp for last recv() */
 	time_t               last_send; /** Timestamp for last send() */
