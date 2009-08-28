@@ -118,6 +118,17 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 	}
 }
 
+#define EXTRACT(MSG, NAME, TARGET) \
+		do { \
+			char* tmp = adc_msg_get_named_argument(MSG, NAME); \
+			if (tmp) \
+				TARGET = adc_msg_unescape(tmp); \
+			else \
+				TARGET = NULL; \
+			hub_free(tmp); \
+		} while (0)
+
+
 static void ADC_client_on_recv_line(struct ADC_client* client, const char* line, size_t length)
 {
 #ifdef ADC_CLIENT_DEBUG_PROTO
@@ -164,7 +175,6 @@ static void ADC_client_on_recv_line(struct ADC_client* client, const char* line,
 			char* message = adc_msg_get_argument(msg, 0);
 			chat.message        = adc_msg_unescape(message);
 			hub_free(message);
-
 			struct ADC_client_callback_data data;
 			data.chat = &chat;
 			client->callback(client, ADC_CLIENT_MESSAGE, &data);
@@ -175,21 +185,12 @@ static void ADC_client_on_recv_line(struct ADC_client* client, const char* line,
 		case ADC_CMD_IINF:
 		{
 			struct ADC_hub_info hubinfo;
-			char* name = adc_msg_get_named_argument(msg, "NI");
-			hubinfo.name = name ? adc_msg_unescape(name) : 0;
-			hub_free(name);
-
-			char* desc = adc_msg_get_named_argument(msg, "DE");
-			hubinfo.description = desc ? adc_msg_unescape(desc) : 0;
-			hub_free(desc);
-
-			char* vers = adc_msg_get_named_argument(msg, "VE");
-			hubinfo.version = vers ? adc_msg_unescape(vers) : 0 ;
-			hub_free(vers);
+			EXTRACT(msg, "NI", hubinfo.name);
+			EXTRACT(msg, "DE", hubinfo.description);
+			EXTRACT(msg, "VE", hubinfo.version);
 
 			struct ADC_client_callback_data data;
 			data.hubinfo = &hubinfo;
-
 			client->callback(client, ADC_CLIENT_HUB_INFO, &data);
 			hub_free(hubinfo.name);
 			hub_free(hubinfo.description);
