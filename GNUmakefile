@@ -187,8 +187,6 @@ admin_OBJECTS         := $(admin_SOURCES:.c=.o)
 
 all_OBJECTS     := $(libuhub_OBJECTS) $(uhub_OBJECTS) $(adcrush_OBJECTS) $(autotest_OBJECTS) $(admin_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
 
-LIBUHUB=libuhub.a
-LIBUCADC=libucadc.a
 uhub_BINARY=uhub$(BIN_EXT)
 adcrush_BINARY=adcrush$(BIN_EXT)
 admin_BINARY=uhub-admin$(BIN_EXT)
@@ -238,7 +236,7 @@ dist-clean:
 	@rm -rf $(all_OBJECTS) *~ core
 
 clean:
-	@rm -rf $(libuhub_OBJECTS) *~ core $(uhub_BINARY) $(admin_BINARY) $(autotest_BINARY) $(adcrush_BINARY) $(LIBUHUB) $(all_OBJECTS) && \
+	@rm -rf $(libuhub_OBJECTS) *~ core $(uhub_BINARY) $(admin_BINARY) $(autotest_BINARY) $(adcrush_BINARY) $(all_OBJECTS) autotest.c && \
 	echo $(MSG_CLEAN)
 
 

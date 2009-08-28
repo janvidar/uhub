@@ -19,11 +19,18 @@
 
 #include "tools/adcclient.h"
 
-#define ADC_HANDSHAKE "HSUP ADBASE ADTIGR\n"
+#define ADC_HANDSHAKE "HSUP ADBASE ADTIGR ADPING\n"
 #define ADC_CID_SIZE 39
 #define BIG_BUFSIZE 32768
 #define TIGERSIZE 24
 
+static ssize_t ADC_client_recv(struct ADC_client* client);
+static void ADC_client_send_info(struct ADC_client* client);
+static void ADC_client_on_connected(struct ADC_client* client);
+static void ADC_client_on_disconnected(struct ADC_client* client);
+static void ADC_client_on_login(struct ADC_client* client);
+static int ADC_client_parse_address(struct ADC_client* client, const char* arg);
+static void ADC_client_on_recv_line(struct ADC_client* client, const char* line, size_t length);
 
 static void ADC_client_debug(struct ADC_client* client, const char* format, ...)
 {
@@ -40,12 +47,6 @@ static void ADC_client_set_state(struct ADC_client* client, enum ADC_client_stat
 	client->state = state;
 }
 
-static ssize_t ADC_client_recv(struct ADC_client* client);
-static void ADC_client_send_info(struct ADC_client* client);
-static void ADC_client_on_connected(struct ADC_client* client);
-static void ADC_client_on_disconnected(struct ADC_client* client);
-static void ADC_client_on_login(struct ADC_client* client);
-static int ADC_client_parse_address(struct ADC_client* client, const char* arg);
 
 static void adc_cid_pid(struct ADC_client* client)
 {
@@ -82,11 +83,9 @@ static void timer_callback(struct net_timer* t, void* arg)
 static void event_callback(struct net_connection* con, int events, void *arg)
 {
 	struct ADC_client* client = (struct ADC_client*) arg;
-	ADC_client_debug(client, "event_callback. events=%d", events);
-
 	if (events == NET_EVENT_SOCKERROR || events == NET_EVENT_CLOSED)
 	{
-		client->callbacks.connection(client, -1, "Closed/socket error");
+		client->callback(client, ADC_CLIENT_DISCONNECTED, 0);
 		return;
 	}
 
@@ -94,7 +93,7 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 	{
 		if (client->state == ps_conn)
 		{
-			client->callbacks.connection(client, -2, "Connection timed out");
+			client->callback(client, ADC_CLIENT_DISCONNECTED, 0);
 		}
 	}
 
@@ -119,96 +118,153 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 	}
 }
 
+static void ADC_client_on_recv_line(struct ADC_client* client, const char* line, size_t length)
+{
+#ifdef ADC_CLIENT_DEBUG_PROTO
+	ADC_client_debug(client, "- LINE: '%s'", start);
+#endif
+
+	/* Parse message */
+	struct adc_message* msg = adc_msg_parse(line, length);
+	if (!msg)
+	{
+		ADC_client_debug(client, "WARNING: Message cannot be decoded: \"%s\"", line);
+		return;
+	}
+
+	if (length < 4)
+	{
+		ADC_client_debug(client, "Unexpected response from hub: '%s'", line);
+		return;
+	}
+
+	switch (msg->cmd)
+	{
+		case ADC_CMD_ISUP:
+			break;
+
+		case ADC_CMD_ISID:
+			if (client->state == ps_protocol)
+			{
+				client->sid = string_to_sid(&line[5]);
+				client->callback(client, ADC_CLIENT_LOGGING_IN, 0);
+				ADC_client_set_state(client, ps_identify);
+				ADC_client_send_info(client);
+			}
+			break;
+
+		case ADC_CMD_BMSG:
+		case ADC_CMD_EMSG:
+		case ADC_CMD_DMSG:
+		case ADC_CMD_IMSG:
+		{
+			struct ADC_chat_message chat;
+			chat.from_sid       = msg->source;
+			chat.to_sid         = msg->target;
+			char* message = adc_msg_get_argument(msg, 0);
+			chat.message        = adc_msg_unescape(message);
+			hub_free(message);
+
+			struct ADC_client_callback_data data;
+			data.chat = &chat;
+			client->callback(client, ADC_CLIENT_MESSAGE, &data);
+			hub_free(chat.message);
+			break;
+		}
+
+		case ADC_CMD_IINF:
+		{
+			struct ADC_hub_info hubinfo;
+			char* name = adc_msg_get_named_argument(msg, "NI");
+			hubinfo.name = name ? adc_msg_unescape(name) : 0;
+			hub_free(name);
+
+			char* desc = adc_msg_get_named_argument(msg, "DE");
+			hubinfo.description = desc ? adc_msg_unescape(desc) : 0;
+			hub_free(desc);
+
+			char* vers = adc_msg_get_named_argument(msg, "VE");
+			hubinfo.version = vers ? adc_msg_unescape(vers) : 0 ;
+			hub_free(vers);
+
+			struct ADC_client_callback_data data;
+			data.hubinfo = &hubinfo;
+
+			client->callback(client, ADC_CLIENT_HUB_INFO, &data);
+			hub_free(hubinfo.name);
+			hub_free(hubinfo.description);
+			hub_free(hubinfo.version);
+			break;
+		}
+
+		case ADC_CMD_BSCH:
+		case ADC_CMD_FSCH:
+		{
+			client->callback(client, ADC_CLIENT_SEARCH_REQ, 0);
+			break;
+		}
+
+		case ADC_CMD_BINF:
+		{
+			if (msg->source == client->sid)
+			{
+				if (client->state == ps_verify || client->state == ps_identify)
+				{
+					ADC_client_on_login(client);
+				}
+			}
+			else
+			{
+				client->callback(client, ADC_CLIENT_USER_JOIN, 0);
+			}
+		}
+
+		case ADC_CMD_ISTA:
+			/*
+			if (strncmp(line, "ISTA 000", 8))
+			{
+				ADC_client_debug(client, "status: '%s'\n", (start + 9));
+			}
+			*/
+			break;
+			
+		default:
+			break;
+	}
+
+	adc_msg_free(msg);
+}
+
 static ssize_t ADC_client_recv(struct ADC_client* client)
 {
 	ssize_t size = net_con_recv(client->con, &client->recvbuf[client->r_offset], ADC_BUFSIZE - client->r_offset);
 	if (size <= 0)
 		return size;
 
-	client->recvbuf[client->r_offset + size] = 0;
+	client->r_offset += size;
+	client->recvbuf[client->r_offset] = 0;
 
 	char* start = client->recvbuf;
 	char* pos;
 	char* lastPos = 0;
-	while ((pos = strchr(start, '\n')))
+	size_t remaining = client->r_offset;
+
+	while ((pos = memchr(start, '\n', remaining)))
 	{
-		lastPos = pos;
 		pos[0] = 0;
 
-		ADC_client_debug(client, "- RECV: '%s'", start);
+		ADC_client_on_recv_line(client, start, pos - start);
 
-		fourcc_t cmd = 0;
-		if (strlen(start) < 4)
-		{
-			ADC_client_debug(client, "Unexpected response from hub: '%s'", start);
-			start = &pos[1];
-			continue;
-		}
-
-		cmd = FOURCC(start[0], start[1], start[2], start[3]);
-		switch (cmd)
-		{
-			case ADC_CMD_ISUP:
-				break;
-
-			case ADC_CMD_ISID:
-				if (client->state == ps_protocol)
-				{
-					client->sid = string_to_sid(&start[5]);
-					ADC_client_set_state(client, ps_identify);
-					ADC_client_send_info(client);
-				}
-				break;
-
-			case ADC_CMD_IINF:
-				break;
-
-			case ADC_CMD_BSCH:
-			case ADC_CMD_FSCH:
-			{
-				break;
-			}
-
-			case ADC_CMD_BINF:
-			{
-				if (strlen(start) > 9)
-				{
-					char t = start[9]; start[9] = 0; sid_t sid = string_to_sid(&start[5]); start[9] = t;
-					
-					if (sid == client->sid)
-					{
-						if (client->state == ps_verify || client->state == ps_identify)
-						{
-							ADC_client_on_login(client);
-						}
-					}
-				}
-				break;
-			}
-
-			case ADC_CMD_ISTA:
-				if (strncmp(start, "ISTA 000", 8))
-				{
-					ADC_client_debug(client, "status: '%s'\n", (start + 9));
-				}
-				break;
-				
-			default:
-				break;
-		}
-
-		start = &pos[1];
+		pos++;
+		remaining -= (pos - start);
+		start = pos;
+		lastPos = pos;
 	}
 
 	if (lastPos)
 	{
-		client->r_offset = strlen(lastPos);
-		memmove(client->recvbuf, lastPos, strlen(lastPos));
-		memset(&client->recvbuf[client->r_offset], 0, ADC_BUFSIZE-client->r_offset);
-	}
-	else
-	{
-		// client->r_offset = size;
+		memmove(client->recvbuf, lastPos, remaining);
+		client->r_offset = remaining;
 	}
 	return 0;
 }
@@ -270,7 +326,6 @@ void ADC_client_send_info(struct ADC_client* client)
 
 int ADC_client_create(struct ADC_client* client, const char* nickname, const char* description)
 {
-	ADC_client_debug(client, "ADC_client_create: %s", nickname);
 	memset(client, 0, sizeof(struct ADC_client));
 
 	int sd = net_socket_create(PF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -304,6 +359,8 @@ int ADC_client_connect(struct ADC_client* client, const char* address)
 	{
 		if (!ADC_client_parse_address(client, address))
 			return 0;
+	
+		client->callback(client, ADC_CLIENT_CONNECTING, 0);
 	}
 
 	int ret = net_connect(client->con->sd, (struct sockaddr*) &client->addr, sizeof(struct sockaddr_in));
@@ -317,7 +374,6 @@ int ADC_client_connect(struct ADC_client* client, const char* address)
 		{
 			net_con_update(client->con, NET_EVENT_READ | NET_EVENT_WRITE);
 			ADC_client_set_state(client, ps_conn);
-			ADC_client_debug(client, "connecting...");
 		}
 	}
 	else
@@ -331,9 +387,9 @@ int ADC_client_connect(struct ADC_client* client, const char* address)
 static void ADC_client_on_connected(struct ADC_client* client)
 {
 	net_con_update(client->con, NET_EVENT_READ);
+	client->callback(client, ADC_CLIENT_CONNECTED, 0);
 	ADC_client_send(client, ADC_HANDSHAKE);
 	ADC_client_set_state(client, ps_protocol);
-	ADC_client_debug(client, "connected.");
 }
 
 static void ADC_client_on_disconnected(struct ADC_client* client)
@@ -341,14 +397,13 @@ static void ADC_client_on_disconnected(struct ADC_client* client)
 	net_con_close(client->con);
 	hub_free(client->con);
 	client->con = 0;
-	ADC_client_debug(client, "disconnected.");
 	ADC_client_set_state(client, ps_none);
 }
 
 static void ADC_client_on_login(struct ADC_client* client)
 {
-	ADC_client_debug(client, "logged in.");
 	ADC_client_set_state(client, ps_normal);
+	client->callback(client, ADC_CLIENT_LOGGED_IN, 0);
 }
 
 void ADC_client_disconnect(struct ADC_client* client)
@@ -356,7 +411,6 @@ void ADC_client_disconnect(struct ADC_client* client)
 	if (client->con->sd != -1)
 	{
 		net_con_close(client->con);
-		ADC_client_debug(client, "disconnected.");
 	}
 }
 
@@ -407,7 +461,11 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 	memset(&client->addr, 0, sizeof(client->addr));
 	client->addr.sin_family = AF_INET;
 	client->addr.sin_port   = htons(port);
-	memcpy(&client->addr.sin_addr, &addr, sizeof(struct in_addr));
+	memcpy(&client->addr.sin_addr, addr, sizeof(struct in_addr));
 	return 1;
 }
 
+void ADC_client_set_callback(struct ADC_client* client, adc_client_cb cb)
+{
+	client->callback = cb;
+}

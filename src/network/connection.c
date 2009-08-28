@@ -197,6 +197,11 @@ void net_con_update(struct net_connection* con, int ev)
 		net_con_flag_set(con, NET_EVENT_WRITE);
 	else
 		net_con_flag_unset(con, NET_EVENT_WRITE);
+
+	if (!net_con_flag_get(con, NET_PROCESSING_BUSY))
+	{
+		net_con_set(con);
+	}
 }
 
 void net_con_close(struct net_connection* con)
@@ -437,7 +442,7 @@ ssize_t net_con_ssl_connect(struct net_connection* con)
 		return handle_openssl_error(con, ret);
 	}
 	return ret;
-}
+// }
 
 ssize_t net_con_ssl_handshake(struct net_connection* con, int ssl_mode)
 {

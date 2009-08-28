@@ -36,16 +36,57 @@ enum ADC_client_state
 
 struct ADC_client;
 
-typedef void (*adc_client_connection_status_cb)(struct ADC_client*, int code, const char* data);
-typedef void (*adc_client_message_cb)(struct ADC_client*, const char* msg, int flags);
-typedef void (*adc_client_status_cb)(struct ADC_client*, const char* status, int code);
-
-struct ADC_client_callbacks
+enum ADC_client_callback_type
 {
-	adc_client_connection_status_cb connection;
-	adc_client_message_cb message;
-	adc_client_status_cb status;
+	ADC_CLIENT_CONNECTING       = 1001,
+	ADC_CLIENT_CONNECTED        = 1002,
+	ADC_CLIENT_DISCONNECTED     = 1003,
+
+	ADC_CLIENT_LOGGING_IN       = 2001,
+	ADC_CLIENT_PASSWORD_REQ     = 2002,
+	ADC_CLIENT_LOGGED_IN        = 2003,
+	ADC_CLIENT_LOGIN_ERROR      = 2004,
+
+	ADC_CLIENT_PROTOCOL_STATUS  = 3001,
+	ADC_CLIENT_MESSAGE          = 3002,
+	ADC_CLIENT_CONNECT_REQ      = 3003,
+	ADC_CLIENT_REVCONNECT_REQ   = 3004,
+	ADC_CLIENT_SEARCH_REQ       = 3005,
+	ADC_CLIENT_SEARCH_REP       = 3006,
+
+	ADC_CLIENT_USER_JOIN        = 4001,
+	ADC_CLIENT_USER_QUIT        = 4002,
+	ADC_CLIENT_USER_UPDATE      = 4003,
+
+	ADC_CLIENT_HUB_INFO         = 5001,
 };
+
+struct ADC_hub_info
+{
+	char* name;
+	char* description;
+	char* version;
+};
+
+struct ADC_chat_message
+{
+	sid_t from_sid;
+	sid_t to_sid;
+	char* message;
+	int flags;
+};
+
+struct ADC_client_callback_data
+{
+	union {
+		struct ADC_hub_info* hubinfo;
+		struct ADC_chat_message* chat;
+	};
+};
+
+
+
+typedef int (*adc_client_cb)(struct ADC_client*, enum ADC_client_callback_type, struct ADC_client_callback_data* data);
 
 struct ADC_client
 {
@@ -54,12 +95,13 @@ struct ADC_client
 	char info[ADC_BUFSIZE];
 	char recvbuf[ADC_BUFSIZE];
 	char sendbuf[ADC_BUFSIZE];
+	adc_client_cb callback;
 	size_t s_offset;
 	size_t r_offset;
 	size_t timeout;
 	struct net_connection* con;
 	struct net_timer* timer;
-	struct ADC_client_callbacks callbacks;
+	
 	struct sockaddr_in addr;
 	char* hub_address;
 	char* nick;
@@ -67,6 +109,7 @@ struct ADC_client
 };
 
 int ADC_client_create(struct ADC_client* client, const char* nickname, const char* description);
+void ADC_client_set_callback(struct ADC_client* client, adc_client_cb);
 void ADC_client_destroy(struct ADC_client* client);
 int ADC_client_connect(struct ADC_client* client, const char* address);
 void ADC_client_disconnect(struct ADC_client* client);
