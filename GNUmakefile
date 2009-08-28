@@ -139,52 +139,28 @@ libuhub_SOURCES := \
 		src/util/list.c \
 		src/util/log.c \
 		src/util/memory.c \
-		src/adc/message.c \
 		src/util/misc.c \
 		src/core/netevent.c \
 		src/network/connection.c \
 		src/network/network.c \
 		src/util/rbtree.c \
 		src/core/route.c \
-		src/adc/sid.c \
 		src/util/tiger.c \
 		src/core/user.c \
 		src/core/usermanager.c
 
-uhub_SOURCES := src/core/main.c
+libadc_common_SOURCES := \
+		src/adc/message.c \
+		src/adc/sid.c
 
-libucadc_SOURCES := src/tools/adcclient.c
+libadc_client_SOURCES := \
+		src/tools/adcclient.c
+
+uhub_SOURCES := src/core/main.c
 
 adcrush_SOURCES := src/tools/adcrush.c
 
 admin_SOURCES := src/tools/admin.c
-
-uhub_HEADERS := \
-		src/adc/adcconst.h \
-		src/core/auth.h \
-		src/core/config.h \
-		src/core/eventid.h \
-		src/core/eventqueue.h \
-		src/core/hub.h \
-		src/core/hubevent.h \
-		src/core/hubio.h \
-		src/core/inf.h \
-		src/util/ipcalc.h \
-		src/util/list.h \
-		src/util/log.h \
-		src/util/memory.h \
-		src/adc/message.h \
-		src/util/misc.h \
-		src/core/netevent.h \
-		src/network/connection.h \
-		src/network/network.h \
-		src/util/rbtree.h \
-		src/core/route.h \
-		src/adc/sid.h \
-		src/util/tiger.h \
-		src/uhub.h \
-		src/core/user.h \
-		src/core/usermanager.h
 
 autotest_SOURCES := \
 		autotest/test_message.tcc \
@@ -201,13 +177,15 @@ autotest_SOURCES := \
 autotest_OBJECTS = autotest.o
 
 # Source to objects
-libuhub_OBJECTS := $(libuhub_SOURCES:.c=.o)
-libucadc_OBJECTS:= $(libucadc_SOURCES:.c=.o)
-uhub_OBJECTS    := $(uhub_SOURCES:.c=.o)
-adcrush_OBJECTS := $(adcrush_SOURCES:.c=.o)
-admin_OBJECTS   := $(admin_SOURCES:.c=.o)
+libuhub_OBJECTS       := $(libuhub_SOURCES:.c=.o)
+libadc_client_OBJECTS := $(libadc_client_SOURCES:.c=.o)
+libadc_common_OBJECTS := $(libadc_common_SOURCES:.c=.o)
 
-all_OBJECTS     := $(libuhub_OBJECTS) $(uhub_OBJECTS) $(adcrush_OBJECTS) $(autotest_OBJECTS) $(admin_OBJECTS)
+uhub_OBJECTS          := $(uhub_SOURCES:.c=.o)
+adcrush_OBJECTS       := $(adcrush_SOURCES:.c=.o)
+admin_OBJECTS         := $(admin_SOURCES:.c=.o)
+
+all_OBJECTS     := $(libuhub_OBJECTS) $(uhub_OBJECTS) $(adcrush_OBJECTS) $(autotest_OBJECTS) $(admin_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
 
 LIBUHUB=libuhub.a
 LIBUCADC=libucadc.a
@@ -221,13 +199,13 @@ autotest_BINARY=autotest/test$(BIN_EXT)
 
 all: $(uhub_BINARY)
 
-$(adcrush_BINARY): $(LIBUHUB) $(adcrush_OBJECTS)
+$(adcrush_BINARY): $(adcrush_OBJECTS) $(libuhub_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
 	$(MSG_LD) $(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-$(admin_BINARY): $(admin_OBJECTS) $(libucadc_OBJECTS) $(libuhub_OBJECTS)
+$(admin_BINARY): $(admin_OBJECTS) $(libuhub_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
 	$(MSG_LD) $(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-$(uhub_BINARY): $(libuhub_OBJECTS) $(uhub_OBJECTS)
+$(uhub_BINARY): $(uhub_OBJECTS) $(libuhub_OBJECTS) $(libadc_common_OBJECTS)
 	$(MSG_LD) $(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 autotest.c: $(autotest_SOURCES)
@@ -236,7 +214,7 @@ autotest.c: $(autotest_SOURCES)
 $(autotest_OBJECTS): autotest.c
 	$(MSG_CC) $(CC) -c $(CFLAGS) -Isrc -o $@ $<
 
-$(autotest_BINARY): $(autotest_OBJECTS) $(libuhub_OBJECTS)
+$(autotest_BINARY): $(autotest_OBJECTS) $(libuhub_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
 	$(MSG_LD) $(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 autotest: $(autotest_BINARY)

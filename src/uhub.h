@@ -25,103 +25,7 @@
 /* #define MEMORY_DEBUG */
 /* #define DEBUG_SENDQ 1 */
 
-#if USE_REGPARM && __GNUC__ >= 3
-#define REGPRM1 __attribute__((regparm(1)))
-#define REGPRM2 __attribute__((regparm(2)))
-#define REGPRM3 __attribute__((regparm(3)))
-#else
-#define REGPRM1
-#define REGPRM2
-#define REGPRM3
-#endif
-
-#ifndef FORCEINLINE
-#if __GNUC__ < 3
-#define FORCEINLINE inline
-#else
-#define FORCEINLINE inline __attribute__((always_inline))
-#endif
-#endif
-
-
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
-
-#if defined(__CYGWIN__) || defined(__MINGW32__)
-#ifndef WINSOCK
-#define WINSOCK
-#endif
-#endif
-
-#ifdef WINSOCK
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#else
-#include <sys/types.h>
-#include <sys/time.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#endif
-
-#include <assert.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <getopt.h>
-#include <signal.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <unistd.h>
-
-#if !defined(WIN32)
-#include <grp.h>
-#include <pwd.h>
-#include <sys/resource.h>
-#define HAVE_STRNDUP
-#define HAVE_MEMMEM
-#define HAVE_GETRLIMIT
-#endif
-
-/* printf and size_t support */
-#if defined(WIN32)
-/* Windows uses %Iu for size_t */
-#define PRINTF_SIZE_T "%Iu"
-#else
-#define PRINTF_SIZE_T "%zu"
-#endif
-
-#ifdef SSL_SUPPORT
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-#endif
-
-#include "../version.h"
-
-#define uhub_assert assert
-
-#include <event.h>
-
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__sun__)
-#undef HAVE_STRNDUP
-#undef HAVE_MEMMEM
-#endif
-
-#ifdef MSG_NOSIGNAL
-#define UHUB_SEND_SIGNAL MSG_NOSIGNAL
-#else
-#ifdef MSG_NOPIPE
-#define UHUB_SEND_SIGNAL MSG_NOPIPE
-#else
-#define UHUB_SEND_SIGNAL 0
-#endif
-#endif
+#include "system.h"
 
 #define SERVER_PORT      1511
 #define SERVER_ADDR_IPV6 "::"
@@ -154,18 +58,11 @@
 #define MAX_RECV_BUF 65535
 #define MAX_SEND_BUF 65535
 
-#ifndef INET6_ADDRSTRLEN
-#define INET6_ADDRSTRLEN 46
-#endif
-
-#include "adc/adcconst.h"
-
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include "adc/adcconst.h"
 
 #include "util/ipcalc.h"
 #include "util/list.h"
