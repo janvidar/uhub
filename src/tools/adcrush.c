@@ -2,19 +2,16 @@
  * An ADC client emulator.
  */
 
-#include "uhub.h"
+#include "adcclient.h"
 
 #define ADC_CLIENTS_DEFAULT 100
 #define ADC_MAX_CLIENTS 25000
 
-#define ADC_BUFSIZE 16384
-#define ADC_SIDSIZE 4
 #define ADC_CID_SIZE 39
 
 #define BIG_BUFSIZE 32768
 #define TIGERSIZE 24
 
-#define ADC_HANDSHAKE "HSUP ADBASE ADTIGR\n"
 #define ADCRUSH "adcrush/0.2"
 #define ADC_NICK "[BOT]adcrush"
 #define ADC_DESC "crash\\stest\\sdummy"
@@ -22,16 +19,6 @@
 #define LVL_INFO 1
 #define LVL_DEBUG 2
 #define LVL_VERBOSE 3
-
-struct ADC_client;
-
-static void ADC_client_on_disconnected(struct ADC_client*);
-static void ADC_client_on_connected(struct ADC_client*);
-static void ADC_client_on_login(struct ADC_client*);
-static void ADC_client_connect(struct ADC_client*);
-static void ADC_client_disconnect(struct ADC_client*);
-static int  ADC_client_create(struct ADC_client* client, int num);
-static void ADC_client_destroy(struct ADC_client* client);
 
 static int cfg_mode     = 0; // See enum operationMode
 static char* cfg_host   = 0;
@@ -46,35 +33,6 @@ static int running = 1;
 
 static struct sockaddr_in saddr;
 
-enum commandMode
-{
-	cm_bcast    = 0x01, /* B - broadcast */
-	cm_dir      = 0x02, /* D - direct message */
-	cm_echo     = 0x04, /* E - echo message */
-	cm_fcast    = 0x08, /* F - feature cast message */
-	cm_c2h      = 0x10, /* H - client to hub message */
-	cm_h2c      = 0x20, /* I - hub to client message */
-	cm_c2c      = 0x40, /* C - client to client message */
-	cm_udp      = 0x80, /* U - udp message (client to client) */
-};
-
-enum commandValidity
-{
-	cv_protocol = 0x01,
-	cv_identify = 0x02,
-	cv_verify   = 0x04,
- 	cv_normal   = 0x08,
-};
-
-enum protocolState
-{
-	ps_none     = 0x00, /* none or disconnected */
-	ps_conn     = 0x01, /* connecting... */
-	ps_protocol = 0x02,
-	ps_identify = 0x04,
-	ps_verify   = 0x08,
-	ps_normal   = 0x10,
-};
 
 enum operationMode
 {
@@ -91,20 +49,6 @@ struct commandPattern
 	unsigned char validity; /* see enum commandValidity */
 };
 
-const struct commandPattern patterns[] =
-{
-	{ cm_c2h | cm_c2c | cm_h2c,                     "SUP", cv_protocol | cv_normal }, /* protocol support */
-	{ cm_bcast | cm_h2c | cm_c2c,                   "INF", cv_identify | cv_verify | cv_normal }, /* info message */
-	{ cm_bcast | cm_h2c | cm_c2c | cm_c2h | cm_udp, "STA", cv_protocol | cv_identify | cv_verify | cv_normal }, /* status message */
-	{ cm_bcast | cm_dir | cm_echo | cm_h2c,         "MSG", cv_normal },   /* chat message */
-	{ cm_bcast | cm_dir | cm_echo | cm_fcast,       "SCH", cv_normal },   /* search */
-	{ cm_dir | cm_udp,                              "RES", cv_normal },   /* search result */
-	{ cm_dir | cm_echo,                             "CTM", cv_normal },   /* connect to me */
-	{ cm_dir | cm_echo,                             "RCM", cv_normal },   /* reversed, connect to me */
-	{ cm_h2c,                                       "QUI", cv_normal },   /* quit message */
-	{ cm_h2c,                                       "GPA", cv_identify }, /* password request */
-	{ cm_c2h,                                       "PAS", cv_verify }    /* password response */
-};
 
 #define MAX_CHAT_MSGS 35
 const char* chat_messages[MAX_CHAT_MSGS] = {
@@ -159,21 +103,6 @@ const char* search_messages[MAX_SEARCH_MSGS] = {
 	"ANburnout ANps3 TOauto",
 };
 
-struct ADC_client
-{
-	int  num;
-	sid_t sid;
-	enum protocolState state;
-	char info[ADC_BUFSIZE];
-	char recvbuf[BIG_BUFSIZE];
-	char sendbuf[BIG_BUFSIZE];
-	size_t s_offset;
-	size_t r_offset;
-	size_t timeout;
-	struct net_connection* con;
-	struct net_timer* timer;
-};
-
 
 
 static void bot_output(struct ADC_client* client, int level, const char* format, ...)
@@ -191,34 +120,8 @@ static void bot_output(struct ADC_client* client, int level, const char* format,
 	else
 	{
 	    if (cfg_debug >= level)
-		fprintf(stdout, "* [%4d] %s\n", client->num, logmsg);
+		fprintf(stdout, "* [%p] %s\n", client, logmsg);
 	}
-}
-
-static void adc_cid_pid(struct ADC_client* client)
-{
-	char seed[64];
-	char pid[64];
-	char cid[64];
-	uint64_t tiger_res1[3];
-	uint64_t tiger_res2[3];
-
-	/* create cid+pid pair */
-	memset(seed, 0, 64);
-	snprintf(seed, 64, ADCRUSH "%p/%d", client, client->num);
-	
-	tiger((uint64_t*) seed, strlen(seed), tiger_res1);
-	base32_encode((unsigned char*) tiger_res1, TIGERSIZE, pid);
-	tiger((uint64_t*) tiger_res1, TIGERSIZE, tiger_res2);
-	base32_encode((unsigned char*) tiger_res2, TIGERSIZE, cid);
-	
-	cid[ADC_CID_SIZE] = 0;
-	pid[ADC_CID_SIZE] = 0;
-	
-	strcat(client->info, " PD");
-	strcat(client->info, pid);
-	strcat(client->info, " ID");
-	strcat(client->info, cid);
 }
 
 static size_t get_wait_rand(size_t max)
@@ -229,316 +132,7 @@ static size_t get_wait_rand(size_t max)
 	return ((size_t )(next / 65536) % max);
 }
 
-static void client_reschedule_timeout(struct ADC_client* client)
-{
-	size_t next_timeout = 0;
-	
-	switch (client->state)
-	{
-		case ps_conn:     next_timeout = 30; break;
-		case ps_protocol: next_timeout = 30; break;
-		case ps_identify: next_timeout = 30; break;
-		case ps_verify:   next_timeout = 30; break;
-		case ps_normal:   next_timeout = 120; break;
-		case ps_none:     next_timeout = 120; break;
-	}
-	
-	if (client->state == ps_normal || client->state == ps_none)
-	{
-		switch (cfg_level)
-		{
-			case 0: /* polite */
-				next_timeout *= 4;
-				break;
-					
-			case 1: /* normal */
-				break;
-				
-			case 2: /* aggressive */
-				next_timeout /= 8;
-				break;
-				
-			case 3: /* excessive */
-				next_timeout /= 16;
-
-			case 4: /* excessive */
-				next_timeout /= 32;
-		}
-
-	}
-
-
-	if (client->state == ps_conn)
-		client->timeout = MAX(next_timeout, 1);
-	else
-		client->timeout = get_wait_rand(MAX(next_timeout, 1));
-
-	if (!client->timeout) client->timeout++;
-	net_timer_reset(client->timer, client->timeout);
-}
-
-static void set_state_timeout(struct ADC_client* client, enum protocolState state)
-{
-	client->state = state;
-	client_reschedule_timeout(client);
-}
-
-static void send_client(struct ADC_client* client, char* msg)
-{
-	int ret = net_con_send(client->con, msg, strlen(msg));
-	
-	if (cfg_debug > 1)
-	{
-		char* dump = strdup(msg);
-		dump[strlen(msg) - 1] = 0;
-		bot_output(client, LVL_INFO, "- SEND: '%s'", dump);
-		free(dump);
-	}
-	
- 	if (ret != strlen(msg))
-	{
-		if (ret == -1)
-		{
-			if (net_error() != EWOULDBLOCK)
-				ADC_client_on_disconnected(client);
-		}
-		else
-		{
-			/* FIXME: Not all data sent! */
-			printf("ret (%d) != msg->length (%d)\n", ret, (int) strlen(msg));
-		}
-	}
-}
-
-
-static void ADC_client_on_connected(struct ADC_client* client)
-{
-	net_con_update(client->con, NET_EVENT_READ);
-	send_client(client, ADC_HANDSHAKE);
-	set_state_timeout(client, ps_protocol);
-	bot_output(client, LVL_INFO, "connected.");
-}
-
-static void ADC_client_on_disconnected(struct ADC_client* client)
-{
-	net_con_close(client->con);
-	hub_free(client->con);
-	client->con = 0;
-
-	bot_output(client, LVL_INFO, "disconnected.");
-	set_state_timeout(client, ps_none);
-}
-
-static void ADC_client_on_login(struct ADC_client* client)
-{
-	bot_output(client, LVL_INFO, "logged in.");
-	set_state_timeout(client, ps_normal);
-}
-
-
-static void send_client_info(struct ADC_client* client)
-{
-	client->info[0] = 0;
-	strcat(client->info, "BINF ");
-	strcat(client->info, sid_to_string(client->sid));
-	strcat(client->info, " NI" ADC_NICK);
-	if (cfg_clients > 1)
-	{
-	    strcat(client->info, "_");
-	    strcat(client->info, uhub_itoa(client->num));
-	}
-	strcat(client->info, " VE" ADCRUSH);
-	strcat(client->info, " DE" ADC_DESC);
-	strcat(client->info, " I40.0.0.0");
-	strcat(client->info, " EMuhub@extatic.org");
-	strcat(client->info, " SL3");
-	strcat(client->info, " HN1");
-	strcat(client->info, " HR1");
-	strcat(client->info, " HO1");
-	
-	adc_cid_pid(client);
-	
-	strcat(client->info, "\n");
-	
-	send_client(client, client->info);
-}
-
 static void perf_result(struct ADC_client* client, sid_t target, const char* what, const char* token);
-
-static int recv_client(struct ADC_client* client)
-{
-	ssize_t size = 0;
-	if (cfg_mode != mode_performance || (cfg_mode == mode_performance && (get_wait_rand(100) < (90 - (15 * cfg_level)))))
-	{
-		size = net_con_recv(client->con, &client->recvbuf[client->r_offset], ADC_BUFSIZE - client->r_offset);
-	}
-	else
-	{
-		if (get_wait_rand(1000) == 99)
-			return -1; /* Can break tings badly! :-) */
-		else
-			return 0;
-	}
-	if (size == 0 || ((size == -1 && net_error() != EWOULDBLOCK)))
-		return -1;
-	client->recvbuf[client->r_offset + size] = 0;
-
-	char* start = client->recvbuf;
-	char* pos;
-	char* lastPos = 0;
-	while ((pos = strchr(start, '\n')))
-	{
-		lastPos = pos;
-		pos[0] = 0;
-		
-		bot_output(client, LVL_VERBOSE, "- RECV: '%s'", start);
-		
-		fourcc_t cmd = 0;
-		if (strlen(start) < 4)
-		{
-			bot_output(client, LVL_INFO, "Unexpected response from hub: '%s'", start);
-			start = &pos[1];
-			continue;
-		}
-		
-		cmd = FOURCC(start[0], start[1], start[2], start[3]);
-		
-		switch (cmd)
-		{
-			case ADC_CMD_ISUP:
-				break;
-
-			case ADC_CMD_ISID:
-				if (client->state == ps_protocol)
-				{
-					client->sid = string_to_sid(&start[5]);
-					client->state = ps_identify;
-					send_client_info(client);
-					
-				}
-				break;
-				
-			case ADC_CMD_IINF:
-				break;
-			
-			case ADC_CMD_BSCH:
-			case ADC_CMD_FSCH:
-			{
-				if (get_wait_rand(100) > (90 - (10 * cfg_level)) && cfg_mode == mode_performance)
-				{
-					sid_t target = string_to_sid(&start[5]);
-					const char* what = strstr(&start[5], " AN");
-					const char* token = strstr(&start[5], " TO");
-					char* split = 0;
-					if (!token || !what) break;
-					
-					token += 3;
-					what += 3;
-
-					split = strchr(what, ' ');
-					if (!split) break;
-					else split[0] = '0';
-
-					split = strchr(token, ' ');
-					if (split) split[0] = '0';
-
-					perf_result(client, target, what, token);
-
-				}
-				break;
-			}
-			case ADC_CMD_BINF:
-			{
-				if (strlen(start) > 9)
-				{
-					char t = start[9]; start[9] = 0; sid_t sid = string_to_sid(&start[5]); start[9] = t;
-					
-					if (sid == client->sid)
-					{
-						if (client->state == ps_verify || client->state == ps_identify)
-						{
-							ADC_client_on_login(client);
-						}
-					}
-				}
-				break;
-			}
-			
-			case ADC_CMD_ISTA:
-				if (strncmp(start, "ISTA 000", 8))
-				{
-					bot_output(client, LVL_INFO, "status: '%s'\n", (start + 9));
-				}
-				break;
-				
-			default:
-				break;
-		}
-		
-		start = &pos[1];
-	}
-	
-	if (lastPos)
-	{
-		client->r_offset = strlen(lastPos);
-		memmove(client->recvbuf, lastPos, strlen(lastPos));
-		memset(&client->recvbuf[client->r_offset], 0, ADC_BUFSIZE-client->r_offset);
-	}
-	else
-	{
-		// client->r_offset = size;
-	}
-	
-	
-	return 0;
-}
-
-void ADC_client_connect(struct ADC_client* client)
-{
-	int ret = net_connect(client->con->sd, (struct sockaddr*) &saddr, sizeof(struct sockaddr_in));
-	if (ret == 0 || (ret == -1 && net_error() == EISCONN))
-	{
-		ADC_client_on_connected(client);
-	}
-	else if (ret == -1 && (net_error() == EALREADY || net_error() == EINPROGRESS || net_error() == EWOULDBLOCK || net_error() == EINTR))
-	{
-		if (client->state != ps_conn)
-		{
-			net_con_update(client->con, NET_EVENT_READ | NET_EVENT_WRITE);
-			set_state_timeout(client, ps_conn);
-			bot_output(client, LVL_INFO, "connecting...");
-		}
-	}
-	else
-	{
-		ADC_client_on_disconnected(client);
-	}
-}
-
-void ADC_client_wait_connect(struct ADC_client* client)
-{
-	set_state_timeout(client, ps_none);
-	
-}
-
-
-
-void ADC_client_disconnect(struct ADC_client* client)
-{
-	if (client->con->sd != -1)
-	{
-		net_con_close(client->con);
-		bot_output(client, LVL_INFO, "disconnected.");
-		
-		if (running)
-		{
-			ADC_client_destroy(client);
-			ADC_client_create(client, client->num);
-			ADC_client_connect(client);
-		}
-
-	}
-}
 
 static void perf_chat(struct ADC_client* client, int priv)
 {
@@ -564,7 +158,7 @@ static void perf_chat(struct ADC_client* client, int priv)
 	hub_free(msg);
 	
 	strcat(buf, "\n");
-	send_client(client, buf);
+	ADC_client_send(client, buf);
 }
 
 static void perf_search(struct ADC_client* client)
@@ -587,7 +181,7 @@ static void perf_search(struct ADC_client* client)
 	}
 	strcat(buf, search_messages[r]);
 	strcat(buf, "\n");
-	send_client(client, buf);
+	ADC_client_send(client, buf);
 }
 
 static void perf_result(struct ADC_client* client, sid_t target, const char* what, const char* token)
@@ -606,7 +200,7 @@ static void perf_result(struct ADC_client* client, sid_t target, const char* wha
 	strcat(buf, " TO");
 	strcat(buf, token);
 	strcat(buf, "\n");
-	send_client(client, buf);
+	ADC_client_send(client, buf);
 }
 
 static void perf_ctm(struct ADC_client* client)
@@ -621,7 +215,7 @@ static void perf_ctm(struct ADC_client* client)
 	strcat(buf, " TOKEN111");
 	strcat(buf, sid_to_string(client->sid));
 	strcat(buf, "\n");
-	send_client(client, buf);
+	ADC_client_send(client, buf);
 }
 
 
@@ -636,7 +230,7 @@ static void perf_update(struct ADC_client* client)
 	strcat(buf, uhub_itoa(n));
 
 	strcat(buf, "\n");
-	send_client(client, buf);
+	ADC_client_send(client, buf);
 }
 
 
@@ -685,79 +279,7 @@ static void perf_normal_action(struct ADC_client* client)
 			break;
 
 	}
-
-	client_reschedule_timeout(client);
 }
-
-void timer_callback(struct net_timer* t, void* arg)
-{
-	struct ADC_client* client = (struct ADC_client*) arg;
-	if (client->state == ps_none)
-	{
-		ADC_client_create(client, client->num);
-		ADC_client_connect(client);
-	}
-}
-
-void event_callback(struct net_connection* con, int events, void *arg)
-{
-	struct ADC_client* client = (struct ADC_client*) arg;
-	if (events == NET_EVENT_SOCKERROR || events == NET_EVENT_CLOSED)
-	{
-		ADC_client_on_disconnected(client);
-	}
-
-	if (events == NET_EVENT_TIMEOUT)
-	{
-		if (client->state == ps_none)
-		{
-			ADC_client_connect(client);
-		}
-	}
-
-	if (events & NET_EVENT_READ)
-	{
-		if (recv_client(client) == -1)
-		{
-			ADC_client_on_disconnected(client);
-		}
-	}
-
-	if (events & NET_EVENT_WRITE)
-	{
-		if (client->state == ps_conn)
-		{
-			ADC_client_connect(client);
-		}
-		else
-		{
-			/* FIXME: Call send again */
-		}
-	}
-}
-
-int ADC_client_create(struct ADC_client* client, int num)
-{
-	memset(client, 0, sizeof(struct ADC_client));
-	client->num = num;
-
-	int sd = net_socket_create(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (sd == -1) return -1;
-
-	client->con = hub_malloc(sizeof(struct net_connection));
-	client->timer = hub_malloc(sizeof(struct net_timer));
-	net_con_initialize(client->con, sd, 0, event_callback, client, 0);
-	net_timer_initialize(client->timer, timer_callback, client);
-	set_state_timeout(client, ps_none);
-	return 0;
-}
-
-void ADC_client_destroy(struct ADC_client* client)
-{
-	ADC_client_disconnect(client);
-	net_timer_shutdown(client->timer);
-}
-
 
 void runloop(size_t clients)
 {
@@ -769,17 +291,13 @@ void runloop(size_t clients)
 		struct ADC_client* c = malloc(sizeof(struct ADC_client));
 		client[n] = c;
 
-		ADC_client_create(c, n);
-		if (n == 0)
-		{
-			ADC_client_connect(c);
-		}
-		else
-		{
-			ADC_client_wait_connect(c);
-		}
+		char nick[20];
+		snprintf(nick, 20, "adcrush_%d", (int) n);
+
+		ADC_client_create(c, nick, "stresstester");
+		ADC_client_connect(c, "adc://adc.extatic.org:1511");
 	}
-	
+
 	event_dispatch();
 
 	for (n = 0; n < clients; n++)

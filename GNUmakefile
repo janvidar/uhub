@@ -164,9 +164,11 @@ libuhub_SOURCES := \
 
 uhub_SOURCES := src/core/main.c
 
+libucadc_SOURCES := src/tools/adcclient.c
+
 adcrush_SOURCES := src/tools/adcrush.c
 
-admin_SOURCES := src/admin.c
+admin_SOURCES := src/tools/admin.c
 
 uhub_HEADERS := \
 		src/adc/adcconst.h \
@@ -211,6 +213,7 @@ autotest_OBJECTS = autotest.o
 
 # Source to objects
 libuhub_OBJECTS := $(libuhub_SOURCES:.c=.o)
+libucadc_OBJECTS:= $(libucadc_SOURCES:.c=.o)
 uhub_OBJECTS    := $(uhub_SOURCES:.c=.o)
 adcrush_OBJECTS := $(adcrush_SOURCES:.c=.o)
 admin_OBJECTS   := $(admin_SOURCES:.c=.o)
@@ -218,6 +221,7 @@ admin_OBJECTS   := $(admin_SOURCES:.c=.o)
 all_OBJECTS     := $(libuhub_OBJECTS) $(uhub_OBJECTS) $(adcrush_OBJECTS) $(autotest_OBJECTS) $(admin_OBJECTS)
 
 LIBUHUB=libuhub.a
+LIBUCADC=libucadc.a
 uhub_BINARY=uhub$(BIN_EXT)
 adcrush_BINARY=adcrush$(BIN_EXT)
 admin_BINARY=uhub-admin$(BIN_EXT)
@@ -231,13 +235,16 @@ all: $(uhub_BINARY) $(PCH)
 $(adcrush_BINARY): $(PCH) $(LIBUHUB) $(adcrush_OBJECTS)
 	$(MSG_LD) $(CC) -o $@ $(adcrush_OBJECTS) $(LIBUHUB) $(LDFLAGS) $(LDLIBS)
 
-$(admin_BINARY): $(PCH) $(LIBUHUB) $(admin_OBJECTS)
-	$(MSG_LD) $(CC) -o $@ $(admin_OBJECTS) $(LIBUHUB) $(LDFLAGS) $(LDLIBS)
+$(admin_BINARY): $(PCH) $(LIBUCADC) $(LIBUHUB) $(admin_OBJECTS)
+	$(MSG_LD) $(CC) -o $@ $(admin_OBJECTS) $(LIBUCADC) $(LIBUHUB) $(LDFLAGS) $(LDLIBS)
 
 $(uhub_BINARY): $(PCH) $(LIBUHUB) $(uhub_OBJECTS)
 	$(MSG_LD) $(CC) -o $@ $(uhub_OBJECTS) $(LIBUHUB) $(LDFLAGS) $(LDLIBS)
 
 $(LIBUHUB): $(libuhub_OBJECTS)
+	$(MSG_AR) $(AR) rc $@ $^ && $(RANLIB) $@
+
+$(LIBUCADC): $(libucadc_OBJECTS)
 	$(MSG_AR) $(AR) rc $@ $^ && $(RANLIB) $@
 
 ifeq ($(USE_PCH),YES)
