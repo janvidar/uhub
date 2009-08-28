@@ -1,2 +1,8 @@
 *~
-*.o
+*.[oa]
+*.exe
+*.gch
+uhub-admin
+adcrush
+uhub
+

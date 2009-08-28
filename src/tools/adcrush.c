@@ -6,12 +6,9 @@
 
 #define ADC_CLIENTS_DEFAULT 100
 #define ADC_MAX_CLIENTS 25000
-
 #define ADC_CID_SIZE 39
-
 #define BIG_BUFSIZE 32768
 #define TIGERSIZE 24
-
 #define ADCRUSH "adcrush/0.2"
 #define ADC_NICK "[BOT]adcrush"
 #define ADC_DESC "crash\\stest\\sdummy"

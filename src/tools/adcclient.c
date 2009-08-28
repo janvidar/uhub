@@ -17,11 +17,10 @@
  *
  */
 
-#include "adcclient.h"
+#include "tools/adcclient.h"
 
 #define ADC_HANDSHAKE "HSUP ADBASE ADTIGR\n"
 #define ADC_CID_SIZE 39
-
 #define BIG_BUFSIZE 32768
 #define TIGERSIZE 24
 
@@ -83,6 +82,8 @@ static void timer_callback(struct net_timer* t, void* arg)
 static void event_callback(struct net_connection* con, int events, void *arg)
 {
 	struct ADC_client* client = (struct ADC_client*) arg;
+	ADC_client_debug(client, "event_callback. events=%d", events);
+
 	if (events == NET_EVENT_SOCKERROR || events == NET_EVENT_CLOSED)
 	{
 		client->callbacks.connection(client, -1, "Closed/socket error");
@@ -269,6 +270,7 @@ void ADC_client_send_info(struct ADC_client* client)
 
 int ADC_client_create(struct ADC_client* client, const char* nickname, const char* description)
 {
+	ADC_client_debug(client, "ADC_client_create: %s", nickname);
 	memset(client, 0, sizeof(struct ADC_client));
 
 	int sd = net_socket_create(PF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -302,7 +304,6 @@ int ADC_client_connect(struct ADC_client* client, const char* address)
 	{
 		if (!ADC_client_parse_address(client, address))
 			return 0;
-		client->hub_address = hub_strdup(address);
 	}
 
 	int ret = net_connect(client->con->sd, (struct sockaddr*) &client->addr, sizeof(struct sockaddr_in));
@@ -362,22 +363,29 @@ void ADC_client_disconnect(struct ADC_client* client)
 static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 {
 	char* split;
+	int ssl = 0;
 	struct hostent* dns;
 	struct in_addr* addr;
 
 	if (!arg)
 		return 0;
 
+	client->hub_address = hub_strdup(arg);
+
 	/* Minimum length of a valid address */
 	if (strlen(arg) < 9)
 		return 0;
 
 	/* Check for ADC or ADCS */
-	if (strncmp(arg, "adc://", 6) != 0 && strncmp(arg, "adcs://", 7) != 0)
+	if (!strncmp(arg, "adc://", 6))
+		ssl = 0;
+	else if (!strncmp(arg, "adcs://", 7))
+		ssl = 1;
+	else
 		return 0;
 
 	/* Split hostname and port (if possible) */
-	split = strrchr(arg+6, ':');
+	split = strrchr(client->hub_address + 6 + ssl, ':');
 	if (split == 0 || strlen(split) < 2 || strlen(split) > 6)
 		return 0;
 
@@ -389,7 +397,7 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 	split[0] = 0;
 
 	/* Resolve IP address (FIXME: blocking call) */
-	dns = gethostbyname(arg+6);
+	dns = gethostbyname(client->hub_address + 6 + ssl);
 	if (dns)
 	{
 		addr = (struct in_addr*) dns->h_addr_list[0];

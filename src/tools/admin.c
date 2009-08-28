@@ -2,10 +2,7 @@
  * A remote uhub admin client.
  */
 
-
-#include "uhub.h"
 #include "adcclient.h"
-#include "network/connection.h"
 
 int main(int argc, char** argv)
 {
@@ -15,7 +12,9 @@ int main(int argc, char** argv)
 	ADC_client_create(&client, "uhub-admin", "stresstester");
 	ADC_client_connect(&client, "adc://adc.extatic.org:1511");
 
+	printf("START\n");
 	event_dispatch();
+	printf("STOP\n");
 
 	ADC_client_destroy(&client);
 	net_destroy();

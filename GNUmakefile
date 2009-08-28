@@ -8,7 +8,6 @@ LD            := $(CC)
 MV            := mv
 RANLIB        := ranlib
 CFLAGS        += -pipe -Wall
-USE_PCH       ?= YES
 USE_SSL       ?= NO
 USE_BIGENDIAN ?= AUTO
 BITS          ?= AUTO
@@ -47,19 +46,16 @@ endif
 
 ifeq ($(SILENT),YES)
 	MSG_CC=@echo "  CC:" $(notdir $^) &&
-	MSG_PCH=@echo " PCH:" $(notdir $@) &&
 	MSG_LD=@echo "  LD:" $(notdir $@) &&
 	MSG_AR=@echo "  AR:" $(notdir $@) &&
 else
 	MSG_CC=
-	MSG_PCH=
 	MSG_LD=
 	MSG_AR=
 endif
 
 ifeq ($(TERSE), YES)
 	MSG_CC=@
-	MSG_PCH=@
 	MSG_LD=@
 	MSG_AR=@
 	MSG_CLEAN=-n ""
@@ -67,8 +63,8 @@ else
 	MSG_CLEAN="Clean as a whistle"
 endif
 
-CFLAGS        += -I/source/libevent
-LDFLAGS       += -L/source/libevent
+# CFLAGS        += -I/source/libevent
+# LDFLAGS       += -L/source/libevent
 
 ifeq ($(RELEASE),YES)
 CFLAGS        += -O3 -DNDEBUG
@@ -91,13 +87,6 @@ endif
 ifeq ($(FUNCTRACE),YES)
 CFLAGS        += -finstrument-functions
 CFLAGS        += -DDEBUG_FUNCTION_TRACE
-endif
-
-ifeq ($(USE_PCH),YES)
-PCHSRC=src/uhub.h
-PCH=src/uhub.h.gch
-else
-PCH=
 endif
 
 ifneq ($(BITS), AUTO)
@@ -230,27 +219,16 @@ autotest_BINARY=autotest/test$(BIN_EXT)
 %.o: %.c
 	$(MSG_CC) $(CC) -c $(CFLAGS) -o $@ $^
 
-all: $(uhub_BINARY) $(PCH)
+all: $(uhub_BINARY)
 
-$(adcrush_BINARY): $(PCH) $(LIBUHUB) $(adcrush_OBJECTS)
-	$(MSG_LD) $(CC) -o $@ $(adcrush_OBJECTS) $(LIBUHUB) $(LDFLAGS) $(LDLIBS)
+$(adcrush_BINARY): $(LIBUHUB) $(adcrush_OBJECTS)
+	$(MSG_LD) $(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-$(admin_BINARY): $(PCH) $(LIBUCADC) $(LIBUHUB) $(admin_OBJECTS)
-	$(MSG_LD) $(CC) -o $@ $(admin_OBJECTS) $(LIBUCADC) $(LIBUHUB) $(LDFLAGS) $(LDLIBS)
+$(admin_BINARY): $(admin_OBJECTS) $(libucadc_OBJECTS) $(libuhub_OBJECTS)
+	$(MSG_LD) $(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-$(uhub_BINARY): $(PCH) $(LIBUHUB) $(uhub_OBJECTS)
-	$(MSG_LD) $(CC) -o $@ $(uhub_OBJECTS) $(LIBUHUB) $(LDFLAGS) $(LDLIBS)
-
-$(LIBUHUB): $(libuhub_OBJECTS)
-	$(MSG_AR) $(AR) rc $@ $^ && $(RANLIB) $@
-
-$(LIBUCADC): $(libucadc_OBJECTS)
-	$(MSG_AR) $(AR) rc $@ $^ && $(RANLIB) $@
-
-ifeq ($(USE_PCH),YES)
-$(PCH): $(uhub_HEADERS)
-	$(MSG_PCH) $(CC) $(CFLAGS) -o $@ $(PCHSRC)
-endif
+$(uhub_BINARY): $(libuhub_OBJECTS) $(uhub_OBJECTS)
+	$(MSG_LD) $(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 autotest.c: $(autotest_SOURCES)
 	$(shell exotic --standalone $(autotest_SOURCES) > $@)
@@ -258,7 +236,7 @@ autotest.c: $(autotest_SOURCES)
 $(autotest_OBJECTS): autotest.c
 	$(MSG_CC) $(CC) -c $(CFLAGS) -Isrc -o $@ $<
 
-$(autotest_BINARY): $(autotest_OBJECTS) $(LIBUHUB)
+$(autotest_BINARY): $(autotest_OBJECTS) $(libuhub_OBJECTS)
 	$(MSG_LD) $(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 autotest: $(autotest_BINARY)
@@ -279,10 +257,10 @@ install: $(uhub_BINARY)
 endif
 
 dist-clean:
-	@rm -rf $(all_OBJECTS) $(PCH) *~ core
+	@rm -rf $(all_OBJECTS) *~ core
 
 clean:
-	@rm -rf $(libuhub_OBJECTS) $(PCH) *~ core $(uhub_BINARY) $(LIBUHUB) $(all_OBJECTS) && \
+	@rm -rf $(libuhub_OBJECTS) *~ core $(uhub_BINARY) $(admin_BINARY) $(autotest_BINARY) $(adcrush_BINARY) $(LIBUHUB) $(all_OBJECTS) && \
 	echo $(MSG_CLEAN)
 
 

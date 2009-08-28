@@ -20,8 +20,9 @@
 #ifndef HAVE_UHUB_ADC_CLIENT_H
 #define HAVE_UHUB_ADC_CLIENT_H
 
+#include "uhub.h"
+
 #define ADC_BUFSIZE 16384
-#define ADC_SIDSIZE 4
 
 enum ADC_client_state
 {
@@ -65,27 +66,11 @@ struct ADC_client
 	char* desc;
 };
 
-
-
-/**
- * Create/Allocate/Initialize an ADC_client struct
- * NOTE: If this is successful, one must call ADC_client_destroy to cleanup afterwards.
- */
-extern int ADC_client_create(struct ADC_client* client, const char* nickname, const char* description);
-
-/**
- * Destroy an ADC_client struct.
- */
-extern void ADC_client_destroy(struct ADC_client* client);
-
-extern int ADC_client_connect(struct ADC_client* client, const char* address);
-
-extern void ADC_client_disconnect(struct ADC_client* client);
-
-/**
- * Send a message (ADC command)
- */
-extern void ADC_client_send(struct ADC_client* client, char* msg);
+int ADC_client_create(struct ADC_client* client, const char* nickname, const char* description);
+void ADC_client_destroy(struct ADC_client* client);
+int ADC_client_connect(struct ADC_client* client, const char* address);
+void ADC_client_disconnect(struct ADC_client* client);
+void ADC_client_send(struct ADC_client* client, char* msg);
 
 #endif /* HAVE_UHUB_ADC_CLIENT_H */
 
