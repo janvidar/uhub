@@ -118,14 +118,23 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 	}
 }
 
-#define EXTRACT(MSG, NAME, TARGET) \
+#define UNESCAPE_ARG(TMP, TARGET) \
+		if (TMP) \
+			TARGET = adc_msg_unescape(TMP); \
+		else \
+			TARGET = NULL; \
+		hub_free(TMP);
+
+#define EXTRACT_NAMED_ARG(MSG, NAME, TARGET) \
 		do { \
 			char* tmp = adc_msg_get_named_argument(MSG, NAME); \
-			if (tmp) \
-				TARGET = adc_msg_unescape(tmp); \
-			else \
-				TARGET = NULL; \
-			hub_free(tmp); \
+			UNESCAPE_ARG(tmp, TARGET); \
+		} while (0)
+
+#define EXTRACT_POS_ARG(MSG, POS, TARGET) \
+		do { \
+			char* tmp = adc_msg_get_argument(MSG, POS); \
+			UNESCAPE_ARG(tmp, TARGET); \
 		} while (0)
 
 
@@ -170,13 +179,11 @@ static void ADC_client_on_recv_line(struct ADC_client* client, const char* line,
 		case ADC_CMD_IMSG:
 		{
 			struct ADC_chat_message chat;
+			struct ADC_client_callback_data data;
 			chat.from_sid       = msg->source;
 			chat.to_sid         = msg->target;
-			char* message = adc_msg_get_argument(msg, 0);
-			chat.message        = adc_msg_unescape(message);
-			hub_free(message);
-			struct ADC_client_callback_data data;
 			data.chat = &chat;
+			EXTRACT_POS_ARG(msg, 0, chat.message);
 			client->callback(client, ADC_CLIENT_MESSAGE, &data);
 			hub_free(chat.message);
 			break;
@@ -185,9 +192,9 @@ static void ADC_client_on_recv_line(struct ADC_client* client, const char* line,
 		case ADC_CMD_IINF:
 		{
 			struct ADC_hub_info hubinfo;
-			EXTRACT(msg, "NI", hubinfo.name);
-			EXTRACT(msg, "DE", hubinfo.description);
-			EXTRACT(msg, "VE", hubinfo.version);
+			EXTRACT_NAMED_ARG(msg, "NI", hubinfo.name);
+			EXTRACT_NAMED_ARG(msg, "DE", hubinfo.description);
+			EXTRACT_NAMED_ARG(msg, "VE", hubinfo.version);
 
 			struct ADC_client_callback_data data;
 			data.hubinfo = &hubinfo;
