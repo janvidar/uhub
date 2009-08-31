@@ -59,19 +59,16 @@ static void adc_cid_pid(struct ADC_client* client)
 	/* create cid+pid pair */
 	memset(seed, 0, 64);
 	snprintf(seed, 64, VERSION "%p", client);
-	
+
 	tiger((uint64_t*) seed, strlen(seed), tiger_res1);
 	base32_encode((unsigned char*) tiger_res1, TIGERSIZE, pid);
 	tiger((uint64_t*) tiger_res1, TIGERSIZE, tiger_res2);
 	base32_encode((unsigned char*) tiger_res2, TIGERSIZE, cid);
-	
 	cid[ADC_CID_SIZE] = 0;
 	pid[ADC_CID_SIZE] = 0;
-	
-	strcat(client->info, " PD");
-	strcat(client->info, pid);
-	strcat(client->info, " ID");
-	strcat(client->info, cid);
+
+	adc_msg_add_named_argument(client->info, ADC_INF_FLAG_PRIVATE_ID, pid);
+	adc_msg_add_named_argument(client->info, ADC_INF_FLAG_CLIENT_ID, cid);
 }
 
 
@@ -306,30 +303,21 @@ void ADC_client_send(struct ADC_client* client, char* msg)
 
 void ADC_client_send_info(struct ADC_client* client)
 {
-	client->info[0] = 0;
-	strcat(client->info, "BINF ");
-	strcat(client->info, sid_to_string(client->sid));
-	strcat(client->info, " NI");
-	strcat(client->info, client->nick); /* FIXME: no escaping */
-	strcat(client->info, "_");
-	strcat(client->info, uhub_itoa(client->sid));
-	strcat(client->info, " VE" VERSION);
+	char binf[11];
+	snprintf(binf, 11, "BINF %s\n", sid_to_string(client->sid));
+	client->info = adc_msg_create(binf);
+
+	adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_NICK, client->nick);
+
 	if (client->desc)
 	{
-		strcat(client->info, " DE");
-		strcat(client->info, client->desc); /* FIXME: no escaping */
-		
+		adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_DESCRIPTION, client->desc);
 	}
-	strcat(client->info, " I40.0.0.0");
-	strcat(client->info, " EMuhub@extatic.org");
-	strcat(client->info, " SL3");
-	strcat(client->info, " HN1");
-	strcat(client->info, " HR1");
-	strcat(client->info, " HO1");
+
+	adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_USER_AGENT, PRODUCT "/" VERSION);
 
 	adc_cid_pid(client);
-	strcat(client->info, "\n");
-	ADC_client_send(client, client->info);
+	ADC_client_send(client, client->info->cache);
 }
 
 int ADC_client_create(struct ADC_client* client, const char* nickname, const char* description)
