@@ -92,7 +92,7 @@ struct ADC_client
 {
 	sid_t sid;
 	enum ADC_client_state state;
-	char info[ADC_BUFSIZE];
+	struct adc_message* info;
 	char recvbuf[ADC_BUFSIZE];
 	char sendbuf[ADC_BUFSIZE];
 	adc_client_cb callback;

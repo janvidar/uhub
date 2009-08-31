@@ -521,7 +521,7 @@ struct adc_message* adc_msg_parse(const char* line, size_t length)
 
 struct adc_message* adc_msg_create(const char* line)
 {
-	return adc_msg_parse_verify(NULL, line, strlen(line));
+	return adc_msg_parse(line, strlen(line));
 }
 
 
@@ -737,6 +737,27 @@ int adc_msg_add_named_argument(struct adc_message* cmd, const char prefix[2], co
 	return ret;
 }
 
+int adc_msg_add_named_argument_string(struct adc_message* cmd, const char prefix[2], const char* string)
+{
+	char* escaped = adc_msg_escape(string);
+	int ret = adc_msg_add_named_argument(cmd, prefix, escaped);
+	hub_free(escaped);
+	return ret;
+}
+
+int adc_msg_add_named_argument_int(struct adc_message* cmd, const char prefix[2], int num)
+{
+	char* s = uhub_itoa(num);
+	int ret = adc_msg_add_named_argument(cmd, prefix, s);
+	return ret;
+}
+
+int adc_msg_add_named_argument_uint64(struct adc_message* cmd, const char prefix[2], uint64_t num)
+{
+	char* s = uhub_ulltoa(num);
+	int ret = adc_msg_add_named_argument(cmd, prefix, s);
+	return ret;
+}
 
 int adc_msg_add_argument(struct adc_message* cmd, const char* string)
 {

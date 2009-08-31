@@ -174,6 +174,22 @@ extern int adc_msg_add_argument(struct adc_message* cmd, const char* string);
 extern int adc_msg_add_named_argument(struct adc_message* cmd, const char prefix[2], const char* string);
 
 /**
+ * Append a string as a named argument.
+ * The string will automatcally be escaped, if you do not wish to escape th string use adc_msg_add_named_argument() instead.
+ *
+ * @arg prefix a 2 character argument prefix
+ * @arg string must NOT be escaped
+ * @return  0 if successful, or -1 if an error occured (out of memory).
+ */
+extern int adc_msg_add_named_argument_string(struct adc_message* cmd, const char prefix[2], const char* string);
+
+/**
+ * Append an integer as a named argument.
+ */
+extern int adc_msg_add_named_argument_int(struct adc_message* cmd, const char prefix[2], int integer);
+extern int adc_msg_add_named_argument_uint64(struct adc_message* cmd, const char prefix[2], uint64_t num);
+
+/**
  * Convert a ADC command escaped string to a regular string.
  * @return string or NULL if out of memory
  */

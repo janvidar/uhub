@@ -59,19 +59,16 @@ static void adc_cid_pid(struct ADC_client* client)
 	/* create cid+pid pair */
 	memset(seed, 0, 64);
 	snprintf(seed, 64, VERSION "%p", client);
-	
+
 	tiger((uint64_t*) seed, strlen(seed), tiger_res1);
 	base32_encode((unsigned char*) tiger_res1, TIGERSIZE, pid);
 	tiger((uint64_t*) tiger_res1, TIGERSIZE, tiger_res2);
 	base32_encode((unsigned char*) tiger_res2, TIGERSIZE, cid);
-	
 	cid[ADC_CID_SIZE] = 0;
 	pid[ADC_CID_SIZE] = 0;
-	
-	strcat(client->info, " PD");
-	strcat(client->info, pid);
-	strcat(client->info, " ID");
-	strcat(client->info, cid);
+
+	adc_msg_add_named_argument(client->info, ADC_INF_FLAG_PRIVATE_ID, pid);
+	adc_msg_add_named_argument(client->info, ADC_INF_FLAG_CLIENT_ID, cid);
 }
 
 
@@ -118,14 +115,23 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 	}
 }
 
-#define EXTRACT(MSG, NAME, TARGET) \
+#define UNESCAPE_ARG(TMP, TARGET) \
+		if (TMP) \
+			TARGET = adc_msg_unescape(TMP); \
+		else \
+			TARGET = NULL; \
+		hub_free(TMP);
+
+#define EXTRACT_NAMED_ARG(MSG, NAME, TARGET) \
 		do { \
 			char* tmp = adc_msg_get_named_argument(MSG, NAME); \
-			if (tmp) \
-				TARGET = adc_msg_unescape(tmp); \
-			else \
-				TARGET = NULL; \
-			hub_free(tmp); \
+			UNESCAPE_ARG(tmp, TARGET); \
+		} while (0)
+
+#define EXTRACT_POS_ARG(MSG, POS, TARGET) \
+		do { \
+			char* tmp = adc_msg_get_argument(MSG, POS); \
+			UNESCAPE_ARG(tmp, TARGET); \
 		} while (0)
 
 
@@ -170,13 +176,11 @@ static void ADC_client_on_recv_line(struct ADC_client* client, const char* line,
 		case ADC_CMD_IMSG:
 		{
 			struct ADC_chat_message chat;
+			struct ADC_client_callback_data data;
 			chat.from_sid       = msg->source;
 			chat.to_sid         = msg->target;
-			char* message = adc_msg_get_argument(msg, 0);
-			chat.message        = adc_msg_unescape(message);
-			hub_free(message);
-			struct ADC_client_callback_data data;
 			data.chat = &chat;
+			EXTRACT_POS_ARG(msg, 0, chat.message);
 			client->callback(client, ADC_CLIENT_MESSAGE, &data);
 			hub_free(chat.message);
 			break;
@@ -185,9 +189,9 @@ static void ADC_client_on_recv_line(struct ADC_client* client, const char* line,
 		case ADC_CMD_IINF:
 		{
 			struct ADC_hub_info hubinfo;
-			EXTRACT(msg, "NI", hubinfo.name);
-			EXTRACT(msg, "DE", hubinfo.description);
-			EXTRACT(msg, "VE", hubinfo.version);
+			EXTRACT_NAMED_ARG(msg, "NI", hubinfo.name);
+			EXTRACT_NAMED_ARG(msg, "DE", hubinfo.description);
+			EXTRACT_NAMED_ARG(msg, "VE", hubinfo.version);
 
 			struct ADC_client_callback_data data;
 			data.hubinfo = &hubinfo;
@@ -299,30 +303,21 @@ void ADC_client_send(struct ADC_client* client, char* msg)
 
 void ADC_client_send_info(struct ADC_client* client)
 {
-	client->info[0] = 0;
-	strcat(client->info, "BINF ");
-	strcat(client->info, sid_to_string(client->sid));
-	strcat(client->info, " NI");
-	strcat(client->info, client->nick); /* FIXME: no escaping */
-	strcat(client->info, "_");
-	strcat(client->info, uhub_itoa(client->sid));
-	strcat(client->info, " VE" VERSION);
+	char binf[11];
+	snprintf(binf, 11, "BINF %s\n", sid_to_string(client->sid));
+	client->info = adc_msg_create(binf);
+
+	adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_NICK, client->nick);
+
 	if (client->desc)
 	{
-		strcat(client->info, " DE");
-		strcat(client->info, client->desc); /* FIXME: no escaping */
-		
+		adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_DESCRIPTION, client->desc);
 	}
-	strcat(client->info, " I40.0.0.0");
-	strcat(client->info, " EMuhub@extatic.org");
-	strcat(client->info, " SL3");
-	strcat(client->info, " HN1");
-	strcat(client->info, " HR1");
-	strcat(client->info, " HO1");
+
+	adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_USER_AGENT, PRODUCT "/" VERSION);
 
 	adc_cid_pid(client);
-	strcat(client->info, "\n");
-	ADC_client_send(client, client->info);
+	ADC_client_send(client, client->info->cache);
 }
 
 int ADC_client_create(struct ADC_client* client, const char* nickname, const char* description)
