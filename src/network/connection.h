@@ -27,6 +27,7 @@
 #define NET_EVENT_WRITE           0x0004
 #define NET_EVENT_SOCKERROR       0x1000 /* Socket error, closed */
 #define NET_EVENT_CLOSED          0x2000 /* Socket closed */
+#define NET_EVENT_DESTROYED       0x4000 /* Struct is invalid and can be cleaned up */
 
 struct net_connection;
 struct net_timer;
@@ -65,6 +66,13 @@ struct net_connection
 
 extern void net_con_initialize(struct net_connection* con, int sd, struct ip_addr_encap*, net_connection_cb callback, const void* ptr, int events);
 extern void net_con_update(struct net_connection* con, int events);
+
+/**
+ * Close the connection.
+ * This will ensure a connection is closed properly and will generate a NET_EVENT_DESTROYED event which indicates
+ * that the con can safely be deleted (or set to NULL)
+ * NOTE: Do not dele
+ */
 extern void net_con_close(struct net_connection* con);
 
 /**

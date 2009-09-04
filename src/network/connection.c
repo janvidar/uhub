@@ -80,6 +80,9 @@ void net_con_set(struct net_connection* con)
 	net_con_flag_set(con, NET_INITIALIZED);
 }
 
+#define CALLBACK(CON, EVENTS) \
+	if (CON->callback) \
+		CON->callback(con, EVENTS, CON->ptr);
 
 static void net_con_event(int fd, short ev, void *arg)
 {
@@ -92,7 +95,7 @@ static void net_con_event(int fd, short ev, void *arg)
 	if (!con->ssl)
 	{
 #endif
-		con->callback(con, events, con->ptr);
+		CALLBACK(con, events);
 #ifdef SSL_SUPPORT
 	}
 	else
@@ -105,29 +108,29 @@ static void net_con_event(int fd, short ev, void *arg)
 			if (net_con_flag_get(con, NET_WANT_SSL_ACCEPT))
 			{
 				if (net_con_ssl_accept(con) < 0)
-					con->callback(con, NET_EVENT_SOCKERROR, con->ptr);
+					CALLBACK(con, NET_EVENT_SOCKERROR);
 			}
 			else if (net_con_flag_get(con, NET_WANT_SSL_CONNECT))
 			{
 				if (net_con_ssl_connect(con) < 0)
-					con->callback(con, NET_EVENT_SOCKERROR, con->ptr);
+					CALLBACK(con, NET_EVENT_SOCKERROR);
 			}
 			else if (ev == EV_READ && net_con_flag_get(con, NET_WANT_SSL_READ))
 			{
-				con->callback(con, NET_EVENT_WRITE, con->ptr);
+				CALLBACK(con, NET_EVENT_WRITE);
 			}
 			else if (ev == EV_WRITE && net_con_flag_get(con, NET_WANT_SSL_WRITE))
 			{
-				con->callback(con, events & NET_EVENT_READ, con->ptr);
+				CALLBACK(con, events & NET_EVENT_READ);
 			}
 			else
 			{
-				con->callback(con, events, con->ptr);
+				CALLBACK((con, events);
 			}
 		}
 		else
 		{
-			con->callback(con, events, con->ptr);
+			CALLBACK(con, events);
 		}
 	}
 #endif
@@ -135,8 +138,8 @@ static void net_con_event(int fd, short ev, void *arg)
 
 	if (net_con_flag_get(con, NET_CLEANUP))
 	{
-		printf("SHOULD SCHEDULE SHUTTING DOWN SOCKET.");
 		net_con_flag_unset(con, NET_INITIALIZED);
+		CALLBACK(con, NET_EVENT_DESTROYED);
 	}
 	else
 	{
@@ -214,7 +217,8 @@ void net_con_close(struct net_connection* con)
 
 	if (net_con_flag_get(con, NET_PROCESSING_BUSY))
 	{
-		LOG_INFO("Trying to close socket while processing it, will need to post a message about it...");
+		LOG_INFO("Trying to close socket while processing it");
+		net_con_flag_set(con, NET_CLEANUP);
 		return;
 	}
 
