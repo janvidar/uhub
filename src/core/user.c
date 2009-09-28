@@ -51,9 +51,11 @@ struct hub_user* user_create(struct hub_info* hub, int sd, struct ip_addr_encap*
 	user->recv_queue = hub_recvq_create();
 
 	user->connection = (struct net_connection*) hub_malloc(sizeof(struct net_connection));
-	net_con_initialize(user->connection, sd, addr, net_event, user, NET_EVENT_READ);
+	net_con_initialize(user->connection, sd, net_event, user, NET_EVENT_READ);
 	net_con_set_timeout(user->connection, TIMEOUT_CONNECTED);
 
+	memcpy(&user->id.addr, addr, sizeof(struct ip_addr_encap));
+	
 	user_set_state(user, state_protocol);
 	return user;
 }
@@ -344,4 +346,7 @@ const char* user_get_quit_reason_string(enum user_quit_reason reason)
 	return "unknown";
 }
 
-
+const char* user_get_address(struct hub_user* user)
+{
+	return ip_convert_to_string(&user->id.addr);
+}

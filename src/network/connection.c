@@ -71,6 +71,8 @@ static void net_con_event(int fd, short ev, void *arg);
 
 void net_con_set(struct net_connection* con)
 {
+	uhub_assert(con);
+
 	int ev = 0;
 	if (net_con_flag_get(con, NET_WANT_READ | NET_WANT_SSL_READ))   ev |= EV_READ;
 	if (net_con_flag_get(con, NET_WANT_WRITE | NET_WANT_SSL_WRITE)) ev |= EV_WRITE;
@@ -147,13 +149,10 @@ static void net_con_event(int fd, short ev, void *arg)
 	}
 }
 
-const char* net_con_get_peer_address(struct net_connection* con)
+void net_con_initialize(struct net_connection* con, int sd, net_connection_cb callback, const void* ptr, int ev)
 {
-	 return ip_convert_to_string(&con->ipaddr);
-}
+	uhub_assert(con);
 
-void net_con_initialize(struct net_connection* con, int sd, struct ip_addr_encap* addr, net_connection_cb callback, const void* ptr, int ev)
-{
 	int events = net_con_convert_to_libevent_mask(ev);
 	if (ev & NET_EVENT_READ)  net_con_flag_set(con, NET_WANT_READ);
 	if (ev & NET_EVENT_WRITE) net_con_flag_set(con, NET_WANT_WRITE);
@@ -164,12 +163,6 @@ void net_con_initialize(struct net_connection* con, int sd, struct ip_addr_encap
 	con->callback = callback;
 	con->last_send = time(0);
 	con->last_recv = con->last_send;
-
-	/** IP address of peer */
-	if (addr)
-	{
-		memcpy(&con->ipaddr, addr, sizeof(struct ip_addr_encap));
-	}
 
 	if (ev)
 	{
@@ -191,6 +184,8 @@ void net_con_initialize(struct net_connection* con, int sd, struct ip_addr_encap
 
 void net_con_update(struct net_connection* con, int ev)
 {
+	uhub_assert(con);
+
 	if (ev & NET_EVENT_READ)
 		net_con_flag_set(con, NET_EVENT_READ);
 	else
@@ -209,6 +204,8 @@ void net_con_update(struct net_connection* con, int ev)
 
 void net_con_close(struct net_connection* con)
 {
+	uhub_assert(con);
+
 	if (net_con_flag_get(con, NET_CLEANUP))
 	{
 		LOG_INFO("Running net_con_close, but we already have closed...");
@@ -238,6 +235,8 @@ void net_con_close(struct net_connection* con)
 #ifdef SSL_SUPPORT
 static int handle_openssl_error(struct net_connection* con, int ret)
 {
+	uhub_assert(con);
+
 	int error = SSL_get_error(con->ssl, ret);
 	switch (error)
 	{
@@ -294,6 +293,8 @@ static int handle_openssl_error(struct net_connection* con, int ret)
 
 ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 {
+	uhub_assert(con);
+
 #ifdef SSL_SUPPORT
 	if (!con->ssl)
 	{
@@ -346,6 +347,8 @@ ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 
 ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 {
+	uhub_assert(con);
+
 #ifdef SSL_SUPPORT
 	if (!con->ssl)
 	{
@@ -391,6 +394,8 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 
 void net_con_set_timeout(struct net_connection* con, int seconds)
 {
+	uhub_assert(con);
+
 	struct timeval timeout = { seconds, 0 };
 	net_con_clear_timeout(con);
 
@@ -401,6 +406,8 @@ void net_con_set_timeout(struct net_connection* con, int seconds)
 
 void net_con_clear_timeout(struct net_connection* con)
 {
+	uhub_assert(con);
+
 	if (net_con_flag_get(con, NET_TIMER_ENABLED))
 	{
 		evtimer_del(&con->timeout);
@@ -412,6 +419,8 @@ void net_con_clear_timeout(struct net_connection* con)
 #ifdef SSL_SUPPORT
 ssize_t net_con_ssl_accept(struct net_connection* con)
 {
+	uhub_assert(con);
+
 	net_con_flag_set(con, NET_WANT_SSL_ACCEPT);
 	ssize_t ret = SSL_accept(con->ssl);
 #ifdef NETWORK_DUMP_DEBUG
@@ -431,6 +440,8 @@ ssize_t net_con_ssl_accept(struct net_connection* con)
 
 ssize_t net_con_ssl_connect(struct net_connection* con)
 {
+	uhub_assert(con);
+
 	net_con_flag_set(con, NET_WANT_SSL_CONNECT);
 	ssize_t ret = SSL_connect(con->ssl);
 #ifdef NETWORK_DUMP_DEBUG
@@ -450,6 +461,8 @@ ssize_t net_con_ssl_connect(struct net_connection* con)
 
 ssize_t net_con_ssl_handshake(struct net_connection* con, int ssl_mode)
 {
+	uhub_assert(con);
+
 	if (ssl_mode == NET_CON_SSL_MODE_SERVER)
 	{
 		con->ssl = SSL_new(g_hub->ssl_ctx);

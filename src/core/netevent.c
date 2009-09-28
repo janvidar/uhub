@@ -187,6 +187,14 @@ void net_event(struct net_connection* con, int event, void *arg)
 	struct hub_user* user = (struct hub_user*) arg;
 	int flag_close = 0;
 
+	if (event == NET_EVENT_DESTROYED)
+	{
+		printf("NET_EVENT_DESTROYED\n");
+		hub_free(user->connection);
+		user->connection = 0;
+		return;
+	}
+
 #ifdef DEBUG_SENDQ
 	LOG_TRACE("net_event() : fd=%d, ev=%d, arg=%p", fd, (int) event, arg);
 #endif
