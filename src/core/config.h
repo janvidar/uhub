@@ -24,6 +24,7 @@ struct hub_config
 {
 	int server_port;             /**<<< "Server port to bind to (default: 1511)" */
 	char* server_bind_addr;      /**<<< "Server bind address (default: '0.0.0.0' or '::')" */
+	int server_listen_backlog;   /**<<< "Server listen backlog (default: 50)" */
 	int hub_enabled;             /**<<< "Is server enabled (default: 1)" */
 	int show_banner;             /**<<< "Show banner on connect (default: 1)" */
 	int max_users;               /**<<< "Maximum number of users allowed on the hub (default: 500)" */

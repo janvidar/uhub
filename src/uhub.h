@@ -30,7 +30,6 @@
 #define SERVER_PORT      1511
 #define SERVER_ADDR_IPV6 "::"
 #define SERVER_ADDR_IPV4 "0.0.0.0"
-#define SERVER_BACKLOG   50
 
 #ifndef WIN32
 #define SERVER_CONFIG    "/etc/uhub/uhub.conf"

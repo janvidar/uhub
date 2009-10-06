@@ -494,7 +494,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		return 0;
 	}
 
-	ret = net_listen(server_tcp, SERVER_BACKLOG);
+	ret = net_listen(server_tcp, config->server_listen_backlog);
 	if (ret == -1)
 	{
 		LOG_FATAL("hub_start_service(): Unable to listen to socket");
