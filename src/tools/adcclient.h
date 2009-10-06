@@ -76,15 +76,25 @@ struct ADC_chat_message
 	int flags;
 };
 
+struct ADC_user
+{
+	sid_t sid;
+	char* cid;
+	char* name;
+	char* description;
+	char* address;
+	char* version;
+};
+
+
 struct ADC_client_callback_data
 {
 	union {
 		struct ADC_hub_info* hubinfo;
 		struct ADC_chat_message* chat;
+		struct ADC_user* user;
 	};
 };
-
-
 
 typedef int (*adc_client_cb)(struct ADC_client*, enum ADC_client_callback_type, struct ADC_client_callback_data* data);
 
@@ -101,7 +111,6 @@ struct ADC_client
 	size_t timeout;
 	struct net_connection* con;
 	struct net_timer* timer;
-	
 	struct sockaddr_in addr;
 	char* hub_address;
 	char* nick;

@@ -230,7 +230,25 @@ static void ADC_client_on_recv_line(struct ADC_client* client, const char* line,
 			}
 			else
 			{
-				client->callback(client, ADC_CLIENT_USER_JOIN, 0);
+				if (adc_msg_has_named_argument(msg, "ID"))
+				{
+					struct ADC_user user;
+					EXTRACT_NAMED_ARG(msg, "NI", user.name);
+					EXTRACT_NAMED_ARG(msg, "DE", user.description);
+					EXTRACT_NAMED_ARG(msg, "VE", user.version);
+					EXTRACT_NAMED_ARG(msg, "ID", user.cid);
+					EXTRACT_NAMED_ARG(msg, "I4", user.address);
+
+					struct ADC_client_callback_data data;
+					data.user = &user;
+					client->callback(client, ADC_CLIENT_USER_JOIN, &data);
+
+					hub_free(user.name);
+					hub_free(user.description);
+					hub_free(user.version);
+					hub_free(user.cid);
+					hub_free(user.address);
+				}
 			}
 		}
 
