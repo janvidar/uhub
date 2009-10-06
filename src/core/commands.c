@@ -490,7 +490,7 @@ int command_dipatcher(struct hub_info* hub, struct hub_user* user, const char* m
 
 	/* Parse and validate the command */
 	struct hub_command* cmd = command_create(message);
-	if (!cmd) return 1;
+	if (!cmd) return 0;
 
 	for (n = 0; command_handlers[n].prefix; n++)
 	{
@@ -524,7 +524,7 @@ int command_dipatcher(struct hub_info* hub, struct hub_user* user, const char* m
 
 	command_not_found(hub, user, cmd);
 	command_destroy(cmd);
-	return 1;
+	return 0;
 }
 
 static struct commands_handler command_handlers[] = {

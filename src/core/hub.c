@@ -183,9 +183,23 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 	int ret = 0;
 	int relay = 1;
 	
-	if (message[0] == '!' || message[0] == '+')
+	if ((cmd->cache[0] == 'B') && (message[0] == '!' || message[0] == '+'))
 	{
-	    relay = command_dipatcher(hub, u, message);
+		/*
+		 * A message such as "++message" is handled as "+message", by removing the first character.
+		 * The first character is removed by memmoving the string one byte to the left.
+		 */
+		if (message[1] == message[0])
+		{
+			relay = 1;
+			int offset = adc_msg_get_arg_offset(cmd);
+			memmove(cmd->cache+offset+1, cmd->cache+offset+2, cmd->length - offset);
+			cmd->length--;
+		}
+		else
+		{
+			relay = command_dipatcher(hub, u, message);
+		}
 	}
 
 	if (hub->config->chat_is_privileged && !user_is_protected(u) && (cmd->cache[0] == 'B' || cmd->cache[0] == 'F'))
