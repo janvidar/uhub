@@ -89,31 +89,31 @@ struct hub_user_info
  */
 struct hub_user_limits
 {
-	uint64_t             shared_size;             /** Shared size in bytes */
-	size_t               shared_files;            /** The number of shared files */
-	size_t               upload_slots;            /** The number of upload slots */
-	size_t               hub_count_user;          /** The number of hubs connected as user */
-	size_t               hub_count_registered;    /** The number of hubs connected as registered user */
-	size_t               hub_count_operator;      /** The number of hubs connected as operator */
-	size_t               hub_count_total;         /** The number of hubs connected to in total */
+	uint64_t            shared_size;           /** Shared size in bytes */
+	size_t              shared_files;          /** The number of shared files */
+	size_t              upload_slots;          /** The number of upload slots */
+	size_t              hub_count_user;        /** The number of hubs connected as user */
+	size_t              hub_count_registered;  /** The number of hubs connected as registered user */
+	size_t              hub_count_operator;    /** The number of hubs connected as operator */
+	size_t              hub_count_total;       /** The number of hubs connected to in total */
 };
 
 struct hub_user
 {
-	enum user_state      state;                   /** see enum user_state */
-	enum user_credentials credentials;            /** see enum user_credentials */
-	struct hub_user_info     id;                      /** Contains nick name and CID */
-	int                  flags;                   /** see enum user_features */
-	char                 user_agent[MAX_UA_LEN+1];/** User agent string */
-	struct linked_list*  feature_cast;            /** Features supported by feature cast */
-	struct adc_message*  info;                    /** ADC 'INF' message (broadcasted to everyone joining the hub) */
-	struct hub_info*     hub;                     /** The hub instance this user belong to */
-	struct hub_recvq*    recv_queue;
-	struct hub_sendq*    send_queue;
-	struct net_connection* connection;            /** Connection data */
-	time_t               tm_connected;            /** time when user connected */
-	struct hub_user_limits   limits;                  /** Data used for limitation */
-	enum user_quit_reason quit_reason;            /** Quit reason (see user_quit_reason) */
+	enum user_state         state;              /** see enum user_state */
+	enum user_credentials   credentials;        /** see enum user_credentials */
+	struct hub_user_info    id;                 /** Contains nick name and CID */
+	int                     flags;              /** see enum user_features */
+	char                    user_agent[MAX_UA_LEN+1];/** User agent string */
+	struct linked_list*     feature_cast;       /** Features supported by feature cast */
+	struct adc_message*     info;               /** ADC 'INF' message (broadcasted to everyone joining the hub) */
+	struct hub_info*        hub;                /** The hub instance this user belong to */
+	struct hub_recvq*       recv_queue;
+	struct hub_sendq*       send_queue;
+	struct net_connection*  connection;         /** Connection data */
+	time_t                  tm_connected;       /** time when user connected */
+	struct hub_user_limits  limits;             /** Data used for limitation */
+	enum user_quit_reason   quit_reason;        /** Quit reason (see user_quit_reason) */
 
 };
 
