@@ -18,15 +18,14 @@
 #define LVL_VERBOSE 3
 
 static int cfg_mode     = 0; // See enum operationMode
-static char* cfg_host   = 0;
-static int cfg_port     = 0;
+static const char* cfg_uri = 0; // address
+
 static int cfg_debug    = 0; /* debug level */
 static int cfg_level    = 1; /* activity level (0..3) */
 static int cfg_chat     = 0; /* chat mode, allow sending chat messages */
 static int cfg_quiet    = 0; /* quiet mode (no output) */
 static int cfg_clients  = ADC_CLIENTS_DEFAULT; /* number of clients */
 
-static struct sockaddr_in saddr;
 static int running = 1;
 
 
@@ -120,6 +119,7 @@ static void bot_output(struct ADC_client* client, int level, const char* format,
 	}
 }
 
+#if 0
 static size_t get_wait_rand(size_t max)
 {
 	static size_t next = 0;
@@ -128,7 +128,7 @@ static size_t get_wait_rand(size_t max)
 	return ((size_t )(next / 65536) % max);
 }
 
-#if 0
+
 static void perf_result(struct ADC_client* client, sid_t target, const char* what, const char* token);
 
 static void perf_chat(struct ADC_client* client, int priv)
@@ -352,7 +352,7 @@ void runloop(size_t clients)
 
 		ADC_client_create(c, nick, "stresstester");
 		ADC_client_set_callback(c, handle);
-		ADC_client_connect(c, "adc://adc.extatic.org:1511");
+		ADC_client_connect(c, cfg_uri);
 	}
 
 	while (running)
@@ -441,39 +441,13 @@ int parse_mode(const char* arg)
 
 int parse_address(const char* arg)
 {
-	char* split;
-	struct hostent* dns;
-	struct in_addr* addr;
-
-	if (!arg)
+	if (!arg || strlen(arg) < 9)
+		return 0;
+	
+	if (strncmp(arg, "adc://", 6) && strncmp(arg, "adcs://", 7))
 		return 0;
 
-	if (strlen(arg) < 9)
-		return 0;
-	
-	if (strncmp(arg, "adc://", 6))
-		return 0;
-	
-	split = strrchr(arg+6, ':');
-	if (split == 0 || strlen(split) < 2 || strlen(split) > 6)
-		return 0;
-	
-	cfg_port = strtol(split+1, NULL, 10);
-	if (cfg_port <= 0 || cfg_port > 65535)
-		return 0;
-	
-	split[0] = 0;
-
-	dns = gethostbyname(arg+6);
-	if (dns)
-	{
-		addr = (struct in_addr*) dns->h_addr_list[0];
-		cfg_host = strdup(inet_ntoa(*addr));
-	}
-	
-	if (!cfg_host)
-		return 0;
-	
+	cfg_uri = arg;
 	return 1;
 }
 
@@ -567,16 +541,11 @@ int main(int argc, char** argv)
 	hub_log_initialize(NULL, 0);
 	hub_set_log_verbosity(1000);
 
-	memset(&saddr, 0, sizeof(saddr));
-	saddr.sin_family = AF_INET;
-	saddr.sin_port   = htons(cfg_port);
-	net_string_to_address(AF_INET, cfg_host, &saddr.sin_addr);
-
 	runloop(cfg_clients);
 
 	shutdown_signal_handlers();
 	net_destroy();
-	free(cfg_host);
+
 	return 0;
 }
 
