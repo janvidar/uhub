@@ -17,25 +17,13 @@
 #define LVL_DEBUG 2
 #define LVL_VERBOSE 3
 
-static int cfg_mode     = 0; // See enum operationMode
 static const char* cfg_uri = 0; // address
-
 static int cfg_debug    = 0; /* debug level */
 static int cfg_level    = 1; /* activity level (0..3) */
 static int cfg_chat     = 0; /* chat mode, allow sending chat messages */
 static int cfg_quiet    = 0; /* quiet mode (no output) */
 static int cfg_clients  = ADC_CLIENTS_DEFAULT; /* number of clients */
-
 static int running = 1;
-
-
-enum operationMode
-{
-	mode_performance = 0x01,
-	mode_bugs        = 0x02,
-	mode_security    = 0x04,
-	mode_log         = 0x08,
-};
 
 struct commandPattern
 {
@@ -108,15 +96,8 @@ static void bot_output(struct ADC_client* client, int level, const char* format,
 	vsnprintf(logmsg, 1024, format, args);
 	va_end(args);
 
-	if (cfg_mode == mode_log)
-	{
-	    fprintf(stdout, "%s\n", logmsg);
-	}
-	else
-	{
-	    if (cfg_debug >= level)
-		fprintf(stdout, "* [%p] %s\n", client, logmsg);
-	}
+	if (cfg_debug >= level)
+	fprintf(stdout, "* [%p] %s\n", client, logmsg);
 }
 
 #if 0
@@ -378,65 +359,18 @@ static void print_usage(const char* program)
 {
 	print_version();
 
-	printf("Usage: %s <mode> (adc://<host>:<port>) [options]\n", program);
-	
+	printf("Usage: %s [adc[s]://<host>:<port>] [options]\n", program);
+
 	printf("\n");
-	printf("  Modes\n");
-	printf("    perf        Do performance testing using multiple clients\n");
-	printf("    bugs        Bugs mode, use fuzzer to construct pseudo-random commands.\n");
-	printf("    security    Perform security tests for the hub.\n");
-	printf("    log         Connect one client to the hub and log the output hub.\n");
-	
-	printf("\n");
-	printf("  General options\n");
+	printf("  OPTIONS\n");
+	printf("    -l <0-3>    Level: 0=polite, 1=normal (default), 2=aggressive, 3=excessive.\n");
+	printf("    -n <num>    Number of concurrent connections\n");
 	printf("    -c          Allow broadcasting chat messages.\n");
 	printf("    -d          Enable debug output.\n");
 	printf("    -q          Quiet mode (no output).\n");
-	
 	printf("\n");
-	printf("  Performance options:\n");
-	printf("    -l <0-3>    Level: 0=polite, 1=normal (default), 2=aggressive, 3=excessive.\n");
-	printf("    -n <num>    Number of concurrent connections\n");
-	
-	printf("\n");
-	
+
 	exit(0);
-}
-
-
-int set_defaults()
-{
-    switch (cfg_mode)
-    {
-	case mode_performance:
-	    break;
-	case mode_bugs:
-	    break;
-	case mode_security:
-	    break;
-	case mode_log:
-	    cfg_quiet = 0;
-	    cfg_debug = 2;
-	    cfg_clients = 1;
-	    break;
-    }
-    return 1;
-}
-
-int parse_mode(const char* arg)
-{
-	cfg_mode = 0;
-
-	if      (!strcmp(arg, "perf"))
-		cfg_mode = mode_performance;
-	else if (!strcmp(arg, "bugs"))
-		cfg_mode = mode_bugs;
-	else if (!strcmp(arg, "security"))
-		cfg_mode = mode_security;
-	else if (!strcmp(arg, "log"))
-		cfg_mode = mode_log;
-
-	return cfg_mode;
 }
 
 int parse_address(const char* arg)
@@ -479,9 +413,7 @@ int parse_arguments(int argc, char** argv)
 void parse_command_line(int argc, char** argv)
 {
 	if (argc < 2 ||
-		!parse_mode(argv[1]) ||
-		!set_defaults() ||
-		!parse_address(argv[2]) ||
+		!parse_address(argv[1]) ||
 		!parse_arguments(argc, argv))
 	{
 		print_usage(argv[0]);
