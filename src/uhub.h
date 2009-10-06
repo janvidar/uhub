@@ -27,10 +27,6 @@
 
 #include "system.h"
 
-#define SERVER_PORT      1511
-#define SERVER_ADDR_IPV6 "::"
-#define SERVER_ADDR_IPV4 "0.0.0.0"
-
 #ifndef WIN32
 #define SERVER_CONFIG    "/etc/uhub/uhub.conf"
 #define SERVER_ACL_FILE  "/etc/uhub/users.conf"
@@ -48,7 +44,6 @@
 #define TIMEOUT_IDLE      7200
 #define TIMEOUT_STATS     60
 
-#define MAX_CLIENTS  512
 #define MAX_CID_LEN  39
 #define MAX_NICK_LEN 64
 #define MAX_UA_LEN   32
