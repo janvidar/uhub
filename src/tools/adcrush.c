@@ -9,7 +9,7 @@
 #define ADC_CID_SIZE 39
 #define BIG_BUFSIZE 32768
 #define TIGERSIZE 24
-#define ADCRUSH "adcrush/0.2"
+#define ADCRUSH "adcrush/0.3"
 #define ADC_NICK "[BOT]adcrush"
 #define ADC_DESC "crash\\stest\\sdummy"
 
@@ -17,21 +17,13 @@
 #define LVL_DEBUG 2
 #define LVL_VERBOSE 3
 
-static const char* cfg_uri = 0; // address
-static int cfg_debug    = 0; /* debug level */
-static int cfg_level    = 1; /* activity level (0..3) */
-static int cfg_chat     = 0; /* chat mode, allow sending chat messages */
-static int cfg_quiet    = 0; /* quiet mode (no output) */
-static int cfg_clients  = ADC_CLIENTS_DEFAULT; /* number of clients */
-static int running = 1;
-
-struct commandPattern
-{
-	unsigned char mode; /* see enum commandMode */
-	char cmd[3];
-	unsigned char validity; /* see enum commandValidity */
-};
-
+static const char* cfg_uri = 0; /* address */
+static int cfg_debug       = 0; /* debug level */
+static int cfg_level       = 1; /* activity level (0..3) */
+static int cfg_chat        = 0; /* chat mode, allow sending chat messages */
+static int cfg_quiet       = 0; /* quiet mode (no output) */
+static int cfg_clients     = ADC_CLIENTS_DEFAULT; /* number of clients */
+static int running         = 1;
 
 #define MAX_CHAT_MSGS 35
 const char* chat_messages[MAX_CHAT_MSGS] = {
