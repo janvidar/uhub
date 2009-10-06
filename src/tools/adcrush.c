@@ -295,11 +295,11 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 			break;
 
 		case ADC_CLIENT_USER_JOIN:
-			bot_output(client, LVL_DEBUG, "    JOIN: %s", data->user->name);
+			bot_output(client, LVL_VERBOSE, "    JOIN: %s", data->user->name);
 			break;
 
 		case ADC_CLIENT_USER_QUIT:
-			bot_output(client, LVL_DEBUG, "    QUIT");
+			bot_output(client, LVL_VERBOSE, "    QUIT");
 			break;
 
 		case ADC_CLIENT_SEARCH_REQ:
