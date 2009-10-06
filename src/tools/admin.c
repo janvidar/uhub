@@ -66,12 +66,18 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 
 int main(int argc, char** argv)
 {
+	if (argc < 2)
+	{
+		printf("Usage: %s adc[s]://host:port\n", argv[0]);
+		return 1;
+	}
+
 	struct ADC_client client;
 	net_initialize();
 
 	ADC_client_create(&client, "uhub-admin", "stresstester");
 	ADC_client_set_callback(&client, handle);
-	ADC_client_connect(&client, "adc://adc.extatic.org:1511");
+	ADC_client_connect(&client, argv[1]);
 
 	event_dispatch();
 
