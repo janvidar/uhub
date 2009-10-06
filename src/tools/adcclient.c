@@ -339,7 +339,7 @@ int ADC_client_create(struct ADC_client* client, const char* nickname, const cha
 
 	client->con = hub_malloc(sizeof(struct net_connection));
 	client->timer = hub_malloc(sizeof(struct net_timer));
-	net_con_initialize(client->con, sd, 0, event_callback, client, 0);
+	net_con_initialize(client->con, sd, event_callback, client, 0);
 	net_timer_initialize(client->timer, timer_callback, client);
 	ADC_client_set_state(client, ps_none);
 
