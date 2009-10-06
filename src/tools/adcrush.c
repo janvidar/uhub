@@ -26,9 +26,8 @@ static int cfg_chat     = 0; /* chat mode, allow sending chat messages */
 static int cfg_quiet    = 0; /* quiet mode (no output) */
 static int cfg_clients  = ADC_CLIENTS_DEFAULT; /* number of clients */
 
-static int running = 1;
-
 static struct sockaddr_in saddr;
+static int running = 1;
 
 
 enum operationMode
@@ -129,6 +128,7 @@ static size_t get_wait_rand(size_t max)
 	return ((size_t )(next / 65536) % max);
 }
 
+#if 0
 static void perf_result(struct ADC_client* client, sid_t target, const char* what, const char* token);
 
 static void perf_chat(struct ADC_client* client, int priv)
@@ -230,7 +230,6 @@ static void perf_update(struct ADC_client* client)
 	ADC_client_send(client, buf);
 }
 
-
 static void perf_normal_action(struct ADC_client* client)
 {
 	size_t r = get_wait_rand(5);
@@ -277,6 +276,66 @@ static void perf_normal_action(struct ADC_client* client)
 
 	}
 }
+#endif
+
+static int handle(struct ADC_client* client, enum ADC_client_callback_type type, struct ADC_client_callback_data* data)
+{
+	switch (type)
+	{
+		case ADC_CLIENT_CONNECTING:
+			bot_output(client, LVL_DEBUG, "*** Connecting...");
+			break;
+
+		case ADC_CLIENT_CONNECTED:
+			bot_output(client, LVL_DEBUG, "*** Connected.");
+			break;
+
+		case ADC_CLIENT_DISCONNECTED:
+			bot_output(client, LVL_DEBUG, "*** Disconnected.");
+			break;
+
+		case ADC_CLIENT_LOGGING_IN:
+			bot_output(client, LVL_DEBUG, "*** Logging in...");
+			break;
+
+		case ADC_CLIENT_PASSWORD_REQ:
+			bot_output(client, LVL_DEBUG, "*** Requesting password.");
+
+		case ADC_CLIENT_LOGGED_IN:
+			bot_output(client, LVL_DEBUG, "*** Logged in.");
+			break;
+
+		case ADC_CLIENT_LOGIN_ERROR:
+			bot_output(client, LVL_DEBUG, "*** Login error");
+			break;
+
+		case ADC_CLIENT_MESSAGE:
+			bot_output(client, LVL_DEBUG, "    <%s> %s", sid_to_string(data->chat->from_sid), data->chat->message);
+			break;
+
+		case ADC_CLIENT_USER_JOIN:
+			bot_output(client, LVL_DEBUG, "    JOIN: %s", data->user->name);
+			break;
+
+		case ADC_CLIENT_USER_QUIT:
+			bot_output(client, LVL_DEBUG, "    QUIT");
+			break;
+
+		case ADC_CLIENT_SEARCH_REQ:
+			break;
+
+		case ADC_CLIENT_HUB_INFO:
+			bot_output(client, LVL_DEBUG, "    Hub: \"%s\" [%s]\n"
+				   "         \"%s\"\n", data->hubinfo->name, data->hubinfo->version, data->hubinfo->description);
+			break;
+
+		default:
+			bot_output(client, LVL_DEBUG, "Not handled event=%d\n", (int) type);
+			return 0;
+			break;
+	}
+	return 1;
+}
 
 void runloop(size_t clients)
 {
@@ -292,10 +351,14 @@ void runloop(size_t clients)
 		snprintf(nick, 20, "adcrush_%d", (int) n);
 
 		ADC_client_create(c, nick, "stresstester");
+		ADC_client_set_callback(c, handle);
 		ADC_client_connect(c, "adc://adc.extatic.org:1511");
 	}
 
-	event_dispatch();
+	while (running)
+	{
+		event_base_loop(net_get_evbase(), EVLOOP_ONCE);
+	}
 
 	for (n = 0; n < clients; n++)
 	{
@@ -451,11 +514,55 @@ void parse_command_line(int argc, char** argv)
 	}
 }
 
+#ifndef WIN32
+static void handle_signal(int signal, short events, void* arg)
+{
+	switch (signal)
+	{
+		case SIGINT:
+		case SIGTERM:
+			running = 0;
+			break;
+		default:
+			break;
+	}
+}
+
+static struct event signal_events[10];
+static int signals[] =
+{
+	SIGINT,  /* Interrupt the application */
+	SIGTERM, /* Terminate the application */
+	0
+};
+
+void setup_signal_handlers()
+{
+	int i = 0;
+	for (i = 0; signals[i]; i++)
+	{
+		signal_set(&signal_events[i], signals[i], handle_signal, NULL);
+		signal_add(&signal_events[i], NULL);
+	}
+}
+
+void shutdown_signal_handlers()
+{
+	int i = 0;
+	for (i = 0; signals[i]; i++)
+	{
+		signal_del(&signal_events[i]);
+	}
+}
+#endif /* WIN32 */
+
+
 int main(int argc, char** argv)
 {
 	parse_command_line(argc, argv);
 	
 	net_initialize();
+	setup_signal_handlers();
 
 	hub_log_initialize(NULL, 0);
 	hub_set_log_verbosity(1000);
@@ -467,7 +574,29 @@ int main(int argc, char** argv)
 
 	runloop(cfg_clients);
 
+	shutdown_signal_handlers();
+	net_destroy();
+	free(cfg_host);
+	return 0;
+}
+
+#if 0
+
+int main(int argc, char** argv)
+{
+	struct ADC_client client;
+	net_initialize();
+
+	ADC_client_create(&client, "uhub-admin", "stresstester");
+	ADC_client_set_callback(&client, handle);
+	ADC_client_connect(&client, "adc://adc.extatic.org:1511");
+
+	event_dispatch();
+
+	ADC_client_destroy(&client);
 	net_destroy();
 	return 0;
 }
+
+#endif
 

@@ -79,13 +79,16 @@ static void timer_callback(struct net_timer* t, void* arg)
 
 static void event_callback(struct net_connection* con, int events, void *arg)
 {
-	struct ADC_client* client = (struct ADC_client*) arg;
+	struct ADC_client* client = (struct ADC_client*) con->ptr;
 
 	if (events == NET_EVENT_DESTROYED)
 	{
 		printf("NET_EVENT_DESTROYED\n");
-		hub_free(client->con);
-		client->con = 0;
+		if (client)
+		{
+			client->con = 0;
+		}
+		hub_free(con);
 		return;
 	}
 
@@ -433,7 +436,11 @@ void ADC_client_disconnect(struct ADC_client* client)
 {
 	if (client->con && client->con->sd != -1)
 	{
-		net_con_close(client->con);
+		if (net_con_close(client->con))
+		{
+			hub_free(client->con);
+		}
+		client->con = 0;
 	}
 }
 
