@@ -389,7 +389,7 @@ int parse_arguments(int argc, char** argv)
 {
 	int ok = 1;
 	int opt;
-	for (opt = 3; opt < argc; opt++)
+	for (opt = 2; opt < argc; opt++)
 	{
 		if      (!strcmp(argv[opt], "-c"))
 			cfg_chat = 1;
@@ -480,24 +480,3 @@ int main(int argc, char** argv)
 
 	return 0;
 }
-
-#if 0
-
-int main(int argc, char** argv)
-{
-	struct ADC_client client;
-	net_initialize();
-
-	ADC_client_create(&client, "uhub-admin", "stresstester");
-	ADC_client_set_callback(&client, handle);
-	ADC_client_connect(&client, "adc://adc.extatic.org:1511");
-
-	event_dispatch();
-
-	ADC_client_destroy(&client);
-	net_destroy();
-	return 0;
-}
-
-#endif
-
