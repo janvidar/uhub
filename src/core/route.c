@@ -197,7 +197,7 @@ int route_info_message(struct hub_info* hub, struct hub_user* u)
 	else
 	{
 		struct adc_message* cmd = adc_msg_copy(u->info);
-		const char* address = net_con_get_peer_address(u->connection);
+		const char* address = user_get_address(u);
 		struct hub_user* user = 0;
 		
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);

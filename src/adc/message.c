@@ -747,14 +747,14 @@ int adc_msg_add_named_argument_string(struct adc_message* cmd, const char prefix
 
 int adc_msg_add_named_argument_int(struct adc_message* cmd, const char prefix[2], int num)
 {
-	char* s = uhub_itoa(num);
+	const char* s = uhub_itoa(num);
 	int ret = adc_msg_add_named_argument(cmd, prefix, s);
 	return ret;
 }
 
 int adc_msg_add_named_argument_uint64(struct adc_message* cmd, const char prefix[2], uint64_t num)
 {
-	char* s = uhub_ulltoa(num);
+	const char* s = uhub_ulltoa(num);
 	int ret = adc_msg_add_named_argument(cmd, prefix, s);
 	return ret;
 }

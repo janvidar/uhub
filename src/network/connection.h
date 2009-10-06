@@ -27,6 +27,7 @@
 #define NET_EVENT_WRITE           0x0004
 #define NET_EVENT_SOCKERROR       0x1000 /* Socket error, closed */
 #define NET_EVENT_CLOSED          0x2000 /* Socket closed */
+#define NET_EVENT_DESTROYED       0x4000 /* Struct is invalid and can be cleaned up */
 
 struct net_connection;
 struct net_timer;
@@ -54,7 +55,6 @@ struct net_connection
 	net_connection_cb    callback;  /** Callback function */
 	struct event         event;     /** libevent struct for read/write events */
 	struct event         timeout;   /** Used for internal timeout handling */
-	struct ip_addr_encap ipaddr;    /** IP address of peer */
 	time_t               last_recv; /** Timestamp for last recv() */
 	time_t               last_send; /** Timestamp for last send() */
 #ifdef SSL_SUPPORT
@@ -63,8 +63,15 @@ struct net_connection
 #endif /*  SSL_SUPPORT */
 };
 
-extern void net_con_initialize(struct net_connection* con, int sd, struct ip_addr_encap*, net_connection_cb callback, const void* ptr, int events);
+extern void net_con_initialize(struct net_connection* con, int sd, net_connection_cb callback, const void* ptr, int events);
 extern void net_con_update(struct net_connection* con, int events);
+
+/**
+ * Close the connection.
+ * This will ensure a connection is closed properly and will generate a NET_EVENT_DESTROYED event which indicates
+ * that the con can safely be deleted (or set to NULL)
+ * NOTE: Do not dele
+ */
 extern void net_con_close(struct net_connection* con);
 
 /**
@@ -92,12 +99,6 @@ extern ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len);
  */
 extern void net_con_set_timeout(struct net_connection* con, int seconds);
 extern void net_con_clear_timeout(struct net_connection* con);
-
-/**
- * Returns a string representation of the ipaddr member.
- * NOTE: Static buffer.
- */
-extern const char* net_con_get_peer_address(struct net_connection* con);
 
 #ifdef SSL_SUPPORT
 /**

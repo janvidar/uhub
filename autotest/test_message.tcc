@@ -31,7 +31,9 @@ EXO_TEST(adc_message_parse_1, {
 
 EXO_TEST(adc_message_parse_2, {
 	struct adc_message* msg = adc_msg_create(test_string2);
-	return msg == NULL;
+	int ok = (msg != NULL);
+	adc_msg_free(msg);
+	return ok;
 });
 
 EXO_TEST(adc_message_parse_3, {

@@ -79,6 +79,7 @@ struct hub_user_info
 	sid_t sid;                    /** session ID */
 	char cid[MAX_CID_LEN+1];      /** global client ID */
 	char nick[MAX_NICK_LEN+1];    /** User's nick name */
+	struct ip_addr_encap addr;    /** User's IP address */
 };
 
 /**
@@ -208,6 +209,8 @@ extern void user_support_add(struct hub_user* user, int fourcc);
  * @see enum user_flags
  */
 extern void user_support_remove(struct hub_user* user, int fourcc);
+
+extern const char* user_get_address(struct hub_user* user);
 
 /**
  * Sets the nat override flag for a user, this allows users on the same

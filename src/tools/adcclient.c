@@ -80,8 +80,18 @@ static void timer_callback(struct net_timer* t, void* arg)
 static void event_callback(struct net_connection* con, int events, void *arg)
 {
 	struct ADC_client* client = (struct ADC_client*) arg;
+
+	if (events == NET_EVENT_DESTROYED)
+	{
+		printf("NET_EVENT_DESTROYED\n");
+		hub_free(client->con);
+		client->con = 0;
+		return;
+	}
+
 	if (events == NET_EVENT_SOCKERROR || events == NET_EVENT_CLOSED)
 	{
+		printf("NET_EVENT_SOCKERROR || NET_EVENT_CLOSED\n");
 		client->callback(client, ADC_CLIENT_DISCONNECTED, 0);
 		return;
 	}
@@ -343,11 +353,12 @@ void ADC_client_destroy(struct ADC_client* client)
 {
 	ADC_client_disconnect(client);
 	net_timer_shutdown(client->timer);
+	hub_free(client->timer);
+	adc_msg_free(client->info);
 	hub_free(client->nick);
 	hub_free(client->desc);
 	hub_free(client->hub_address);
 }
-
 
 int ADC_client_connect(struct ADC_client* client, const char* address)
 {
@@ -391,8 +402,6 @@ static void ADC_client_on_connected(struct ADC_client* client)
 static void ADC_client_on_disconnected(struct ADC_client* client)
 {
 	net_con_close(client->con);
-	hub_free(client->con);
-	client->con = 0;
 	ADC_client_set_state(client, ps_none);
 }
 
@@ -404,7 +413,7 @@ static void ADC_client_on_login(struct ADC_client* client)
 
 void ADC_client_disconnect(struct ADC_client* client)
 {
-	if (client->con->sd != -1)
+	if (client->con && client->con->sd != -1)
 	{
 		net_con_close(client->con);
 	}

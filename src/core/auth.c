@@ -179,26 +179,18 @@ static int acl_parse_line(char* line, int line_count, void* ptr_data)
 	char* pos;
 	struct acl_handle* handle = (struct acl_handle*) ptr_data;
 	int ret;
-	
+
 	if ((pos = strchr(line, '#')) != NULL)
 	{
 		pos[0] = 0;
 	}
-	
+
+	line = strip_white_space(line);
 	if (!*line)
 		return 0;
 
-	LOG_DEBUG("acl_parse_line(): '%s'", line);
-	line = strip_white_space(line);
-	
-	if (!*line)
-	{
-		LOG_FATAL("ACL parse error on line %d", line_count);
-		return -1;
-	}
-
 	LOG_DEBUG("acl_parse_line: '%s'", line);
-	
+
 	ACL_ADD_USER("bot",        handle->users, cred_bot);
 	ACL_ADD_USER("user_admin", handle->users, cred_admin);
 	ACL_ADD_USER("user_super", handle->users, cred_super);
@@ -210,7 +202,7 @@ static int acl_parse_line(char* line, int line_count, void* ptr_data)
 	ACL_ADD_BOOL("ban_cid",    handle->cids);
 	ACL_ADD_ADDR("deny_ip",    handle->networks);
 	ACL_ADD_ADDR("nat_ip",     handle->nat_override);
-	
+
 	LOG_ERROR("Unknown ACL command on line %d: '%s'", line_count, line);
 	return -1;
 }

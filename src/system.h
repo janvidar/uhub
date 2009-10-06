@@ -20,6 +20,8 @@
 #ifndef HAVE_UHUB_SYSTEM_H
 #define HAVE_UHUB_SYSTEM_H
 
+#define _FILE_OFFSET_BITS 64
+
 #if USE_REGPARM && __GNUC__ >= 3
 #define REGPRM1 __attribute__((regparm(1)))
 #define REGPRM2 __attribute__((regparm(2)))

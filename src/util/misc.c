@@ -45,12 +45,15 @@ static int is_printable(unsigned char c)
 char* strip_white_space(char* string)
 {
 	char* pos;
-	
+
+	if (!string)
+		return "";
+
 	while (string[0] && is_white_space(string[0])) string++;
-	
+
 	if (!*string)
-		return 0;
-	
+		return string;
+
 	/* Strip appending whitespace */
 	pos = &string[strlen(string)-1];
 	while (&string[0] < &pos[0] && is_white_space(pos[0])) { pos[0] = 0; pos--; }
