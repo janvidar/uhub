@@ -202,21 +202,21 @@ void net_con_update(struct net_connection* con, int ev)
 	}
 }
 
-void net_con_close(struct net_connection* con)
+int net_con_close(struct net_connection* con)
 {
 	uhub_assert(con);
 
 	if (net_con_flag_get(con, NET_CLEANUP))
 	{
 		LOG_INFO("Running net_con_close, but we already have closed...");
-		return;
+		return 0;
 	}
 
 	if (net_con_flag_get(con, NET_PROCESSING_BUSY))
 	{
 		LOG_INFO("Trying to close socket while processing it");
 		net_con_flag_set(con, NET_CLEANUP);
-		return;
+		return 0;
 	}
 
 	if (net_con_flag_get(con, NET_INITIALIZED))
@@ -230,6 +230,7 @@ void net_con_close(struct net_connection* con)
 	con->sd = -1;
 
 	net_con_flag_set(con, NET_CLEANUP);
+	return 1;
 }
 
 #ifdef SSL_SUPPORT

@@ -69,10 +69,10 @@ extern void net_con_update(struct net_connection* con, int events);
 /**
  * Close the connection.
  * This will ensure a connection is closed properly and will generate a NET_EVENT_DESTROYED event which indicates
- * that the con can safely be deleted (or set to NULL)
- * NOTE: Do not dele
+ * that the con can safely be deleted (or set to NULL).
+ * @returns 1 if the memory can be freed immediately, or 0 if it needs to go through the NET_EVENT_DESTROYED event.
  */
-extern void net_con_close(struct net_connection* con);
+extern int net_con_close(struct net_connection* con);
 
 /**
  * Send data
