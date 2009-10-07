@@ -80,9 +80,14 @@ size_t net_get_max_sockets()
 	}
 	LOG_ERROR("getrlimit() failed");
 #else
-	LOG_ERROR("System does not have getrlimit(): constrained to 1024 sockets");
-#endif /* HAVE_GETRLIMIT */
+#ifdef WIN32
+	LOG_WARN("Windows system, limited to 4096 connections.");
+	return 4096;
+#else
+	LOG_WARN("System does not have getrlimit(): constrained to 1024 sockets");
 	return 1024;
+#endif
+#endif /* HAVE_GETRLIMIT */
 }
 
 

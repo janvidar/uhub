@@ -555,7 +555,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		net_close(server_tcp);
 		return 0;
 	}
-	
+
 	event_set(&hub->ev_accept, hub->fd_tcp, EV_READ | EV_PERSIST, net_on_accept, hub);
 	if (event_add(&hub->ev_accept, NULL) == -1)
 	{
@@ -572,7 +572,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		net_close(server_tcp);
 		return 0;
 	}
-	
+
 	hub->recvbuf = hub_malloc(MAX_RECV_BUF);
 	hub->sendbuf = hub_malloc(MAX_SEND_BUF);
 	if (!hub->recvbuf || !hub->sendbuf)
@@ -650,7 +650,7 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_DESCRIPTION, tmp);
 		hub_free(tmp);
 	}
-	
+
 	/* (Re-)read the message of the day */
 	hub->command_motd = 0;
 	fd = open(hub->config->file_motd, 0);
@@ -1033,7 +1033,11 @@ void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason
 
 	/* stop reading from user */
 	net_shutdown_r(user->connection->sd);
-	net_con_close(user->connection);
+	if (net_con_close(user->connection))
+	{
+		hub_free(user->connection);
+	}
+	user->connection = 0;
 
 	LOG_TRACE("hub_disconnect_user(), user=%p, reason=%d, state=%d", user, reason, user->state);
 	

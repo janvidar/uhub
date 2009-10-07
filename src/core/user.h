@@ -111,7 +111,6 @@ struct hub_user
 	struct hub_recvq*       recv_queue;
 	struct hub_sendq*       send_queue;
 	struct net_connection*  connection;         /** Connection data */
-	time_t                  tm_connected;       /** time when user connected */
 	struct hub_user_limits  limits;             /** Data used for limitation */
 	enum user_quit_reason   quit_reason;        /** Quit reason (see user_quit_reason) */
 
@@ -128,7 +127,7 @@ struct hub_user
  * @param sd socket descriptor associated with the user
  * @return User object or NULL if not enough memory is available.
  */
-extern struct hub_user* user_create(struct hub_info* hub, int sd, struct ip_addr_encap* addr);
+extern struct hub_user* user_create(struct hub_info* hub, struct net_connection* con, struct ip_addr_encap* addr);
 
 /**
  * Delete a user.

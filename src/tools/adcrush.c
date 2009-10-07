@@ -337,6 +337,7 @@ void runloop(size_t clients)
 	{
 		ADC_client_destroy(client[n]);
 		free(client[n]);
+		client[n] = 0;
 	}
 }
 

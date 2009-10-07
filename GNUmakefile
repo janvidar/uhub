@@ -135,6 +135,7 @@ libuhub_SOURCES := \
 		src/core/hubevent.c \
 		src/core/hubio.c \
 		src/core/inf.c \
+		src/core/probe.c \
 		src/util/ipcalc.c \
 		src/util/list.c \
 		src/util/log.c \

@@ -180,7 +180,13 @@ void net_con_initialize(struct net_connection* con, int sd, net_connection_cb ca
 #endif
 }
 
-
+void net_con_reinitialize(struct net_connection* con, net_connection_cb callback, const void* ptr, int events)
+{
+	uhub_assert(con);
+	con->callback = callback;
+	con->ptr = (void*) ptr;
+	net_con_update(con, events);
+}
 
 void net_con_update(struct net_connection* con, int ev)
 {
@@ -389,6 +395,41 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 			return handle_openssl_error(con, ret);
 		}
 		return ret;
+	}
+#endif
+}
+
+ssize_t net_con_peek(struct net_connection* con, void* buf, size_t len)
+{
+	uhub_assert(con);
+
+#ifdef SSL_SUPPORT
+	if (!con->ssl)
+	{
+#endif
+		int ret = net_recv(con->sd, buf, len, MSG_PEEK);
+#ifdef NETWORK_DUMP_DEBUG
+		LOG_PROTO("net_recv: ret=%d (MSG_PEEK)", ret);
+#endif
+		if (ret > 0)
+		{
+			con->last_recv = time(0);
+		}
+		else if (ret == -1 && (net_error() == EWOULDBLOCK || net_error() == EINTR))
+		{
+			return 0;
+		}
+		else
+		{
+			return -1;
+		}
+		return ret;
+#ifdef SSL_SUPPORT
+	}
+	else
+	{
+		// FIXME: Not able to do this!
+		return 0;
 	}
 #endif
 }

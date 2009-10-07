@@ -97,6 +97,9 @@ int route_to_user(struct hub_info* hub, struct hub_user* user, struct adc_messag
 	free(data);
 #endif
 
+	if (!user->connection)
+		return 0;
+
 	if (hub_sendq_is_empty(user->send_queue) && !user_flag_get(user, flag_pipeline))
 	{
 		/* Perform oportunistic write */

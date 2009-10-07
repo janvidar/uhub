@@ -64,6 +64,7 @@ struct net_connection
 };
 
 extern void net_con_initialize(struct net_connection* con, int sd, net_connection_cb callback, const void* ptr, int events);
+extern void net_con_reinitialize(struct net_connection* con, net_connection_cb callback, const void* ptr, int events);
 extern void net_con_update(struct net_connection* con, int events);
 
 /**
@@ -91,6 +92,13 @@ extern ssize_t net_con_send(struct net_connection* con, const void* buf, size_t 
  *        <0 if an error occured, the negative number contains the error code.
  */
 extern ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len);
+
+/**
+ * Receive data without removing them from the recv() buffer.
+ * NOTE: This does not currently work for SSL connections after the SSL handshake has been
+ * performed.
+ */
+extern ssize_t net_con_peek(struct net_connection* con, void* buf, size_t len);
 
 /**
  * Set timeout for connetion.

@@ -58,10 +58,9 @@ extern void hub_sendq_add(struct hub_sendq*, struct adc_message* msg);
 
 /**
  * Process the send queue, and send as many messages as possible.
- * @returns the number of bytes sent.
- * FIXME: send error not handled here!
+ * @returns -1 on error, 0 if unable to send more, 1 if more can be sent.
  */
-extern int  hub_sendq_send(struct hub_sendq*, hub_recvq_write, void* data);
+extern int  hub_sendq_send(struct hub_sendq*, struct hub_user*);
 
 /**
  * @returns 1 if send queue is empty, 0 otherwise.

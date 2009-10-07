@@ -35,27 +35,24 @@ static const char* user_log_str(struct hub_user* user)
 }
 #endif
 
-struct hub_user* user_create(struct hub_info* hub, int sd, struct ip_addr_encap* addr)
+struct hub_user* user_create(struct hub_info* hub, struct net_connection* con, struct ip_addr_encap* addr)
 {
 	struct hub_user* user = NULL;
 	
-	LOG_TRACE("user_create(), hub=%p, sd=%d", hub, sd);
+	LOG_TRACE("user_create(), hub=%p, con[sd=%d]", hub, con->sd);
 
 	user = (struct hub_user*) hub_malloc_zero(sizeof(struct hub_user));
 
 	if (user == NULL)
 		return NULL; /* OOM */
 
-	user->tm_connected = time(NULL);
 	user->send_queue = hub_sendq_create();
 	user->recv_queue = hub_recvq_create();
 
-	user->connection = (struct net_connection*) hub_malloc(sizeof(struct net_connection));
-	net_con_initialize(user->connection, sd, net_event, user, NET_EVENT_READ);
-	net_con_set_timeout(user->connection, TIMEOUT_CONNECTED);
+	user->connection = con;
+	net_con_reinitialize(user->connection, net_event, user, NET_EVENT_READ);
 
 	memcpy(&user->id.addr, addr, sizeof(struct ip_addr_encap));
-	
 	user_set_state(user, state_protocol);
 	return user;
 }

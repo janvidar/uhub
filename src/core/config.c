@@ -417,7 +417,7 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 	DUMP_BOOL(registered_users_only, DEF_REGISTERED_USERS_ONLY);
 
 #ifdef SSL_SUPPORT
-        DUMP_BOOL(tls_enable, DEF_TLS_ENABLE);
+	DUMP_BOOL(tls_enable, DEF_TLS_ENABLE);
 	DUMP_BOOL(tls_require, DEF_TLS_REQUIRE);
 	DUMP_STR (tls_certificate, DEF_TLS_CERTIFICATE);
 	DUMP_STR (tls_private_key, DEF_TLS_PRIVATE_KEY);

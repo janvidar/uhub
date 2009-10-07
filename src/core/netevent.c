@@ -17,8 +17,9 @@
  *
  */
 
-#include "uhub.h"
+#include <uhub.h>
 #include "hubio.h"
+#include "probe.h"
 
 /* FIXME: This should not be needed! */
 extern struct hub_info* g_hub;
@@ -51,21 +52,6 @@ void debug_sendq_recv(struct hub_user* user, int received, int max, const char* 
 	}
 }
 #endif
-
-int net_user_send(void* ptr, const void* buf, size_t len)
-{
-	struct hub_user* user = (struct hub_user*) ptr;
-	int ret = net_con_send(user->connection, buf, len);
-#ifdef DEBUG_SENDQ
-	debug_sendq_send(user, ret, len);
-#endif
-	if (ret > 0)
-		return ret;
-	if (ret == 0)
-		return -2;
-	else
-		return -1;
-}
 
 int net_user_recv(void* ptr, void* buf, size_t len)
 {
@@ -161,13 +147,11 @@ int handle_net_write(struct hub_user* user)
 	int ret = 0;
 	while (hub_sendq_get_bytes(user->send_queue))
 	{
-		ret = hub_sendq_send(user->send_queue, net_user_send, user);
+		ret = hub_sendq_send(user->send_queue, user);
 		if (ret <= 0)
 			break;
 	}
 
-	if (ret == -1)
-		return quit_disconnected;
 	if (ret < 0)
 		return quit_socket_error;
 
@@ -189,9 +173,12 @@ void net_event(struct net_connection* con, int event, void *arg)
 
 	if (event == NET_EVENT_DESTROYED)
 	{
-		printf("NET_EVENT_DESTROYED\n");
-		hub_free(user->connection);
-		user->connection = 0;
+		printf("NET_EVENT_DESTROYED: con=%p, user=%p\n", con, user);
+		if (user)
+		{
+			user->connection = 0;
+		}
+		hub_free(con);
 		return;
 	}
 
@@ -217,26 +204,32 @@ void net_event(struct net_connection* con, int event, void *arg)
 			return;
 		}
 	}
-	else if (event & NET_EVENT_READ)
+
+	if (event & NET_EVENT_READ)
 	{
 		flag_close = handle_net_read(user);
-	}
-	else if (event & NET_EVENT_WRITE)
-	{
-		flag_close = handle_net_write(user);
+		if (flag_close)
+		{
+			hub_disconnect_user(g_hub, user, flag_close);
+			return;
+		}
 	}
 
-	if (flag_close)
+	if (event & NET_EVENT_WRITE)
 	{
-		hub_disconnect_user(g_hub, user, flag_close);
-		return;
+		flag_close = handle_net_write(user);
+		if (flag_close)
+		{
+			hub_disconnect_user(g_hub, user, flag_close);
+			return;
+		}
 	}
 }
 
 void net_on_accept(int server_fd, short event, void *arg)
 {
 	struct hub_info* hub = (struct hub_info*) arg;
-	struct hub_user* user = 0;
+	struct hub_probe* probe = 0;
 	struct ip_addr_encap ipaddr;
 	const char* addr;
 
@@ -269,17 +262,13 @@ void net_on_accept(int server_fd, short event, void *arg)
 			continue;
 		}
 
-		user = user_create(hub, fd, &ipaddr);
-		if (!user)
+		probe = probe_create(hub, fd, &ipaddr);
+		if (!probe)
 		{
-			LOG_ERROR("Unable to create user after socket accepted. Out of memory?");
+			LOG_ERROR("Unable to create probe after socket accepted. Out of memory?");
 			net_close(fd);
 			break;
 		}
-
-#ifdef SSL_SUPPORT
-		net_con_ssl_handshake(&user->net.connection, NET_CON_SSL_MODE_SERVER);
-#endif
 	}
 }
 

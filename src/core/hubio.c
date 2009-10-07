@@ -146,58 +146,21 @@ void hub_sendq_remove(struct hub_sendq* q, struct adc_message* msg)
 	q->offset = 0;
 }
 
-int hub_sendq_send(struct hub_sendq* q, hub_recvq_write w, void* data)
+int hub_sendq_send(struct hub_sendq* q, struct hub_user* user)
 {
-	int ret = 0;
-	size_t bytes = 0;
-	size_t offset = q->offset; // offset into first message.
-	size_t remain = 0;
-	size_t length = 0;
-	char* sbuf = g_hub->sendbuf;
-	size_t max_send_buf = 4096;
-
-	/* Copy as many messages possible into global send queue */
 	struct adc_message* msg = list_get_first(q->queue);
-	while (msg)
-	{
-		length = MIN(msg->length - offset, (max_send_buf-1) - bytes);
-		memcpy(sbuf + bytes, msg->cache + offset, length);
-		bytes += length;
-		
-		if (length < (msg->length - offset))
-			break;
-		offset = 0;
-		msg = list_get_next(q->queue);
-	}
+	if (!msg) return 0;
 
-	msg = list_get_first(q->queue);
-
-	/* Send as much as possible */
-	ret = w(data, sbuf, bytes);
+	int ret = net_con_send(user->connection, msg->cache + q->offset, msg->length - q->offset);
 
 	if (ret > 0)
 	{
-#ifdef SSL_SUPPORT
-		q->last_send = ret;
-#endif
+		q->offset += ret;
+		if (msg->length - q->offset > 0)
+			return 0;
 
-		/* Remove messages sent */
-		offset = q->offset;
-		remain = ret;
-		
-		while (msg)
-		{
-			length = msg->length - offset;
-			if (length >= remain)
-			{
-				q->offset += remain;
-				break;
-			}
-			remain -= length;
-			hub_sendq_remove(q, msg);
-			msg = list_get_next(q->queue);
-			offset = 0;
-		}
+		hub_sendq_remove(q, msg);
+		return 1;
 	}
 	return ret;
 }
