@@ -79,6 +79,7 @@ size_t net_get_max_sockets()
 		return limits.rlim_max;
 	}
 	LOG_ERROR("getrlimit() failed");
+	return 1024;
 #else
 #ifdef WIN32
 	LOG_WARN("Windows system, limited to 4096 connections.");
