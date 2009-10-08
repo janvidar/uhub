@@ -216,7 +216,7 @@ void net_event(struct net_connection* con, int event, void *arg)
 		}
 	}
 
-	if (!flag_close && event & NET_EVENT_WRITE)
+	if (event & NET_EVENT_WRITE)
 	{
 		flag_close = handle_net_write(user);
 		if (flag_close)
