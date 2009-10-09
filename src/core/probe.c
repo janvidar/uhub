@@ -76,13 +76,21 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 				if (probe->hub->config->tls_enable)
 				{
 					LOG_TRACE("Probed TLS %d.%d connection", (int) probe_recvbuf[1], (int) probe_recvbuf[2]);
+					if (user_create(probe->hub, probe->connection, &probe->addr))
+					{
+						probe->connection = 0;
+					}
 					net_con_ssl_handshake(con, NET_CON_SSL_MODE_SERVER);
 				}
 				else
 				{
 					LOG_TRACE("Probed TLS %d.%d connection. TLS disabled in hub.", (int) probe_recvbuf[1], (int) probe_recvbuf[2]);
-					probe_destroy(probe);
 				}
+				probe_destroy(probe);
+				return;
+			}
+			else
+			{
 				return;
 			}
 #endif

@@ -103,7 +103,7 @@ static void net_con_event(int fd, short ev, void *arg)
 
 	net_con_flag_set(con, NET_PROCESSING_BUSY);
 
-	uhub_assert(net_con_flag_get(con, NET_EVENT_SET) != 0);
+// 	uhub_assert(net_con_flag_get(con, NET_EVENT_SET) != 0);
 	net_con_flag_unset(con, NET_EVENT_SET);
 
 	LOG_MEMORY("EVT: process: CON={ %p, %p, %d, %d}", con, &con->event, con->sd, (int) ev);
