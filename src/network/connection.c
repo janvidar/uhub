@@ -142,7 +142,7 @@ static void net_con_event(int fd, short ev, void *arg)
 			}
 			else
 			{
-				CALLBACK((con, events);
+				CALLBACK(con, events);
 			}
 		}
 		else
@@ -523,7 +523,7 @@ ssize_t net_con_ssl_connect(struct net_connection* con)
 		return handle_openssl_error(con, ret);
 	}
 	return ret;
-// }
+}
 
 ssize_t net_con_ssl_handshake(struct net_connection* con, int ssl_mode)
 {

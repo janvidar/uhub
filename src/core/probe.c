@@ -66,16 +66,23 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 			}
 
 #ifdef SSL_SUPPORT
-			if (bytes >= 11
+			if (bytes >= 11 &&
 				probe_recvbuf[0] == 22 && 
 				probe_recvbuf[1] == 3 && /* protocol major version */
 				probe_recvbuf[5] == 1 && /* message type */
 				probe_recvbuf[9] == probe_recvbuf[1] &&
 				probe_recvbuf[10] == probe_recvbuf[2])
 			{
-				LOG_TRACE("Probed TLS %d.%d connection", (int) probe_recvbuf[1], (int) probe_recvbuf[2]);
-
-				net_con_ssl_handshake(con, NET_CON_SSL_MODE_SERVER);
+				if (probe->hub->config->tls_enable)
+				{
+					LOG_TRACE("Probed TLS %d.%d connection", (int) probe_recvbuf[1], (int) probe_recvbuf[2]);
+					net_con_ssl_handshake(con, NET_CON_SSL_MODE_SERVER);
+				}
+				else
+				{
+					LOG_TRACE("Probed TLS %d.%d connection. TLS disabled in hub.", (int) probe_recvbuf[1], (int) probe_recvbuf[2]);
+					probe_destroy(probe);
+				}
 				return;
 			}
 #endif
