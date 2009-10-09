@@ -33,6 +33,9 @@
 #define NET_INITIALIZED           0x2000
 #define NET_TIMER_ENABLED         0x1000
 
+/* FIXME: Meant for debugging */
+#define NET_EVENT_SET             0x0800
+
 extern struct hub_info* g_hub;
 
 static inline int net_con_flag_get(struct net_connection* con, unsigned int flag)
@@ -77,6 +80,13 @@ void net_con_set(struct net_connection* con)
 	if (net_con_flag_get(con, NET_WANT_READ | NET_WANT_SSL_READ))   ev |= EV_READ;
 	if (net_con_flag_get(con, NET_WANT_WRITE | NET_WANT_SSL_WRITE)) ev |= EV_WRITE;
 
+	if (net_con_flag_get(con, NET_EVENT_SET) != 0)
+	{
+		event_del(&con->event);
+	}
+	net_con_flag_set(con, NET_EVENT_SET);
+
+	LOG_MEMORY("SET: set+add: CON={ %p, %p, %d, %d}", con, &con->event, con->sd, ev);
 	event_set(&con->event, con->sd, ev, net_con_event, con);
 	event_add(&con->event, 0);
 	net_con_flag_set(con, NET_INITIALIZED);
@@ -92,6 +102,11 @@ static void net_con_event(int fd, short ev, void *arg)
 	int events = net_con_convert_from_libevent_mask(ev);
 
 	net_con_flag_set(con, NET_PROCESSING_BUSY);
+
+	uhub_assert(net_con_flag_get(con, NET_EVENT_SET) != 0);
+	net_con_flag_unset(con, NET_EVENT_SET);
+
+	LOG_MEMORY("EVT: process: CON={ %p, %p, %d, %d}", con, &con->event, con->sd, (int) ev);
 
 #ifdef SSL_SUPPORT
 	if (!con->ssl)
@@ -140,6 +155,7 @@ static void net_con_event(int fd, short ev, void *arg)
 
 	if (net_con_flag_get(con, NET_CLEANUP))
 	{
+		net_con_clear_timeout(con);
 		net_con_flag_unset(con, NET_INITIALIZED);
 		CALLBACK(con, NET_EVENT_DESTROYED);
 	}
@@ -166,6 +182,10 @@ void net_con_initialize(struct net_connection* con, int sd, net_connection_cb ca
 
 	if (ev)
 	{
+		uhub_assert(net_con_flag_get(con, NET_EVENT_SET) == 0);
+		net_con_flag_set(con, NET_EVENT_SET);
+
+		LOG_MEMORY("SET:    init: CON={ %p, %p, %d, %d}", con, &con->event, con->sd, ev);
 		event_set(&con->event, con->sd, events, net_con_event, con);
 		event_add(&con->event, 0);
 		net_con_flag_set(con, NET_INITIALIZED);
@@ -214,19 +234,23 @@ int net_con_close(struct net_connection* con)
 
 	if (net_con_flag_get(con, NET_CLEANUP))
 	{
-		LOG_INFO("Running net_con_close, but we already have closed...");
+		LOG_PROTO("Running net_con_close, but we already have closed...");
 		return 0;
 	}
 
 	if (net_con_flag_get(con, NET_PROCESSING_BUSY))
 	{
-		LOG_INFO("Trying to close socket while processing it");
+		LOG_PROTO("Trying to close socket while processing it");
 		net_con_flag_set(con, NET_CLEANUP);
 		return 0;
 	}
 
 	if (net_con_flag_get(con, NET_INITIALIZED))
 	{
+		LOG_MEMORY("DEL:   close: CON={ %p, %p, %d, %d}", con, &con->event, con->sd, -1);
+		uhub_assert(net_con_flag_get(con, NET_EVENT_SET) != 0);
+		net_con_flag_unset(con, NET_EVENT_SET);
+
 		event_del(&con->event);
 		net_con_flag_unset(con, NET_INITIALIZED);
 	}

@@ -173,7 +173,7 @@ void net_event(struct net_connection* con, int event, void *arg)
 
 	if (event == NET_EVENT_DESTROYED)
 	{
-		printf("NET_EVENT_DESTROYED: con=%p, user=%p\n", con, user);
+		LOG_PROTO("NET_EVENT_DESTROYED: con=%p, user=%p\n", con, user);
 		if (user)
 		{
 			user->connection = 0;
