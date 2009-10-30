@@ -132,6 +132,7 @@ int handle_net_read(struct hub_user* user)
 			{
 				hub_recvq_set(q, 0, 0);
 				user_flag_set(user, flag_maxbuf);
+				LOG_WARN("Received message past max_recv_buffer, dropping message.");
 			}
 		}
 		else

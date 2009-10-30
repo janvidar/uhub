@@ -81,10 +81,16 @@ static inline int check_send_queue(struct hub_info* hub, struct hub_user* user, 
 		return 1;
 
 	if ((user->send_queue->size + msg->length) > get_max_send_queue(hub))
+	{
+		LOG_WARN("send queue overflowed, message discarded.");
 		return -1;
+	}
 
 	if (user->send_queue->size > get_max_send_queue_soft(hub) && msg->priority < 0)
+	{
+		LOG_WARN("send queue soft overflowed.");
 		return 0;
+	}
 
 	return 1;
 }
