@@ -101,6 +101,12 @@ static void net_con_event(int fd, short ev, void *arg)
 	struct net_connection* con = (struct net_connection*) arg;
 	int events = net_con_convert_from_libevent_mask(ev);
 
+	if (net_con_flag_get(con, NET_CLEANUP))
+	{
+		hub_free(con);
+		return;
+	}
+
 	net_con_flag_set(con, NET_PROCESSING_BUSY);
 
 // 	uhub_assert(net_con_flag_get(con, NET_EVENT_SET) != 0);
