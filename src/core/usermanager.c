@@ -101,9 +101,10 @@ int uman_init(struct hub_info* hub)
 	if (!users->list)
 	{
 		list_destroy(users->list);
+		hub_free(users);
 		return -1;
 	}
-	
+
 	hub->users = users;
 
 #ifdef USERMANAGER_TIMER

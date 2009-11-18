@@ -46,8 +46,11 @@ static int set_feature_cast_supports(struct hub_user* u, struct adc_message* cmd
 	if (adc_msg_has_named_argument(cmd, ADC_INF_FLAG_SUPPORT))
 	{
 		tmp = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_SUPPORT);
+		if (!tmp)
+			return -1; // FIXME: OOM
+
 		user_clear_feature_cast_support(u);
-		
+
 		it = tmp;
 		while (strlen(it) > 4)
 		{

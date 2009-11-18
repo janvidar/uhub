@@ -26,8 +26,7 @@
 	uhub_assert(X->capacity); \
 	uhub_assert(X->length); \
 	uhub_assert(X->length <= X->capacity); \
-	uhub_assert(X->length == strlen(X->cache)); \
-	uhub_assert(X->references >= 0);
+	uhub_assert(X->length == strlen(X->cache));
 #else
 #define ADC_MSG_ASSERT(X) do { } while(0)
 #endif /* DEBUG */
@@ -111,12 +110,12 @@ static int adc_msg_grow(struct adc_message* msg, size_t size)
 
 	if (msg->capacity > size)
 		return 1;
-	
+
 	/* Make sure we align our data */
 	newsize = size;
 	newsize += 2; /* termination */
 	newsize += (newsize % sizeof(size_t)); /* alignment padding */
-	
+
 	buf = msg_malloc_zero(newsize);
 	if (!buf)
 		return 0;
@@ -126,7 +125,7 @@ static int adc_msg_grow(struct adc_message* msg, size_t size)
 		memcpy(buf, msg->cache, msg->length);
 		msg_free(msg->cache);
 	}
-	
+
 	msg->cache = buf;
 	msg->capacity = newsize;
 
@@ -144,7 +143,7 @@ static int adc_msg_cache_append(struct adc_message* msg, const char* string, siz
 
 	memcpy(&msg->cache[msg->length], string, len);
 	adc_msg_set_length(msg, msg->length + len);
-	
+
 	assert(msg->capacity > msg->length);
 	msg->cache[msg->length] = 0;
 	return 1;
@@ -777,16 +776,15 @@ char* adc_msg_get_argument(struct adc_message* cmd, int offset)
 	char* end;
 	char* argument;
 	int count = 0;
-	
+
 	ADC_MSG_ASSERT(cmd);
-	
+
 	adc_msg_unterminate(cmd);
-	
+
 	start = strchr(&cmd->cache[adc_msg_get_arg_offset(cmd)-1], ' ');
 	while (start)
 	{
 		end = strchr(&start[1], ' ');
-		
 		if (count == offset)
 		{
 			if (end)
@@ -796,21 +794,27 @@ char* adc_msg_get_argument(struct adc_message* cmd, int offset)
 			else
 			{
 				argument = hub_strdup(&start[1]);
-				if (argument[strlen(argument)-1] == '\n')
+				if (argument && argument[strlen(argument)-1] == '\n')
 					argument[strlen(argument)-1] = 0;
 			}
-			
+
+			if (!argument)
+				return 0; // FIXME: OOM
+
 			if (*argument)
 			{
 				adc_msg_terminate(cmd);
 				return argument;
 			}
+			else
+			{
+				hub_free(argument);
+			}
 		}
-		
 		count++;
 		start = end;
 	}
-	
+
 	adc_msg_terminate(cmd);
 	return 0;
 }

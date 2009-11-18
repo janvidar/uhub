@@ -355,25 +355,46 @@ int acl_is_user_denied(struct acl_handle* handle, const char* data)
 
 int acl_user_ban_nick(struct acl_handle* handle, const char* nick)
 {
+	char* data = 0;
 	struct hub_user_access_info* info = hub_malloc_zero(sizeof(struct hub_user_access_info));
+
 	if (!info)
 	{
 		LOG_ERROR("ACL error: Out of memory!");
 		return -1;
 	}
-	list_append(handle->users_banned, hub_strdup(nick));
+
+	data = hub_strdup(nick);
+	if (!data)
+	{
+		LOG_ERROR("ACL error: Out of memory!");
+		hub_free(info);
+		return -1;
+	}
+
+	list_append(handle->users_banned, data);
 	return 0;
 }
 
 int acl_user_ban_cid(struct acl_handle* handle, const char* cid)
 {
+	char* data;
 	struct hub_user_access_info* info = hub_malloc_zero(sizeof(struct hub_user_access_info));
 	if (!info)
 	{
 		LOG_ERROR("ACL error: Out of memory!");
 		return -1;
 	}
-	list_append(handle->cids, hub_strdup(cid));
+
+	data = hub_strdup(cid);
+	if (!data)
+	{
+		LOG_ERROR("ACL error: Out of memory!");
+		hub_free(info);
+		return -1;
+	}
+
+	list_append(handle->cids, data);
 	return 0;
 }
 
@@ -431,12 +452,12 @@ int acl_is_ip_nat_override(struct acl_handle* handle, const char* ip_address)
  */
 const char* acl_password_generate_challenge(struct acl_handle* acl, struct hub_user* user)
 {
-	char buf[32];
+	char buf[64];
 	uint64_t tiger_res[3];
 	static char tiger_buf[MAX_CID_LEN+1];
 
 	// FIXME: Generate a better nonce scheme.
-	snprintf(buf, 32, "%p%d%d", user, (int) user->id.sid, (int) user->connection->sd);
+	snprintf(buf, 64, "%p%d%d", user, (int) user->id.sid, (int) user->connection->sd);
 
 	tiger((uint64_t*) buf, strlen(buf), (uint64_t*) tiger_res);
 	base32_encode((unsigned char*) tiger_res, TIGERSIZE, tiger_buf);

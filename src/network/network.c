@@ -303,7 +303,7 @@ int net_close(int fd)
 	}
 	else
 	{
-		if (fd != -1)
+		if (ret != -1)
 		{
 			net_stats_add_error();
 		}
@@ -474,6 +474,7 @@ int net_socket_create(int af, int type, int protocol)
 	if (sd == -1)
 	{
 		net_error_out(sd, "net_socket_create");
+		return -1;
 	}
 
 #ifdef SOCK_DUAL_STACK_OPT

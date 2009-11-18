@@ -88,10 +88,18 @@ struct sid_pool
 struct sid_pool* sid_pool_create(sid_t max)
 {
 	struct sid_pool* pool = hub_malloc(sizeof(struct sid_pool));
+	if (!pool)
+		return 0;
+
 	pool->min = 1;
 	pool->max = max + 1;
 	pool->count = 0;
 	pool->map = hub_malloc_zero(sizeof(struct hub_user*) * pool->max);
+	if (!pool->map)
+	{
+		hub_free(pool);
+		return 0;
+	}
 	pool->map[0] = (struct hub_user*) pool; /* hack to reserve the first sid. */
 
 #ifdef DEBUG_SID

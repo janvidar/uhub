@@ -54,6 +54,11 @@ void list_clear(struct linked_list* list, void (*free_handle)(void* ptr))
 void list_append(struct linked_list* list, void* data_ptr)
 {
 	struct node* new_node = (struct node*) hub_malloc_zero(sizeof(struct node));
+	if (!new_node)
+	{
+		LOG_FATAL("Unable to allocate memory");
+		return;
+	}
 	new_node->ptr = data_ptr;
 	
 	if (list->last)

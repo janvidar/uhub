@@ -111,7 +111,6 @@ int handle_net_read(struct hub_user* user)
 					if (hub_handle_message(g_hub, user, start, (pos - start)) == -1)
 					{
 							return quit_protocol_error;
-							break;
 					}
 				}
 			}

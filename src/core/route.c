@@ -86,7 +86,7 @@ static inline int check_send_queue(struct hub_info* hub, struct hub_user* user, 
 		return -1;
 	}
 
-	if (user->send_queue->size > get_max_send_queue_soft(hub) && msg->priority < 0)
+	if (user->send_queue->size > get_max_send_queue_soft(hub))
 	{
 		LOG_WARN("send queue soft overflowed.");
 		return 0;

@@ -102,6 +102,7 @@ int hub_handle_support(struct hub_info* hub, struct hub_user* u, struct adc_mess
 	if (hub->status == hub_status_disabled && u->state == state_protocol)
 	{
 		on_login_failure(hub, u, status_msg_hub_disabled);
+		hub_free(arg);
 		return -1;
 	}
 

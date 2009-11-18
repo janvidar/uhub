@@ -47,10 +47,13 @@ extern uint64_t tiger_sboxes[4*256];
 	ROUND(b, c, a, x7, mul)
 
 void tiger_compress(uint64_t* str, uint64_t state[3]) {
-	uint64_t a, b, c, swap;
+	uint64_t a, b, c;
 	uint64_t x0, x1, x2, x3, x4, x5, x6, x7;
 	uint64_t aa, bb, cc;
+#if PASSES > 3
+	uint64_t swap;
 	size_t pass_no;
+#endif
 	a = state[0];
 	b = state[1];
 	c = state[2];
@@ -107,7 +110,8 @@ void tiger_compress(uint64_t* str, uint64_t state[3]) {
 	x7 -= x6 ^ 0x0123456789ABCDEFULL;
 
 	PASS(b, c, a, 9);
-	
+
+#if PASSES > 3
 	for (pass_no = 3; pass_no < PASSES; pass_no++)
 	{
 		x0 -= x7 ^ 0xA5A5A5A5A5A5A5A5ULL;
@@ -134,7 +138,8 @@ void tiger_compress(uint64_t* str, uint64_t state[3]) {
 		c = b;
 		b = swap;
 	}
-	
+#endif
+
 	a ^= aa;
 	b -= bb;
 	c += cc;

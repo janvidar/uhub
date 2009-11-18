@@ -77,7 +77,7 @@ static struct hub_command* command_create(const char* message)
 	}
 
 	char* prefix = list_get_first(cmd->args);
-	if (prefix[0] && prefix[1])
+	if (prefix && prefix[0] && prefix[1])
 	{
 		cmd->prefix = hub_strdup(&prefix[1]);
 		cmd->prefix_len = strlen(cmd->prefix);
@@ -235,6 +235,9 @@ static int command_uptime(struct hub_info* hub, struct hub_user* user, struct hu
 static int command_kick(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
 {
 	char* nick = list_get_first(cmd->args);
+	if (!nick)
+		return -1; // FIXME: bad syntax.
+
 	struct hub_user* target = uman_get_user_by_nick(hub, nick);
 	
 	if (!target)
@@ -250,6 +253,9 @@ static int command_kick(struct hub_info* hub, struct hub_user* user, struct hub_
 static int command_ban(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
 {
 	char* nick = list_get_first(cmd->args);
+	if (!nick)
+		return -1; // FIXME: bad syntax.
+
 	struct hub_user* target = uman_get_user_by_nick(hub, nick);
 
 	if (!target)
@@ -299,6 +305,9 @@ static int command_getip(struct hub_info* hub, struct hub_user* user, struct hub
 	char tmp[128];
 
 	char* nick = list_get_first(cmd->args);
+	if (!nick);
+		return -1; // FIXME: bad syntax/OOM
+
 	struct hub_user* target = uman_get_user_by_nick(hub, nick);
 
 	if (!target)
@@ -316,11 +325,17 @@ static int command_whoip(struct hub_info* hub, struct hub_user* user, struct hub
 	struct hub_user* u;
 	int ret = 0;
 
+	if (!address)
+		return -1; // FIXME: bad syntax.
+
 	ret = ip_convert_address_to_range(address, &range);
 	if (!ret)
 		return command_status(hub, user, cmd, "Invalid IP address/range/mask");
 
 	users = (struct linked_list*) list_create();
+	if (!users)
+		return -1; // FIXME: OOM
+
 	ret = uman_get_user_by_addr(hub, users, &range);
 
 	if (!ret)
@@ -333,6 +348,12 @@ static int command_whoip(struct hub_info* hub, struct hub_user* user, struct hub
 	snprintf(tmp, 128, "*** %s: Found %d match%s:", cmd->prefix, ret, ((ret != 1) ? "es" : ""));
 
 	char* buffer = hub_malloc(((MAX_NICK_LEN + INET6_ADDRSTRLEN + 5) * ret) + strlen(tmp) + 3);
+	if (!buffer)
+	{
+		list_destroy(users);
+		return -1; // FIXME: OOM
+	}
+
 	buffer[0] = 0;
 	strcat(buffer, tmp);
 	strcat(buffer, "\n");
@@ -350,6 +371,7 @@ static int command_whoip(struct hub_info* hub, struct hub_user* user, struct hub
 
 	send_message(hub, user, buffer);
 	hub_free(buffer);
+	list_destroy(users);
 	return 0;
 }
 
