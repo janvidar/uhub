@@ -101,6 +101,9 @@ static void net_con_event(int fd, short ev, void *arg)
 	struct net_connection* con = (struct net_connection*) arg;
 	int events = net_con_convert_from_libevent_mask(ev);
 
+	if (!con->flags)
+		return;
+
 	if (net_con_flag_get(con, NET_CLEANUP))
 	{
 		hub_free(con);

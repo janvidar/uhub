@@ -658,7 +658,6 @@ int hub_perform_login_checks(struct hub_info* hub, struct hub_user* user, struct
 	INF_CHECK(check_user_agent,           hub, user, cmd);
 	INF_CHECK(check_acl,                  hub, user, cmd);
 	INF_CHECK(check_logged_in,            hub, user, cmd);
-	
 	return 0;
 }
 
