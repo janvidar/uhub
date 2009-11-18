@@ -91,6 +91,9 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 			}
 			else
 			{
+				LOG_TRACE("Probed TLS %d.%d connection", (int) probe_recvbuf[1], (int) probe_recvbuf[2]);
+
+				net_con_ssl_handshake(con, NET_CON_SSL_MODE_SERVER);
 				return;
 			}
 #endif
