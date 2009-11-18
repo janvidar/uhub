@@ -96,7 +96,7 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 				net_con_ssl_handshake(con, NET_CON_SSL_MODE_SERVER);
 				return;
 			}
-#endifq
+#endif
 			probe_destroy(probe);
 			return;
 		}
