@@ -654,7 +654,7 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 
 	/* (Re-)read the message of the day */
 	hub->command_motd = 0;
-	fd = open(hub->config->file_motd, 0);
+	fd = (hub->config->file_motd && *hub->config->file_motd) ? open(hub->config->file_motd, 0) : -1;
 	if (fd != -1)
 	{
 		ret = read(fd, buf, MAX_RECV_BUF);
@@ -663,22 +663,18 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 			buf[ret] = 0;
 			tmp = adc_msg_escape(buf);
 			hub->command_motd = adc_msg_construct(ADC_CMD_IMSG, 6 + strlen(tmp));
- 			adc_msg_add_argument(hub->command_motd, tmp);
+			adc_msg_add_argument(hub->command_motd, tmp);
 			hub_free(tmp);
-		}
-		else
-		{
-			
 		}
 		close(fd);
 	}
-	
+
 	hub->command_support = adc_msg_construct(ADC_CMD_ISUP, 6 + strlen(ADC_PROTO_SUPPORT));
 	if (hub->command_support)
 	{
 		adc_msg_add_argument(hub->command_support, ADC_PROTO_SUPPORT);
 	}
-	
+
 	hub->command_banner = adc_msg_construct(ADC_CMD_ISTA, 25 + strlen(server));
 	if (hub->command_banner)
 	{
@@ -687,7 +683,7 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 		adc_msg_add_argument(hub->command_banner, tmp);
 		hub_free(tmp);
 	}
-	
+
 	hub->status = (hub->config->hub_enabled ? hub_status_running : hub_status_disabled);
 	hub_free(server);
 }
@@ -697,10 +693,10 @@ void hub_free_variables(struct hub_info* hub)
 {
 	adc_msg_free(hub->command_info);
 	adc_msg_free(hub->command_banner);
-	
+
 	if (hub->command_motd)
 		adc_msg_free(hub->command_motd);
-	
+
 	adc_msg_free(hub->command_support);
 }
 
