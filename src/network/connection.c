@@ -101,7 +101,6 @@ static void net_con_after_close(struct net_connection* con)
 	if (net_con_flag_get(con, NET_INITIALIZED))
 	{
 		LOG_MEMORY("DEL:   close: CON={ %p, %p, %d, %d}", con, &con->event, con->sd, -1);
-		uhub_assert(net_con_flag_get(con, NET_EVENT_SET) != 0);
 		net_con_flag_unset(con, NET_EVENT_SET);
 
 		event_del(&con->event);
