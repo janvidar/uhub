@@ -96,17 +96,38 @@ void net_con_set(struct net_connection* con)
 	if (CON->callback) \
 		CON->callback(con, EVENTS, CON->ptr);
 
+static void net_con_after_close(struct net_connection* con)
+{
+	if (net_con_flag_get(con, NET_INITIALIZED))
+	{
+		LOG_MEMORY("DEL:   close: CON={ %p, %p, %d, %d}", con, &con->event, con->sd, -1);
+		uhub_assert(net_con_flag_get(con, NET_EVENT_SET) != 0);
+		net_con_flag_unset(con, NET_EVENT_SET);
+
+		event_del(&con->event);
+		net_con_flag_unset(con, NET_INITIALIZED);
+	}
+
+	net_con_clear_timeout(con);
+	net_close(con->sd);
+	con->sd = -1;
+
+	hub_free(con);
+}
+
 static void net_con_event(int fd, short ev, void *arg)
 {
 	struct net_connection* con = (struct net_connection*) arg;
 	int events = net_con_convert_from_libevent_mask(ev);
 
-	if (!con->flags)
+	if (!net_con_flag_get(con, NET_INITIALIZED))
+	{
 		return;
+	}
 
 	if (net_con_flag_get(con, NET_CLEANUP))
 	{
-		hub_free(con);
+		net_con_after_close(con);
 		return;
 	}
 
@@ -164,9 +185,7 @@ static void net_con_event(int fd, short ev, void *arg)
 
 	if (net_con_flag_get(con, NET_CLEANUP))
 	{
-		net_con_clear_timeout(con);
-		net_con_flag_unset(con, NET_INITIALIZED);
-		CALLBACK(con, NET_EVENT_DESTROYED);
+		net_con_after_close(con);
 	}
 	else
 	{
@@ -241,34 +260,18 @@ int net_con_close(struct net_connection* con)
 {
 	uhub_assert(con);
 
+	con->ptr = 0;
+
 	if (net_con_flag_get(con, NET_CLEANUP))
-	{
-		LOG_PROTO("Running net_con_close, but we already have closed...");
 		return 0;
-	}
 
 	if (net_con_flag_get(con, NET_PROCESSING_BUSY))
 	{
-		LOG_PROTO("Trying to close socket while processing it");
 		net_con_flag_set(con, NET_CLEANUP);
 		return 0;
 	}
 
-	if (net_con_flag_get(con, NET_INITIALIZED))
-	{
-		LOG_MEMORY("DEL:   close: CON={ %p, %p, %d, %d}", con, &con->event, con->sd, -1);
-		uhub_assert(net_con_flag_get(con, NET_EVENT_SET) != 0);
-		net_con_flag_unset(con, NET_EVENT_SET);
-
-		event_del(&con->event);
-		net_con_flag_unset(con, NET_INITIALIZED);
-	}
-
-	net_con_clear_timeout(con);
-	net_close(con->sd);
-	con->sd = -1;
-
-	net_con_flag_set(con, NET_CLEANUP);
+	net_con_after_close(con);
 	return 1;
 }
 

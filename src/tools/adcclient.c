@@ -81,17 +81,6 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 {
 	struct ADC_client* client = (struct ADC_client*) con->ptr;
 
-	if (events == NET_EVENT_DESTROYED)
-	{
-		printf("NET_EVENT_DESTROYED\n");
-		if (client)
-		{
-			client->con = 0;
-		}
-		hub_free(con);
-		return;
-	}
-
 	if (events == NET_EVENT_SOCKERROR || events == NET_EVENT_CLOSED)
 	{
 		printf("NET_EVENT_SOCKERROR || NET_EVENT_CLOSED\n");
@@ -423,6 +412,7 @@ static void ADC_client_on_connected(struct ADC_client* client)
 static void ADC_client_on_disconnected(struct ADC_client* client)
 {
 	net_con_close(client->con);
+	client->con = 0;
 	ADC_client_set_state(client, ps_none);
 }
 
@@ -436,10 +426,7 @@ void ADC_client_disconnect(struct ADC_client* client)
 {
 	if (client->con && client->con->sd != -1)
 	{
-		if (net_con_close(client->con))
-		{
-			hub_free(client->con);
-		}
+		net_con_close(client->con);
 		client->con = 0;
 	}
 }

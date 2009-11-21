@@ -27,16 +27,6 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 {
 	struct hub_probe* probe = (struct hub_probe*) con->ptr;
 
-	if (events == NET_EVENT_DESTROYED)
-	{
-		if (probe)
-		{
-			probe->connection = 0;
-		}
-		hub_free(con);
-		return;
-	}
-
 	if (events == NET_EVENT_SOCKERROR || events == NET_EVENT_CLOSED || events == NET_EVENT_TIMEOUT)
 	{
 		probe_destroy(probe);
@@ -123,10 +113,7 @@ void probe_destroy(struct hub_probe* probe)
 {
 	if (probe->connection)
 	{
-		if (net_con_close(probe->connection))
-		{
-			hub_free(probe->connection);
-		}
+		net_con_close(probe->connection);
 		probe->connection = 0;
 	}
 	hub_free(probe);

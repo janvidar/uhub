@@ -27,7 +27,6 @@
 #define NET_EVENT_WRITE           0x0004
 #define NET_EVENT_SOCKERROR       0x1000 /* Socket error, closed */
 #define NET_EVENT_CLOSED          0x2000 /* Socket closed */
-#define NET_EVENT_DESTROYED       0x4000 /* Struct is invalid and can be cleaned up */
 
 struct net_connection;
 struct net_timer;

@@ -171,17 +171,6 @@ void net_event(struct net_connection* con, int event, void *arg)
 	struct hub_user* user = (struct hub_user*) arg;
 	int flag_close = 0;
 
-	if (event == NET_EVENT_DESTROYED)
-	{
-		LOG_PROTO("NET_EVENT_DESTROYED: con=%p, user=%p\n", con, user);
-		if (user)
-		{
-			user->connection = 0;
-		}
-		hub_free(con);
-		return;
-	}
-
 #ifdef DEBUG_SENDQ
 	LOG_TRACE("net_event() : fd=%d, ev=%d, arg=%p", fd, (int) event, arg);
 #endif

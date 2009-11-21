@@ -1030,10 +1030,7 @@ void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason
 
 	/* stop reading from user */
 	net_shutdown_r(user->connection->sd);
-	if (net_con_close(user->connection))
-	{
-		hub_free(user->connection);
-	}
+	net_con_close(user->connection);
 	user->connection = 0;
 
 	LOG_TRACE("hub_disconnect_user(), user=%p, reason=%d, state=%d", user, reason, user->state);
