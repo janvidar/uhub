@@ -121,11 +121,11 @@ int handle_net_read(struct hub_user* user)
 			start = pos;
 		}
 
-		if (lastPos)
+		if (lastPos || remaining)
 		{
 			if (remaining < g_hub->config->max_recv_buffer)
 			{
-				hub_recvq_set(q, lastPos, remaining);
+				hub_recvq_set(q, lastPos ? lastPos : buf, remaining);
 			}
 			else
 			{
