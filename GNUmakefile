@@ -141,6 +141,7 @@ libuhub_SOURCES := \
 		src/util/log.c \
 		src/util/memory.c \
 		src/util/misc.c \
+		src/util/timeout.c \
 		src/core/netevent.c \
 		src/network/connection.c \
 		src/network/network.c \
