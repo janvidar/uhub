@@ -53,6 +53,7 @@ static inline void net_con_flag_unset(struct net_connection* con, unsigned int f
     con->flags &= ~flag;
 }
 
+#ifdef USE_LIBEVENT
 static inline int net_con_convert_to_libevent_mask(int ev)
 {
 	int events = 0;
@@ -69,6 +70,7 @@ static inline int net_con_convert_from_libevent_mask(int ev)
 	if (ev & EV_WRITE)      events |= NET_EVENT_WRITE;
 	return events;
 }
+#endif
 
 static void net_con_event(int fd, short ev, void *arg);
 
@@ -92,10 +94,6 @@ void net_con_set(struct net_connection* con)
 	net_con_flag_set(con, NET_INITIALIZED);
 }
 
-#define CALLBACK(CON, EVENTS) \
-	if (CON->callback) \
-		CON->callback(con, EVENTS, CON->ptr);
-
 static void net_con_after_close(struct net_connection* con)
 {
 	if (net_con_flag_get(con, NET_INITIALIZED))
@@ -113,6 +111,10 @@ static void net_con_after_close(struct net_connection* con)
 
 	hub_free(con);
 }
+
+#define CALLBACK(CON, EVENTS) \
+	if (CON->callback) \
+		CON->callback(con, EVENTS, CON->ptr);
 
 static void net_con_event(int fd, short ev, void *arg)
 {
@@ -191,6 +193,7 @@ static void net_con_event(int fd, short ev, void *arg)
 		net_con_set(con);
 	}
 }
+
 
 void net_con_initialize(struct net_connection* con, int sd, net_connection_cb callback, const void* ptr, int ev)
 {

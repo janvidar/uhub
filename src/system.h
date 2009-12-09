@@ -102,7 +102,9 @@
 
 #define uhub_assert assert
 
+#ifdef USE_LIBEVENT
 #include <event.h>
+#endif
 
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__sun__)
 #undef HAVE_STRNDUP

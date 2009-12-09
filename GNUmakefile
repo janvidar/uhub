@@ -9,10 +9,10 @@ MV            := mv
 RANLIB        := ranlib
 CFLAGS        += -pipe -Wall
 USE_SSL       ?= NO
+USE_LIBEVENT  ?= YES
 USE_BIGENDIAN ?= AUTO
 BITS          ?= AUTO
 SILENT        ?= YES
-LDLIBS        += -levent
 TERSE         ?= NO
 STACK_PROTECT ?= NO
 
@@ -116,9 +116,13 @@ CFLAGS        += -DSSL_SUPPORT
 LDLIBS        += -lssl
 endif
 
+ifeq ($(USE_LIBEVENT),YES)
+CFLAGS        += -DUSE_LIBEVENT
+LDLIBS        += -levent
 ifneq ($(LIBEVENT_PATH),)
 CFLAGS        += -I$(LIBEVENT_PATH)
 LDFLAGS       += -L$(LIBEVENT_PATH)
+endif
 endif
 
 ifeq ($(GIT_REVISION),YES)

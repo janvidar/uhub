@@ -52,8 +52,12 @@ struct net_connection
 	unsigned int         flags;     /** Connection flags */
 	void*                ptr;       /** data pointer */
 	net_connection_cb    callback;  /** Callback function */
+#ifdef USE_LIBEVENT
 	struct event         event;     /** libevent struct for read/write events */
 	struct event         timeout;   /** Used for internal timeout handling */
+#else
+#warning not implemented
+#endif
 	time_t               last_recv; /** Timestamp for last recv() */
 	time_t               last_send; /** Timestamp for last send() */
 #ifdef SSL_SUPPORT
