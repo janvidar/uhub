@@ -184,7 +184,7 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 	int ret = 0;
 	int relay = 1;
 
-	if (!message)
+	if (!message || !user_is_logged_in(u))
 		return 0;
 
 	if ((cmd->cache[0] == 'B') && (message[0] == '!' || message[0] == '+'))
@@ -211,7 +211,7 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 		relay = 0;
 	}
 
-	if (relay && user_is_logged_in(u))
+	if (relay)
 	{
 		/* adc_msg_remove_named_argument(cmd, "PM"); */
 		if (cmd->cache[0] == 'B')
