@@ -183,7 +183,10 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 	char* message = adc_msg_get_argument(cmd, 0);
 	int ret = 0;
 	int relay = 1;
-	
+
+	if (!message)
+		return 0;
+
 	if ((cmd->cache[0] == 'B') && (message[0] == '!' || message[0] == '+'))
 	{
 		/*
