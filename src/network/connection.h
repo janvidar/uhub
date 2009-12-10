@@ -46,25 +46,8 @@ extern void net_timer_initialize(struct net_timer* timer, net_timeout_cb callbac
 extern void net_timer_reset(struct net_timer* timer, int seconds);
 extern void net_timer_shutdown(struct net_timer* timer);
 
-struct net_connection
-{
-	int                  sd;        /** socket descriptor */
-	unsigned int         flags;     /** Connection flags */
-	void*                ptr;       /** data pointer */
-	net_connection_cb    callback;  /** Callback function */
-#ifdef USE_LIBEVENT
-	struct event         event;     /** libevent struct for read/write events */
-	struct event         timeout;   /** Used for internal timeout handling */
-#else
-#warning not implemented
-#endif
-	time_t               last_recv; /** Timestamp for last recv() */
-	time_t               last_send; /** Timestamp for last send() */
-#ifdef SSL_SUPPORT
-	SSL*                 ssl;       /** SSL handle */
-	size_t               write_len; /** Length of last SSL_write(), only used if flags is NET_WANT_SSL_READ. */
-#endif /*  SSL_SUPPORT */
-};
+extern int   net_con_get_sd(struct net_connection* con);
+extern void* net_con_get_ptr(struct net_connection* con);
 
 extern void net_con_initialize(struct net_connection* con, int sd, net_connection_cb callback, const void* ptr, int events);
 extern void net_con_reinitialize(struct net_connection* con, net_connection_cb callback, const void* ptr, int events);

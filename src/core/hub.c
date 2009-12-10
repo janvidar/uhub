@@ -1029,7 +1029,7 @@ void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason
 	}
 
 	/* stop reading from user */
-	net_shutdown_r(user->connection->sd);
+	net_shutdown_r(net_con_get_sd(user->connection));
 	net_con_close(user->connection);
 	user->connection = 0;
 
