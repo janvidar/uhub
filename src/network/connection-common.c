@@ -16,24 +16,9 @@
 /* FIXME: Meant for debugging */
 #define NET_EVENT_SET             0x0800
 
-static inline int net_con_flag_get(struct net_connection* con, unsigned int flag)
-{
-    return con->flags & flag;
-}
-
-static inline void net_con_flag_set(struct net_connection* con, unsigned int flag)
-{
-    con->flags |= flag;
-}
-
-static inline void net_con_flag_unset(struct net_connection* con, unsigned int flag)
-{
-    con->flags &= ~flag;
-}
-
 #define NET_CON_STRUCT_BASIC \
 	int                  sd;        /** socket descriptor */ \
-	unsigned int         flags;     /** Connection flags */ \
+	uint32_t             flags;     /** Connection flags */ \
 	void*                ptr;       /** data pointer */ \
 	net_connection_cb    callback;  /** Callback function */ \
 	time_t               last_recv; /** Timestamp for last recv() */ \

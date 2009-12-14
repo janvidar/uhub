@@ -42,6 +42,7 @@ struct net_timer
 	void*                ptr;
 };
 
+
 extern void net_timer_initialize(struct net_timer* timer, net_timeout_cb callback, void* ptr);
 extern void net_timer_reset(struct net_timer* timer, int seconds);
 extern void net_timer_shutdown(struct net_timer* timer);
@@ -49,6 +50,8 @@ extern void net_timer_shutdown(struct net_timer* timer);
 extern int   net_con_get_sd(struct net_connection* con);
 extern void* net_con_get_ptr(struct net_connection* con);
 
+extern struct net_connection* net_con_create();
+extern void net_con_destroy(struct net_connection*);
 extern void net_con_initialize(struct net_connection* con, int sd, net_connection_cb callback, const void* ptr, int events);
 extern void net_con_reinitialize(struct net_connection* con, net_connection_cb callback, const void* ptr, int events);
 extern void net_con_update(struct net_connection* con, int events);

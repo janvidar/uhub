@@ -26,6 +26,42 @@ struct net_connection
 	struct event         timeout;   /** Used for internal timeout handling */
 };
 
+int net_con_get_sd(struct net_connection* con)
+{
+	return con->sd;
+}
+
+void* net_con_get_ptr(struct net_connection* con)
+{
+	return con->ptr;
+}
+
+struct net_connection* net_con_create()
+{
+	struct net_connection* con = (struct net_connection*) hub_malloc(sizeof(struct net_connection));
+	return con;
+}
+
+static inline int net_con_flag_get(struct net_connection* con, unsigned int flag)
+{
+    return con->flags & flag;
+}
+
+static inline void net_con_flag_set(struct net_connection* con, unsigned int flag)
+{
+    con->flags |= flag;
+}
+
+static inline void net_con_flag_unset(struct net_connection* con, unsigned int flag)
+{
+    con->flags &= ~flag;
+}
+
+void net_con_destroy(struct net_connection* con)
+{
+	hub_free(con);
+}
+
 static inline int net_con_convert_to_libevent_mask(int ev)
 {
 	int events = 0;

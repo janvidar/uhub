@@ -101,7 +101,7 @@ struct hub_probe* probe_create(struct hub_info* hub, int sd, struct ip_addr_enca
 		return NULL; /* OOM */
 
 	probe->hub = hub;
-	probe->connection = (struct net_connection*) hub_malloc(sizeof(struct net_connection));
+	probe->connection = net_con_create();
 	net_con_initialize(probe->connection, sd, probe_net_event, probe, NET_EVENT_READ);
 	net_con_set_timeout(probe->connection, TIMEOUT_CONNECTED);
 
