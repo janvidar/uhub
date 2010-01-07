@@ -91,8 +91,10 @@ struct hub_logout_info
 struct hub_info
 {
 	int fd_tcp;
+#ifdef USE_LIBEVENT
 	struct event ev_accept;
 	struct event ev_timer;
+#endif
 	struct hub_stats stats;
 	struct event_queue* queue;
 	struct hub_config* config;

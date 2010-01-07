@@ -21,7 +21,9 @@
 
 static int is_ipv6_supported = -1; /* -1 = CHECK, 0 = NO, 1 = YES */
 static int net_initialized = 0;
+#ifdef USE_LIBEVENT
 static struct event_base* net_evbase = 0;
+#endif
 static struct net_statistics stats;
 static struct net_statistics stats_total;
 
@@ -47,6 +49,7 @@ int net_initialize()
 		}
 #endif /* WINSOCK */
 
+#ifdef USE_LIBEVENT
 		net_evbase = event_init();
 		if (!net_evbase)
 		{
@@ -54,6 +57,7 @@ int net_initialize()
 			return 0;
 		}
 		LOG_DEBUG("Using libevent %s, backend: %s", event_get_version(), event_get_method());
+#endif
 
 		net_stats_initialize();
 
@@ -98,8 +102,10 @@ int net_destroy()
 	{
 		LOG_TRACE("Shutting down network monitor");
 
+#ifdef USE_LIBEVENT
 		event_base_free(net_evbase);
 		net_evbase = 0;
+#endif
 
 #ifdef SSL_SUPPORT
 		/* FIXME: Shutdown OpenSSL here. */
@@ -114,10 +120,12 @@ int net_destroy()
 	return -1;
 }
 
+#ifdef USE_LIBEVENT
 struct event_base* net_get_evbase()
 {
 	return net_evbase;
 }
+#endif
 
 static void net_error_out(int fd, const char* func)
 {

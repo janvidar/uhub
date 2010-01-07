@@ -63,6 +63,7 @@ extern "C" {
 #include "util/log.h"
 #include "util/memory.h"
 #include "util/misc.h"
+#include "util/timeout.h"
 #include "util/tiger.h"
 
 #include "adc/sid.h"

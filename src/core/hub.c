@@ -557,6 +557,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		return 0;
 	}
 
+#ifdef USE_LIBEVENT
 	event_set(&hub->ev_accept, hub->fd_tcp, EV_READ | EV_PERSIST, net_on_accept, hub);
 	if (event_add(&hub->ev_accept, NULL) == -1)
 	{
@@ -565,6 +566,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		net_close(server_tcp);
 		return 0;
 	}
+#endif
 
 	if (event_queue_initialize(&hub->queue, hub_event_dispatcher, (void*) hub) == -1)
 	{
@@ -612,7 +614,9 @@ void hub_shutdown_service(struct hub_info* hub)
 	LOG_DEBUG("hub_shutdown_service()");
 
 	event_queue_shutdown(hub->queue);
+#ifdef USE_LIBEVENT
 	event_del(&hub->ev_accept);
+#endif
 	net_close(hub->fd_tcp);
 	uman_shutdown(hub);
 	hub->status = hub_status_stopped;
@@ -987,10 +991,10 @@ void hub_disconnect_all(struct hub_info* hub)
 
 void hub_event_loop(struct hub_info* hub)
 {
-	int ret;
 	do
 	{
-		ret = event_base_loop(net_get_evbase(), EVLOOP_ONCE);
+#ifdef USE_LIBEVENT
+		int ret = event_base_loop(net_get_evbase(), EVLOOP_ONCE);
 
 		if (ret != 0)
 		{
@@ -999,7 +1003,7 @@ void hub_event_loop(struct hub_info* hub)
 
 		if (ret < 0)
 			break;
-
+#endif
 		 event_queue_process(hub->queue);
 	}
 	while (hub->status == hub_status_running || hub->status == hub_status_disabled);

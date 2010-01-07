@@ -31,17 +31,19 @@
 struct net_connection;
 struct net_timer;
 
+/**
+ * Initialize the network backend.
+ * Returns 1 on success, or 0 on failure.
+ */
+extern int net_backend_initialize();
+
+/**
+ * Shutdown the network connection backend.
+ */
+extern void net_backend_shutdown();
+
 typedef void (*net_connection_cb)(struct net_connection*, int event, void* ptr);
 typedef void (*net_timeout_cb)(struct net_timer*, void* ptr);
-
-struct net_timer
-{
-	unsigned int         initialized;
-	struct event         timeout;
-	net_timeout_cb       callback;
-	void*                ptr;
-};
-
 
 extern void net_timer_initialize(struct net_timer* timer, net_timeout_cb callback, void* ptr);
 extern void net_timer_reset(struct net_timer* timer, int seconds);
@@ -108,9 +110,13 @@ extern ssize_t net_con_ssl_accept(struct net_connection*);
  */
 extern ssize_t net_con_ssl_connect(struct net_connection*);
 
-#define NET_CON_SSL_MODE_SERVER 1
-#define NET_CON_SSL_MODE_CLIENT 2
-extern ssize_t net_con_ssl_handshake(struct net_connection* con, int ssl_mode);
+enum net_con_ssl_mode
+{
+	net_con_ssl_mode_server,
+	net_con_ssl_mode_client,
+};
+
+extern ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode, void* ssl_ctx);
 
 #endif /* SSL_SUPPORT */
 

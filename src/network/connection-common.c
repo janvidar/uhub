@@ -21,8 +21,6 @@
 	uint32_t             flags;     /** Connection flags */ \
 	void*                ptr;       /** data pointer */ \
 	net_connection_cb    callback;  /** Callback function */ \
-	time_t               last_recv; /** Timestamp for last recv() */ \
-	time_t               last_send; /** Timestamp for last send() */ \
 
 #define NET_CON_STRUCT_SSL \
 	SSL*                 ssl;       /** SSL handle */ \

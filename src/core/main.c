@@ -33,7 +33,7 @@ static const char* arg_pid = 0;
 static int arg_log_syslog = 0;
 
 
-#ifndef WIN32
+#if !defined(WIN32) && defined(USE_LIBEVENT)
 void hub_handle_signal(int fd, short events, void* arg)
 {
 	struct hub_info* hub = (struct hub_info*) arg;
@@ -97,7 +97,7 @@ void shutdown_signal_handlers(struct hub_info* hub)
 	}
 }
 
-#endif /* WIN32 */
+#endif /* !WIN32 && USE_LIBEVENT*/
 
 
 int main_loop()
@@ -133,7 +133,7 @@ int main_loop()
 			hub = hub_start_service(&configuration);
 			if (!hub)
 				return -1;
-#ifndef WIN32
+#if !defined(WIN32) && defined(USE_LIBEVENT)
 			setup_signal_handlers(hub);
 #endif
 		}
@@ -148,7 +148,7 @@ int main_loop()
 
 	} while (hub->status == hub_status_restart);
 
-#ifndef WIN32
+#if !defined(WIN32) && defined(USE_LIBEVENT)
 	shutdown_signal_handlers(hub);
 #endif
 	

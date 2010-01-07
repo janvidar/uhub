@@ -26,6 +26,14 @@ struct net_connection
 	struct event         timeout;   /** Used for internal timeout handling */
 };
 
+struct net_timer
+{
+	unsigned int         initialized;
+	struct event         timeout;
+	net_timeout_cb       callback;
+	void*                ptr;
+};
+
 int net_con_get_sd(struct net_connection* con)
 {
 	return con->sd;
@@ -80,6 +88,26 @@ static inline int net_con_convert_from_libevent_mask(int ev)
 }
 
 static void net_con_event(int fd, short ev, void *arg);
+
+
+int net_con_close(struct net_connection* con)
+{
+	uhub_assert(con);
+
+	con->ptr = 0;
+
+	if (net_con_flag_get(con, NET_CLEANUP))
+		return 0;
+
+	if (net_con_flag_get(con, NET_PROCESSING_BUSY))
+	{
+		net_con_flag_set(con, NET_CLEANUP);
+		return 0;
+	}
+
+	net_con_after_close(con);
+	return 1;
+}
 
 static void net_con_set(struct net_connection* con)
 {
@@ -264,5 +292,322 @@ static void net_con_event(int fd, short ev, void *arg)
 		net_con_set(con);
 	}
 }
+
+
+static void net_timer_event(int fd, short ev, void *arg)
+{
+	struct net_timer* timer = (struct net_timer*) arg;
+	timer->callback(timer, timer->ptr);
+}
+
+void net_timer_initialize(struct net_timer* timer, net_timeout_cb callback, void* ptr)
+{
+	timer->initialized = 0;
+	timer->callback = callback;
+	timer->ptr = ptr;
+}
+
+void net_timer_reset(struct net_timer* timer, int seconds)
+{
+	struct timeval timeout = { seconds, 0 };
+	if (timer->initialized)
+	{
+		evtimer_del(&timer->timeout);
+		timer->initialized = 0;
+	}
+	evtimer_set(&timer->timeout, net_timer_event, timer);
+	evtimer_add(&timer->timeout, &timeout);
+}
+
+void net_timer_shutdown(struct net_timer* timer)
+{
+	if (timer->initialized)
+	{
+		evtimer_del(&timer->timeout);
+		timer->initialized = 0;
+	}
+	timer->callback = 0;
+	timer->ptr = 0;
+}
+
+#ifdef SSL_SUPPORT
+static int handle_openssl_error(struct net_connection* con, int ret)
+{
+	uhub_assert(con);
+
+	int error = SSL_get_error(con->ssl, ret);
+	switch (error)
+	{
+		case SSL_ERROR_ZERO_RETURN:
+			LOG_PROTO("SSL_get_error: ret=%d, error=%d: SSL_ERROR_ZERO_RETURN", ret, error);
+			return -1;
+
+		case SSL_ERROR_WANT_READ:
+			LOG_PROTO("SSL_get_error: ret=%d, error=%d: SSL_ERROR_WANT_READ", ret, error);
+			net_con_update(con, EV_READ);
+			net_con_flag_set(con, NET_WANT_SSL_READ);
+			return 0;
+
+		case SSL_ERROR_WANT_WRITE:
+			LOG_PROTO("SSL_get_error: ret=%d, error=%d: SSL_ERROR_WANT_WRITE", ret, error);
+			net_con_update(con, EV_READ | EV_WRITE);
+			net_con_flag_set(con, NET_WANT_SSL_WRITE);
+			return 0;
+
+		case SSL_ERROR_WANT_CONNECT:
+			LOG_PROTO("SSL_get_error: ret=%d, error=%d: SSL_ERROR_WANT_CONNECT", ret, error);
+			net_con_update(con, EV_READ | EV_WRITE);
+			net_con_flag_set(con, NET_WANT_SSL_CONNECT);
+			return 0;
+
+		case SSL_ERROR_WANT_ACCEPT:
+			LOG_PROTO("SSL_get_error: ret=%d, error=%d: SSL_ERROR_WANT_ACCEPT", ret, error);
+			net_con_update(con, EV_READ | EV_WRITE);
+			net_con_flag_set(con, NET_WANT_SSL_ACCEPT);
+			return 0;
+
+		case SSL_ERROR_WANT_X509_LOOKUP:
+			LOG_PROTO("SSL_get_error: ret=%d, error=%d: SSL_ERROR_WANT_X509_LOOKUP", ret, error);
+			return 0;
+
+		case SSL_ERROR_SYSCALL:
+			LOG_PROTO("SSL_get_error: ret=%d, error=%d: SSL_ERROR_SYSCALL", ret, error);
+			/* if ret == 0, connection closed, if ret == -1, check with errno */
+			if (ret == 0)
+				return -1;
+			else
+				return -net_error();
+
+		case SSL_ERROR_SSL:
+			LOG_PROTO("SSL_get_error: ret=%d, error=%d: SSL_ERROR_SSL", ret, error);
+			/* internal openssl error */
+			return -1;
+	}
+
+	return -1;
+}
+#endif
+
+
+ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
+{
+	uhub_assert(con);
+
+#ifdef SSL_SUPPORT
+	if (!con->ssl)
+	{
+#endif
+		int ret = net_send(con->sd, buf, len, UHUB_SEND_SIGNAL);
+#ifdef NETWORK_DUMP_DEBUG
+		LOG_PROTO("net_send: ret=%d", ret);
+#endif
+		if (ret > 0)
+		{
+			con->last_send = time(0);
+		}
+		else if (ret == -1 && (net_error() == EWOULDBLOCK || net_error() == EINTR))
+		{
+			return 0;
+		}
+		else
+		{
+			return -1;
+		}
+		return ret;
+#ifdef SSL_SUPPORT
+	}
+	else
+	{
+		if (net_con_flag_get(con, NET_WANT_SSL_READ) && con->write_len)
+			len = con->write_len;
+
+		int ret = SSL_write(con->ssl, buf, len);
+#ifdef NETWORK_DUMP_DEBUG
+		LOG_PROTO("net_send: ret=%d", ret);
+#endif
+		if (ret > 0)
+		{
+			con->last_send = time(0);
+			net_con_flag_unset(con, NET_WANT_SSL_READ);
+			con->write_len = 0;
+		}
+		else
+		{
+			con->write_len = len;
+			return handle_openssl_error(con, ret);
+		}
+		return ret;
+	}
+#endif
+}
+
+ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
+{
+	uhub_assert(con);
+
+#ifdef SSL_SUPPORT
+	if (!con->ssl)
+	{
+#endif
+		int ret = net_recv(con->sd, buf, len, 0);
+#ifdef NETWORK_DUMP_DEBUG
+		LOG_PROTO("net_recv: ret=%d", ret);
+#endif
+		if (ret > 0)
+		{
+			con->last_recv = time(0);
+		}
+		else if (ret == -1 && (net_error() == EWOULDBLOCK || net_error() == EINTR))
+		{
+			return 0;
+		}
+		else
+		{
+			return -1;
+		}
+		return ret;
+#ifdef SSL_SUPPORT
+	}
+	else
+	{
+		int ret = SSL_read(con->ssl, buf, len);
+#ifdef NETWORK_DUMP_DEBUG
+		LOG_PROTO("net_recv: ret=%d", ret);
+#endif
+		if (ret > 0)
+		{
+			con->last_recv = time(0);
+			net_con_flag_unset(con, NET_WANT_SSL_WRITE);
+		}
+		else
+		{
+			return handle_openssl_error(con, ret);
+		}
+		return ret;
+	}
+#endif
+}
+
+ssize_t net_con_peek(struct net_connection* con, void* buf, size_t len)
+{
+	uhub_assert(con);
+
+#ifdef SSL_SUPPORT
+	if (!con->ssl)
+	{
+#endif
+		int ret = net_recv(con->sd, buf, len, MSG_PEEK);
+#ifdef NETWORK_DUMP_DEBUG
+		LOG_PROTO("net_recv: ret=%d (MSG_PEEK)", ret);
+#endif
+		if (ret > 0)
+		{
+			con->last_recv = time(0);
+		}
+		else if (ret == -1 && (net_error() == EWOULDBLOCK || net_error() == EINTR))
+		{
+			return 0;
+		}
+		else
+		{
+			return -1;
+		}
+		return ret;
+#ifdef SSL_SUPPORT
+	}
+	else
+	{
+		// FIXME: Not able to do this!
+		return 0;
+	}
+#endif
+}
+
+void net_con_set_timeout(struct net_connection* con, int seconds)
+{
+	uhub_assert(con);
+
+	struct timeval timeout = { seconds, 0 };
+	net_con_clear_timeout(con);
+
+	evtimer_set(&con->timeout, net_con_event, con);
+	evtimer_add(&con->timeout, &timeout);
+	net_con_flag_set(con, NET_TIMER_ENABLED);
+}
+
+void net_con_clear_timeout(struct net_connection* con)
+{
+	uhub_assert(con);
+
+	if (net_con_flag_get(con, NET_TIMER_ENABLED))
+	{
+		evtimer_del(&con->timeout);
+		net_con_flag_unset(con, NET_TIMER_ENABLED);
+	}
+}
+
+
+#ifdef SSL_SUPPORT
+ssize_t net_con_ssl_accept(struct net_connection* con)
+{
+	uhub_assert(con);
+
+	net_con_flag_set(con, NET_WANT_SSL_ACCEPT);
+	ssize_t ret = SSL_accept(con->ssl);
+#ifdef NETWORK_DUMP_DEBUG
+	LOG_PROTO("SSL_accept() ret=%d", ret);
+#endif
+	if (ret > 0)
+	{
+		net_con_flag_unset(con, NET_WANT_SSL_ACCEPT);
+		net_con_flag_unset(con, NET_WANT_SSL_READ);
+	}
+	else
+	{
+		return handle_openssl_error(con, ret);
+	}
+	return ret;
+}
+
+ssize_t net_con_ssl_connect(struct net_connection* con)
+{
+	uhub_assert(con);
+
+	net_con_flag_set(con, NET_WANT_SSL_CONNECT);
+	ssize_t ret = SSL_connect(con->ssl);
+#ifdef NETWORK_DUMP_DEBUG
+	LOG_PROTO("SSL_connect() ret=%d", ret);
+#endif
+	if (ret > 0)
+	{
+		net_con_flag_unset(con, NET_WANT_SSL_CONNECT);
+		net_con_flag_unset(con, NET_WANT_SSL_WRITE);
+	}
+	else
+	{
+		return handle_openssl_error(con, ret);
+	}
+	return ret;
+}
+
+ssize_t net_con_ssl_handshake(struct net_connection* con, int ssl_mode)
+{
+	uhub_assert(con);
+
+	if (ssl_mode == net_con_ssl_mode_server)
+	{
+		con->ssl = SSL_new(g_hub->ssl_ctx);
+		SSL_set_fd(con->ssl, con->sd);
+		return net_con_ssl_accept(con);
+	}
+	else
+	{
+		con->ssl = SSL_new(SSL_CTX_new(TLSv1_method()));
+		SSL_set_fd(con->ssl, con->sd);
+		return net_con_ssl_connect(con);
+	}
+}
+#endif /* SSL_SUPPORT */
+
 
 #endif /* USE_LIBEVENT */

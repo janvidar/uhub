@@ -104,6 +104,11 @@
 
 #ifdef USE_LIBEVENT
 #include <event.h>
+#else
+#ifdef __linux__
+#define USE_EPOLL
+#include <sys/epoll.h>
+#endif
 #endif
 
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__sun__)
