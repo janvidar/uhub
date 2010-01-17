@@ -30,6 +30,7 @@
 
 struct net_connection;
 struct net_timer;
+struct net_backend;
 
 /**
  * Initialize the network backend.
@@ -41,6 +42,12 @@ extern int net_backend_initialize();
  * Shutdown the network connection backend.
  */
 extern void net_backend_shutdown();
+
+/**
+ * Process the network backend.
+ */
+extern int net_backend_process();
+
 
 typedef void (*net_connection_cb)(struct net_connection*, int event, void* ptr);
 typedef void (*net_timeout_cb)(struct net_timer*, void* ptr);

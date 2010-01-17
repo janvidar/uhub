@@ -215,12 +215,13 @@ void net_event(struct net_connection* con, int event, void *arg)
 	}
 }
 
-void net_on_accept(int server_fd, short event, void *arg)
+void net_on_accept(struct net_connection* con, int event, void *arg)
 {
 	struct hub_info* hub = (struct hub_info*) arg;
 	struct hub_probe* probe = 0;
 	struct ip_addr_encap ipaddr;
 	const char* addr;
+	int server_fd = net_con_get_sd(con);
 
 	for (;;)
 	{

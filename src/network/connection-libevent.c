@@ -609,5 +609,46 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, int ssl_mode)
 }
 #endif /* SSL_SUPPORT */
 
+static struct event_base g_evbase = 0;
+
+/**
+ * Initialize the network backend.
+ * Returns 1 on success, or 0 on failure.
+ */
+int net_backend_initialize()
+{
+	g_evbase = event_init();
+	if (!g_evbase)
+	{
+		LOG_ERROR("Unable to initialize libevent.");
+		return 0;
+	}
+	LOG_DEBUG("Using libevent %s, backend: %s", event_get_version(), event_get_method());
+	return 1;
+}
+
+/**
+ * Shutdown the network connection backend.
+ */
+void net_backend_shutdown()
+{
+	event_base_free(g_evbase);
+}
+
+/**
+ * Process the network backend.
+ */
+int net_backend_process()
+{
+	int ret = event_base_loop(g_evbase, EVLOOP_ONCE);
+	if (ret != 0)
+	{
+		LOG_DEBUG("event_base_loop returned: %d", (int) ret);
+	}
+	if (ret < 0)
+		return 0;
+	return 1;
+}
+
 
 #endif /* USE_LIBEVENT */

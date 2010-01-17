@@ -19,7 +19,7 @@
 
 #ifdef USE_EPOLL
 
-static int g_epfd = -1;
+#define EPOLL_EVBUFFER 512
 
 struct net_connection
 {
@@ -28,7 +28,81 @@ struct net_connection
 	net_connection_cb    callback;
 	struct epoll_event   ev;
 	struct timeout_evt*  timeout;
+	void*                ptr;
 };
+
+struct net_backend
+{
+	int epfd;
+	size_t num;
+	size_t max;
+	struct net_connection** conns;
+	struct epoll_event events[EPOLL_EVBUFFER];
+};
+
+static struct net_backend* g_backend = 0;
+
+/**
+ * Initialize the network backend.
+ * Returns 1 on success, or 0 on failure.
+ */
+int net_backend_initialize()
+{
+	size_t max = net_get_max_sockets();
+	g_backend = hub_malloc(sizeof(struct net_backend));
+	g_backend->epfd = epoll_create(max);
+	if (g_backend->epfd == -1)
+	{
+		LOG_WARN("Unable to create epoll socket.");
+		return 0;
+	}
+	
+	g_backend->num = 0;
+	g_backend->max = max;
+	g_backend->conns = hub_malloc_zero(sizeof(struct net_connection*) * max);
+	memset(g_backend->events, 0, sizeof(g_backend->events));
+	
+	return 1;
+}
+
+/**
+ * Shutdown the network connection backend.
+ */
+void net_backend_shutdown()
+{
+	close(g_backend->epfd);
+	hub_free(g_backend->conns);
+	hub_free(g_backend);
+}
+
+/**
+ * Process the network backend.
+ */
+int net_backend_process()
+{
+	int n;
+	int res = epoll_wait(g_backend->epfd, g_backend->events, EPOLL_EVBUFFER, 1000);
+	if (res == -1)
+	{
+		return 0;
+	}
+
+	for (n = 0; n < res; n++)
+	{
+		struct net_connection* con = (struct net_connection*) g_backend->events[n].data.ptr;
+		if (con && con->callback)
+		{
+			con->callback(con, g_backend->events[n].events, con->ptr);
+		}
+		else
+		{
+			LOG_WARN("Con == NULL");
+		}
+		
+	}
+	return 1;
+}
+
 
 struct net_connection* net_con_create()
 {
@@ -55,7 +129,11 @@ void net_con_initialize(struct net_connection* con, int sd, net_connection_cb ca
 
 	if (events & NET_EVENT_READ) con->ev.events |= EPOLLIN;
 	if (events & NET_EVENT_WRITE) con->ev.events |= EPOLLOUT;
-	if (epoll_ctl(g_epfd, EPOLL_CTL_ADD, con->sd, &con->ev) == -1)
+
+	g_backend->conns[sd] = con;
+	g_backend->num++;
+
+	if (epoll_ctl(g_backend->epfd, EPOLL_CTL_ADD, con->sd, &con->ev) == -1)
 	{
 		LOG_WARN("epoll_ctl() add failed.");
 	}
@@ -74,7 +152,7 @@ void net_con_update(struct net_connection* con, int events)
 	if (events & NET_EVENT_READ) con->ev.events |= EPOLLIN;
 	if (events & NET_EVENT_WRITE) con->ev.events |= EPOLLOUT;
 
-	if (epoll_ctl(g_epfd, EPOLL_CTL_MOD, con->sd, &con->ev) == -1)
+	if (epoll_ctl(g_backend->epfd, EPOLL_CTL_MOD, con->sd, &con->ev) == -1)
 	{
 		LOG_WARN("epoll_ctl() modify failed.");
 	}
@@ -86,7 +164,14 @@ int net_con_close(struct net_connection* con)
 		return 0;
 
 	con->flags &= ~NET_INITIALIZED;
-	if (epoll_ctl(g_epfd, EPOLL_CTL_DEL, con->sd, &con->ev) == -1)
+
+	if (con->sd != -1)
+	{
+		g_backend->conns[con->sd] = 0;
+		g_backend->num--;
+	}
+
+	if (epoll_ctl(g_backend->epfd, EPOLL_CTL_DEL, con->sd, &con->ev) == -1)
 	{
 		LOG_WARN("epoll_ctl() delete failed.");
 	}

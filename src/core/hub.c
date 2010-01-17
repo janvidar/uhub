@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2010, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -546,7 +546,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	}
 #endif
 
-	hub->fd_tcp = server_tcp;
+
 	hub->config = config;
 	hub->users = NULL;
 
@@ -556,17 +556,6 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		net_close(server_tcp);
 		return 0;
 	}
-
-#ifdef USE_LIBEVENT
-	event_set(&hub->ev_accept, hub->fd_tcp, EV_READ | EV_PERSIST, net_on_accept, hub);
-	if (event_add(&hub->ev_accept, NULL) == -1)
-	{
-		uman_shutdown(hub);
-		hub_free(hub);
-		net_close(server_tcp);
-		return 0;
-	}
-#endif
 
 	if (event_queue_initialize(&hub->queue, hub_event_dispatcher, (void*) hub) == -1)
 	{
@@ -604,6 +593,9 @@ struct hub_info* hub_start_service(struct hub_config* config)
 
 	hub->status = hub_status_running;
 
+	hub->server = net_con_create();
+	net_con_initialize(hub->server, server_tcp, net_on_accept, hub, NET_EVENT_READ);
+	
 	g_hub = hub;
 	return hub;
 }
@@ -617,7 +609,8 @@ void hub_shutdown_service(struct hub_info* hub)
 #ifdef USE_LIBEVENT
 	event_del(&hub->ev_accept);
 #endif
-	net_close(hub->fd_tcp);
+	net_con_close(hub->server);
+	hub_free(hub->server);
 	uman_shutdown(hub);
 	hub->status = hub_status_stopped;
 	hub_free(hub->sendbuf);
@@ -993,18 +986,8 @@ void hub_event_loop(struct hub_info* hub)
 {
 	do
 	{
-#ifdef USE_LIBEVENT
-		int ret = event_base_loop(net_get_evbase(), EVLOOP_ONCE);
-
-		if (ret != 0)
-		{
-			LOG_DEBUG("event_base_loop returned: %d", (int) ret);
-		}
-
-		if (ret < 0)
-			break;
-#endif
-		 event_queue_process(hub->queue);
+		net_backend_process();
+		event_queue_process(hub->queue);
 	}
 	while (hub->status == hub_status_running || hub->status == hub_status_disabled);
 	

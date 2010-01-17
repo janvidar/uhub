@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2010, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -90,7 +90,7 @@ struct hub_logout_info
 
 struct hub_info
 {
-	int fd_tcp;
+	struct net_connection* server;
 #ifdef USE_LIBEVENT
 	struct event ev_accept;
 	struct event ev_timer;
