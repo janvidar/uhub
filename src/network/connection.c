@@ -18,9 +18,6 @@
  */
 
 #include "uhub.h"
-#include "network/connection-common.c"
-#include "network/connection-timeout.c"
-#include "network/connection-libevent.c"
-#include "network/connection-epoll.c"
+
 
 

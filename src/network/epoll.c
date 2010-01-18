@@ -17,7 +17,12 @@
  *
  */
 
+#include "uhub.h"
+
 #ifdef USE_EPOLL
+
+#include "network/connection.h"
+#include "network/common.h"
 
 #define EPOLL_EVBUFFER 512
 
@@ -26,10 +31,26 @@ struct net_connection
 	int                  sd;
 	uint32_t             flags;
 	net_connection_cb    callback;
+	void*                ptr;
 	struct epoll_event   ev;
 	struct timeout_evt*  timeout;
-	void*                ptr;
 };
+
+static void net_con_print(const char* prefix, struct net_connection* con)
+{
+	char buf[512];
+	int off = snprintf(buf, 512, "%s: net_connection={ sd=%d, flags=%u, callback=%p, ptr=%p, ev={ events=%s%s, data.ptr=%p }",
+		prefix, con->sd, con->flags, con->callback, con->ptr, (con->ev.events & EPOLLIN ? "R" : ""),(con->ev.events & EPOLLOUT ? "W" : "") , con->ev.data.ptr);
+	if (con->timeout)
+	{
+		sprintf(buf + off, ", timeout={ %d seconds left }", (int) (time(0) - con->timeout->timestamp));
+	}
+	else
+	{
+		sprintf(buf + off, ", timeout=NULL");
+	}
+	LOG_WARN(buf);
+}
 
 struct net_backend
 {
@@ -38,6 +59,8 @@ struct net_backend
 	size_t max;
 	struct net_connection** conns;
 	struct epoll_event events[EPOLL_EVBUFFER];
+	time_t now;
+	struct timeout_queue timeout_queue;
 };
 
 static struct net_backend* g_backend = 0;
@@ -61,7 +84,9 @@ int net_backend_initialize()
 	g_backend->max = max;
 	g_backend->conns = hub_malloc_zero(sizeof(struct net_connection*) * max);
 	memset(g_backend->events, 0, sizeof(g_backend->events));
-	
+
+	g_backend->now = time(0);
+	timeout_queue_initialize(&g_backend->timeout_queue, g_backend->now, 600); /* look max 10 minutes into the future. */
 	return 1;
 }
 
@@ -81,24 +106,21 @@ void net_backend_shutdown()
 int net_backend_process()
 {
 	int n;
-	int res = epoll_wait(g_backend->epfd, g_backend->events, EPOLL_EVBUFFER, 1000);
+	LOG_WARN("epoll_wait: fd=%d, events=%x, max=%zu", g_backend->epfd, g_backend->events, MIN(g_backend->num, EPOLL_EVBUFFER));
+	int res = epoll_wait(g_backend->epfd, g_backend->events, MIN(g_backend->num, EPOLL_EVBUFFER), 1000);
 	if (res == -1)
 	{
+		LOG_WARN("epoll_wait returned -1");
 		return 0;
 	}
 
 	for (n = 0; n < res; n++)
 	{
 		struct net_connection* con = (struct net_connection*) g_backend->events[n].data.ptr;
-		if (con && con->callback)
-		{
-			con->callback(con, g_backend->events[n].events, con->ptr);
-		}
-		else
-		{
-			LOG_WARN("Con == NULL");
-		}
-		
+		int ev = 0;
+		if (g_backend->events[n].events & EPOLLIN) ev |= NET_EVENT_READ;
+		if (g_backend->events[n].events & EPOLLOUT) ev |= NET_EVENT_WRITE;
+		con->callback(con, ev, con->ptr);
 	}
 	return 1;
 }
@@ -120,9 +142,9 @@ void net_con_initialize(struct net_connection* con, int sd, net_connection_cb ca
 	con->sd = sd;
 	con->flags = NET_INITIALIZED;
 	con->callback = callback;
-
 	con->ev.events = 0;
-	con->ev.data.ptr = (void*) ptr;
+	con->ptr = (void*) ptr;
+	con->ev.data.ptr = (void*) con;
 
 	net_set_nonblocking(con->sd, 1);
 	net_set_nosigpipe(con->sd, 1);
@@ -137,12 +159,14 @@ void net_con_initialize(struct net_connection* con, int sd, net_connection_cb ca
 	{
 		LOG_WARN("epoll_ctl() add failed.");
 	}
+
+	net_con_print("ADD", con);
 }
 
 void net_con_reinitialize(struct net_connection* con, net_connection_cb callback, const void* ptr, int events)
 {
 	con->callback = callback;
-	con->ev.data.ptr = (void*) ptr;
+	con->ptr = (void*) ptr;
 	net_con_update(con, events);
 }
 
@@ -156,6 +180,7 @@ void net_con_update(struct net_connection* con, int events)
 	{
 		LOG_WARN("epoll_ctl() modify failed.");
 	}
+	net_con_print("MOD", con);
 }
 
 int net_con_close(struct net_connection* con)
@@ -171,10 +196,18 @@ int net_con_close(struct net_connection* con)
 		g_backend->num--;
 	}
 
+	if (timeout_evt_is_scheduled(con->timeout))
+	{
+		timeout_queue_remove(&g_backend->timeout_queue, con->timeout);
+		hub_free(con->timeout);
+		con->timeout = 0;
+	}
+
 	if (epoll_ctl(g_backend->epfd, EPOLL_CTL_DEL, con->sd, &con->ev) == -1)
 	{
 		LOG_WARN("epoll_ctl() delete failed.");
 	}
+	net_con_print("DEL", con);
 	return 0;
 }
 
@@ -186,7 +219,7 @@ int net_con_get_sd(struct net_connection* con)
 
 void* net_con_get_ptr(struct net_connection* con)
 {
-	return con->ev.data.ptr;
+	return con->ptr;
 }
 
 ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
@@ -254,13 +287,29 @@ ssize_t net_con_peek(struct net_connection* con, void* buf, size_t len)
 	return ret;
 }
 
+
+void timeout_evt_initialize(struct timeout_evt*, timeout_evt_cb, void* ptr);
+void timeout_evt_reset(struct timeout_evt*);
+int  timeout_evt_is_scheduled(struct timeout_evt*);
+
+static void timeout_callback(struct timeout_evt* evt)
+{
+	struct net_connection* con = (struct net_connection*) evt->ptr;
+	con->callback(con, NET_EVENT_TIMEOUT, con->ptr);
+}
+
+
 void net_con_set_timeout(struct net_connection* con, int seconds)
 {
-	uhub_assert(con);
 	if (!con->timeout)
 	{
-		con->timeout = hub_malloc(sizeof(struct timeout_evt));
+		con->timeout = hub_malloc_zero(sizeof(struct timeout_evt));
 		timeout_evt_initialize(con->timeout, timeout_callback, con);
+		timeout_queue_insert(&g_backend->timeout_queue, con->timeout, seconds);
+	}
+	else
+	{
+		timeout_queue_reschedule(&g_backend->timeout_queue, con->timeout, seconds);
 	}
 }
 

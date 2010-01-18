@@ -139,21 +139,22 @@ libuhub_SOURCES := \
 		src/core/hubevent.c \
 		src/core/hubio.c \
 		src/core/inf.c \
+		src/core/netevent.c \
 		src/core/probe.c \
+		src/core/route.c \
+		src/core/user.c \
+		src/core/usermanager.c \
 		src/util/ipcalc.c \
+		src/network/epoll.c \
+		src/network/libevent.c \
+		src/network/network.c \
 		src/util/list.c \
 		src/util/log.c \
 		src/util/memory.c \
 		src/util/misc.c \
-		src/util/timeout.c \
-		src/core/netevent.c \
-		src/network/connection.c \
-		src/network/network.c \
 		src/util/rbtree.c \
-		src/core/route.c \
-		src/util/tiger.c \
-		src/core/user.c \
-		src/core/usermanager.c
+		src/util/timeout.c \
+		src/util/tiger.c
 
 libadc_common_SOURCES := \
 		src/adc/message.c \
