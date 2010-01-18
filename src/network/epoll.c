@@ -36,22 +36,6 @@ struct net_connection
 	struct timeout_evt*  timeout;
 };
 
-static void net_con_print(const char* prefix, struct net_connection* con)
-{
-	char buf[512];
-	int off = snprintf(buf, 512, "%s: net_connection={ sd=%d, flags=%u, callback=%p, ptr=%p, ev={ events=%s%s, data.ptr=%p }",
-		prefix, con->sd, con->flags, con->callback, con->ptr, (con->ev.events & EPOLLIN ? "R" : ""),(con->ev.events & EPOLLOUT ? "W" : "") , con->ev.data.ptr);
-	if (con->timeout)
-	{
-		sprintf(buf + off, ", timeout={ %d seconds left }", (int) (time(0) - con->timeout->timestamp));
-	}
-	else
-	{
-		sprintf(buf + off, ", timeout=NULL");
-	}
-	LOG_WARN(buf);
-}
-
 struct net_backend
 {
 	int epfd;
@@ -64,6 +48,23 @@ struct net_backend
 };
 
 static struct net_backend* g_backend = 0;
+
+
+static void net_con_print(const char* prefix, struct net_connection* con)
+{
+	char buf[512];
+	int off = snprintf(buf, 512, "%s: net_connection={ sd=%d, flags=%u, callback=%p, ptr=%p, ev={ events=%s%s, data.ptr=%p }",
+		prefix, con->sd, con->flags, con->callback, con->ptr, (con->ev.events & EPOLLIN ? "R" : ""),(con->ev.events & EPOLLOUT ? "W" : "") , con->ev.data.ptr);
+	if (con->timeout)
+	{
+		sprintf(buf + off, ", timeout={ %d seconds left }", (int) (con->timeout->timestamp - g_backend->now));
+	}
+	else
+	{
+		sprintf(buf + off, ", timeout=NULL");
+	}
+	LOG_TRACE(buf);
+}
 
 /**
  * Initialize the network backend.
@@ -106,7 +107,7 @@ void net_backend_shutdown()
 int net_backend_process()
 {
 	int n;
-	LOG_WARN("epoll_wait: fd=%d, events=%x, max=%zu", g_backend->epfd, g_backend->events, MIN(g_backend->num, EPOLL_EVBUFFER));
+	LOG_TRACE("epoll_wait: fd=%d, events=%x, max=%zu", g_backend->epfd, g_backend->events, MIN(g_backend->num, EPOLL_EVBUFFER));
 	int res = epoll_wait(g_backend->epfd, g_backend->events, MIN(g_backend->num, EPOLL_EVBUFFER), 1000);
 	if (res == -1)
 	{
@@ -118,7 +119,7 @@ int net_backend_process()
 	{
 		struct net_connection* con = (struct net_connection*) g_backend->events[n].data.ptr;
 		int ev = 0;
-		if (g_backend->events[n].events & EPOLLIN) ev |= NET_EVENT_READ;
+		if (g_backend->events[n].events & EPOLLIN)  ev |= NET_EVENT_READ;
 		if (g_backend->events[n].events & EPOLLOUT) ev |= NET_EVENT_WRITE;
 		con->callback(con, ev, con->ptr);
 	}
@@ -157,7 +158,7 @@ void net_con_initialize(struct net_connection* con, int sd, net_connection_cb ca
 
 	if (epoll_ctl(g_backend->epfd, EPOLL_CTL_ADD, con->sd, &con->ev) == -1)
 	{
-		LOG_WARN("epoll_ctl() add failed.");
+		LOG_TRACE("epoll_ctl() add failed.");
 	}
 
 	net_con_print("ADD", con);
@@ -178,7 +179,7 @@ void net_con_update(struct net_connection* con, int events)
 
 	if (epoll_ctl(g_backend->epfd, EPOLL_CTL_MOD, con->sd, &con->ev) == -1)
 	{
-		LOG_WARN("epoll_ctl() modify failed.");
+		LOG_TRACE("epoll_ctl() modify failed.");
 	}
 	net_con_print("MOD", con);
 }
@@ -310,6 +311,16 @@ void net_con_set_timeout(struct net_connection* con, int seconds)
 	else
 	{
 		timeout_queue_reschedule(&g_backend->timeout_queue, con->timeout, seconds);
+	}
+}
+
+void net_con_clear_timeout(struct net_connection* con)
+{
+	if (con->timeout && timeout_evt_is_scheduled(con->timeout))
+	{
+		timeout_queue_remove(&g_backend->timeout_queue, con->timeout);
+		hub_free(con->timeout);
+		con->timeout = 0;
 	}
 }
 

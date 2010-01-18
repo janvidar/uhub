@@ -100,7 +100,8 @@ void timeout_queue_remove(struct timeout_queue* t, struct timeout_evt* evt)
 
 	if (first == evt)
 	{
-		first->next->prev = first->prev;
+		if (first->next)
+			first->next->prev = first->prev;
 		t->events[pos] = first->next;
 	}
 	else
