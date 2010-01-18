@@ -36,6 +36,7 @@ void timeout_evt_reset(struct timeout_evt* t)
 
 int timeout_evt_is_scheduled(struct timeout_evt* t)
 {
+	if (!t) return 0;
 	return !!t->prev;
 }
 
