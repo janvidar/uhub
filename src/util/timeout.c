@@ -98,6 +98,9 @@ void timeout_queue_remove(struct timeout_queue* t, struct timeout_evt* evt)
 	size_t pos = (evt->timestamp % t->max);
 	struct timeout_evt* first = t->events[pos];
 
+	if (!first)
+		return;
+
 	if (first == evt)
 	{
 		if (first->next)
