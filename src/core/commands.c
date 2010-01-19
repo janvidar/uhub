@@ -399,8 +399,8 @@ static int command_whoip(struct hub_info* hub, struct hub_user* user, struct hub
 
 static int command_broadcast(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
 {
-	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen((cmd->message + 10)) + 6);
-	adc_msg_add_argument(command, (cmd->message + 10));
+	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen((cmd->message + 11)) + 6);
+	adc_msg_add_argument(command, (cmd->message + 11));
 	route_to_all(hub, command);
 	adc_msg_free(command);
 	return 0;
