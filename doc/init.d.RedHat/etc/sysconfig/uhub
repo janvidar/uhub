@@ -1,0 +1,15 @@
+# Options to UHUB
+#  -v          Verbose mode. Add more -v's for higher verbosity.
+#  -q          Quiet mode - no output
+#  -f          Fork to background
+#  -l <file>   Log messages to given file (default: stderr)
+#  -L          Log messages to syslog
+#  -c <file>   Specify configuration file (default: /etc/uhub/uhub.conf)
+#  -S          Show configuration parameters, but ignore defaults
+#  -u <user>   Run as given user
+#  -g <group>  Run with given group permissions
+#  -p <file>   Store pid in file (process id)
+                                 
+                                                                                                                                             
+UHUBOPTIONS=" -u uhub -f -p /var/run/uhub.pid -l /var/log/uhub.log"
+

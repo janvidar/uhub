@@ -1,0 +1,101 @@
+#!/bin/sh
+#
+# chkconfig: - 91 35
+# description: Starts and stops the Uhub ( http://www.extatic.org/uhub ) daemons on RHEL\CentOS \
+#	       used to provide p2p network services.
+#
+# pidfile: /var/run/uhub.pid
+# config:  /etc/uhub/uhub.conf
+
+
+
+# Source function library.
+if [ -f /etc/init.d/functions ] ; then
+  . /etc/init.d/functions
+elif [ -f /etc/rc.d/init.d/functions ] ; then
+  . /etc/rc.d/init.d/functions
+else
+  exit 1
+fi
+
+# Avoid using root's TMPDIR
+unset TMPDIR
+
+# Source networking configuration.
+. /etc/sysconfig/network
+
+if [ -f /etc/sysconfig/uhub ]; then
+   . /etc/sysconfig/uhub
+fi
+
+# Check that networking is up.
+[ ${NETWORKING} = "no" ] && exit 1
+
+# Check that uhub.conf exists.
+[ -f /etc/uhub/uhub.conf ] || exit 6
+
+RETVAL=0
+
+
+start() {
+        KIND="UHUB"
+	echo -n $"Starting $KIND services: "
+	daemon uhub $UHUBOPTIONS
+	RETVAL=$?
+        echo "" 
+	return $RETVAL
+}	
+
+stop() {
+        KIND="UHUB"
+	echo -n $"Shutting down $KIND services: "
+	killproc uhub
+	RETVAL=$?
+	echo ""
+	return $RETVAL
+}	
+
+restart() {
+	stop
+	start
+}	
+
+reload() {
+        echo -n $"Reloading uhub.conf / user.conf file: "
+	killproc uhub -HUP
+	RETVAL=$?
+	echo ""
+	return $RETVAL
+}	
+
+rhstatus() {
+	status uhub                                                                                                                                                   
+        RETVAL=$?                                                                                                                                                     
+        if [ $RETVAL -ne 0 ] ; then                                                                                                                                   
+                return $RETVAL                                                                                                                                        
+        fi                                                                                                                                                            
+}                 
+
+
+case "$1" in
+  start)
+  	start
+	;;
+  stop)
+  	stop
+	;;
+  restart)
+  	restart
+	;;
+  reload)
+  	reload
+	;;
+  status)
+  	rhstatus
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|restart|reload|status}"
+	exit 2
+esac
+
+exit $?
