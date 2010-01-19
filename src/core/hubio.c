@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2010, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,11 +19,6 @@
 
 #include "uhub.h"
 #include "hubio.h"
-
-// #define SEND_CHUNKS 1
-
-/* FIXME: This should not be needed! */
-extern struct hub_info* g_hub;
 
 #ifdef DEBUG_SENDQ
 static void debug_msg(const char* prefix, struct adc_message* msg)

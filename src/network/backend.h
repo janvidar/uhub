@@ -17,18 +17,23 @@
  *
  */
 
-#ifndef HAVE_UHUB_NET_EVENT_H
-#define HAVE_UHUB_NET_EVENT_H
+#ifndef HAVE_UHUB_NETWORK_BACKEND_H
+#define HAVE_UHUB_NETWORK_BACKEND_H
 
 /**
- * Network callback to accept incoming connections.
+ * Initialize the network backend.
+ * Returns 1 on success, or 0 on failure.
  */
-extern void net_on_accept(struct net_connection* con, int event, void *arg);
-extern void net_event(struct net_connection* con, int event, void *arg);
+extern int net_backend_initialize();
 
-extern int handle_net_read(struct hub_user* user);
-extern int handle_net_write(struct hub_user* user);
+/**
+ * Shutdown the network connection backend.
+ */
+extern void net_backend_shutdown();
 
+/**
+ * Process the network backend.
+ */
+extern int net_backend_process();
 
-#endif /* HAVE_UHUB_NET_EVENT_H */
-
+#endif /* HAVE_UHUB_NETWORK_BACKEND_H */

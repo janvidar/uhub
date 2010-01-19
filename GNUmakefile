@@ -1,6 +1,6 @@
  ##
 ## Makefile for uhub (Use GNU make)
-## Copyright (C) 2007-2009, Jan Vidar Krey <janvidar@extatic.org>
+## Copyright (C) 2007-2010, Jan Vidar Krey <janvidar@extatic.org>
  #
 
 CC            = gcc
@@ -144,10 +144,11 @@ libuhub_SOURCES := \
 		src/core/route.c \
 		src/core/user.c \
 		src/core/usermanager.c \
-		src/util/ipcalc.c \
+		src/network/connection.c \
 		src/network/epoll.c \
 		src/network/libevent.c \
 		src/network/network.c \
+		src/util/ipcalc.c \
 		src/util/list.c \
 		src/util/log.c \
 		src/util/memory.c \

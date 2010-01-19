@@ -70,7 +70,7 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 					{
 						probe->connection = 0;
 					}
-					net_con_ssl_handshake(con, NET_CON_SSL_MODE_SERVER);
+					net_con_ssl_handshake(con, net_con_ssl_mode_server, probe->hub->ssl_ctx);
 				}
 				else
 				{
@@ -83,7 +83,7 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 			{
 				LOG_TRACE("Probed TLS %d.%d connection", (int) probe_recvbuf[1], (int) probe_recvbuf[2]);
 
-				net_con_ssl_handshake(con, NET_CON_SSL_MODE_SERVER);
+				net_con_ssl_handshake(con, net_con_ssl_mode_server, probe->hub->ssl_ctx);
 				return;
 			}
 #endif

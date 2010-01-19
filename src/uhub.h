@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2010, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -41,7 +41,6 @@
 #define TIMEOUT_CONNECTED 15
 #define TIMEOUT_HANDSHAKE 30
 #define TIMEOUT_SENDQ     120
-#define TIMEOUT_IDLE      7200
 #define TIMEOUT_STATS     60
 
 #define MAX_CID_LEN  39

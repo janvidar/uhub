@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2010, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -53,22 +53,12 @@ void debug_sendq_recv(struct hub_user* user, int received, int max, const char* 
 }
 #endif
 
-int net_user_recv(void* ptr, void* buf, size_t len)
-{
-	struct hub_user* user = (struct hub_user*) ptr;
-	int ret = net_con_recv(user->connection, buf, len);
-#ifdef DEBUG_SENDQ
-	debug_sendq_recv(user, ret, len, buf);
-#endif
-	return ret;
-}
-
 int handle_net_read(struct hub_user* user)
 {
 	static char buf[MAX_RECV_BUF];
 	struct hub_recvq* q = user->recv_queue;
 	size_t buf_size = hub_recvq_get(q, buf, MAX_RECV_BUF);
-	ssize_t size = net_user_recv(user, &buf[buf_size], MAX_RECV_BUF - buf_size);
+	ssize_t size = net_con_recv(user->connection, buf, MAX_RECV_BUF);
 
 	if (size > 0)
 		buf_size += size;

@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2010, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 #define HAVE_UHUB_NETWORK_CONNECTION_H
 
 #include "uhub.h"
+#include "network/backend.h"
 
 #define NET_EVENT_TIMEOUT         0x0001
 #define NET_EVENT_READ            0x0002
@@ -29,32 +30,7 @@
 #define NET_EVENT_CLOSED          0x2000 /* Socket closed */
 
 struct net_connection;
-struct net_timer;
-struct net_backend;
-
-/**
- * Initialize the network backend.
- * Returns 1 on success, or 0 on failure.
- */
-extern int net_backend_initialize();
-
-/**
- * Shutdown the network connection backend.
- */
-extern void net_backend_shutdown();
-
-/**
- * Process the network backend.
- */
-extern int net_backend_process();
-
-
 typedef void (*net_connection_cb)(struct net_connection*, int event, void* ptr);
-typedef void (*net_timeout_cb)(struct net_timer*, void* ptr);
-
-extern void net_timer_initialize(struct net_timer* timer, net_timeout_cb callback, void* ptr);
-extern void net_timer_reset(struct net_timer* timer, int seconds);
-extern void net_timer_shutdown(struct net_timer* timer);
 
 extern int   net_con_get_sd(struct net_connection* con);
 extern void* net_con_get_ptr(struct net_connection* con);
@@ -123,8 +99,11 @@ enum net_con_ssl_mode
 	net_con_ssl_mode_client,
 };
 
-extern ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode, void* ssl_ctx);
+extern ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode, SSL_CTX* ssl_ctx);
 
+extern int   net_con_is_ssl(struct net_connection* con);
+extern SSL* net_con_get_ssl(struct net_connection* con);
+extern void net_con_set_ssl(struct net_connection* con, SSL*);
 #endif /* SSL_SUPPORT */
 
 #endif /* HAVE_UHUB_NETWORK_CONNECTION_H */

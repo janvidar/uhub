@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2010, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@
 
 #include "network/connection.h"
 #include "network/common.h"
+#include "network/backend.h"
 
 #define EPOLL_EVBUFFER 512
 
@@ -34,6 +35,10 @@ struct net_connection
 	void*                ptr;
 	struct epoll_event   ev;
 	struct timeout_evt*  timeout;
+#ifdef SSL_SUPPORT
+	SSL*                 ssl;
+	size_t               write_len; /** Length of last SSL_write(), only used if flags is NET_WANT_SSL_READ. */
+#endif
 };
 
 struct net_backend
@@ -48,7 +53,6 @@ struct net_backend
 };
 
 static struct net_backend* g_backend = 0;
-
 
 static void net_con_print(const char* prefix, struct net_connection* con)
 {
@@ -130,6 +134,7 @@ int net_backend_process()
 struct net_connection* net_con_create()
 {
 	struct net_connection* con = (struct net_connection*) hub_malloc_zero(sizeof(struct net_connection));
+	con->sd = -1;
 	return con;
 }
 
@@ -177,6 +182,28 @@ void net_con_update(struct net_connection* con, int events)
 	if (events & NET_EVENT_READ) con->ev.events |= EPOLLIN;
 	if (events & NET_EVENT_WRITE) con->ev.events |= EPOLLOUT;
 
+#ifdef SSL_SUPPORT
+	if (events & NET_WANT_SSL_WRITE)
+		con->flags |= NET_WANT_SSL_WRITE;
+	else
+		con->flags &= ~NET_WANT_SSL_WRITE;
+
+	if (events & NET_WANT_SSL_READ)
+		con->flags |= NET_WANT_SSL_READ;
+	else
+		con->flags &= ~NET_WANT_SSL_READ;
+
+	if (events & NET_WANT_SSL_ACCEPT)
+		con->flags |= NET_WANT_SSL_ACCEPT;
+	else
+		con->flags &= ~NET_WANT_SSL_ACCEPT;
+
+	if (events & NET_WANT_SSL_CONNECT)
+		con->flags |= NET_WANT_SSL_CONNECT;
+	else
+		con->flags &= ~NET_WANT_SSL_CONNECT;
+#endif /* SSL_SUPPORT */
+
 	if (epoll_ctl(g_backend->epfd, EPOLL_CTL_MOD, con->sd, &con->ev) == -1)
 	{
 		LOG_TRACE("epoll_ctl() modify failed.");
@@ -212,6 +239,23 @@ int net_con_close(struct net_connection* con)
 	return 0;
 }
 
+#ifdef SSL_SUPPORT
+int net_con_is_ssl(struct net_connection* con)
+{
+
+	return con->ssl != 0;
+}
+
+SSL* net_con_get_ssl(struct net_connection* con)
+{
+	return con->ssl;
+}
+
+void net_con_set_ssl(struct net_connection* con, SSL* ssl)
+{
+	con->ssl = ssl;
+}
+#endif
 
 int net_con_get_sd(struct net_connection* con)
 {
@@ -221,71 +265,6 @@ int net_con_get_sd(struct net_connection* con)
 void* net_con_get_ptr(struct net_connection* con)
 {
 	return con->ptr;
-}
-
-ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
-{
-	int ret = net_send(con->sd, buf, len, UHUB_SEND_SIGNAL);
-	if (ret == -1)
-	{
-		if (net_error() == EWOULDBLOCK || net_error() == EINTR)
-			return 0;
-		return -1;
-	}
-	return ret;
-}
-
-ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
-{
-	uhub_assert(con);
-
-#ifdef SSL_SUPPORT
-	if (!con->ssl)
-	{
-#endif
-		int ret = net_recv(con->sd, buf, len, 0);
-#ifdef NETWORK_DUMP_DEBUG
-		LOG_PROTO("net_recv: ret=%d", ret);
-#endif
-		if (ret == -1)
-		{
-			if (net_error() == EWOULDBLOCK || net_error() == EINTR)
-				return 0;
-			return -1;
-		}
-		return ret;
-#ifdef SSL_SUPPORT
-	}
-	else
-	{
-		int ret = SSL_read(con->ssl, buf, len);
-#ifdef NETWORK_DUMP_DEBUG
-		LOG_PROTO("net_recv: ret=%d", ret);
-#endif
-		if (ret > 0)
-		{
-			con->last_recv = time(0);
-			net_con_flag_unset(con, NET_WANT_SSL_WRITE);
-		}
-		else
-		{
-			return handle_openssl_error(con, ret);
-		}
-		return ret;
-	}
-#endif
-}
-
-ssize_t net_con_peek(struct net_connection* con, void* buf, size_t len)
-{
-	int ret = net_recv(con->sd, buf, len, MSG_PEEK);
-	if (ret == -1)
-	{
-		if (net_error() == EWOULDBLOCK || net_error() == EINTR)
-			return 0;
-		return -1;
-	}
-	return ret;
 }
 
 
@@ -323,6 +302,5 @@ void net_con_clear_timeout(struct net_connection* con)
 		con->timeout = 0;
 	}
 }
-
 
 #endif /* USE_EPOLL */

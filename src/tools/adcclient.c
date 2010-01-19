@@ -71,15 +71,9 @@ static void adc_cid_pid(struct ADC_client* client)
 	adc_msg_add_named_argument(client->info, ADC_INF_FLAG_CLIENT_ID, cid);
 }
 
-
-static void timer_callback(struct net_timer* t, void* arg)
-{
-
-}
-
 static void event_callback(struct net_connection* con, int events, void *arg)
 {
-	struct ADC_client* client = (struct ADC_client*) con->ptr;
+	struct ADC_client* client = (struct ADC_client*) net_con_get_ptr(con);
 
 	if (events == NET_EVENT_SOCKERROR || events == NET_EVENT_CLOSED)
 	{
@@ -347,10 +341,16 @@ int ADC_client_create(struct ADC_client* client, const char* nickname, const cha
 	int sd = net_socket_create(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sd == -1) return -1;
 
-	client->con = hub_malloc(sizeof(struct net_connection));
-	client->timer = hub_malloc(sizeof(struct net_timer));
+	client->con = net_con_create();
+#if 0
+	/* FIXME */
+	client->timer = 0; /* FIXME: hub_malloc(sizeof(struct net_timer)); */
+#endif
 	net_con_initialize(client->con, sd, event_callback, client, 0);
+#if 0
+	/* FIXME */
 	net_timer_initialize(client->timer, timer_callback, client);
+#endif
 	ADC_client_set_state(client, ps_none);
 
 	client->nick = hub_strdup(nickname);
@@ -362,7 +362,10 @@ int ADC_client_create(struct ADC_client* client, const char* nickname, const cha
 void ADC_client_destroy(struct ADC_client* client)
 {
 	ADC_client_disconnect(client);
+#if 0
+	/* FIXME */
 	net_timer_shutdown(client->timer);
+#endif
 	hub_free(client->timer);
 	adc_msg_free(client->info);
 	hub_free(client->nick);
@@ -380,7 +383,7 @@ int ADC_client_connect(struct ADC_client* client, const char* address)
 		client->callback(client, ADC_CLIENT_CONNECTING, 0);
 	}
 
-	int ret = net_connect(client->con->sd, (struct sockaddr*) &client->addr, sizeof(struct sockaddr_in));
+	int ret = net_connect(net_con_get_sd(client->con), (struct sockaddr*) &client->addr, sizeof(struct sockaddr_in));
 	if (ret == 0 || (ret == -1 && net_error() == EISCONN))
 	{
 		ADC_client_on_connected(client);
@@ -424,7 +427,7 @@ static void ADC_client_on_login(struct ADC_client* client)
 
 void ADC_client_disconnect(struct ADC_client* client)
 {
-	if (client->con && client->con->sd != -1)
+	if (client->con && net_con_get_sd(client->con) != -1)
 	{
 		net_con_close(client->con);
 		client->con = 0;
