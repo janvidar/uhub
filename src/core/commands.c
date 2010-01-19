@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2010, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -274,6 +274,28 @@ static int command_ban(struct hub_info* hub, struct hub_user* user, struct hub_c
 static int command_unban(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
 {
 	return command_status(hub, user, cmd, "Not implemented");
+}
+
+static int command_mute(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
+{
+	char* nick = list_get_first(cmd->args);
+	if (!nick)
+		return -1; // FIXME: bad syntax.
+
+	struct hub_user* target = uman_get_user_by_nick(hub, nick);
+
+	if (!target)
+		return command_status_user_not_found(hub, user, cmd, nick);
+
+	if (strlen(cmd->prefix) == 4)
+	{
+		user_flag_set(target, flag_muted);
+	}
+	else
+	{
+		user_flag_unset(target, flag_muted);
+	}
+	return command_status(hub, user, cmd, nick);
 }
 
 static int command_reload(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
@@ -565,6 +587,8 @@ static struct commands_handler command_handlers[] = {
 	{ "whoip",      5, "a", cred_operator,  command_whoip,    "Show users matching IP range" },
 	{ "broadcast",  9, "m", cred_operator,  command_broadcast,"Send a message to all users"  },
 	{ "log",        3, 0,   cred_operator,  command_log,      "Display log"                  },
+	{ "mute",       4, "n", cred_operator,  command_mute,     "Mute user"                    },
+	{ "unmute",     6, "n", cred_operator,  command_mute,     "Unmute user"                  },
 #ifdef CRASH_DEBUG
 	{ "crash",      5, 0,   cred_admin,     command_crash,    "Crash the hub (DEBUG)."       },
 #endif

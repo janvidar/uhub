@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2010, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -45,6 +45,7 @@ enum user_flags
 	feature_ping    = 0x00000080, /** PING: Hub pinger information extension */
 	feature_link    = 0x00000100, /** LINK: Hub link (not supported) */
 	feature_adcs    = 0x00000200, /** ADCS: ADC over TLS/SSL */
+	flag_muted      = 0x00800000, /** User is muted (cannot chat) */
 	flag_ignore     = 0x01000000, /** Ignore further reads */
 	flag_maxbuf     = 0x02000000, /** Hit max buf read, ignore msg */
 	flag_choke      = 0x04000000, /** Choked: Cannot send, waiting for write event */ 

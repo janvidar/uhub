@@ -206,7 +206,7 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 		}
 	}
 
-	if (hub->config->chat_is_privileged && !user_is_protected(u) && (cmd->cache[0] == 'B' || cmd->cache[0] == 'F'))
+	if (((hub->config->chat_is_privileged && !user_is_protected(u)) || (user_flag_get(u, flag_muted))) && (cmd->cache[0] == 'B' || cmd->cache[0] == 'F'))
 	{
 		relay = 0;
 	}
