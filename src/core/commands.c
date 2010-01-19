@@ -518,6 +518,20 @@ static int command_log(struct hub_info* hub, struct hub_user* user, struct hub_c
 	return 0;
 }
 
+static int command_rules(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
+{
+	if (!hub_send_rules(hub, user))
+		return command_status(hub, user, cmd, "no rules defined.");
+	return 0;
+}
+
+static int command_motd(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
+{
+	if (!hub_send_motd(hub, user))
+		return command_status(hub, user, cmd, "no motd defined.");
+	return 0;
+}
+
 #ifdef CRASH_DEBUG
 static int command_crash(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
 {
@@ -589,6 +603,8 @@ static struct commands_handler command_handlers[] = {
 	{ "log",        3, 0,   cred_operator,  command_log,      "Display log"                  },
 	{ "mute",       4, "n", cred_operator,  command_mute,     "Mute user"                    },
 	{ "unmute",     6, "n", cred_operator,  command_mute,     "Unmute user"                  },
+	{ "rules",      5, 0,   cred_guest,     command_rules,    "Show the hub rules"           },
+	{ "motd",       4, 0,   cred_guest,     command_motd,     "Show the message of the day"  },
 #ifdef CRASH_DEBUG
 	{ "crash",      5, 0,   cred_admin,     command_crash,    "Crash the hub (DEBUG)."       },
 #endif

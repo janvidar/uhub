@@ -68,6 +68,10 @@ void on_login_success(struct hub_info* hub, struct hub_user* u)
 	if (user_is_logged_in(u)) /* Previous send() can fail! */
 		hub_send_motd(hub, u);
 
+	/* Send message of the day (if any) */
+	if (user_is_logged_in(u)) /* Previous send() can fail! */
+		hub_send_rules(hub, u);
+
 	/* reset timeout */
 	net_con_clear_timeout(u->connection);
 }

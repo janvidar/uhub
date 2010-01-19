@@ -116,6 +116,7 @@
 #define DEF_HUB_ENABLED                     1
 #define DEF_FILE_ACL                        ""
 #define DEF_FILE_MOTD                       ""
+#define DEF_FILE_RULES                      ""
 #define DEF_MAX_USERS                       500
 #define DEF_MAX_CHAT_HISTORY                20
 #define DEF_MAX_LOGOUT_LOG                  100
@@ -180,6 +181,7 @@ void config_defaults(struct hub_config* config)
 	DEFAULT_BOOLEAN(hub_enabled,           DEF_HUB_ENABLED);
 	DEFAULT_STRING (file_acl,              DEF_FILE_ACL);
 	DEFAULT_STRING (file_motd,             DEF_FILE_MOTD);
+	DEFAULT_STRING (file_rules,            DEF_FILE_RULES);
 	DEFAULT_INTEGER(server_port,           DEF_SERVER_PORT);
 	DEFAULT_INTEGER(server_listen_backlog, DEF_SERVER_BACKLOG);
 	DEFAULT_INTEGER(max_users,             DEF_MAX_USERS);
@@ -249,6 +251,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 {
 	GET_STR (file_acl);
 	GET_STR (file_motd);
+	GET_STR (file_rules);
 	GET_STR (server_bind_addr);
 	GET_INT (server_port);
 	GET_INT (server_listen_backlog);
@@ -327,6 +330,7 @@ void free_config(struct hub_config* config)
 	hub_free(config->server_bind_addr);
 	hub_free(config->file_motd);
 	hub_free(config->file_acl);
+	hub_free(config->file_rules);
 	hub_free(config->hub_name);
 	hub_free(config->hub_description);
 	
@@ -398,6 +402,7 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 {
 	DUMP_STR (file_acl, DEF_FILE_ACL);
 	DUMP_STR (file_motd, DEF_FILE_MOTD);
+	DUMP_STR (file_rules, DEF_FILE_RULES);
 	DUMP_STR (server_bind_addr, DEF_SERVER_BIND_ADDR);
 	DUMP_INT (server_port, DEF_SERVER_PORT);
 	DUMP_INT (server_listen_backlog, DEF_SERVER_BACKLOG);

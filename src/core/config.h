@@ -33,6 +33,7 @@ struct hub_config
 	int chat_is_privileged;      /**<<< "Allow chat for operators and above only (default: 0) */
 	char* file_motd;             /**<<< "File containing the 'message of the day' (default: '' - no motd)" */
 	char* file_acl;              /**<<< "File containing user database (default: '' - no known users)" */
+	char* file_rules;            /**<<< "File containing the rules (default: '' - no rules)" */
 	char* hub_name;              /**<<< "Name of hub (default: 'My uhub hub')" */
 	char* hub_description;       /**<<< "Name of hub (default: 'no description')" */
 	int max_recv_buffer;         /**<<< "Max read buffer before parse, per user (default: 4096)" */
