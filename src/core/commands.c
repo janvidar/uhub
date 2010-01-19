@@ -586,28 +586,28 @@ int command_dipatcher(struct hub_info* hub, struct hub_user* user, const char* m
 }
 
 static struct commands_handler command_handlers[] = {
-	{ "help",       4, 0,   cred_guest,     command_help,     "Show this help message."      },
-	{ "stats",      5, 0,   cred_super,     command_stats,    "Show hub statistics."         },
-	{ "version",    7, 0,   cred_guest,     command_version,  "Show hub version info."       },
-	{ "history",    7, 0,   cred_guest,     command_history,  "Show the last chat messages." },
-	{ "uptime",     6, 0,   cred_guest,     command_uptime,   "Display hub uptime info."     },
-	{ "kick",       4, "n", cred_operator,  command_kick,     "Kick a user"                  },
 	{ "ban",        3, "n", cred_operator,  command_ban,      "Ban a user"                   },
-	{ "unban",      5, "n", cred_operator,  command_unban,    "Lift ban on a user"           },
-	{ "reload",     6, 0,   cred_admin,     command_reload,   "Reload configuration files."  },
-	{ "shutdown",   8, 0,   cred_admin,     command_shutdown, "Shutdown hub."                },
-	{ "myip",       4, 0,   cred_guest,     command_myip,     "Show your own IP."            },
-	{ "getip",      5, "n", cred_operator,  command_getip,    "Show IP address for a user"   },
-	{ "whoip",      5, "a", cred_operator,  command_whoip,    "Show users matching IP range" },
 	{ "broadcast",  9, "m", cred_operator,  command_broadcast,"Send a message to all users"  },
-	{ "log",        3, 0,   cred_operator,  command_log,      "Display log"                  },
-	{ "mute",       4, "n", cred_operator,  command_mute,     "Mute user"                    },
-	{ "unmute",     6, "n", cred_operator,  command_mute,     "Unmute user"                  },
-	{ "rules",      5, 0,   cred_guest,     command_rules,    "Show the hub rules"           },
-	{ "motd",       4, 0,   cred_guest,     command_motd,     "Show the message of the day"  },
 #ifdef CRASH_DEBUG
 	{ "crash",      5, 0,   cred_admin,     command_crash,    "Crash the hub (DEBUG)."       },
 #endif
+	{ "getip",      5, "n", cred_operator,  command_getip,    "Show IP address for a user"   },
+	{ "help",       4, 0,   cred_guest,     command_help,     "Show this help message."      },
+	{ "history",    7, 0,   cred_guest,     command_history,  "Show the last chat messages." },
+	{ "kick",       4, "n", cred_operator,  command_kick,     "Kick a user"                  },
+	{ "log",        3, 0,   cred_operator,  command_log,      "Display log"                  },
+	{ "motd",       4, 0,   cred_guest,     command_motd,     "Show the message of the day"  },
+	{ "mute",       4, "n", cred_operator,  command_mute,     "Mute user"                    },
+	{ "myip",       4, 0,   cred_guest,     command_myip,     "Show your own IP."            },
+	{ "reload",     6, 0,   cred_admin,     command_reload,   "Reload configuration files."  },
+	{ "rules",      5, 0,   cred_guest,     command_rules,    "Show the hub rules"           },
+	{ "shutdown",   8, 0,   cred_admin,     command_shutdown, "Shutdown hub."                },
+	{ "stats",      5, 0,   cred_super,     command_stats,    "Show hub statistics."         },
+	{ "unban",      5, "n", cred_operator,  command_unban,    "Lift ban on a user"           },
+	{ "unmute",     6, "n", cred_operator,  command_mute,     "Unmute user"                  },
+	{ "uptime",     6, 0,   cred_guest,     command_uptime,   "Display hub uptime info."     },
+	{ "version",    7, 0,   cred_guest,     command_version,  "Show hub version info."       },
+	{ "whoip",      5, "a", cred_operator,  command_whoip,    "Show users matching IP range" },
 	{ 0,            0, 0,   cred_none,      command_help,     ""                             }
 };
 
