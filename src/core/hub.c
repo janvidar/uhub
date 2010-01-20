@@ -622,9 +622,6 @@ void hub_shutdown_service(struct hub_info* hub)
 	LOG_DEBUG("hub_shutdown_service()");
 
 	event_queue_shutdown(hub->queue);
-#ifdef USE_LIBEVENT
-	event_del(&hub->ev_accept);
-#endif
 	net_con_close(hub->server);
 	hub_free(hub->server);
 	uman_shutdown(hub);

@@ -21,6 +21,7 @@
 #define HAVE_UHUB_NETWORK_CONNECTION_H
 
 #include "uhub.h"
+#include "network/common.h"
 #include "network/backend.h"
 
 #define NET_EVENT_TIMEOUT         0x0001
@@ -30,7 +31,13 @@
 #define NET_EVENT_CLOSED          0x2000 /* Socket closed */
 
 struct net_connection;
+
 typedef void (*net_connection_cb)(struct net_connection*, int event, void* ptr);
+
+struct net_connection
+{
+	NET_CON_STRUCT_COMMON
+};
 
 extern int   net_con_get_sd(struct net_connection* con);
 extern void* net_con_get_ptr(struct net_connection* con);
@@ -40,6 +47,7 @@ extern void net_con_destroy(struct net_connection*);
 extern void net_con_initialize(struct net_connection* con, int sd, net_connection_cb callback, const void* ptr, int events);
 extern void net_con_reinitialize(struct net_connection* con, net_connection_cb callback, const void* ptr, int events);
 extern void net_con_update(struct net_connection* con, int events);
+extern void net_con_callback(struct net_connection* con, int events);
 
 /**
  * Close the connection.

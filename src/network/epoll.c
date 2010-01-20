@@ -27,18 +27,10 @@
 
 #define EPOLL_EVBUFFER 512
 
-struct net_connection
+struct net_connection_epoll
 {
-	int                  sd;
-	uint32_t             flags;
-	net_connection_cb    callback;
-	void*                ptr;
-	struct epoll_event   ev;
-	struct timeout_evt*  timeout;
-#ifdef SSL_SUPPORT
-	SSL*                 ssl;
-	size_t               write_len; /** Length of last SSL_write(), only used if flags is NET_WANT_SSL_READ. */
-#endif
+	NET_CON_STRUCT_COMMON
+	struct epoll_event ev;
 };
 
 struct net_backend
@@ -46,7 +38,7 @@ struct net_backend
 	int epfd;
 	size_t num;
 	size_t max;
-	struct net_connection** conns;
+	struct net_connection_epoll** conns;
 	struct epoll_event events[EPOLL_EVBUFFER];
 	time_t now;
 	struct timeout_queue timeout_queue;
@@ -54,7 +46,7 @@ struct net_backend
 
 static struct net_backend* g_backend = 0;
 
-static void net_con_print(const char* prefix, struct net_connection* con)
+static void net_con_print(const char* prefix, struct net_connection_epoll* con)
 {
 	char buf[512];
 	int off = snprintf(buf, 512, "%s: net_connection={ sd=%d, flags=%u, callback=%p, ptr=%p, ev={ events=%s%s, data.ptr=%p }",
@@ -87,7 +79,7 @@ int net_backend_initialize()
 	
 	g_backend->num = 0;
 	g_backend->max = max;
-	g_backend->conns = hub_malloc_zero(sizeof(struct net_connection*) * max);
+	g_backend->conns = hub_malloc_zero(sizeof(struct net_connection_epoll*) * max);
 	memset(g_backend->events, 0, sizeof(g_backend->events));
 
 	g_backend->now = time(0);
@@ -121,19 +113,23 @@ int net_backend_process()
 
 	for (n = 0; n < res; n++)
 	{
-		struct net_connection* con = (struct net_connection*) g_backend->events[n].data.ptr;
+		struct net_connection_epoll* con = (struct net_connection_epoll*) g_backend->events[n].data.ptr;
 		int ev = 0;
 		if (g_backend->events[n].events & EPOLLIN)  ev |= NET_EVENT_READ;
 		if (g_backend->events[n].events & EPOLLOUT) ev |= NET_EVENT_WRITE;
-		con->callback(con, ev, con->ptr);
+		net_con_callback((struct net_connection*) con, ev);
 	}
 	return 1;
 }
 
+struct timeout_queue* net_backend_get_timeout_queue()
+{
+	return &g_backend->timeout_queue;
+}
 
 struct net_connection* net_con_create()
 {
-	struct net_connection* con = (struct net_connection*) hub_malloc_zero(sizeof(struct net_connection));
+	struct net_connection* con = (struct net_connection*) hub_malloc_zero(sizeof(struct net_connection_epoll));
 	con->sd = -1;
 	return con;
 }
@@ -143,8 +139,9 @@ void net_con_destroy(struct net_connection* con)
 	hub_free(con);
 }
 
-void net_con_initialize(struct net_connection* con, int sd, net_connection_cb callback, const void* ptr, int events)
+void net_con_initialize(struct net_connection* con_, int sd, net_connection_cb callback, const void* ptr, int events)
 {
+	struct net_connection_epoll* con = (struct net_connection_epoll*) con_;
 	con->sd = sd;
 	con->flags = NET_INITIALIZED;
 	con->callback = callback;
@@ -176,10 +173,11 @@ void net_con_reinitialize(struct net_connection* con, net_connection_cb callback
 	net_con_update(con, events);
 }
 
-void net_con_update(struct net_connection* con, int events)
+void net_con_update(struct net_connection* con_, int events)
 {
+	struct net_connection_epoll* con = (struct net_connection_epoll*) con_;
 	con->ev.events = 0;
-	if (events & NET_EVENT_READ) con->ev.events |= EPOLLIN;
+	if (events & NET_EVENT_READ)  con->ev.events |= EPOLLIN;
 	if (events & NET_EVENT_WRITE) con->ev.events |= EPOLLOUT;
 
 #ifdef SSL_SUPPORT
@@ -211,8 +209,9 @@ void net_con_update(struct net_connection* con, int events)
 	net_con_print("MOD", con);
 }
 
-int net_con_close(struct net_connection* con)
+int net_con_close(struct net_connection* con_)
 {
+	struct net_connection_epoll* con = (struct net_connection_epoll*) con_;
 	if (!(con->flags & NET_INITIALIZED))
 		return 0;
 
@@ -237,70 +236,6 @@ int net_con_close(struct net_connection* con)
 	}
 	net_con_print("DEL", con);
 	return 0;
-}
-
-#ifdef SSL_SUPPORT
-int net_con_is_ssl(struct net_connection* con)
-{
-
-	return con->ssl != 0;
-}
-
-SSL* net_con_get_ssl(struct net_connection* con)
-{
-	return con->ssl;
-}
-
-void net_con_set_ssl(struct net_connection* con, SSL* ssl)
-{
-	con->ssl = ssl;
-}
-#endif
-
-int net_con_get_sd(struct net_connection* con)
-{
-	return con->sd;
-}
-
-void* net_con_get_ptr(struct net_connection* con)
-{
-	return con->ptr;
-}
-
-
-void timeout_evt_initialize(struct timeout_evt*, timeout_evt_cb, void* ptr);
-void timeout_evt_reset(struct timeout_evt*);
-int  timeout_evt_is_scheduled(struct timeout_evt*);
-
-static void timeout_callback(struct timeout_evt* evt)
-{
-	struct net_connection* con = (struct net_connection*) evt->ptr;
-	con->callback(con, NET_EVENT_TIMEOUT, con->ptr);
-}
-
-
-void net_con_set_timeout(struct net_connection* con, int seconds)
-{
-	if (!con->timeout)
-	{
-		con->timeout = hub_malloc_zero(sizeof(struct timeout_evt));
-		timeout_evt_initialize(con->timeout, timeout_callback, con);
-		timeout_queue_insert(&g_backend->timeout_queue, con->timeout, seconds);
-	}
-	else
-	{
-		timeout_queue_reschedule(&g_backend->timeout_queue, con->timeout, seconds);
-	}
-}
-
-void net_con_clear_timeout(struct net_connection* con)
-{
-	if (con->timeout && timeout_evt_is_scheduled(con->timeout))
-	{
-		timeout_queue_remove(&g_backend->timeout_queue, con->timeout);
-		hub_free(con->timeout);
-		con->timeout = 0;
-	}
 }
 
 #endif /* USE_EPOLL */

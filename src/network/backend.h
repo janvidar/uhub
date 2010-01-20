@@ -36,4 +36,6 @@ extern void net_backend_shutdown();
  */
 extern int net_backend_process();
 
+extern struct timeout_queue* net_backend_get_timeout_queue();
+
 #endif /* HAVE_UHUB_NETWORK_BACKEND_H */

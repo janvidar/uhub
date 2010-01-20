@@ -9,7 +9,6 @@ MV            := mv
 RANLIB        := ranlib
 CFLAGS        += -pipe -Wall
 USE_SSL       ?= NO
-USE_LIBEVENT  ?= NO
 USE_BIGENDIAN ?= AUTO
 BITS          ?= AUTO
 SILENT        ?= YES
@@ -63,9 +62,6 @@ else
 	MSG_CLEAN="Clean as a whistle"
 endif
 
-# CFLAGS        += -I/source/libevent
-# LDFLAGS       += -L/source/libevent
-
 ifeq ($(RELEASE),YES)
 CFLAGS        += -O3 -DNDEBUG
 GIT_REVISION  ?= NO
@@ -116,15 +112,6 @@ CFLAGS        += -DSSL_SUPPORT
 LDLIBS        += -lssl
 endif
 
-ifeq ($(USE_LIBEVENT),YES)
-CFLAGS        += -DUSE_LIBEVENT
-LDLIBS        += -levent
-ifneq ($(LIBEVENT_PATH),)
-CFLAGS        += -I$(LIBEVENT_PATH)
-LDFLAGS       += -L$(LIBEVENT_PATH)
-endif
-endif
-
 ifeq ($(GIT_REVISION),YES)
 CFLAGS        += -DGIT_REVISION=\"$(shell git show --abbrev-commit | head -n 1 | cut -f 2 -d " ")\"
 endif
@@ -146,8 +133,9 @@ libuhub_SOURCES := \
 		src/core/usermanager.c \
 		src/network/connection.c \
 		src/network/epoll.c \
-		src/network/libevent.c \
 		src/network/network.c \
+		src/network/select.c \
+		src/network/timer.c \
 		src/util/ipcalc.c \
 		src/util/list.c \
 		src/util/log.c \

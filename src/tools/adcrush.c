@@ -330,7 +330,7 @@ void runloop(size_t clients)
 
 	while (running)
 	{
-		event_base_loop(net_get_evbase(), EVLOOP_ONCE);
+		net_backend_process();
 	}
 
 	for (n = 0; n < clients; n++)
@@ -413,63 +413,17 @@ void parse_command_line(int argc, char** argv)
 	}
 }
 
-#ifndef WIN32
-static void handle_signal(int signal, short events, void* arg)
-{
-	switch (signal)
-	{
-		case SIGINT:
-		case SIGTERM:
-			running = 0;
-			break;
-		default:
-			break;
-	}
-}
-
-static struct event signal_events[10];
-static int signals[] =
-{
-	SIGINT,  /* Interrupt the application */
-	SIGTERM, /* Terminate the application */
-	0
-};
-
-void setup_signal_handlers()
-{
-	int i = 0;
-	for (i = 0; signals[i]; i++)
-	{
-		signal_set(&signal_events[i], signals[i], handle_signal, NULL);
-		signal_add(&signal_events[i], NULL);
-	}
-}
-
-void shutdown_signal_handlers()
-{
-	int i = 0;
-	for (i = 0; signals[i]; i++)
-	{
-		signal_del(&signal_events[i]);
-	}
-}
-#endif /* WIN32 */
-
-
 int main(int argc, char** argv)
 {
 	parse_command_line(argc, argv);
 	
 	net_initialize();
-	setup_signal_handlers();
 
 	hub_log_initialize(NULL, 0);
 	hub_set_log_verbosity(1000);
 
 	runloop(cfg_clients);
 
-	shutdown_signal_handlers();
 	net_destroy();
-
 	return 0;
 }

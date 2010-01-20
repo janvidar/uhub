@@ -25,7 +25,7 @@ static int handle_openssl_error(struct net_connection* con, int ret)
 {
 	uhub_assert(con);
 
-	int error = SSL_get_error(net_con_get_ssl(con), ret);
+	int error = SSL_get_error(con->ssl, ret);
 	switch (error)
 	{
 		case SSL_ERROR_ZERO_RETURN:
@@ -77,7 +77,7 @@ ssize_t net_con_ssl_accept(struct net_connection* con)
 {
 	uhub_assert(con);
 
-	ssize_t ret = SSL_accept(net_con_get_ssl(con));
+	ssize_t ret = SSL_accept(con->ssl);
 #ifdef NETWORK_DUMP_DEBUG
 	LOG_PROTO("SSL_accept() ret=%d", ret);
 #endif
@@ -96,7 +96,7 @@ ssize_t net_con_ssl_connect(struct net_connection* con)
 {
 	uhub_assert(con);
 
-	ssize_t ret = SSL_connect(net_con_get_ssl(con));
+	ssize_t ret = SSL_connect(con->ssl);
 #ifdef NETWORK_DUMP_DEBUG
 	LOG_PROTO("SSL_connect() ret=%d", ret);
 #endif
@@ -119,14 +119,14 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode 
 	if (ssl_mode == net_con_ssl_mode_server)
 	{
 		ssl = SSL_new(ssl_ctx);
-		SSL_set_fd(ssl, net_con_get_sd(con));
+		SSL_set_fd(ssl, con->sd);
 		net_con_set_ssl(con, ssl);
 		return net_con_ssl_accept(con);
 	}
 	else
 	{
 		ssl = SSL_new(SSL_CTX_new(TLSv1_method()));
-		SSL_set_fd(ssl, net_con_get_sd(con));
+		SSL_set_fd(ssl, con->sd);
 		net_con_set_ssl(con, ssl);
 		return net_con_ssl_connect(con);
 	}
@@ -136,7 +136,7 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode 
 
 ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 {
-	int ret = net_send(net_con_get_sd(con), buf, len, UHUB_SEND_SIGNAL);
+	int ret = net_send(con->sd, buf, len, UHUB_SEND_SIGNAL);
 	if (ret == -1)
 	{
 		if (net_error() == EWOULDBLOCK || net_error() == EINTR)
@@ -154,7 +154,7 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 	if (!net_con_is_ssl(con))
 	{
 #endif
-		int ret = net_recv(net_con_get_sd(con), buf, len, 0);
+		int ret = net_recv(con->sd, buf, len, 0);
 #ifdef NETWORK_DUMP_DEBUG
 		LOG_PROTO("net_recv: ret=%d", ret);
 #endif
@@ -174,7 +174,7 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 	}
 	else
 	{
-		int ret = SSL_read(net_con_get_ssl(con), buf, len);
+		int ret = SSL_read(con->ssl, buf, len);
 #ifdef NETWORK_DUMP_DEBUG
 		LOG_PROTO("net_recv: ret=%d", ret);
 #endif
@@ -193,7 +193,7 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 
 ssize_t net_con_peek(struct net_connection* con, void* buf, size_t len)
 {
-	int ret = net_recv(net_con_get_sd(con), buf, len, MSG_PEEK);
+	int ret = net_recv(con->sd, buf, len, MSG_PEEK);
 	if (ret == -1)
 	{
 		if (net_error() == EWOULDBLOCK || net_error() == EINTR)
@@ -205,6 +205,39 @@ ssize_t net_con_peek(struct net_connection* con, void* buf, size_t len)
 	return ret;
 }
 
+#ifdef SSL_SUPPORT
+int net_con_is_ssl(struct net_connection* con)
+{
+	return con->ssl != 0;
+}
 
+SSL* net_con_get_ssl(struct net_connection* con)
+{
+	return con->ssl;
+}
 
+void net_con_set_ssl(struct net_connection* con, SSL* ssl)
+{
+	con->ssl = ssl;
+}
+#endif /* SSL_SUPPORT */
+
+int net_con_get_sd(struct net_connection* con)
+{
+	return con->sd;
+}
+
+void* net_con_get_ptr(struct net_connection* con)
+{
+	return con->ptr;
+}
+
+void net_con_callback(struct net_connection* con, int events)
+{
+	if (!(con->flags & NET_CLEANUP))
+	{
+		LOG_TRACE("net_con_callback(%p, %s%s%s)", con, (events & NET_EVENT_READ ? "R" : ""), (events & NET_EVENT_WRITE ? "W" : ""), events == NET_EVENT_TIMEOUT ? "TIMEOUT" : "");
+		con->callback(con, events, con->ptr);
+	}
+}
 

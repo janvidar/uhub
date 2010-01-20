@@ -70,28 +70,9 @@ void uman_print_stats(struct hub_info* hub)
 		(int) hub->stats.net_rx_peak / 1024);
 }
 
-#ifdef USERMANAGER_TIMER
-#ifdef USE_LIBEVENT
-static void timer_statistics(int fd, short ev, void *arg)
-{
-	struct hub_info* hub = (struct hub_info*) arg;
-	struct timeval timeout = { TIMEOUT_STATS, 0 };
-	uman_update_stats(hub);
-	evtimer_set(&hub->ev_timer, timer_statistics, hub);
-	evtimer_add(&hub->ev_timer, &timeout);
-}
-#endif
-#endif
-
-
 int uman_init(struct hub_info* hub)
 {
 	struct hub_user_manager* users = NULL;
-#ifdef USERMANAGER_TIMER
-#ifdef USE_LIBEVENT
-	struct timeval timeout = { TIMEOUT_STATS, 0 };
-#endif
-#endif
 	if (!hub)
 		return -1;
 
@@ -110,16 +91,6 @@ int uman_init(struct hub_info* hub)
 	}
 
 	hub->users = users;
-
-#ifdef USERMANAGER_TIMER
-#ifdef USE_LIBEVENT
-	if (net_get_evbase())
-	{
-		evtimer_set(&hub->ev_timer, timer_statistics, hub);
-		evtimer_add(&hub->ev_timer, &timeout);
-	}
-#endif
-#endif // 0
 	return 0;
 }
 
@@ -129,13 +100,6 @@ int uman_shutdown(struct hub_info* hub)
 	if (!hub || !hub->users)
 		return -1;
 
-#ifdef USERMANAGER_TIMER
-#ifdef USE_LIBEVENT
-	if (evtimer_pending(&hub->ev_timer, 0))
-		evtimer_del(&hub->ev_timer);
-#endif
-#endif
-
 	if (hub->users->list)
 	{
 		list_clear(hub->users->list, &clear_user_list_callback);
@@ -144,7 +108,6 @@ int uman_shutdown(struct hub_info* hub)
 	sid_pool_destroy(hub->users->sids);
 	hub_free(hub->users);
 	hub->users = 0;
-
 	return 0;
 }
 

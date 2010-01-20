@@ -63,6 +63,7 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 	return 1;
 }
 
+static int running = 1;
 
 int main(int argc, char** argv)
 {
@@ -79,7 +80,10 @@ int main(int argc, char** argv)
 	ADC_client_set_callback(&client, handle);
 	ADC_client_connect(&client, argv[1]);
 
-	event_dispatch();
+	while (running)
+	{
+		net_backend_process();
+	}
 
 	ADC_client_destroy(&client);
 	net_destroy();

@@ -1,7 +1,7 @@
 
 #define NET_WANT_READ             NET_EVENT_READ
 #define NET_WANT_WRITE            NET_EVENT_WRITE
-#define NET_WANT_ACCEPT           0x0008
+#define NET_WANT_ACCEPT           NET_EVENT_READ
 #define NET_WANT_SSL_READ         0x0010
 #define NET_WANT_SSL_WRITE        0x0020
 #define NET_WANT_SSL_ACCEPT       0x0040
@@ -13,14 +13,12 @@
 #define NET_INITIALIZED           0x2000
 #define NET_TIMER_ENABLED         0x1000
 
-/* FIXME: Meant for debugging */
-#define NET_EVENT_SET             0x0800
-
 #define NET_CON_STRUCT_BASIC \
 	int                  sd;        /** socket descriptor */ \
 	uint32_t             flags;     /** Connection flags */ \
 	void*                ptr;       /** data pointer */ \
 	net_connection_cb    callback;  /** Callback function */ \
+	struct timeout_evt*  timeout;   /** timeout event handler */
 
 #define NET_CON_STRUCT_SSL \
 	SSL*                 ssl;       /** SSL handle */ \
