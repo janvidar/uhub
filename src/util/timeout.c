@@ -124,3 +124,4 @@ void timeout_queue_reschedule(struct timeout_queue* t, struct timeout_evt* evt, 
 		timeout_queue_remove(t, evt);
 	timeout_queue_insert(t, evt, seconds);
 }
+
