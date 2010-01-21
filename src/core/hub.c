@@ -450,89 +450,85 @@ static void hub_event_dispatcher(void* callback_data, struct event_data* message
 	}
 }
 
+static int start_listening_socket(const char* bind_addr, uint16_t port, int backlog, char* address_out)
+{
+	struct sockaddr_storage addr;
+	socklen_t sockaddr_size;
+	int af, sd, ret;
+
+	if (ip_convert_address(bind_addr, port, (struct sockaddr*) &addr, &sockaddr_size) == -1)
+	{
+		return -1;
+	}
+
+	af = addr.ss_family;
+	if (af == AF_INET)
+	{
+		net_address_to_string(AF_INET, &((struct sockaddr_in*) &addr)->sin_addr, address_out, INET6_ADDRSTRLEN);
+	}
+	else if (af == AF_INET6)
+	{
+		net_address_to_string(AF_INET6, &((struct sockaddr_in6*) &addr)->sin6_addr, address_out, INET6_ADDRSTRLEN);
+	}
+
+	sd = net_socket_create(af, SOCK_STREAM, IPPROTO_TCP);
+	if (sd == -1)
+	{
+		return -1;
+	}
+
+	if ((net_set_reuseaddress(sd, 1) == -1) || (net_set_nonblocking(sd, 1) == -1))
+	{
+		net_close(sd);
+		return -1;
+	}
+
+	ret = net_bind(sd, (struct sockaddr*) &addr, sockaddr_size);
+	if (ret == -1)
+	{
+		LOG_ERROR("hub_start_service(): Unable to bind to TCP local address. errno=%d, str=%s", net_error(), net_error_string(net_error()));
+		net_close(sd);
+		return -1;
+	}
+
+	ret = net_listen(sd, backlog);
+	if (ret == -1)
+	{
+		LOG_ERROR("hub_start_service(): Unable to listen to socket");
+		net_close(sd);
+		return -1;
+	}
+	return sd;
+}
 
 struct hub_info* hub_start_service(struct hub_config* config)
 {
 	struct hub_info* hub = 0;
-	struct sockaddr_storage addr;
-	socklen_t sockaddr_size;
-	int server_tcp, ret, ipv6_supported, af;
+	int server_tcp, ipv6_supported;
 	char address_buf[INET6_ADDRSTRLEN+1];
-	
+
 	hub = hub_malloc_zero(sizeof(struct hub_info));
 	if (!hub)
 	{
 		LOG_FATAL("Unable to allocate memory for hub");
 		return 0;
 	}
-	
+
 	hub->tm_started = time(0);
-	
 	ipv6_supported = net_is_ipv6_supported();
-	
 	if (ipv6_supported)
 		LOG_DEBUG("IPv6 supported.");
 	else
 		LOG_DEBUG("IPv6 not supported.");
-	
-	if (ip_convert_address(config->server_bind_addr, config->server_port, (struct sockaddr*) &addr, &sockaddr_size) == -1)
-	{
-		hub_free(hub);
-		return 0;
-	}
-	
-	af = addr.ss_family;
-	if (af == AF_INET)
-	{
-		net_address_to_string(AF_INET, &((struct sockaddr_in*) &addr)->sin_addr, address_buf, INET6_ADDRSTRLEN);
-	}
-	else if (af == AF_INET6)
-	{
-		net_address_to_string(AF_INET6, &((struct sockaddr_in6*) &addr)->sin6_addr, address_buf, INET6_ADDRSTRLEN);
-	}
 
-	LOG_INFO("Starting " PRODUCT "/" VERSION ", listening on %s:%d...", address_buf, config->server_port);
-
-	server_tcp = net_socket_create(af, SOCK_STREAM, IPPROTO_TCP);
+	server_tcp = start_listening_socket(config->server_bind_addr, config->server_port, config->server_listen_backlog, address_buf);
 	if (server_tcp == -1)
 	{
 		hub_free(hub);
+		LOG_FATAL("Unable to start hub service");
 		return 0;
 	}
-	
-	ret = net_set_reuseaddress(server_tcp, 1);
-	if (ret == -1)
-	{
-		hub_free(hub);
-		net_close(server_tcp);
-		return 0;
-	}
-	
-	ret = net_set_nonblocking(server_tcp, 1);
-	if (ret == -1)
-	{
-		hub_free(hub);
-		net_close(server_tcp);
-		return 0;
-	}
-	
-	ret = net_bind(server_tcp, (struct sockaddr*) &addr, sockaddr_size);
-	if (ret == -1)
-	{
-		LOG_FATAL("hub_start_service(): Unable to bind to TCP local address. errno=%d, str=%s", net_error(), net_error_string(net_error()));
-		hub_free(hub);
-		net_close(server_tcp);
-		return 0;
-	}
-
-	ret = net_listen(server_tcp, config->server_listen_backlog);
-	if (ret == -1)
-	{
-		LOG_FATAL("hub_start_service(): Unable to listen to socket");
-		hub_free(hub);
-		net_close(server_tcp);
-		return 0;
-	}
+	LOG_INFO("Starting " PRODUCT "/" VERSION ", listening on %s:%d...", address_buf, config->server_port);
 
 #ifdef SSL_SUPPORT
 	if (config->tls_enable)
