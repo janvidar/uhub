@@ -55,7 +55,7 @@ extern void net_con_callback(struct net_connection* con, int events);
  * that the con can safely be deleted (or set to NULL).
  * @returns 1 if the memory pointed to by con can be freed immediately, or 0 if it needs to go through the NET_EVENT_DESTROYED event.
  */
-extern int net_con_close(struct net_connection* con);
+extern void net_con_close(struct net_connection* con);
 
 /**
  * Send data

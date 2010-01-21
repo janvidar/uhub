@@ -42,6 +42,7 @@ struct net_backend
 	struct epoll_event events[EPOLL_EVBUFFER];
 	time_t now;
 	struct timeout_queue timeout_queue;
+	struct net_cleanup_handler* cleaner;
 };
 
 static struct net_backend* g_backend = 0;
@@ -84,6 +85,7 @@ int net_backend_initialize()
 
 	g_backend->now = time(0);
 	timeout_queue_initialize(&g_backend->timeout_queue, g_backend->now, 600); /* look max 10 minutes into the future. */
+	g_backend->cleaner = net_cleanup_initialize(max);
 	return 1;
 }
 
@@ -93,6 +95,7 @@ int net_backend_initialize()
 void net_backend_shutdown()
 {
 	close(g_backend->epfd);
+	net_cleanup_shutdown(g_backend->cleaner);
 	hub_free(g_backend->conns);
 	hub_free(g_backend);
 }
@@ -119,6 +122,8 @@ int net_backend_process()
 		if (g_backend->events[n].events & EPOLLOUT) ev |= NET_EVENT_WRITE;
 		net_con_callback((struct net_connection*) con, ev);
 	}
+
+	net_cleanup_process(g_backend->cleaner);
 	return 1;
 }
 
@@ -143,7 +148,7 @@ void net_con_initialize(struct net_connection* con_, int sd, net_connection_cb c
 {
 	struct net_connection_epoll* con = (struct net_connection_epoll*) con_;
 	con->sd = sd;
-	con->flags = NET_INITIALIZED;
+	con->flags = 0;
 	con->callback = callback;
 	con->ev.events = 0;
 	con->ptr = (void*) ptr;
@@ -209,13 +214,11 @@ void net_con_update(struct net_connection* con_, int events)
 	net_con_print("MOD", con);
 }
 
-int net_con_close(struct net_connection* con_)
+void net_con_close(struct net_connection* con_)
 {
 	struct net_connection_epoll* con = (struct net_connection_epoll*) con_;
-	if (!(con->flags & NET_INITIALIZED))
-		return 0;
-
-	con->flags &= ~NET_INITIALIZED;
+	if (con->flags & NET_CLEANUP)
+		return;
 
 	if (con->sd != -1)
 	{
@@ -235,7 +238,7 @@ int net_con_close(struct net_connection* con_)
 		LOG_WARN("epoll_ctl() delete failed.");
 	}
 	net_con_print("DEL", con);
-	return 0;
+	net_cleanup_delayed_free(g_backend->cleaner, con_);
 }
 
 #endif /* USE_EPOLL */

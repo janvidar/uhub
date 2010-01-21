@@ -20,6 +20,9 @@
 #ifndef HAVE_UHUB_NETWORK_BACKEND_H
 #define HAVE_UHUB_NETWORK_BACKEND_H
 
+struct net_cleanup_handler;
+struct net_connection;
+
 /**
  * Initialize the network backend.
  * Returns 1 on success, or 0 on failure.
@@ -37,5 +40,14 @@ extern void net_backend_shutdown();
 extern int net_backend_process();
 
 extern struct timeout_queue* net_backend_get_timeout_queue();
+
+struct net_cleanup_handler* net_cleanup_initialize(size_t max);
+
+void net_cleanup_shutdown(struct net_cleanup_handler* handler);
+
+void net_cleanup_delayed_free(struct net_cleanup_handler* handler, struct net_connection* con);
+
+void net_cleanup_process(struct net_cleanup_handler* handler);
+
 
 #endif /* HAVE_UHUB_NETWORK_BACKEND_H */

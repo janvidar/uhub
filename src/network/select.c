@@ -39,6 +39,7 @@ struct net_backend
 	fd_set wfds;
 	time_t now;
 	struct timeout_queue timeout_queue;
+	struct net_cleanup_handler* cleaner;
 };
 
 static struct net_backend* g_backend = 0;
@@ -74,6 +75,7 @@ int net_backend_initialize()
 	FD_ZERO(&g_backend->wfds);
 	g_backend->now = time(0);
 	timeout_queue_initialize(&g_backend->timeout_queue, g_backend->now, 600); /* look max 10 minutes into the future. */
+	g_backend->cleaner = net_cleanup_initialize(max);
 	return 1;
 }
 
@@ -82,6 +84,7 @@ int net_backend_initialize()
  */
 void net_backend_shutdown()
 {
+	net_cleanup_shutdown(g_backend->cleaner);
 	hub_free(g_backend->conns);
 	hub_free(g_backend);
 }
@@ -130,6 +133,8 @@ int net_backend_process()
 			}
 		}
 	}
+
+	net_cleanup_process(g_backend->cleaner);
 	return 1;
 }
 
@@ -154,8 +159,7 @@ void net_con_initialize(struct net_connection* con_, int sd, net_connection_cb c
 {
 	struct net_connection_select* con = (struct net_connection_select*) con_;
 	con->sd = sd;
-	con->flags = NET_INITIALIZED;
-	con->flags |= events;
+	con->flags = events;
 	con->callback = callback;
 	con->ptr = (void*) ptr;
 
@@ -176,17 +180,14 @@ void net_con_reinitialize(struct net_connection* con, net_connection_cb callback
 
 void net_con_update(struct net_connection* con, int events)
 {
-	con->flags = NET_INITIALIZED;
-	con->flags |= events;
+	con->flags = events;
 	net_con_print("MOD", (struct net_connection_select*) con);
 }
 
-int net_con_close(struct net_connection* con)
+void net_con_close(struct net_connection* con)
 {
-	if (!(con->flags & NET_INITIALIZED))
-		return 0;
-
-	con->flags &= ~NET_INITIALIZED;
+	if (con->flags & NET_CLEANUP)
+		return;
 
 	if (con->sd != -1)
 	{
@@ -202,7 +203,7 @@ int net_con_close(struct net_connection* con)
 	}
 
 	net_con_print("DEL", (struct net_connection_select*) con);
-	return 0;
+	net_cleanup_delayed_free(g_backend->cleaner, con);
 }
 
 #endif /* USE_SELECT */

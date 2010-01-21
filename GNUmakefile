@@ -131,6 +131,7 @@ libuhub_SOURCES := \
 		src/core/route.c \
 		src/core/user.c \
 		src/core/usermanager.c \
+		src/network/backend.c \
 		src/network/connection.c \
 		src/network/epoll.c \
 		src/network/network.c \
