@@ -165,23 +165,13 @@ void net_event(struct net_connection* con, int event, void *arg)
 	LOG_TRACE("net_event() : fd=%d, ev=%d, arg=%p", fd, (int) event, arg);
 #endif
 
-	if (event == NET_EVENT_SOCKERROR)
-	{
-		hub_disconnect_user(g_hub, user, quit_socket_error);
-		return;
-	}
-	else if (event == NET_EVENT_CLOSED)
-	{
-		hub_disconnect_user(g_hub, user, quit_disconnected);
-		return;
-	}
-	else if (event == NET_EVENT_TIMEOUT)
+	if (event == NET_EVENT_TIMEOUT)
 	{
 		if (user_is_connecting(user))
 		{
 			hub_disconnect_user(g_hub, user, quit_timeout);
-			return;
 		}
+		return;
 	}
 
 	if (event & NET_EVENT_READ)
