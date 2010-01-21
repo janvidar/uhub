@@ -195,12 +195,7 @@ void net_con_close(struct net_connection* con)
 		g_backend->num--;
 	}
 
-	if (timeout_evt_is_scheduled(con->timeout))
-	{
-		timeout_queue_remove(&g_backend->timeout_queue, con->timeout);
-		hub_free(con->timeout);
-		con->timeout = 0;
-	}
+	net_con_clear_timeout(con);
 
 	net_con_print("DEL", (struct net_connection_select*) con);
 	net_cleanup_delayed_free(g_backend->cleaner, con);

@@ -226,12 +226,7 @@ void net_con_close(struct net_connection* con_)
 		g_backend->num--;
 	}
 
-	if (timeout_evt_is_scheduled(con->timeout))
-	{
-		timeout_queue_remove(&g_backend->timeout_queue, con->timeout);
-		hub_free(con->timeout);
-		con->timeout = 0;
-	}
+	net_con_clear_timeout(con_);
 
 	if (epoll_ctl(g_backend->epfd, EPOLL_CTL_DEL, con->sd, &con->ev) == -1)
 	{
