@@ -228,7 +228,7 @@ void net_on_accept(struct net_connection* con, int event, void *arg)
 		if (acl_is_ip_banned(hub->acl, addr))
 		{
 			LOG_INFO("Denied      [%s] (IP banned)", addr);
-			net_close(fd);
+			net_con_close(con);
 			continue;
 		}
 
@@ -236,7 +236,7 @@ void net_on_accept(struct net_connection* con, int event, void *arg)
 		if (!probe)
 		{
 			LOG_ERROR("Unable to create probe after socket accepted. Out of memory?");
-			net_close(fd);
+			net_con_close(con);
 			break;
 		}
 	}
