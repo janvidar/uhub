@@ -117,6 +117,9 @@ int net_backend_process()
 		return 0;
 	}
 
+	g_backend->now = time(0);
+	timeout_queue_process(&g_backend->timeout_queue, g_backend->now);
+
 	for (n = 0, found = 0; found < res && n < (maxfd+1); n++)
 	{
 		struct net_connection_select* con = g_backend->conns[n];
@@ -196,6 +199,9 @@ void net_con_close(struct net_connection* con)
 	}
 
 	net_con_clear_timeout(con);
+
+	net_close(con->sd);
+	con->sd = -1;
 
 	net_con_print("DEL", (struct net_connection_select*) con);
 	net_cleanup_delayed_free(g_backend->cleaner, con);

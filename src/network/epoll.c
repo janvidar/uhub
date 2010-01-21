@@ -114,6 +114,9 @@ int net_backend_process()
 		return 0;
 	}
 
+	g_backend->now = time(0);
+	timeout_queue_process(&g_backend->timeout_queue, g_backend->now);
+
 	for (n = 0; n < res; n++)
 	{
 		struct net_connection_epoll* con = (struct net_connection_epoll*) g_backend->events[n].data.ptr;
@@ -232,6 +235,10 @@ void net_con_close(struct net_connection* con_)
 	{
 		LOG_WARN("epoll_ctl() delete failed.");
 	}
+
+	net_close(con->sd);
+	con->sd = -1;
+
 	net_con_print("DEL", con);
 	net_cleanup_delayed_free(g_backend->cleaner, con_);
 }

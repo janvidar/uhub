@@ -63,7 +63,6 @@ size_t timeout_queue_process(struct timeout_queue* t, time_t now)
 		while ((evt = t->events[pos % t->max]))
 		{
 			timeout_queue_remove(t, evt);
-			timeout_evt_reset(evt);
 			evt->callback(evt);
 			events++;
 		}
@@ -125,8 +124,7 @@ void timeout_queue_remove(struct timeout_queue* t, struct timeout_evt* evt)
 		evt->prev->next = evt->next;
 		evt->next->prev = evt->prev;
 	}
-	evt->next = 0;
-	evt->prev = 0;
+	timeout_evt_reset(evt);
 }
 
 void timeout_queue_reschedule(struct timeout_queue* t, struct timeout_evt* evt, size_t seconds)
