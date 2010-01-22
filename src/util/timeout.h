@@ -53,4 +53,6 @@ void timeout_queue_insert(struct timeout_queue*, struct timeout_evt*, size_t sec
 void timeout_queue_remove(struct timeout_queue*, struct timeout_evt*);
 void timeout_queue_reschedule(struct timeout_queue*, struct timeout_evt*, size_t seconds);
 
+size_t timeout_queue_get_next_timeout(struct timeout_queue*, time_t now);
+
 #endif /* HAVE_UHUB_TIMEOUT_HANDLER_H */

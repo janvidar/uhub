@@ -84,6 +84,7 @@ int net_backend_initialize()
  */
 void net_backend_shutdown()
 {
+	timeout_queue_shutdown(&g_backend->timeout_queue);
 	net_cleanup_shutdown(g_backend->cleaner);
 	hub_free(g_backend->conns);
 	hub_free(g_backend);
@@ -95,9 +96,14 @@ void net_backend_shutdown()
 int net_backend_process()
 {
 	int n, found, maxfd;
-	struct timeval tval = { 1, 0 };
+	struct timeval tval;
 	FD_ZERO(&g_backend->rfds);
 	FD_ZERO(&g_backend->wfds);
+
+	size_t secs = timeout_queue_get_next_timeout(&g_backend->timeout_queue, g_backend->now);
+	tval.tv_secs = secs;
+	tval.tv_usecs = 0;
+
 	for (n = 0, found = 0; found < g_backend->num && n < g_backend->max; n++)
 	{
 		struct net_connection_select* con = g_backend->conns[n];

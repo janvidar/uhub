@@ -58,7 +58,7 @@ size_t timeout_queue_process(struct timeout_queue* t, time_t now)
 	size_t pos;
 	size_t events = 0;
 	struct timeout_evt* evt = 0;
-	for (pos = t->last; pos < now; pos++)
+	for (pos = t->last; pos <= now; pos++)
 	{
 		while ((evt = t->events[pos % t->max]))
 		{
@@ -70,6 +70,19 @@ size_t timeout_queue_process(struct timeout_queue* t, time_t now)
 	t->last = now;
 	return events;
 }
+
+size_t timeout_queue_get_next_timeout(struct timeout_queue* t, time_t now)
+{
+	size_t seconds = 0;
+	while (t->events[(now + seconds) % t->max] == NULL && seconds < t->max)
+	{
+		seconds++;
+	}
+	if (seconds == 0)
+		return 1;
+	return seconds;
+}
+
 
 void timeout_queue_insert(struct timeout_queue* t, struct timeout_evt* evt, size_t seconds)
 {

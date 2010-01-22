@@ -95,6 +95,7 @@ int net_backend_initialize()
 void net_backend_shutdown()
 {
 	close(g_backend->epfd);
+	timeout_queue_shutdown(&g_backend->timeout_queue);
 	net_cleanup_shutdown(g_backend->cleaner);
 	hub_free(g_backend->conns);
 	hub_free(g_backend);
@@ -106,8 +107,9 @@ void net_backend_shutdown()
 int net_backend_process()
 {
 	int n;
-	LOG_TRACE("epoll_wait: fd=%d, events=%x, max=%zu", g_backend->epfd, g_backend->events, MIN(g_backend->num, EPOLL_EVBUFFER));
-	int res = epoll_wait(g_backend->epfd, g_backend->events, MIN(g_backend->num, EPOLL_EVBUFFER), 1000);
+	size_t secs = timeout_queue_get_next_timeout(&g_backend->timeout_queue, g_backend->now);
+	LOG_TRACE("epoll_wait: fd=%d, events=%x, max=%zu, seconds=%d", g_backend->epfd, g_backend->events, MIN(g_backend->num, EPOLL_EVBUFFER), (int) secs);
+	int res = epoll_wait(g_backend->epfd, g_backend->events, MIN(g_backend->num, EPOLL_EVBUFFER), secs * 1000);
 	if (res == -1)
 	{
 		LOG_WARN("epoll_wait returned -1");
@@ -187,28 +189,6 @@ void net_con_update(struct net_connection* con_, int events)
 	con->ev.events = 0;
 	if (events & NET_EVENT_READ)  con->ev.events |= EPOLLIN;
 	if (events & NET_EVENT_WRITE) con->ev.events |= EPOLLOUT;
-
-#ifdef SSL_SUPPORT
-	if (events & NET_WANT_SSL_WRITE)
-		con->flags |= NET_WANT_SSL_WRITE;
-	else
-		con->flags &= ~NET_WANT_SSL_WRITE;
-
-	if (events & NET_WANT_SSL_READ)
-		con->flags |= NET_WANT_SSL_READ;
-	else
-		con->flags &= ~NET_WANT_SSL_READ;
-
-	if (events & NET_WANT_SSL_ACCEPT)
-		con->flags |= NET_WANT_SSL_ACCEPT;
-	else
-		con->flags &= ~NET_WANT_SSL_ACCEPT;
-
-	if (events & NET_WANT_SSL_CONNECT)
-		con->flags |= NET_WANT_SSL_CONNECT;
-	else
-		con->flags &= ~NET_WANT_SSL_CONNECT;
-#endif /* SSL_SUPPORT */
 
 	if (epoll_ctl(g_backend->epfd, EPOLL_CTL_MOD, con->sd, &con->ev) == -1)
 	{
