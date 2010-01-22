@@ -110,14 +110,15 @@ int net_backend_process()
 	size_t secs = timeout_queue_get_next_timeout(&g_backend->timeout_queue, g_backend->now);
 	LOG_TRACE("epoll_wait: fd=%d, events=%x, max=%zu, seconds=%d", g_backend->epfd, g_backend->events, MIN(g_backend->num, EPOLL_EVBUFFER), (int) secs);
 	int res = epoll_wait(g_backend->epfd, g_backend->events, MIN(g_backend->num, EPOLL_EVBUFFER), secs * 1000);
+
+	g_backend->now = time(0);
+	timeout_queue_process(&g_backend->timeout_queue, g_backend->now);
+
 	if (res == -1)
 	{
 		LOG_WARN("epoll_wait returned -1");
 		return 0;
 	}
-
-	g_backend->now = time(0);
-	timeout_queue_process(&g_backend->timeout_queue, g_backend->now);
 
 	for (n = 0; n < res; n++)
 	{

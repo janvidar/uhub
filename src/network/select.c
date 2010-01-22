@@ -117,14 +117,14 @@ int net_backend_process()
 	}
 
 	int res = select(maxfd+1, &g_backend->rfds, &g_backend->wfds, 0, &tval);
+	g_backend->now = time(0);
+	timeout_queue_process(&g_backend->timeout_queue, g_backend->now);
+
 	if (res == -1)
 	{
 		LOG_WARN("select returned -1");
 		return 0;
 	}
-
-	g_backend->now = time(0);
-	timeout_queue_process(&g_backend->timeout_queue, g_backend->now);
 
 	for (n = 0, found = 0; found < res && n < (maxfd+1); n++)
 	{
