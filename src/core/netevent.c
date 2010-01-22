@@ -27,7 +27,7 @@ extern struct hub_info* g_hub;
 #ifdef DEBUG_SENDQ
 void debug_sendq_send(struct hub_user* user, int sent, int total)
 {
-	LOG_DUMP("SEND: sd=%d, %d/%d bytes\n", user->net.connection.sd, sent, total);
+	LOG_DUMP("SEND: sd=%d, %d/%d bytes\n", user->connection->sd, sent, total);
 	if (sent == -1)
 	{
 		int err = net_error();
@@ -162,7 +162,7 @@ void net_event(struct net_connection* con, int event, void *arg)
 	int flag_close = 0;
 
 #ifdef DEBUG_SENDQ
-	LOG_TRACE("net_event() : fd=%d, ev=%d, arg=%p", fd, (int) event, arg);
+	LOG_TRACE("net_event() : fd=%d, ev=%d, arg=%p", con->sd, (int) event, arg);
 #endif
 
 	if (event == NET_EVENT_TIMEOUT)
