@@ -279,6 +279,10 @@ void net_con_callback(struct net_connection* con, int events)
 				con->callback(con, events, con->ptr);
 				break;
 
+			case tls_st_error:
+				con->callback(con, NET_EVENT_READ, con->ptr);
+				break;
+
 			case tls_st_accepting:
 				if (net_con_ssl_accept(con) < 0)
 				{
