@@ -234,10 +234,49 @@ void* net_con_get_ptr(struct net_connection* con)
 
 void net_con_callback(struct net_connection* con, int events)
 {
-	if (!(con->flags & NET_CLEANUP))
+	if ((con->flags & NET_CLEANUP))
+		return;
+
+	if (events == NET_EVENT_TIMEOUT)
 	{
-		LOG_TRACE("net_con_callback(%p, %s%s%s)", con, (events & NET_EVENT_READ ? "R" : ""), (events & NET_EVENT_WRITE ? "W" : ""), events == NET_EVENT_TIMEOUT ? "TIMEOUT" : "");
+		LOG_TRACE("net_con_callback(%p, TIMEOUT", con);
 		con->callback(con, events, con->ptr);
+		return;
 	}
+
+#ifdef SSL_SUPPORT
+	if (!con->ssl)
+	{
+#endif
+		con->callback(con, events, con->ptr);
+#ifdef SSL_SUPPORT
+	}
+	else
+	{
+#ifdef NETWORK_DUMP_DEBUG
+		LOG_PROTO("net_con_event: events=%d, con=%p", ev, con);
+#endif
+		if (events == NET_EVENT_READ && con->flags & NET_WANT_SSL_READ)
+		{
+			con->callback(con, NET_EVENT_WRITE, con->ptr);
+		}
+		else if (events == NET_EVENT_WRITE && con->flags & NET_WANT_SSL_WRITE)
+		{
+			con->callback(con, events & NET_EVENT_READ, con->ptr);
+		}
+		if (con->flags & NET_WANT_SSL_ACCEPT)
+		{
+			net_con_ssl_accept(con);
+		}
+		else if (con->flags & NET_WANT_SSL_CONNECT)
+		{
+			net_con_ssl_connect(con);
+		}
+		else
+		{
+			con->callback(con, events, con->ptr);
+		}
+	}
+#endif
 }
 
