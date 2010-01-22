@@ -9,7 +9,7 @@
 #endif
 
 #ifndef VERSION
-#define VERSION "0.3.0-rc4" REVISION
+#define VERSION "0.3.0" REVISION
 #endif
 
 #ifndef COPYRIGHT
