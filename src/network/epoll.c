@@ -186,10 +186,14 @@ void net_con_reinitialize(struct net_connection* con, net_connection_cb callback
 void net_con_update(struct net_connection* con_, int events)
 {
 	struct net_connection_epoll* con = (struct net_connection_epoll*) con_;
-	con->ev.events = 0;
-	if (events & NET_EVENT_READ)  con->ev.events |= EPOLLIN;
-	if (events & NET_EVENT_WRITE) con->ev.events |= EPOLLOUT;
+	int newev = 0;
+	if (events & NET_EVENT_READ)  newev |= EPOLLIN;
+	if (events & NET_EVENT_WRITE) newev |= EPOLLOUT;
 
+	if (newev == con->ev.events)
+		return;
+
+	con->ev.events = newev;
 	if (epoll_ctl(g_backend->epfd, EPOLL_CTL_MOD, con->sd, &con->ev) == -1)
 	{
 		LOG_TRACE("epoll_ctl() modify failed.");
