@@ -526,12 +526,15 @@ const char* net_address_to_string(int af, const void* src, char* dst, socklen_t 
 
 	return NULL;
 #else
-	const char* address = inet_ntop(af, src, dst, cnt);
-	if (af == AF_INET6 && strncmp(address, "::ffff:", 7) == 0) /* IPv6 mapped IPv4 address. */
+	if (inet_ntop(af, src, dst, cnt))
 	{
-		return &address[7];
+		if (af == AF_INET6 && strncmp(dst, "::ffff:", 7) == 0) /* IPv6 mapped IPv4 address. */
+		{
+			memmove(dst, dst + 7, cnt - 7);
+		}
+		return dst;
 	}
-	return address;
+	return NULL;
 #endif
 }
 
