@@ -376,7 +376,7 @@ int net_accept(int fd, struct ip_addr_encap* ipaddr)
 		if (ipaddr)
 		{
 			memset(ipaddr, 0, sizeof(struct ip_addr_encap));
-			ipaddr->af = addr4->sin_family;
+			ipaddr->af = addr.ss_family;;
 			if (ipaddr->af == AF_INET6)
 			{
 				char address[INET6_ADDRSTRLEN+1] = { 0, };
@@ -599,7 +599,7 @@ const char* net_get_peer_address(int fd)
 	
 	if (getpeername(fd, (struct sockaddr*) name, &namelen) != -1)
 	{
-		int af = name4->sin_family;
+		int af = storage.ss_family;
 		if (af == AF_INET6)
 		{
 			net_address_to_string(af, (void*) &name6->sin6_addr, address, INET6_ADDRSTRLEN);
@@ -637,7 +637,7 @@ const char* net_get_local_address(int fd)
 
 	if (getsockname(fd, (struct sockaddr*) name, &namelen) != -1)
 	{
-		int af = name4->sin_family;
+		int af = storage.ss_family;
 		if (af == AF_INET6)
 		{
 			net_address_to_string(af, (void*) &name6->sin6_addr, address, INET6_ADDRSTRLEN);
