@@ -28,6 +28,7 @@ test -x $DAEMON || exit 0
 . /lib/lsb/init-functions
 
 ulimit -n 65536
+mkdir -p /var/run/uhub/
 
 set -e
 
