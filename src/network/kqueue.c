@@ -115,18 +115,21 @@ void net_con_destroy(struct net_connection* con)
 
 void net_con_initialize(struct net_connection* con_, int sd, net_connection_cb callback, const void* ptr, int events)
 {
+	short filter = 0;
 	struct net_connection_kqueue* con = (struct net_connection_kqueue*) con_;
 	con->sd = sd;
 	con->flags = 0;
 	con->callback = callback;
 	con->ev.events = 0;
 	con->ptr = (void*) ptr;
-	con->ev.data.ptr = (void*) con;
 
 	net_set_nonblocking(con->sd, 1);
 	net_set_nosigpipe(con->sd, 1);
 
-	/* FIXME */
+	if  (events & NET_EVENT_READ)  filter |= EVFILT_READ;
+	if  (events & NET_EVENT_WRITE) filter |= EVFILT_READ;
+
+	EV_SET(&con->ev, sd, filter, EV_ADD, 0, 0, con);
 
 	g_backend->conns[sd] = con;
 	g_backend->num++;
@@ -141,8 +144,16 @@ void net_con_reinitialize(struct net_connection* con, net_connection_cb callback
 
 void net_con_update(struct net_connection* con_, int events)
 {
+	short filter = 0;
 	struct net_connection_kqueue* con = (struct net_connection_kqueue*) con_;
-	/* FIXME */
+
+	if  (events & NET_EVENT_READ)  filter |= EVFILT_READ;
+	if  (events & NET_EVENT_WRITE) filter |= EVFILT_READ;
+
+	if (filter == con->ev.filter)
+		return;
+
+	EV_SET(&con->ev, sd, filter, EV_ADD, 0, 0, con);
 }
 
 void net_con_close(struct net_connection* con_)
@@ -159,12 +170,11 @@ void net_con_close(struct net_connection* con_)
 
 	net_con_clear_timeout(con_);
 
-	/* FIXME */
+	EV_SET(&con->ev, sd, 0, EV_DELETE, 0, 0, 0);
 
 	net_close(con->sd);
 	con->sd = -1;
 
-	net_con_print("DEL", con);
 	net_cleanup_delayed_free(g_backend->cleaner, con_);
 }
 
