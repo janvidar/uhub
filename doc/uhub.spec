@@ -4,8 +4,6 @@ Version: 0.3.0
 Release: 1
 License: GPL
 Group: Applications/Internet
-Requires: libevent >= 1.3
-Requires: perl >= 5
 Source: uhub-%{version}.tar.gz
 URL: http://www.uhub.org
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
