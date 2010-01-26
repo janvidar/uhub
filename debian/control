@@ -1,0 +1,24 @@
+Source: uhub
+Section: net
+Priority: optional
+Maintainer: Jan Vidar Krey <janvidar@extatic.org>
+Build-Depends: debhelper (>= 7.0.0)
+Standards-Version: 3.8.3.0
+
+Package: uhub
+Architecture: any
+Depends: ${shlibs:Depends}
+Description: High performance ADC p2p hub
+ uhub is a high performance peer-to-peer hub for the ADC network.
+ Its low memory footprint allows it to handle several thousand users on
+ high-end servers, or a small private hub on embedded hardware.
+ .
+ Key features:
+  - High performance and low memory usage
+  - IPv4 and IPv6 support
+  - Experimental SSL support (optional)
+  - Advanced access control support
+  - Easy configuration
+ .
+Homepage: http://www.uhub.org/
+

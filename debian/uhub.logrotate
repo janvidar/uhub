@@ -1,0 +1,9 @@
+/var/log/uhub/*.log
+{
+        compress
+        size 10M
+        rotate 10
+        missingok
+        notifempty
+}
+

@@ -1,0 +1,6 @@
+etc/default
+etc/init.d
+etc/logrotate.d
+etc/uhub
+usr/bin
+var/log/uhub

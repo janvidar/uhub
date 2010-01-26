@@ -1,0 +1,45 @@
+#!/usr/bin/make -f
+
+# export DH_VERBOSE=1
+
+makeopts := DESTDIR=$(shell pwd)/debian/uhub/ \
+	UHUB_PREFIX=$(shell pwd)/debian/uhub/usr \
+	RELEASE=YES SILENT=YES
+
+build: build-stamp
+build-stamp:
+	dh_testdir
+	make $(makeopts)
+	touch build-stamp
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp
+	make clean
+	dh_clean
+
+binary-indep: build
+
+binary-arch: build
+	dh_testdir
+	dh_testroot
+	dh_clean -k
+	dh_installdirs
+	$(MAKE) install $(makeopts)
+	dh_installdocs
+	dh_installinit
+	dh_installlogrotate
+	dh_installman -A
+	dh_installchangelogs	ChangeLog
+	dh_strip
+	dh_compress
+	dh_installdeb
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary
+
