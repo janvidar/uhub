@@ -134,6 +134,7 @@ libuhub_SOURCES := \
 		src/network/backend.c \
 		src/network/connection.c \
 		src/network/epoll.c \
+		src/network/kqueue.c \
 		src/network/network.c \
 		src/network/select.c \
 		src/network/timeout.c \
