@@ -136,6 +136,7 @@ libuhub_SOURCES := \
 		src/network/epoll.c \
 		src/network/network.c \
 		src/network/select.c \
+		src/network/timeout.c \
 		src/network/timer.c \
 		src/util/ipcalc.c \
 		src/util/list.c \
@@ -143,7 +144,6 @@ libuhub_SOURCES := \
 		src/util/memory.c \
 		src/util/misc.c \
 		src/util/rbtree.c \
-		src/util/timeout.c \
 		src/util/tiger.c
 
 libadc_common_SOURCES := \

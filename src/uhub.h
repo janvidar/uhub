@@ -62,13 +62,13 @@ extern "C" {
 #include "util/log.h"
 #include "util/memory.h"
 #include "util/misc.h"
-#include "util/timeout.h"
 #include "util/tiger.h"
 
 #include "adc/sid.h"
 #include "adc/message.h"
 #include "network/network.h"
 #include "network/connection.h"
+#include "network/timeout.h"
 
 #include "core/auth.h"
 #include "core/config.h"

@@ -18,7 +18,6 @@
  */
 
 #include "uhub.h"
-#include "util/timeout.h"
 
 void timeout_evt_initialize(struct timeout_evt* t, timeout_evt_cb cb, void* ptr)
 {
