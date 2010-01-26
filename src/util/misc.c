@@ -225,7 +225,6 @@ int file_read_lines(const char* file, void* data, file_line_handler_t handler)
 		
 		if (*start)
 		{
-			buf[strlen(start)] = 0;
 			LOG_DUMP("Line: %s", start);
 			if (handler(start, line_count+1, data) < 0)
 				return -1;

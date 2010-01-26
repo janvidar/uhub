@@ -69,7 +69,7 @@ size_t net_get_max_sockets()
 	struct rlimit limits;
 	if (getrlimit(RLIMIT_NOFILE, &limits) == 0)
 	{
-		return limits.rlim_max;
+		return MIN(limits.rlim_max, 65536);
 	}
 	LOG_ERROR("getrlimit() failed");
 	return 1024;
