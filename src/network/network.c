@@ -376,16 +376,16 @@ int net_accept(int fd, struct ip_addr_encap* ipaddr)
 		if (ipaddr)
 		{
 			memset(ipaddr, 0, sizeof(struct ip_addr_encap));
-			ipaddr->af = addr4->sin_family;
+			ipaddr->af = addr.ss_family;;
 			if (ipaddr->af == AF_INET6)
 			{
 				char address[INET6_ADDRSTRLEN+1] = { 0, };
 				net_address_to_string(AF_INET6, (void*) &addr6->sin6_addr, address, INET6_ADDRSTRLEN+1);
-				if (!strncmp(address, "::ffff:", 7))
+				if (strchr(address, '.'))
 				{
 					/* Hack to convert IPv6 mapped IPv4 addresses to true IPv4 addresses */
-					net_string_to_address(AF_INET, address + 7, (void*) &ipaddr->internal_ip_data.in);
 					ipaddr->af = AF_INET;
+					net_string_to_address(AF_INET, address, (void*) &ipaddr->internal_ip_data.in);
 				}
 				else
 				{
@@ -526,7 +526,15 @@ const char* net_address_to_string(int af, const void* src, char* dst, socklen_t 
 
 	return NULL;
 #else
-	return inet_ntop(af, src, dst, cnt);
+	if (inet_ntop(af, src, dst, cnt))
+	{
+		if (af == AF_INET6 && strncmp(dst, "::ffff:", 7) == 0) /* IPv6 mapped IPv4 address. */
+		{
+			memmove(dst, dst + 7, cnt - 7);
+		}
+		return dst;
+	}
+	return NULL;
 #endif
 }
 
@@ -573,9 +581,6 @@ int net_string_to_address(int af, const char* src, void* dst)
 #endif
 }
 
-
-
-
 const char* net_get_peer_address(int fd)
 {
 	static char address[INET6_ADDRSTRLEN+1];
@@ -594,21 +599,16 @@ const char* net_get_peer_address(int fd)
 	
 	if (getpeername(fd, (struct sockaddr*) name, &namelen) != -1)
 	{
-		int af = name4->sin_family;
+		int af = storage.ss_family;
 		if (af == AF_INET6)
 		{
 			net_address_to_string(af, (void*) &name6->sin6_addr, address, INET6_ADDRSTRLEN);
-			if (strncmp(address, "::ffff:", 7) == 0) /* IPv6 mapped IPv4 address. */
-			{
-				return &address[7];
-			}
-			return address;
 		}
 		else
 		{
 			net_address_to_string(af, (void*) &name4->sin_addr, address, INET6_ADDRSTRLEN);
-			return address;
 		}
+		return address;
 	}
 	else
 	{
@@ -618,6 +618,45 @@ const char* net_get_peer_address(int fd)
 
 	return "0.0.0.0";
 }
+
+const char* net_get_local_address(int fd)
+{
+	static char address[INET6_ADDRSTRLEN+1];
+	struct sockaddr_storage storage;
+	struct sockaddr_in6* name6;
+	struct sockaddr_in*  name4;
+	struct sockaddr*     name;
+
+	memset(address, 0, INET6_ADDRSTRLEN);
+	socklen_t namelen = sizeof(struct sockaddr_storage);
+	memset(&storage, 0, namelen);
+
+	name6 = (struct sockaddr_in6*) &storage;
+	name4 = (struct sockaddr_in*)  &storage;
+	name  = (struct sockaddr*)     &storage;
+
+	if (getsockname(fd, (struct sockaddr*) name, &namelen) != -1)
+	{
+		int af = storage.ss_family;
+		if (af == AF_INET6)
+		{
+			net_address_to_string(af, (void*) &name6->sin6_addr, address, INET6_ADDRSTRLEN);
+		}
+		else
+		{
+			net_address_to_string(af, (void*) &name4->sin_addr, address, INET6_ADDRSTRLEN);
+		}
+		return address;
+	}
+	else
+	{
+		net_error_out(fd, "net_get_local_address");
+		net_stats_add_error();
+	}
+
+	return "0.0.0.0";
+}
+
 
 
 ssize_t net_recv(int fd, void* buf, size_t len, int flags)

@@ -26,8 +26,7 @@ static char probe_recvbuf[PROBE_RECV_SIZE];
 static void probe_net_event(struct net_connection* con, int events, void *arg)
 {
 	struct hub_probe* probe = (struct hub_probe*) net_con_get_ptr(con);
-
-	if (events == NET_EVENT_SOCKERROR || events == NET_EVENT_CLOSED || events == NET_EVENT_TIMEOUT)
+	if (events == NET_EVENT_TIMEOUT)
 	{
 		probe_destroy(probe);
 		return;

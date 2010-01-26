@@ -75,19 +75,13 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 {
 	struct ADC_client* client = (struct ADC_client*) net_con_get_ptr(con);
 
-	if (events == NET_EVENT_SOCKERROR || events == NET_EVENT_CLOSED)
-	{
-		printf("NET_EVENT_SOCKERROR || NET_EVENT_CLOSED\n");
-		client->callback(client, ADC_CLIENT_DISCONNECTED, 0);
-		return;
-	}
-
 	if (events == NET_EVENT_TIMEOUT)
 	{
 		if (client->state == ps_conn)
 		{
 			client->callback(client, ADC_CLIENT_DISCONNECTED, 0);
 		}
+		return;
 	}
 
 	if (events & NET_EVENT_READ)

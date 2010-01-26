@@ -1,3 +1,15 @@
+0.3.0:
+- More user commands: ban, broadcast, mute, rules, history, myip, whoip, log
+- Experimental SSL support
+- Large rewrite of the network stack in order to support SSL.
+- Added rule file for defining hub rules.
+- Many crash fixes and other important bug fixes.
+- Optimizations: O(1) timeout scheduler
+- New sid allocation code.
+- Added configurable server_listen_backlog (default 50).
+- Added init.d scripts for RedHat/CentOS
+
+
 0.2.8:
 - Fix bug #13: getsockname() failure, use sockaddr from accept() instead.
 - Fix bug #10: Improve logging, ensure logs are machine readable.

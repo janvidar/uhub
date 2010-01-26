@@ -19,8 +19,6 @@
 
 #include "uhub.h"
 
-#define USERMANAGER_TIMER
-
 /*
  * This callback function is used to clear user objects from the userlist.
  * Should only be used in uman_shutdown().
@@ -40,7 +38,6 @@ static void clear_user_list_callback(void* ptr)
 	}
 }
 
-
 void uman_update_stats(struct hub_info* hub)
 {
 	const int factor = TIMEOUT_STATS;
@@ -58,7 +55,6 @@ void uman_update_stats(struct hub_info* hub)
 	net_stats_reset();
 }
 
-
 void uman_print_stats(struct hub_info* hub)
 {
 	LOG_INFO("Statistics  users=" PRINTF_SIZE_T " (peak_users=" PRINTF_SIZE_T "), net_tx=%d KB/s, net_rx=%d KB/s (peak_tx=%d KB/s, peak_rx=%d KB/s)",
@@ -68,6 +64,13 @@ void uman_print_stats(struct hub_info* hub)
 		(int) hub->stats.net_rx / 1024,
 		(int) hub->stats.net_tx_peak / 1024,
 		(int) hub->stats.net_rx_peak / 1024);
+}
+
+static void timer_statistics(struct timeout_evt* t)
+{
+	struct hub_info* hub = (struct hub_info*) t->ptr;
+	uman_update_stats(hub);
+	timeout_queue_reschedule(net_backend_get_timeout_queue(), hub->users->timeout, TIMEOUT_STATS);
 }
 
 int uman_init(struct hub_info* hub)
@@ -90,6 +93,10 @@ int uman_init(struct hub_info* hub)
 		return -1;
 	}
 
+	users->timeout = hub_malloc_zero(sizeof(struct timeout_evt));
+	timeout_evt_initialize(users->timeout, timer_statistics, hub);
+	timeout_queue_insert(net_backend_get_timeout_queue(), users->timeout, TIMEOUT_STATS);
+
 	hub->users = users;
 	return 0;
 }
@@ -100,6 +107,9 @@ int uman_shutdown(struct hub_info* hub)
 	if (!hub || !hub->users)
 		return -1;
 
+	timeout_queue_remove(net_backend_get_timeout_queue(), hub->users->timeout);
+	hub_free(hub->users->timeout);
+
 	if (hub->users->list)
 	{
 		list_clear(hub->users->list, &clear_user_list_callback);
@@ -108,6 +118,8 @@ int uman_shutdown(struct hub_info* hub)
 	sid_pool_destroy(hub->users->sids);
 	hub_free(hub->users);
 	hub->users = 0;
+
+
 	return 0;
 }
 

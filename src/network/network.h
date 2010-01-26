@@ -224,6 +224,8 @@ extern int net_is_ipv6_supported();
  */
 extern const char* net_get_peer_address(int fd);
 
+extern const char* net_get_local_address(int fd);
+
 /**
  * See man(3) inet_ntop.
  */

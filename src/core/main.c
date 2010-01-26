@@ -33,13 +33,13 @@ static const char* arg_pid = 0;
 static int arg_log_syslog = 0;
 
 
-#if !defined(WIN32) && defined(USE_LIBEVENT)
-void hub_handle_signal(int fd, short events, void* arg)
+#if !defined(WIN32)
+extern struct hub_info* g_hub;
+void hub_handle_signal(int sig)
 {
-	struct hub_info* hub = (struct hub_info*) arg;
-	int signal = fd;
+	struct hub_info* hub = g_hub;
 
-	switch (signal)
+	switch (sig)
 	{
 		case SIGINT:
 			LOG_INFO("Interrupted. Shutting down...");
@@ -65,7 +65,6 @@ void hub_handle_signal(int fd, short events, void* arg)
 	}
 }
 
-static struct event signal_events[10];
 static int signals[] =
 {
 	SIGINT,  /* Interrupt the application */
@@ -77,11 +76,16 @@ static int signals[] =
 
 void setup_signal_handlers(struct hub_info* hub)
 {
+	sigset_t sig_set;
+	sigemptyset(&sig_set);
+	struct sigaction act;
+	act.sa_mask = sig_set;
+	act.sa_flags = SA_ONSTACK  | SA_RESTART;
+	act.sa_handler = hub_handle_signal;
 	int i = 0;
 	for (i = 0; signals[i]; i++)
 	{
-		signal_set(&signal_events[i], signals[i], hub_handle_signal, hub);
-		if (signal_add(&signal_events[i], NULL))
+		if (sigaction(signals[i], &act, 0) != 0)
 		{
 			LOG_ERROR("Error setting signal handler %d", signals[i]);
 		}
@@ -90,14 +94,8 @@ void setup_signal_handlers(struct hub_info* hub)
 
 void shutdown_signal_handlers(struct hub_info* hub)
 {
-	int i = 0;
-	for (i = 0; signals[i]; i++)
-	{
-		signal_del(&signal_events[i]);
-	}
 }
-
-#endif /* !WIN32 && USE_LIBEVENT*/
+#endif /* !WIN32 */
 
 
 int main_loop()
@@ -133,7 +131,7 @@ int main_loop()
 			hub = hub_start_service(&configuration);
 			if (!hub)
 				return -1;
-#if !defined(WIN32) && defined(USE_LIBEVENT)
+#if !defined(WIN32)
 			setup_signal_handlers(hub);
 #endif
 		}
@@ -148,7 +146,7 @@ int main_loop()
 
 	} while (hub->status == hub_status_restart);
 
-#if !defined(WIN32) && defined(USE_LIBEVENT)
+#if !defined(WIN32)
 	shutdown_signal_handlers(hub);
 #endif
 	

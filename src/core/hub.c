@@ -450,37 +450,28 @@ static void hub_event_dispatcher(void* callback_data, struct event_data* message
 	}
 }
 
-static int start_listening_socket(const char* bind_addr, uint16_t port, int backlog, char* address_out)
+static struct net_connection* start_listening_socket(const char* bind_addr, uint16_t port, int backlog, struct hub_info* hub)
 {
+	struct net_connection* server;
 	struct sockaddr_storage addr;
 	socklen_t sockaddr_size;
-	int af, sd, ret;
+	int sd, ret;
 
 	if (ip_convert_address(bind_addr, port, (struct sockaddr*) &addr, &sockaddr_size) == -1)
 	{
-		return -1;
+		return 0;
 	}
 
-	af = addr.ss_family;
-	if (af == AF_INET)
-	{
-		net_address_to_string(AF_INET, &((struct sockaddr_in*) &addr)->sin_addr, address_out, INET6_ADDRSTRLEN);
-	}
-	else if (af == AF_INET6)
-	{
-		net_address_to_string(AF_INET6, &((struct sockaddr_in6*) &addr)->sin6_addr, address_out, INET6_ADDRSTRLEN);
-	}
-
-	sd = net_socket_create(af, SOCK_STREAM, IPPROTO_TCP);
+	sd = net_socket_create(addr.ss_family, SOCK_STREAM, IPPROTO_TCP);
 	if (sd == -1)
 	{
-		return -1;
+		return 0;
 	}
 
 	if ((net_set_reuseaddress(sd, 1) == -1) || (net_set_nonblocking(sd, 1) == -1))
 	{
 		net_close(sd);
-		return -1;
+		return 0;
 	}
 
 	ret = net_bind(sd, (struct sockaddr*) &addr, sockaddr_size);
@@ -488,7 +479,7 @@ static int start_listening_socket(const char* bind_addr, uint16_t port, int back
 	{
 		LOG_ERROR("hub_start_service(): Unable to bind to TCP local address. errno=%d, str=%s", net_error(), net_error_string(net_error()));
 		net_close(sd);
-		return -1;
+		return 0;
 	}
 
 	ret = net_listen(sd, backlog);
@@ -496,16 +487,19 @@ static int start_listening_socket(const char* bind_addr, uint16_t port, int back
 	{
 		LOG_ERROR("hub_start_service(): Unable to listen to socket");
 		net_close(sd);
-		return -1;
+		return 0;
 	}
-	return sd;
+
+	server = net_con_create();
+	net_con_initialize(server, sd, net_on_accept, hub, NET_EVENT_READ);
+
+	return server;
 }
 
 struct hub_info* hub_start_service(struct hub_config* config)
 {
 	struct hub_info* hub = 0;
-	int server_tcp, ipv6_supported;
-	char address_buf[INET6_ADDRSTRLEN+1];
+	int ipv6_supported;
 
 	hub = hub_malloc_zero(sizeof(struct hub_info));
 	if (!hub)
@@ -521,14 +515,14 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	else
 		LOG_DEBUG("IPv6 not supported.");
 
-	server_tcp = start_listening_socket(config->server_bind_addr, config->server_port, config->server_listen_backlog, address_buf);
-	if (server_tcp == -1)
+	hub->server = start_listening_socket(config->server_bind_addr, config->server_port, config->server_listen_backlog, hub);
+	if (!hub->server)
 	{
 		hub_free(hub);
 		LOG_FATAL("Unable to start hub service");
 		return 0;
 	}
-	LOG_INFO("Starting " PRODUCT "/" VERSION ", listening on %s:%d...", address_buf, config->server_port);
+	LOG_INFO("Starting " PRODUCT "/" VERSION ", listening on %s:%d...", net_get_local_address(hub->server->sd), config->server_port);
 
 #ifdef SSL_SUPPORT
 	if (config->tls_enable)
@@ -558,22 +552,21 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	}
 #endif
 
-
 	hub->config = config;
 	hub->users = NULL;
 
 	if (uman_init(hub) == -1)
 	{
+		net_con_close(hub->server);
 		hub_free(hub);
-		net_close(server_tcp);
 		return 0;
 	}
 
 	if (event_queue_initialize(&hub->queue, hub_event_dispatcher, (void*) hub) == -1)
 	{
+		net_con_close(hub->server);
 		uman_shutdown(hub);
 		hub_free(hub);
-		net_close(server_tcp);
 		return 0;
 	}
 
@@ -581,11 +574,11 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	hub->sendbuf = hub_malloc(MAX_SEND_BUF);
 	if (!hub->recvbuf || !hub->sendbuf)
 	{
+		net_con_close(hub->server);
 		hub_free(hub->recvbuf);
 		hub_free(hub->sendbuf);
 		uman_shutdown(hub);
 		hub_free(hub);
-		net_close(server_tcp);
 		return 0;
 	}
 
@@ -593,21 +586,18 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	hub->logout_info  = (struct linked_list*) list_create();
 	if (!hub->chat_history)
 	{
+		net_con_close(hub->server);
 		list_destroy(hub->chat_history);
 		list_destroy(hub->logout_info);
 		hub_free(hub->recvbuf);
 		hub_free(hub->sendbuf);
 		uman_shutdown(hub);
 		hub_free(hub);
-		net_close(server_tcp);
 		return 0;
 	}
 
 	hub->status = hub_status_running;
 
-	hub->server = net_con_create();
-	net_con_initialize(hub->server, server_tcp, net_on_accept, hub, NET_EVENT_READ);
-	
 	g_hub = hub;
 	return hub;
 }

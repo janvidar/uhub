@@ -27,7 +27,7 @@ extern struct hub_info* g_hub;
 #ifdef DEBUG_SENDQ
 void debug_sendq_send(struct hub_user* user, int sent, int total)
 {
-	LOG_DUMP("SEND: sd=%d, %d/%d bytes\n", user->net.connection.sd, sent, total);
+	LOG_DUMP("SEND: sd=%d, %d/%d bytes\n", user->connection->sd, sent, total);
 	if (sent == -1)
 	{
 		int err = net_error();
@@ -162,26 +162,16 @@ void net_event(struct net_connection* con, int event, void *arg)
 	int flag_close = 0;
 
 #ifdef DEBUG_SENDQ
-	LOG_TRACE("net_event() : fd=%d, ev=%d, arg=%p", fd, (int) event, arg);
+	LOG_TRACE("net_event() : fd=%d, ev=%d, arg=%p", con->sd, (int) event, arg);
 #endif
 
-	if (event == NET_EVENT_SOCKERROR)
-	{
-		hub_disconnect_user(g_hub, user, quit_socket_error);
-		return;
-	}
-	else if (event == NET_EVENT_CLOSED)
-	{
-		hub_disconnect_user(g_hub, user, quit_disconnected);
-		return;
-	}
-	else if (event == NET_EVENT_TIMEOUT)
+	if (event == NET_EVENT_TIMEOUT)
 	{
 		if (user_is_connecting(user))
 		{
 			hub_disconnect_user(g_hub, user, quit_timeout);
-			return;
 		}
+		return;
 	}
 
 	if (event & NET_EVENT_READ)
@@ -238,7 +228,7 @@ void net_on_accept(struct net_connection* con, int event, void *arg)
 		if (acl_is_ip_banned(hub->acl, addr))
 		{
 			LOG_INFO("Denied      [%s] (IP banned)", addr);
-			net_close(fd);
+			net_con_close(con);
 			continue;
 		}
 
@@ -246,7 +236,7 @@ void net_on_accept(struct net_connection* con, int event, void *arg)
 		if (!probe)
 		{
 			LOG_ERROR("Unable to create probe after socket accepted. Out of memory?");
-			net_close(fd);
+			net_con_close(con);
 			break;
 		}
 	}

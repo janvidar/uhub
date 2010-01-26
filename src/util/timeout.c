@@ -36,7 +36,6 @@ void timeout_evt_reset(struct timeout_evt* t)
 
 int timeout_evt_is_scheduled(struct timeout_evt* t)
 {
-	if (!t) return 0;
 	return !!t->prev;
 }
 
@@ -59,12 +58,11 @@ size_t timeout_queue_process(struct timeout_queue* t, time_t now)
 	size_t pos;
 	size_t events = 0;
 	struct timeout_evt* evt = 0;
-	for (pos = t->last; pos < now; pos++)
+	for (pos = t->last; pos <= now; pos++)
 	{
 		while ((evt = t->events[pos % t->max]))
 		{
 			timeout_queue_remove(t, evt);
-			timeout_evt_reset(evt);
 			evt->callback(evt);
 			events++;
 		}
@@ -72,6 +70,19 @@ size_t timeout_queue_process(struct timeout_queue* t, time_t now)
 	t->last = now;
 	return events;
 }
+
+size_t timeout_queue_get_next_timeout(struct timeout_queue* t, time_t now)
+{
+	size_t seconds = 0;
+	while (t->events[(now + seconds) % t->max] == NULL && seconds < t->max)
+	{
+		seconds++;
+	}
+	if (seconds == 0)
+		return 1;
+	return seconds;
+}
+
 
 void timeout_queue_insert(struct timeout_queue* t, struct timeout_evt* evt, size_t seconds)
 {
@@ -82,16 +93,18 @@ void timeout_queue_insert(struct timeout_queue* t, struct timeout_evt* evt, size
 	
 	first = t->events[pos];
 	
-	if (!first)
+	if (first)
+	{
+		first->prev->next = evt;
+		evt->prev = first->prev;
+		first->prev = evt;
+	}
+	else
 	{
 		t->events[pos] = evt;
 		evt->prev = evt;
 	}
-	else
-	{
-		evt->prev = first->prev;
-		first->prev = evt;
-	}
+	evt->next = 0;
 }
 
 void timeout_queue_remove(struct timeout_queue* t, struct timeout_evt* evt)
@@ -99,23 +112,32 @@ void timeout_queue_remove(struct timeout_queue* t, struct timeout_evt* evt)
 	size_t pos = (evt->timestamp % t->max);
 	struct timeout_evt* first = t->events[pos];
 
-	if (!first || !evt)
+	if (!first || !evt->prev)
 		return;
 
 	if (first == evt)
 	{
-		if (first->next)
-			first->next->prev = first->prev;
-		t->events[pos] = first->next;
+		if (first->prev != first)
+		{
+			t->events[pos] = first->next;
+			t->events[pos]->prev = evt->prev;
+		}
+		else
+		{
+			t->events[pos] = 0;
+		}
+	}
+	else if (evt == first->prev)
+	{
+		first->prev = evt->prev;
+		evt->prev->next = 0;
 	}
 	else
 	{
 		evt->prev->next = evt->next;
-		if (evt->next)
-				evt->next->prev = evt->prev;
-		else
-				first->prev = evt->prev;
+		evt->next->prev = evt->prev;
 	}
+	timeout_evt_reset(evt);
 }
 
 void timeout_queue_reschedule(struct timeout_queue* t, struct timeout_evt* evt, size_t seconds)

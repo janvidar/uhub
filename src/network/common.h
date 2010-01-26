@@ -28,7 +28,6 @@
 
 #define NET_CLEANUP               0x8000
 
-
 #define NET_CON_STRUCT_BASIC \
 	int                  sd;        /** socket descriptor */ \
 	uint32_t             flags;     /** Connection flags */ \
@@ -38,6 +37,7 @@
 
 #define NET_CON_STRUCT_SSL \
 	SSL*                 ssl;       /** SSL handle */ \
+	uint32_t             ssl_state; /** SSL state */ \
 	size_t               write_len; /** Length of last SSL_write(), only used if flags is NET_WANT_SSL_READ. */ \
 
 #ifdef SSL_SUPPORT
