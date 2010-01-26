@@ -1,0 +1,73 @@
+Summary: Advanced Direct Connect (p2p) Server
+Name: uhub
+Version: 0.3.0 
+Release: 1
+License: GPL
+Group: Applications/Internet
+Source: uhub-%{version}.tar.gz
+URL: http://www.uhub.org
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
+
+
+%description
+A high performance ADC peer to peer message hub. 
+Main site: http://www.uhub.org
+Bugzilla: http://bugs.extatic.org
+Development hub : adc://adc.extatic.org:1511
+
+
+%prep
+%setup -q -n %{name}-%{version}
+
+%build
+echo RPM_BUILD_ROOT = $RPM_BUILD_ROOT
+make clean
+make
+
+%install
+mkdir -p $RPM_BUILD_ROOT/usr/bin
+mkdir -p $RPM_BUILD_ROOT/etc/uhub
+mkdir -p $RPM_BUILD_ROOT/etc/init.d
+mkdir -p $RPM_BUILD_ROOT/etc/logrotate.d
+mkdir -p $RPM_BUILD_ROOT/etc/sysconfig
+mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1
+
+install uhub $RPM_BUILD_ROOT/usr/bin/
+> doc/motd.txt
+install doc/uhub.conf doc/users.conf doc/rules.txt doc/motd.txt $RPM_BUILD_ROOT/etc/uhub
+install doc/init.d.RedHat/etc/init.d/uhub $RPM_BUILD_ROOT/etc/init.d
+install doc/init.d.RedHat/etc/sysconfig/uhub  $RPM_BUILD_ROOT/etc/sysconfig/
+install doc/init.d.RedHat/etc/logrotate.d/uhub $RPM_BUILD_ROOT/etc/logrotate.d/
+/bin/gzip -9c doc/uhub.1 > doc/uhub.1.gz &&
+install doc/uhub.1.gz $RPM_BUILD_ROOT/usr/share/man/man1
+
+
+%files
+%defattr(-,root,root)
+%doc AUTHORS BUGS COPYING ChangeLog README TODO doc/Doxyfile doc/architecture.txt doc/compile.txt doc/extensions.txt doc/getstarted.txt doc/uhub.dot
+%config(noreplace) /etc/uhub/uhub.conf
+#%{_sysconfdir}/uhub/uhub.conf
+%config(noreplace) %{_sysconfdir}/uhub/users.conf
+%config(noreplace) %{_sysconfdir}/uhub/motd.txt
+%config(noreplace) %{_sysconfdir}/uhub/rules.txt
+%{_sysconfdir}/init.d/uhub
+%config(noreplace) %{_sysconfdir}/logrotate.d/uhub
+%config(noreplace) %{_sysconfdir}/sysconfig/uhub
+/usr/share/man/man1/uhub.1.gz
+%{_bindir}/uhub
+
+
+%clean
+make clean
+rm -rf $RPM_BUILD_ROOT
+
+%post
+# need more informations about add services and users in system
+#chkconfig uhub on
+#adduser -M -d /tmp -G nobody -s /sbin/nologin uhub
+
+%changelog
+* Tue Jan 26 2010 E_zombie
+- first .spec release
+
+
