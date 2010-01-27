@@ -111,6 +111,7 @@
 #define DEF_SERVER_BIND_ADDR                "any"
 #define DEF_SERVER_PORT                     1511
 #define DEF_SERVER_BACKLOG                  50
+#define DEF_SERVER_ALT_PORTS                ""
 #define DEF_HUB_NAME                        "uhub"
 #define DEF_HUB_DESCRIPTION                 ""
 #define DEF_HUB_ENABLED                     1
@@ -184,6 +185,7 @@ void config_defaults(struct hub_config* config)
 	DEFAULT_STRING (file_rules,            DEF_FILE_RULES);
 	DEFAULT_INTEGER(server_port,           DEF_SERVER_PORT);
 	DEFAULT_INTEGER(server_listen_backlog, DEF_SERVER_BACKLOG);
+	DEFAULT_STRING (server_alt_ports,      DEF_SERVER_ALT_PORTS);
 	DEFAULT_INTEGER(max_users,             DEF_MAX_USERS);
 	DEFAULT_INTEGER(max_chat_history,      DEF_MAX_CHAT_HISTORY);
 	DEFAULT_INTEGER(max_logout_log,        DEF_MAX_LOGOUT_LOG);
@@ -255,6 +257,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 	GET_STR (server_bind_addr);
 	GET_INT (server_port);
 	GET_INT (server_listen_backlog);
+	GET_STR (server_alt_ports);
 	GET_STR (hub_name);
 	GET_STR (hub_description);
 	GET_BOOL(hub_enabled);
@@ -328,6 +331,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 void free_config(struct hub_config* config)
 {
 	hub_free(config->server_bind_addr);
+	hub_free(config->server_alt_ports);
 	hub_free(config->file_motd);
 	hub_free(config->file_acl);
 	hub_free(config->file_rules);
@@ -406,6 +410,7 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 	DUMP_STR (server_bind_addr, DEF_SERVER_BIND_ADDR);
 	DUMP_INT (server_port, DEF_SERVER_PORT);
 	DUMP_INT (server_listen_backlog, DEF_SERVER_BACKLOG);
+	DUMP_STR (server_alt_ports, DEF_SERVER_ALT_PORTS);
 	DUMP_STR (hub_name, DEF_HUB_NAME);
 	DUMP_STR (hub_description, DEF_HUB_DESCRIPTION);
 	DUMP_BOOL(hub_enabled, DEF_HUB_ENABLED);

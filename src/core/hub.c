@@ -496,6 +496,62 @@ static struct net_connection* start_listening_socket(const char* bind_addr, uint
 	return server;
 }
 
+struct server_alt_port_data
+{
+	struct hub_info* hub;
+	struct hub_config* config;
+};
+
+static int server_alt_port_start_one(char* line, int count, void* ptr)
+{
+	struct server_alt_port_data* data = (struct server_alt_port_data*) ptr;
+
+	int port = uhub_atoi(line);
+	struct net_connection* con = start_listening_socket(data->config->server_bind_addr, port, data->config->server_listen_backlog, data->hub);
+	if (con)
+	{
+		list_append(data->hub->server_alt_ports, con);
+		LOG_INFO("Listening on alternate port %d...", port);
+		return 0;
+	}
+	return -1;
+}
+
+static void server_alt_port_start(struct hub_info* hub, struct hub_config* config)
+{
+	if (!config->server_alt_ports || !*config->server_alt_ports)
+		return;
+
+	hub->server_alt_ports = (struct linked_list*) list_create();
+
+	struct server_alt_port_data data;
+	data.hub = hub;
+	data.config = config;
+
+	string_split(config->server_alt_ports, ",", &data, server_alt_port_start_one);
+}
+
+static void server_alt_port_clear(void* ptr)
+{
+	struct net_connection* con = (struct net_connection*) ptr;
+	if (con)
+	{
+		net_con_close(con);
+		hub_free(con);
+	}
+}
+
+static void server_alt_port_stop(struct hub_info* hub)
+{
+	if (hub->server_alt_ports)
+	{
+		list_clear(hub->server_alt_ports, &server_alt_port_clear);
+		list_destroy(hub->server_alt_ports);
+	}
+}
+
+
+
 struct hub_info* hub_start_service(struct hub_config* config)
 {
 	struct hub_info* hub = 0;
@@ -596,6 +652,8 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		return 0;
 	}
 
+	server_alt_port_start(hub, config);
+
 	hub->status = hub_status_running;
 
 	g_hub = hub;
@@ -610,6 +668,7 @@ void hub_shutdown_service(struct hub_info* hub)
 	event_queue_shutdown(hub->queue);
 	net_con_close(hub->server);
 	hub_free(hub->server);
+	server_alt_port_stop(hub);
 	uman_shutdown(hub);
 	hub->status = hub_status_stopped;
 	hub_free(hub->sendbuf);

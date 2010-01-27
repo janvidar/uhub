@@ -91,6 +91,7 @@ struct hub_logout_info
 struct hub_info
 {
 	struct net_connection* server;
+	struct linked_list* server_alt_ports;
 	struct hub_stats stats;
 	struct event_queue* queue;
 	struct hub_config* config;
