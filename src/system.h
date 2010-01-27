@@ -118,7 +118,9 @@
 
 #ifndef HAVE_BACKEND
 #define USE_SELECT
+#ifndef WINSOCK
 #include <sys/select.h>
+#endif
 #endif
 
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__sun__)
