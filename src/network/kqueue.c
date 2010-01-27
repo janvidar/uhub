@@ -38,7 +38,7 @@ struct net_backend
 	int kqfd;
 	size_t num;
 	size_t max;
-	struct net_connection_epoll** conns;
+	struct net_connection_kqueue** conns;
 	struct kevent** changes;
 	size_t nchanges;
 	struct kevent events[KQUEUE_EVBUFFER];
@@ -93,7 +93,33 @@ void net_backend_shutdown()
  */
 int net_backend_process()
 {
+	int n;
+	struct timespec tspec = { 0, };
+	size_t secs = timeout_queue_get_next_timeout(&g_backend->timeout_queue, g_backend->now);
+	tspec.tv_sec = secs;
+	int res = kevent(g_backend->kqfd, *g_backend->changes, g_backend->nchanges, g_backend->events, KQUEUE_EVBUFFER, &tspec);
+	g_backend->nchanges = 0;
 
+        g_backend->now = time(0);
+        timeout_queue_process(&g_backend->timeout_queue, g_backend->now);
+
+	if (res == -1)
+	{
+		LOG_WARN("kevent returned -1");
+		return 0;
+	}
+
+	for (n = 0; n < res; n++)
+	{
+		struct net_connection_kqueue* con = (struct net_connection_kqueue*) g_backend->events[n].udata;
+                int ev = 0;
+                if (g_backend->events[n].filter & EVFILT_READ)  ev |= NET_EVENT_READ;
+                if (g_backend->events[n].filter & EVFILT_WRITE) ev |= NET_EVENT_WRITE;
+                net_con_callback((struct net_connection*) con, ev);
+	}
+
+	net_cleanup_process(g_backend->cleaner);
+	return 1;
 }
 
 struct timeout_queue* net_backend_get_timeout_queue()
@@ -130,6 +156,8 @@ void net_con_initialize(struct net_connection* con_, int sd, net_connection_cb c
 
 	EV_SET(&con->ev, sd, filter, EV_ADD, 0, 0, con);
 
+	g_backend->changes[g_backend->nchanges++] = &con->ev;
+
 	g_backend->conns[sd] = con;
 	g_backend->num++;
 }
@@ -153,6 +181,7 @@ void net_con_update(struct net_connection* con_, int events)
 		return;
 
 	EV_SET(&con->ev, con->sd, filter, EV_ADD, 0, 0, con);
+	g_backend->changes[g_backend->nchanges++] = &con->ev;
 }
 
 void net_con_close(struct net_connection* con_)
@@ -169,7 +198,8 @@ void net_con_close(struct net_connection* con_)
 
 	net_con_clear_timeout(con_);
 
-	EV_SET(&con->ev, con->sd, 0, EV_DELETE, 0, 0, 0);
+	/* No need to remove it from the kqueue filter, the kqueue man page says
+	   it is automatically removed when the descriptor is closed. */
 
 	net_close(con->sd);
 	con->sd = -1;
