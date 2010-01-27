@@ -1,4 +1,4 @@
-Summary: Advanced Direct Connect (p2p) Server
+Summary: High performance ADC p2p hub.
 Name: uhub
 Version: 0.3.0 
 Release: 1
@@ -10,10 +10,16 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
 
 %description
-A high performance ADC peer to peer message hub. 
-Main site: http://www.uhub.org
-Bugzilla: http://bugs.extatic.org
-Development hub : adc://adc.extatic.org:1511
+uhub is a high performance peer-to-peer hub for the ADC network.
+Its low memory footprint allows it to handle several thousand users on
+high-end servers, or a small private hub on embedded hardware.
+
+Key features:
+- High performance and low memory usage
+- IPv4 and IPv6 support
+- Experimental SSL support (optional)
+- Advanced access control support
+- Easy configuration
 
 
 %prep
