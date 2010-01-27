@@ -120,7 +120,6 @@ void net_con_initialize(struct net_connection* con_, int sd, net_connection_cb c
 	con->sd = sd;
 	con->flags = 0;
 	con->callback = callback;
-	con->ev.events = 0;
 	con->ptr = (void*) ptr;
 
 	net_set_nonblocking(con->sd, 1);
@@ -153,12 +152,12 @@ void net_con_update(struct net_connection* con_, int events)
 	if (filter == con->ev.filter)
 		return;
 
-	EV_SET(&con->ev, sd, filter, EV_ADD, 0, 0, con);
+	EV_SET(&con->ev, con->sd, filter, EV_ADD, 0, 0, con);
 }
 
 void net_con_close(struct net_connection* con_)
 {
-	struct net_connection_epoll* con = (struct net_connection_kqueue*) con_;
+	struct net_connection_kqueue* con = (struct net_connection_kqueue*) con_;
 	if (con->flags & NET_CLEANUP)
 		return;
 
@@ -170,7 +169,7 @@ void net_con_close(struct net_connection* con_)
 
 	net_con_clear_timeout(con_);
 
-	EV_SET(&con->ev, sd, 0, EV_DELETE, 0, 0, 0);
+	EV_SET(&con->ev, con->sd, 0, EV_DELETE, 0, 0, 0);
 
 	net_close(con->sd);
 	con->sd = -1;
