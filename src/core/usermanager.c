@@ -93,9 +93,12 @@ int uman_init(struct hub_info* hub)
 		return -1;
 	}
 
-	users->timeout = hub_malloc_zero(sizeof(struct timeout_evt));
-	timeout_evt_initialize(users->timeout, timer_statistics, hub);
-	timeout_queue_insert(net_backend_get_timeout_queue(), users->timeout, TIMEOUT_STATS);
+	if (net_backend_get_timeout_queue())
+	{
+		users->timeout = hub_malloc_zero(sizeof(struct timeout_evt));
+		timeout_evt_initialize(users->timeout, timer_statistics, hub);
+		timeout_queue_insert(net_backend_get_timeout_queue(), users->timeout, TIMEOUT_STATS);
+	}
 
 	hub->users = users;
 	return 0;
@@ -107,8 +110,11 @@ int uman_shutdown(struct hub_info* hub)
 	if (!hub || !hub->users)
 		return -1;
 
-	timeout_queue_remove(net_backend_get_timeout_queue(), hub->users->timeout);
-	hub_free(hub->users->timeout);
+	if (net_backend_get_timeout_queue())
+	{
+		timeout_queue_remove(net_backend_get_timeout_queue(), hub->users->timeout);
+		hub_free(hub->users->timeout);
+	}
 
 	if (hub->users->list)
 	{

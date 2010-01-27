@@ -88,6 +88,7 @@ void net_backend_shutdown()
 	net_cleanup_shutdown(g_backend->cleaner);
 	hub_free(g_backend->conns);
 	hub_free(g_backend);
+	g_backend = 0;
 }
 
 /**
@@ -149,6 +150,9 @@ int net_backend_process()
 
 struct timeout_queue* net_backend_get_timeout_queue()
 {
+	if (!g_backend)
+		return 0;
+
 	return &g_backend->timeout_queue;
 }
 

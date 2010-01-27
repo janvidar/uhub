@@ -50,6 +50,7 @@ static void inf_create_user()
 static void inf_destroy_user()
 {
 	if (!inf_user) return;
+	hub_free(inf_user->connection);
 	hub_free(inf_user);
 	inf_user = 0;
 }
