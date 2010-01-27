@@ -171,14 +171,64 @@ void base32_decode(const char* src, unsigned char* dst, size_t len) {
 	}
 }
 
+int string_split(const char* string, const char* split, void* data, string_split_handler_t handler)
+{
+	char* buf = strdup(string);
+	char* start;
+	char* pos;
+	int count = 0;
+
+	start = buf;
+	while ((pos = strstr(start, split)))
+	{
+		pos[0] = '\0';
+		start = strip_white_space(start);
+		if (*start)
+		{
+			if (handler(start, count, data) < 0)
+			{
+				hub_free(buf);
+				return -1;
+			}
+		}
+		start = &pos[1];
+		count++;
+	}
+
+	start = strip_white_space(start);
+	if (*start)
+	{
+		if (handler(start, count, data) < 0)
+		{
+			hub_free(buf);
+			return -1;
+		}
+	}
+	hub_free(buf);
+	return count+1;
+}
+
+struct file_read_line_data
+{
+	file_line_handler_t handler;
+	void* data;
+};
+
+static int file_read_line_handler(char* line, int count, void* ptr)
+{
+	struct file_read_line_data* data = (struct file_read_line_data*) ptr;
+
+	LOG_DUMP("Line: %s", line);
+	if (data->handler(line, count+1, data->data) < 0)
+		return -1;
+	return 0;
+}
 
 int file_read_lines(const char* file, void* data, file_line_handler_t handler)
 {
 	int fd;
 	ssize_t ret;
 	char buf[MAX_RECV_BUF];
-	char *pos, *start;
-	size_t line_count = 0;
 
 	memset(buf, 0, MAX_RECV_BUF);
 
@@ -192,45 +242,25 @@ int file_read_lines(const char* file, void* data, file_line_handler_t handler)
 	}
 	
 	ret = read(fd, buf, MAX_RECV_BUF);
+	close(fd);
+
 	if (ret < 0)
 	{
 		LOG_ERROR("Unable to read from file %s: %s", file, strerror(errno));
-		close(fd);
 		return -1;
 	}
 	else  if (ret == 0)
 	{
-		close(fd);
 		LOG_WARN("File is empty.");
 		return 0;
 	}
-	else
-	{
-		close(fd);
-		
-		/* Parse configuaration */
-		start = buf;
-		while ((pos = strchr(start, '\n')))
-		{
-			pos[0] = '\0';
-			if (*start)
-			{
-				LOG_DUMP("Line: %s", start);
-				if (handler(start, line_count+1, data) < 0)
-					return -1;
-			}
-			start = &pos[1];
-			line_count++;
-		}
-		
-		if (*start)
-		{
-			LOG_DUMP("Line: %s", start);
-			if (handler(start, line_count+1, data) < 0)
-				return -1;
-		}
-	}
-	return line_count+1;
+
+	/* Parse configuaration */
+	struct file_read_line_data split_data;
+	split_data.handler = handler;
+	split_data.data = data;
+
+	return string_split(buf, "\n", &split_data, file_read_line_handler);
 }
 
 

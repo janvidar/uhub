@@ -36,6 +36,7 @@ extern char* strip_white_space(char* string);
 
 extern int file_read_lines(const char* file, void* data, file_line_handler_t handler);
 
+
 extern const char* uhub_itoa(int val);
 extern const char* uhub_ulltoa(uint64_t val);
 
@@ -61,6 +62,8 @@ void* memmem(const void *haystack, size_t haystacklen, const void *needle, size_
 struct linked_list;
 extern int split_string(const char* string, const char* split, struct linked_list* list, int allow_empty);
 
+typedef int (*string_split_handler_t)(char* string, int count, void* data);
+extern int string_split(const char* string, const char* split, void* data, string_split_handler_t handler);
 
 #endif /* HAVE_UHUB_MISC_H */
 
