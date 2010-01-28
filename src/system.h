@@ -140,8 +140,12 @@
 #define INET6_ADDRSTRLEN 46
 #endif
 
+#ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
 
+#ifndef MAX
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
 
 #endif /* HAVE_UHUB_SYSTEM_H */
