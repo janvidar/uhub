@@ -183,6 +183,7 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 	char* message = adc_msg_get_argument(cmd, 0);
 	int ret = 0;
 	int relay = 1;
+	int offset;
 
 	if (!message || !user_is_logged_in(u))
 		return 0;
@@ -196,7 +197,7 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 		if (message[1] == message[0])
 		{
 			relay = 1;
-			int offset = adc_msg_get_arg_offset(cmd);
+			offset = adc_msg_get_arg_offset(cmd);
 			memmove(cmd->cache+offset+1, cmd->cache+offset+2, cmd->length - offset);
 			cmd->length--;
 		}
@@ -519,12 +520,13 @@ static int server_alt_port_start_one(char* line, int count, void* ptr)
 
 static void server_alt_port_start(struct hub_info* hub, struct hub_config* config)
 {
+	struct server_alt_port_data data;
+
 	if (!config->server_alt_ports || !*config->server_alt_ports)
 		return;
 
 	hub->server_alt_ports = (struct linked_list*) list_create();
 
-	struct server_alt_port_data data;
 	data.hub = hub;
 	data.config = config;
 
@@ -823,11 +825,12 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 {
 	struct hub_config* cfg = hub->config;
 	struct adc_message* cmd = adc_msg_construct(ADC_CMD_ISTA, 6);
-	if (!cmd) return;
 	char code[4];
 	const char* text = 0;
 	const char* flag = 0;
 	char* escaped_text = 0;
+
+	if (!cmd) return;
 	
 #define STATUS(CODE, MSG, FLAG) case status_ ## MSG : set_status_code(level, CODE, code); text = cfg->MSG; flag = FLAG; break
 	switch (msg)

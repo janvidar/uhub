@@ -224,8 +224,9 @@ size_t uman_get_user_by_addr(struct hub_info* hub, struct linked_list* users, st
 int uman_send_user_list(struct hub_info* hub, struct hub_user* target)
 {
 	int ret = 1;
+	struct hub_user* user;
 	user_flag_set(target, flag_user_list);
-	struct hub_user* user = (struct hub_user*) list_get_first(hub->users->list); /* iterate users - only on INF or PAS msg */
+	user = (struct hub_user*) list_get_first(hub->users->list); /* iterate users - only on INF or PAS msg */
 	while (user)
 	{
 		if (user_is_logged_in(user))

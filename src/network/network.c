@@ -588,9 +588,10 @@ const char* net_get_peer_address(int fd)
 	struct sockaddr_in6* name6;
 	struct sockaddr_in*  name4;
 	struct sockaddr*     name;
+	socklen_t namelen;
 	
 	memset(address, 0, INET6_ADDRSTRLEN);
-	socklen_t namelen = sizeof(struct sockaddr_storage);
+	namelen = sizeof(struct sockaddr_storage);
 	memset(&storage, 0, namelen);
 	
 	name6 = (struct sockaddr_in6*) &storage;
@@ -626,9 +627,10 @@ const char* net_get_local_address(int fd)
 	struct sockaddr_in6* name6;
 	struct sockaddr_in*  name4;
 	struct sockaddr*     name;
+	socklen_t namelen;
 
 	memset(address, 0, INET6_ADDRSTRLEN);
-	socklen_t namelen = sizeof(struct sockaddr_storage);
+	namelen = sizeof(struct sockaddr_storage);
 	memset(&storage, 0, namelen);
 
 	name6 = (struct sockaddr_in6*) &storage;

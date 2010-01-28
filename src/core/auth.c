@@ -326,7 +326,7 @@ struct hub_user_access_info* acl_get_access_info(struct acl_handle* handle, cons
 }
 
 #define STR_LIST_CONTAINS(LIST, STR) \
-		char* str = (char*) list_get_first(LIST); \
+		str = (char*) list_get_first(LIST); \
 		while (str) \
 		{ \
 			if (strcasecmp(str, STR) == 0) \
@@ -337,18 +337,21 @@ struct hub_user_access_info* acl_get_access_info(struct acl_handle* handle, cons
 
 int acl_is_cid_banned(struct acl_handle* handle, const char* data)
 {
+	char* str;
 	if (!handle) return 0;
 	STR_LIST_CONTAINS(handle->cids, data);
 }
 
 int acl_is_user_banned(struct acl_handle* handle, const char* data)
 {
+	char* str;
 	if (!handle) return 0;
 	STR_LIST_CONTAINS(handle->users_banned, data);
 }
 
 int acl_is_user_denied(struct acl_handle* handle, const char* data)
 {
+	char* str;
 	if (!handle) return 0;
 	STR_LIST_CONTAINS(handle->users_denied, data);
 }

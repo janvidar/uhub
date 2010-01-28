@@ -229,6 +229,7 @@ int file_read_lines(const char* file, void* data, file_line_handler_t handler)
 	int fd;
 	ssize_t ret;
 	char buf[MAX_RECV_BUF];
+	struct file_read_line_data split_data;
 
 	memset(buf, 0, MAX_RECV_BUF);
 
@@ -256,7 +257,6 @@ int file_read_lines(const char* file, void* data, file_line_handler_t handler)
 	}
 
 	/* Parse configuaration */
-	struct file_read_line_data split_data;
 	split_data.handler = handler;
 	split_data.data = data;
 

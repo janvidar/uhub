@@ -715,6 +715,7 @@ int hub_handle_info_login(struct hub_info* hub, struct hub_user* user, struct ad
  */
 int hub_handle_info(struct hub_info* hub, struct hub_user* user, const struct adc_message* cmd_unmodified)
 {
+	int ret;
 	struct adc_message* cmd = adc_msg_copy(cmd_unmodified);
 	if (!cmd) return -1; /* OOM */
 
@@ -737,7 +738,7 @@ int hub_handle_info(struct hub_info* hub, struct hub_user* user, const struct ad
 			return 0;
 		}
 	
-		int ret = hub_handle_info_login(hub, user, cmd);
+		ret = hub_handle_info_login(hub, user, cmd);
 		if (ret < 0)
 		{
 			on_login_failure(hub, user, ret);

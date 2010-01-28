@@ -77,12 +77,14 @@ static int signals[] =
 void setup_signal_handlers(struct hub_info* hub)
 {
 	sigset_t sig_set;
-	sigemptyset(&sig_set);
 	struct sigaction act;
+	int i;
+
+	sigemptyset(&sig_set);
 	act.sa_mask = sig_set;
-	act.sa_flags = SA_ONSTACK  | SA_RESTART;
+	act.sa_flags = SA_ONSTACK | SA_RESTART;
 	act.sa_handler = hub_handle_signal;
-	int i = 0;
+	
 	for (i = 0; signals[i]; i++)
 	{
 		if (sigaction(signals[i], &act, 0) != 0)

@@ -63,20 +63,23 @@ static void command_destroy(struct hub_command* cmd)
 
 static struct hub_command* command_create(const char* message)
 {
+	char* prefix;
+	int n;
 	struct hub_command* cmd = hub_malloc_zero(sizeof(struct hub_command));
+
 	if (!cmd) return 0;
 
 	cmd->message = message;
 	cmd->args = list_create();
 
-	int n = split_string(message, "\\s", cmd->args, 0);
+	n = split_string(message, "\\s", cmd->args, 0);
 	if (n <= 0)
 	{
 		command_destroy(cmd);
 		return 0;
 	}
 
-	char* prefix = list_get_first(cmd->args);
+	prefix = list_get_first(cmd->args);
 	if (prefix && prefix[0] && prefix[1])
 	{
 		cmd->prefix = hub_strdup(&prefix[1]);
@@ -129,8 +132,8 @@ static int command_status_user_not_found(struct hub_info* hub, struct hub_user* 
 const char* command_get_syntax(struct commands_handler* handler)
 {
 	static char args[128];
-	args[0] = 0;
 	size_t n = 0;
+	args[0] = 0;
 	if (handler->args)
 	{
 		for (n = 0; n < strlen(handler->args); n++)
@@ -235,10 +238,11 @@ static int command_uptime(struct hub_info* hub, struct hub_user* user, struct hu
 static int command_kick(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
 {
 	char* nick = list_get_first(cmd->args);
+	struct hub_user* target;
 	if (!nick)
 		return -1; // FIXME: bad syntax.
 
-	struct hub_user* target = uman_get_user_by_nick(hub, nick);
+	target = uman_get_user_by_nick(hub, nick);
 	
 	if (!target)
 		return command_status_user_not_found(hub, user, cmd, nick);
@@ -253,10 +257,11 @@ static int command_kick(struct hub_info* hub, struct hub_user* user, struct hub_
 static int command_ban(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
 {
 	char* nick = list_get_first(cmd->args);
+	struct hub_user* target;
 	if (!nick)
 		return -1; // FIXME: bad syntax.
 
-	struct hub_user* target = uman_get_user_by_nick(hub, nick);
+	target = uman_get_user_by_nick(hub, nick);
 
 	if (!target)
 		return command_status_user_not_found(hub, user, cmd, nick);
@@ -279,10 +284,11 @@ static int command_unban(struct hub_info* hub, struct hub_user* user, struct hub
 static int command_mute(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
 {
 	char* nick = list_get_first(cmd->args);
+	struct hub_user* target;
 	if (!nick)
 		return -1; // FIXME: bad syntax.
 
-	struct hub_user* target = uman_get_user_by_nick(hub, nick);
+	target = uman_get_user_by_nick(hub, nick);
 
 	if (!target)
 		return command_status_user_not_found(hub, user, cmd, nick);
@@ -325,12 +331,13 @@ static int command_myip(struct hub_info* hub, struct hub_user* user, struct hub_
 static int command_getip(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
 {
 	char tmp[128];
-
 	char* nick = list_get_first(cmd->args);
+	struct hub_user* target;
+
 	if (!nick);
 		return -1; // FIXME: bad syntax/OOM
 
-	struct hub_user* target = uman_get_user_by_nick(hub, nick);
+	target = uman_get_user_by_nick(hub, nick);
 
 	if (!target)
 		return command_status_user_not_found(hub, user, cmd, nick);
@@ -346,6 +353,8 @@ static int command_whoip(struct hub_info* hub, struct hub_user* user, struct hub
 	struct linked_list* users;
 	struct hub_user* u;
 	int ret = 0;
+	char tmp[128];
+	char* buffer;
 
 	if (!address)
 		return -1; // FIXME: bad syntax.
@@ -366,10 +375,9 @@ static int command_whoip(struct hub_info* hub, struct hub_user* user, struct hub
 		return command_status(hub, user, cmd, "No users found.");
 	}
 
-	char tmp[128];
 	snprintf(tmp, 128, "*** %s: Found %d match%s:", cmd->prefix, ret, ((ret != 1) ? "es" : ""));
 
-	char* buffer = hub_malloc(((MAX_NICK_LEN + INET6_ADDRSTRLEN + 5) * ret) + strlen(tmp) + 3);
+	buffer = hub_malloc(((MAX_NICK_LEN + INET6_ADDRSTRLEN + 5) * ret) + strlen(tmp) + 3);
 	if (!buffer)
 	{
 		list_destroy(users);
@@ -413,13 +421,13 @@ static int command_history(struct hub_info* hub, struct hub_user* user, struct h
 	char* message = 0;
 	int ret = (int) list_size(messages);
 	size_t bufsize;
+	char tmp[128];
 
 	if (!ret)
 	{
 		return command_status(hub, user, cmd, "No messages.");
 	}
 
-	char tmp[128];
 	snprintf(tmp, 128, "*** %s: Found %d message%s:", cmd->prefix, ret, ((ret != 1) ? "s" : ""));
 	bufsize = strlen(tmp);
 	message = (char*) list_get_first(messages);

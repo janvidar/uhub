@@ -143,10 +143,11 @@ void hub_sendq_remove(struct hub_sendq* q, struct adc_message* msg)
 
 int hub_sendq_send(struct hub_sendq* q, struct hub_user* user)
 {
+	int ret;
 	struct adc_message* msg = list_get_first(q->queue);
 	if (!msg) return 0;
 
-	int ret = net_con_send(user->connection, msg->cache + q->offset, msg->length - q->offset);
+	ret = net_con_send(user->connection, msg->cache + q->offset, msg->length - q->offset);
 
 	if (ret > 0)
 	{

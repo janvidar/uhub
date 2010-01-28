@@ -451,11 +451,12 @@ int ip_convert_address_to_range(const char* address, struct ip_range* range)
 {
 	int ret = 0;
 	char* addr = 0;
+	const char* split;
 
 	if (!address || !range)
 		return 0;
 
-	const char* split = strrchr(address, '/');
+	split = strrchr(address, '/');
 	if (split)
 	{
 		int mask = uhub_atoi(split+1);
