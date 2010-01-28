@@ -66,11 +66,15 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+
+#ifndef __sun__
 #include <getopt.h>
+#include <stdint.h>
+#endif
+
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
