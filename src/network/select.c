@@ -96,12 +96,14 @@ void net_backend_shutdown()
  */
 int net_backend_process()
 {
-	int n, found, maxfd;
+	int n, found, maxfd, res;
 	struct timeval tval;
+	size_t secs;
+
 	FD_ZERO(&g_backend->rfds);
 	FD_ZERO(&g_backend->wfds);
 
-	size_t secs = timeout_queue_get_next_timeout(&g_backend->timeout_queue, g_backend->now);
+	secs = timeout_queue_get_next_timeout(&g_backend->timeout_queue, g_backend->now);
 	tval.tv_sec = secs;
 	tval.tv_usec = 0;
 
@@ -117,7 +119,7 @@ int net_backend_process()
 		}
 	}
 
-	int res = select(maxfd+1, &g_backend->rfds, &g_backend->wfds, 0, &tval);
+	res = select(maxfd+1, &g_backend->rfds, &g_backend->wfds, 0, &tval);
 	g_backend->now = time(0);
 	timeout_queue_process(&g_backend->timeout_queue, g_backend->now);
 
