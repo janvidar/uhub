@@ -17,15 +17,22 @@ STACK_PROTECT ?= NO
 
 ifeq ($(OS), Windows_NT)
 WINDOWS       ?= YES
+OPSYS ?= Windows
+else
+OPSYS ?= $(shell uname)
 endif
 
-ifeq (SOLARIS,YES)
+ifeq ($(OPSYS),SunOS)
 LDLIBS        += -lsocket -lnsl
+endif
+
+ifeq ($(OPSYS),Haiku)
+LDLIBS        += -lnetwork
 endif
 
 CFLAGS        += -I./src/
 
-ifeq ($(WINDOWS),YES)
+ifeq ($(OPSYS),Windows)
 USE_BIGENDIAN := NO
 LDLIBS        += -lws2_32
 UHUB_CONF_DIR ?= c:/uhub/

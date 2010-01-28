@@ -351,6 +351,9 @@ int net_accept(int fd, struct ip_addr_encap* ipaddr)
 	{
 		switch (net_error())
 		{
+#if defined(__HAIKU__)
+			case ETIMEDOUT:
+#endif
 #if defined(__linux__)
 			case ENETDOWN:
 			case EPROTO:

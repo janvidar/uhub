@@ -81,7 +81,9 @@
 #include <pwd.h>
 #include <sys/resource.h>
 #define HAVE_STRNDUP
+#ifndef __HAIKU__
 #define HAVE_MEMMEM
+#endif
 #define HAVE_GETRLIMIT
 #endif
 
