@@ -9,7 +9,5 @@
 #  -u <user>   Run as given user
 #  -g <group>  Run with given group permissions
 #  -p <file>   Store pid in file (process id)
-                                 
-                                                                                                                                             
 UHUBOPTIONS=" -u uhub -f -p /var/run/uhub.pid -l /var/log/uhub.log"
 

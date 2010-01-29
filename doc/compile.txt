@@ -8,7 +8,7 @@ Prerequisites
 Before you try to compile µHub, please make sure the following prerequisites are met.
   * GNU make
   * gcc > 3.0 (or MinGW on Windows)
-  * libevent >= 1.3
+  * libevent >= 1.3 ( not require on Linux)
   * Perl 5
 
 Linux and Mac OSX

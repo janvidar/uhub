@@ -2,7 +2,7 @@
 # see man logrotate
 #
 #
-/var/log/uhub.log {                                                                                  
+/var/log/uhub.log {
         compress
         size 10M
         rotate 10
