@@ -22,8 +22,7 @@ LICENSE="GPL-3"
 SLOT="0"
 IUSE="+ssl"
 
-DEPEND=">=dev-libs/libevent-1.3
-=dev-lang/perl-5*
+DEPEND="=dev-lang/perl-5*
 ssl? ( >=dev-libs/openssl-0.9.8 )
 "
 RDEPEND="${DEPEND}"
