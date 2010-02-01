@@ -38,7 +38,7 @@ RETVAL=0
 
 
 start() {
-        KIND="UHUB"
+        KIND="Uhub"
 	echo -n $"Starting $KIND services: "
 	daemon uhub $UHUBOPTIONS
 	RETVAL=$?
@@ -47,7 +47,7 @@ start() {
 }	
 
 stop() {
-        KIND="UHUB"
+        KIND="Uhub"
 	echo -n $"Shutting down $KIND services: "
 	killproc uhub
 	RETVAL=$?

@@ -1,9 +1,9 @@
 Summary: High performance ADC p2p hub.
 Name: uhub
 Version: 0.3.0 
-Release: 1
-License: GPL
-Group: Applications/Internet
+Release: 3
+License: GPLv3
+Group: Networking/File transfer
 Source: uhub-%{version}.tar.gz
 URL: http://www.uhub.org
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
@@ -27,7 +27,6 @@ Key features:
 
 %build
 echo RPM_BUILD_ROOT = $RPM_BUILD_ROOT
-make clean
 make
 
 %install
@@ -40,12 +39,12 @@ mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1
 
 install uhub $RPM_BUILD_ROOT/usr/bin/
 > doc/motd.txt
-install doc/uhub.conf doc/users.conf doc/rules.txt doc/motd.txt $RPM_BUILD_ROOT/etc/uhub
+install -m644 doc/uhub.conf doc/users.conf doc/rules.txt doc/motd.txt $RPM_BUILD_ROOT/etc/uhub
 install doc/init.d.RedHat/etc/init.d/uhub $RPM_BUILD_ROOT/etc/init.d
-install doc/init.d.RedHat/etc/sysconfig/uhub  $RPM_BUILD_ROOT/etc/sysconfig/
-install doc/init.d.RedHat/etc/logrotate.d/uhub $RPM_BUILD_ROOT/etc/logrotate.d/
+install -m644 doc/init.d.RedHat/etc/sysconfig/uhub  $RPM_BUILD_ROOT/etc/sysconfig/
+install -m644 doc/init.d.RedHat/etc/logrotate.d/uhub $RPM_BUILD_ROOT/etc/logrotate.d/
 /bin/gzip -9c doc/uhub.1 > doc/uhub.1.gz &&
-install doc/uhub.1.gz $RPM_BUILD_ROOT/usr/share/man/man1
+install -m644 doc/uhub.1.gz $RPM_BUILD_ROOT/usr/share/man/man1
 
 
 %files
@@ -64,15 +63,22 @@ install doc/uhub.1.gz $RPM_BUILD_ROOT/usr/share/man/man1
 
 
 %clean
-make clean
 rm -rf $RPM_BUILD_ROOT
 
 %post
+/sbin/chkconfig --add uhub
+if [ $1 -gt 1 ] ; then
+    /etc/rc.d/init.d/uhub restart >/dev/null || :
+fi
 # need more informations about add services and users in system
-#chkconfig uhub on
-#adduser -M -d /tmp -G nobody -s /sbin/nologin uhub
+/usr/sbin/adduser -M -d /tmp -G nobody -s /sbin/nologin -c 'The Uhub ADC p2p hub Daemon' uhub >/dev/null 2>&1 ||:
 
 %changelog
+* Tue Jan 31 2010 E_zombie
+- change GROUP
+- chmod for files
+- add postinstall scripts
+- fix "License"
 * Tue Jan 26 2010 E_zombie
 - first .spec release
 
