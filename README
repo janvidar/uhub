@@ -3,3 +3,15 @@ Welcome and thanks for downloading uHub, a high performance ADC p2p hub.
 For the official documentation, bugs and other information, please visit:
 http://www.uhub.org/
 
+Compatible ADC clients
+
+Windows:
+- StrongDC
+- ApexDC 1.1.x and newest
+- Jucy
+- RSX++
+
+Unix\Linux:
+- Linuxdcpp 1.1.x+   and newest
+- FreeDC++
+- EiskaltDC++
