@@ -43,4 +43,13 @@ if one wishes to run uhub as a specific user using the -u and -g switches.
 Example:
   % uhub -f -l mylog.txt -u nobody -g nogroup
 
+
+If you are planning to more than 1000 users on hub, you must increase the number of max descriptor limits.
+The descriptor limits must be great than the value of max_users uhub.conf.
+
+In linux you must add the following line in /etc/security/limits.conf (for max_users = 4000 ):
+      *     soft nofile 4096
+      *     hard nofile 4096
+
+                     
 Your mileage may vary -- Good luck!
