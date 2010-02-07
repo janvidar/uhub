@@ -33,6 +33,13 @@ static void log_user_login_error(struct hub_user* u, enum status_message msg)
 	LOG_USER("LoginError  %s/%s %s \"%s\" (%s) \"%s\"", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, message, u->user_agent);
 }
 
+static void log_user_update_error(struct hub_user* u, enum status_message msg)
+{
+	const char* addr = user_get_address(u);
+	const char* message = hub_get_status_message_log(u->hub, msg);
+	LOG_USER("UpdateError %s/%s %s \"%s\" (%s) \"%s\"", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, message, u->user_agent);
+}
+
 static void log_user_logout(struct hub_user* u, const char* message)
 {
 	const char* addr = user_get_address(u);
@@ -81,6 +88,13 @@ void on_login_failure(struct hub_info* hub, struct hub_user* u, enum status_mess
 	log_user_login_error(u, msg);
 	hub_send_status(hub, u, msg, status_level_fatal);
 	hub_disconnect_user(hub, u, quit_logon_error);
+}
+
+void on_update_failure(struct hub_info* hub, struct hub_user* u, enum status_message msg)
+{
+	log_user_update_error(u, msg);
+	hub_send_status(hub, u, msg, status_level_fatal);
+	hub_disconnect_user(hub, u, quit_update_error);
 }
 
 void on_nick_change(struct hub_info* hub, struct hub_user* u, const char* nick)

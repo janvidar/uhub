@@ -187,7 +187,7 @@ static int check_required_login_flags(struct hub_info* hub, struct hub_user* use
  * remove any wrong address, and replace it with the correct one
  * as seen by the hub.
  */
-int check_network(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
+static int check_network(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	const char* address = user_get_address(user);
 	
@@ -223,7 +223,7 @@ int check_network(struct hub_info* hub, struct hub_user* user, struct adc_messag
 	return 0;
 }
 
-void strip_network(struct hub_user* user, struct adc_message* cmd)
+static void strip_network(struct hub_user* user, struct adc_message* cmd)
 {
 	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
 	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_UDP_PORT);
@@ -526,7 +526,6 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 	return 0;
 }
 
-
 /*
  * Set the expected credentials, and returns 1 if authentication is needed,
  * or 0 if not.
@@ -648,7 +647,7 @@ static int hub_handle_info_low_bandwidth(struct hub_info* hub, struct hub_user* 
 			return ret; \
 	} while(0)
 
-int hub_perform_login_checks(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
+static int hub_perform_login_checks(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	/* Make syntax checks.  */
 	INF_CHECK(check_required_login_flags, hub, user, cmd);
@@ -666,7 +665,7 @@ int hub_perform_login_checks(struct hub_info* hub, struct hub_user* user, struct
  *
  * @return 0 if success, <0 if error, >0 if authentication needed.
  */
-int hub_handle_info_login(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
+static int hub_handle_info_login(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	int code = 0;
 
@@ -737,7 +736,7 @@ int hub_handle_info(struct hub_info* hub, struct hub_user* user, const struct ad
 			adc_msg_free(cmd);
 			return 0;
 		}
-	
+
 		ret = hub_handle_info_login(hub, user, cmd);
 		if (ret < 0)
 		{
@@ -763,7 +762,7 @@ int hub_handle_info(struct hub_info* hub, struct hub_user* user, const struct ad
 		/* These must not be allowed updated, let's remove them! */
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_PRIVATE_ID);
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_CLIENT_ID);
-		
+
 		/*
 		 * If the nick is not accepted, do not relay it.
 		 * Otherwise, the nickname will be updated.
@@ -775,9 +774,15 @@ int hub_handle_info(struct hub_info* hub, struct hub_user* user, const struct ad
 #endif
 				adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_NICK);
 		}
-		
-		/* FIXME - What if limits are not met ? */
-		check_limits(hub, user, cmd);
+
+		ret = check_limits(hub, user, cmd);
+		if (ret < 0)
+		{
+			on_update_failure(hub, user, ret);
+			adc_msg_free(cmd);
+			return -1;
+		}
+
 		strip_network(user, cmd);
 		hub_handle_info_low_bandwidth(hub, user, cmd);
 		

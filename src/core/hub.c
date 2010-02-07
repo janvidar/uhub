@@ -825,63 +825,79 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 {
 	struct hub_config* cfg = hub->config;
 	struct adc_message* cmd = adc_msg_construct(ADC_CMD_ISTA, 6);
+	struct adc_message* qui = adc_msg_construct(ADC_CMD_IQUI, 256);
 	char code[4];
+	char buf[250];
 	const char* text = 0;
 	const char* flag = 0;
 	char* escaped_text = 0;
+	int reconnect_time = 0;
 
 	if (!cmd) return;
-	
-#define STATUS(CODE, MSG, FLAG) case status_ ## MSG : set_status_code(level, CODE, code); text = cfg->MSG; flag = FLAG; break
+
+#define STATUS(CODE, MSG, FLAG, RCONTIME) case status_ ## MSG : set_status_code(level, CODE, code); text = cfg->MSG; flag = FLAG; reconnect_time = RCONTIME; break
 	switch (msg)
 	{
-		STATUS(11, msg_hub_full, 0);
-		STATUS(12, msg_hub_disabled, 0);
-		STATUS(26, msg_hub_registered_users_only, 0);
-		STATUS(43, msg_inf_error_nick_missing, 0);
-		STATUS(43, msg_inf_error_nick_multiple, 0);
-		STATUS(21, msg_inf_error_nick_invalid, 0);
-		STATUS(21, msg_inf_error_nick_long, 0);
-		STATUS(21, msg_inf_error_nick_short, 0);
-		STATUS(21, msg_inf_error_nick_spaces, 0);
-		STATUS(21, msg_inf_error_nick_bad_chars, 0);
-		STATUS(21, msg_inf_error_nick_not_utf8, 0);
-		STATUS(22, msg_inf_error_nick_taken, 0);
-		STATUS(21, msg_inf_error_nick_restricted, 0);
-		STATUS(43, msg_inf_error_cid_invalid, "FBID");
-		STATUS(43, msg_inf_error_cid_missing, "FMID");
-		STATUS(24, msg_inf_error_cid_taken, 0);
-		STATUS(43, msg_inf_error_pid_missing, "FMPD");
-		STATUS(27, msg_inf_error_pid_invalid, "FBPD");
-		STATUS(31, msg_ban_permanently, 0);
-		STATUS(32, msg_ban_temporarily, "TL600"); /* FIXME: Use a proper timeout */
-		STATUS(23, msg_auth_invalid_password, 0);
-		STATUS(20, msg_auth_user_not_found, 0);
-		STATUS(30, msg_error_no_memory, 0);
-		STATUS(43, msg_user_share_size_low,   "FB" ADC_INF_FLAG_SHARED_SIZE);
-		STATUS(43, msg_user_share_size_high,  "FB" ADC_INF_FLAG_SHARED_SIZE);
-		STATUS(43, msg_user_slots_low,        "FB" ADC_INF_FLAG_UPLOAD_SLOTS);
-		STATUS(43, msg_user_slots_high,       "FB" ADC_INF_FLAG_UPLOAD_SLOTS);
-		STATUS(43, msg_user_hub_limit_low, 0);
-		STATUS(43, msg_user_hub_limit_high, 0);
+		STATUS(11, msg_hub_full, 0, 600); /* FIXME: Proper timeout? */
+		STATUS(12, msg_hub_disabled, 0, -1);
+		STATUS(26, msg_hub_registered_users_only, 0, 0);
+		STATUS(43, msg_inf_error_nick_missing, 0, 0);
+		STATUS(43, msg_inf_error_nick_multiple, 0, 0);
+		STATUS(21, msg_inf_error_nick_invalid, 0, 0);
+		STATUS(21, msg_inf_error_nick_long, 0, 0);
+		STATUS(21, msg_inf_error_nick_short, 0, 0);
+		STATUS(21, msg_inf_error_nick_spaces, 0, 0);
+		STATUS(21, msg_inf_error_nick_bad_chars, 0, 0);
+		STATUS(21, msg_inf_error_nick_not_utf8, 0, 0);
+		STATUS(22, msg_inf_error_nick_taken, 0, 0);
+		STATUS(21, msg_inf_error_nick_restricted, 0, 0);
+		STATUS(43, msg_inf_error_cid_invalid, "FBID", 0);
+		STATUS(43, msg_inf_error_cid_missing, "FMID", 0);
+		STATUS(24, msg_inf_error_cid_taken, 0, 0);
+		STATUS(43, msg_inf_error_pid_missing, "FMPD", 0);
+		STATUS(27, msg_inf_error_pid_invalid, "FBPD", 0);
+		STATUS(31, msg_ban_permanently, 0, 0);
+		STATUS(32, msg_ban_temporarily, "TL600", 600); /* FIXME: Proper timeout? */
+		STATUS(23, msg_auth_invalid_password, 0, 0);
+		STATUS(20, msg_auth_user_not_found, 0, 0);
+		STATUS(30, msg_error_no_memory, 0, 0);
+		STATUS(43, msg_user_share_size_low,   "FB" ADC_INF_FLAG_SHARED_SIZE, 0);
+		STATUS(43, msg_user_share_size_high,  "FB" ADC_INF_FLAG_SHARED_SIZE, 0);
+		STATUS(43, msg_user_slots_low,        "FB" ADC_INF_FLAG_UPLOAD_SLOTS, 0);
+		STATUS(43, msg_user_slots_high,       "FB" ADC_INF_FLAG_UPLOAD_SLOTS, 0);
+		STATUS(43, msg_user_hub_limit_low, 0, 0);
+		STATUS(43, msg_user_hub_limit_high, 0, 0);
 	}
 #undef STATUS
 	
 	escaped_text = adc_msg_escape(text);
-	
+
 	adc_msg_add_argument(cmd, code);
 	adc_msg_add_argument(cmd, escaped_text);
-	
-	hub_free(escaped_text);
-	
+
 	if (flag)
 	{
 		adc_msg_add_argument(cmd, flag);
 	}
-	
+
 	route_to_user(hub, user, cmd);
+
+	if (level >= status_level_fatal)
+	{
+		snprintf(buf, 230, "MS%s", escaped_text);
+		adc_msg_add_argument(cmd, buf);
+
+		if (reconnect_time != 0)
+		{
+			snprintf(buf, 10, "TL%d", reconnect_time);
+			adc_msg_add_argument(cmd, buf);
+		}
+		route_to_user(hub, user, cmd);
+	}
+
+	hub_free(escaped_text);
 	adc_msg_free(cmd);
-	
+	adc_msg_free(qui);
 }
 
 const char* hub_get_status_message(struct hub_info* hub, enum status_message msg)

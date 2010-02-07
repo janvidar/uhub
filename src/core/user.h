@@ -68,8 +68,9 @@ enum user_quit_reason
 	quit_socket_error   = 7,     /** A socket error occured */
 	quit_protocol_error = 8,     /** Fatal protocol error */
 	quit_logon_error    = 9,     /** Unable to login (wrong password, CID/PID, etc) */
-	quit_hub_disabled   = 10,    /** Hub is disabled. No new connections allowed */
-	quit_ghost_timeout  = 11,    /** The user is a ghost, and trying to login from another connection */
+	quit_update_error   = 10,    /** Update error. INF update changed share/slot info and no longer satisfies the hub limits. */
+	quit_hub_disabled   = 11,    /** Hub is disabled. No new connections allowed */
+	quit_ghost_timeout  = 12,    /** The user is a ghost, and trying to login from another connection */
 };
 
 /** Returns an apropriate string for the given quit reason */

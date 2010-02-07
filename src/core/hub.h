@@ -45,7 +45,7 @@ enum status_message
 	status_msg_auth_invalid_password     = -21, /* Password is wrong */
 	status_msg_auth_user_not_found       = -22, /* User not found in password database */
 	status_msg_error_no_memory           = -23, /* Hub is out of memory */
-	
+
 	status_msg_user_share_size_low       = -40, /* User is not sharing enough. */
 	status_msg_user_share_size_high      = -41, /* User is sharing too much. */
 	status_msg_user_slots_low            = -42, /* User has too few slots open. */

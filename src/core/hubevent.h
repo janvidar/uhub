@@ -29,6 +29,7 @@ extern void on_login_success(struct hub_info* hub, struct hub_user* u);
  * This event is triggered whenever a user failed to log in to the hub.
  */
 extern void on_login_failure(struct hub_info* hub, struct hub_user* u, enum status_message msg);
+extern void on_update_failure(struct hub_info* hub, struct hub_user* u, enum status_message msg);
 
 /**
  * This event is triggered whenever a previously logged in user leaves the hub.

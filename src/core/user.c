@@ -336,6 +336,7 @@ const char* user_get_quit_reason_string(enum user_quit_reason reason)
 		case quit_socket_error:     return "socket error";   break;
 		case quit_protocol_error:   return "protocol error"; break;
 		case quit_logon_error:      return "login error";    break;
+		case quit_update_error:     return "update error";   break;
 		case quit_hub_disabled:     return "hub disabled";   break;
 		case quit_ghost_timeout:    return "ghost";          break;
 	}
