@@ -665,7 +665,7 @@ static int hub_perform_login_checks(struct hub_info* hub, struct hub_user* user,
  *
  * @return 0 if success, <0 if error, >0 if authentication needed.
  */
-static int hub_handle_info_login(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
+int hub_handle_info_login(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	int code = 0;
 
