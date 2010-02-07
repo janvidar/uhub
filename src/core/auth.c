@@ -119,7 +119,7 @@ static void add_ip_range(struct linked_list* list, struct ip_range* info)
 {
 	char buf1[INET6_ADDRSTRLEN+1];
 	char buf2[INET6_ADDRSTRLEN+1];
-	
+
 	if (info->lo.af == AF_INET)
 	{
 		net_address_to_string(AF_INET, &info->lo.internal_ip_data.in.s_addr, buf1, INET6_ADDRSTRLEN);
@@ -130,8 +130,8 @@ static void add_ip_range(struct linked_list* list, struct ip_range* info)
 		net_address_to_string(AF_INET6, &info->lo.internal_ip_data.in6, buf1, INET6_ADDRSTRLEN);
 		net_address_to_string(AF_INET6, &info->hi.internal_ip_data.in6, buf2, INET6_ADDRSTRLEN);
 	}
-	LOG_DEBUG("ACL: Deny access for: %s-%s", buf1, buf2);
-	
+	LOG_DEBUG("ACL: Added ip range: %s-%s", buf1, buf2);
+
 	list_append(list, info);
 }
 
