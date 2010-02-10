@@ -125,6 +125,7 @@
 #define DEF_MAX_SEND_BUFFER                 131072
 #define DEF_MAX_SEND_BUFFER_SOFT            98304
 #define DEF_SHOW_BANNER                     1
+#define DEF_SHOW_BANNER_SYS_INFO            1
 #define DEF_REGISTERED_USERS_ONLY           0
 #define DEF_CHAT_ONLY                       0
 #define DEF_CHAT_IS_PRIVILEGED              0
@@ -193,6 +194,7 @@ void config_defaults(struct hub_config* config)
 	DEFAULT_INTEGER(max_send_buffer,       DEF_MAX_SEND_BUFFER);
 	DEFAULT_INTEGER(max_send_buffer_soft,  DEF_MAX_SEND_BUFFER_SOFT);
 	DEFAULT_BOOLEAN(show_banner,           DEF_SHOW_BANNER);
+	DEFAULT_BOOLEAN(show_banner_sys_info,  DEF_SHOW_BANNER_SYS_INFO);
 	DEFAULT_BOOLEAN(chat_only,             DEF_CHAT_ONLY);
 	DEFAULT_BOOLEAN(chat_is_privileged,    DEF_CHAT_IS_PRIVILEGED);
 	DEFAULT_BOOLEAN(low_bandwidth_mode,    DEF_LOW_BANDWIDTH_MODE);
@@ -268,6 +270,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 	GET_INT (max_send_buffer);
 	GET_INT (max_send_buffer_soft);
 	GET_BOOL(show_banner);
+	GET_BOOL(show_banner_sys_info);
 	GET_BOOL(chat_only);
 	GET_BOOL(chat_is_privileged);
 	GET_BOOL(low_bandwidth_mode);
@@ -421,6 +424,7 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 	DUMP_INT (max_send_buffer, DEF_MAX_SEND_BUFFER);
 	DUMP_INT (max_send_buffer_soft, DEF_MAX_SEND_BUFFER_SOFT);
 	DUMP_BOOL(show_banner, DEF_SHOW_BANNER);
+	DUMP_BOOL(show_banner_sys_info, DEF_SHOW_BANNER_SYS_INFO);
 	DUMP_BOOL(chat_only, DEF_CHAT_ONLY);
 	DUMP_BOOL(chat_is_privileged, DEF_CHAT_IS_PRIVILEGED);
 	DUMP_BOOL(low_bandwidth_mode, DEF_LOW_BANDWIDTH_MODE);

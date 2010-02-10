@@ -684,17 +684,15 @@ void hub_shutdown_service(struct hub_info* hub)
 	g_hub = 0;
 }
 
-#define SERVER "" PRODUCT "/" VERSION ""
-
 void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 {
 	int fd, ret;
 	char buf[MAX_RECV_BUF];
 	char* tmp;
-	char* server = adc_msg_escape(SERVER); /* FIXME: OOM */
+	char* server = adc_msg_escape(PRODUCT_STRING); /* FIXME: OOM */
 	
 	hub->acl = acl;
-	hub->command_info = adc_msg_construct(ADC_CMD_IINF, 15 + strlen(server));
+	hub->command_info = adc_msg_construct(ADC_CMD_IINF, 15);
 	if (hub->command_info)
 	{
 		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_CLIENT_TYPE, ADC_CLIENT_TYPE_HUB);
@@ -748,10 +746,13 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 		adc_msg_add_argument(hub->command_support, ADC_PROTO_SUPPORT);
 	}
 
-	hub->command_banner = adc_msg_construct(ADC_CMD_ISTA, 25 + strlen(server));
+	hub->command_banner = adc_msg_construct(ADC_CMD_ISTA, 100 + strlen(server));
 	if (hub->command_banner)
 	{
-		tmp = adc_msg_escape("Powered by " SERVER);
+		if (hub->config->show_banner_sys_info)
+			tmp = adc_msg_escape("Powered by " PRODUCT_STRING " on " OPSYS "/" CPUINFO);
+		else
+			tmp = adc_msg_escape("Powered by " PRODUCT_STRING);
 		adc_msg_add_argument(hub->command_banner, "000");
 		adc_msg_add_argument(hub->command_banner, tmp);
 		hub_free(tmp);

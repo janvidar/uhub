@@ -28,6 +28,7 @@ struct hub_config
 	char* server_alt_ports;      /**<<< "Comma separated list of alternative ports to listen to (default: '')" */
 	int hub_enabled;             /**<<< "Is server enabled (default: 1)" */
 	int show_banner;             /**<<< "Show banner on connect (default: 1)" */
+	int show_banner_sys_info;    /**<<< "Show banner system information (default: 1). Has no effect unless show_banner is enabled." */
 	int max_users;               /**<<< "Maximum number of users allowed on the hub (default: 500)" */
 	int registered_users_only;   /**<<< "Allow registered users only (default: 0)" */
 	int chat_only;               /**<<< "Allow chat only operation on hub (default: 0)" */

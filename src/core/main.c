@@ -190,8 +190,8 @@ int check_configuration(int dump)
 
 void print_version()
 {
-	fprintf(stdout, "" PRODUCT " " VERSION "\n");
-	fprintf(stdout, "Copyright (C) 2007-2009, Jan Vidar Krey <janvidar@extatic.org>\n"
+	fprintf(stdout, PRODUCT_STRING "\n");
+	fprintf(stdout, COPYRIGHT "\n"
 			"This is free software with ABSOLUTELY NO WARRANTY.\n\n");
 	exit(0);
 }

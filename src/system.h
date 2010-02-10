@@ -44,6 +44,10 @@
 #define _GNU_SOURCE
 #endif
 
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__) || defined(__DragonFly__) || (defined(__APPLE__) && defined(__MACH__))
+#define BSD_LIKE
+#endif
+
 #if defined(__CYGWIN__) || defined(__MINGW32__)
 #ifndef WINSOCK
 #define WINSOCK
@@ -113,7 +117,7 @@
 #include <sys/epoll.h>
 #endif
 
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+#ifdef BSD_LIKE
 #define USE_KQUEUE
 #include <sys/event.h>
 #endif
@@ -123,11 +127,98 @@
 #include <sys/select.h>
 #endif
 
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__sun__)
+#if defined(BSD_LIKE) || defined(__sun__)
 #undef HAVE_STRNDUP
 #undef HAVE_MEMMEM
 #endif
 
+
+/*
+ * Detect operating system info.
+ * See: http://predef.sourceforge.net/
+ */
+#if defined(__linux__)
+#define OPSYS "Linux"
+#endif
+
+#if defined(_WIN32) || defined(__MINGW32__) || defined(_WIN64) || defined(__WIN32__) || defined(__WINDOWS__)
+#define OPSYS "Windows"
+#endif
+
+#if defined(__APPLE__) && defined(__MACH__)
+#define OPSYS "MacOSX"
+#endif
+
+#if defined(__FreeBSD__)
+#define OPSYS "FreeBSD"
+#endif
+
+#if defined(__OpenBSD__)
+#define OPSYS "OpenBSD"
+#endif
+
+#if defined(__NetBSD__)
+#define OPSYS "NetBSD"
+#endif
+
+#if defined(__sun__)
+#if defined(__SVR4) || defined(__svr4__)
+#define OPSYS "Solaris"
+#else
+#define OPSYS "SunOS"
+#endif
+#endif
+
+#if defined(__HAIKU__)
+#define OPSYS "Haiku"
+#endif
+
+/* Detect CPUs */
+#if defined(__alpha__) || defined(__alpha)
+#define CPUINFO "Alpha"
+#endif
+
+#if defined(__x86_64__) || defined(__x86_64) || defined(__amd64__) || defined(__amd64) || defined(_M_X64)
+#define CPUINFO "AMD64"
+#endif
+
+#if defined(__arm__) || defined(__thumb__) || defined(_ARM) || defined(__TARGET_ARCH_ARM)
+#define CPUINFO "ARM"
+#endif
+
+#if defined(__i386__) || defined(__i386) || defined(i386) || defined(_M_IX86) || defined(__X86__) || defined(_X86_) || defined(__I86__) || defined(__INTEL__) || defined(__THW_INTEL__)
+#define CPUINFO "i386"
+#endif
+
+#if defined(__ia64__) || defined(_IA64) || defined(__IA64__) || defined(__ia64) || defined(_M_IA64)
+#define CPUINFO "IA64"
+#endif
+
+#if defined(__hppa__) || defined(__hppa)
+#define CPUINFO "PARISC"
+#endif
+
+#if defined(__m68k__) || defined(M68000)
+#define CPUINFO "M68K"
+#endif
+
+#if defined(__mips__) || defined(mips) || defined(__mips) || defined(__MIPS__)
+#define CPUINFO "MIPS"
+#endif
+
+#if defined(__POWERPC__) || defined(__ppc__) || defined(_ARCH_PPC) || defined(__powerpc) || defined(__powerpc__)
+#define CPUINFO "PowerPC"
+#endif
+
+#if defined(__sparc__) || defined(__sparc)
+#define CPUINFO "SPARC"
+#endif
+
+#if defined(__sh__)
+#define CPUINFO "SuperH"
+#endif
+
+/* Misc */
 #ifdef MSG_NOSIGNAL
 #define UHUB_SEND_SIGNAL MSG_NOSIGNAL
 #else
