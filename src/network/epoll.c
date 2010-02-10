@@ -59,15 +59,18 @@ int net_backend_poll_epoll(struct net_backend* data, int ms)
 
 void net_backend_process_epoll(struct net_backend* data, int res)
 {
-	int n;
+	int n, ev;
 	struct net_backend_epoll* backend = (struct net_backend_epoll*) data;
 	for (n = 0; n < res; n++)
 	{
-		struct net_connection_epoll* con = (struct net_connection_epoll*) backend->events[n].data.ptr;
-		int ev = 0;
-		if (backend->events[n].events & EPOLLIN)  ev |= NET_EVENT_READ;
-		if (backend->events[n].events & EPOLLOUT) ev |= NET_EVENT_WRITE;
-		net_con_callback((struct net_connection*) con, ev);
+		struct net_connection_epoll* con = backend->conns[backend->events[n].data.fd];
+		if (con)
+		{
+			ev = 0;
+			if (backend->events[n].events & EPOLLIN)  ev |= NET_EVENT_READ;
+			if (backend->events[n].events & EPOLLOUT) ev |= NET_EVENT_WRITE;
+			net_con_callback((struct net_connection*) con, ev);
+		}
 	}
 }
 
@@ -86,7 +89,7 @@ void net_con_initialize_epoll(struct net_backend* data, struct net_connection* c
 	con->callback = callback;
 	con->ev.events = 0;
 	con->ptr = (void*) ptr;
-	con->ev.data.ptr = (void*) con;
+	con->ev.data.fd = sd;
 }
 
 void net_con_backend_add_epoll(struct net_backend* data, struct net_connection* con_, int events)
