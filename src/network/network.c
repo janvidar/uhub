@@ -47,7 +47,13 @@ int net_initialize()
 		}
 #endif /* WINSOCK */
 
-		net_backend_initialize();
+		if (!net_backend_init())
+		{
+#ifdef WINSOCK
+			WSACleanup();
+#endif
+			return -1;
+		}
 		net_stats_initialize();
 
 #ifdef SSL_SUPPORT

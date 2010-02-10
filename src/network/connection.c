@@ -249,6 +249,11 @@ void* net_con_get_ptr(struct net_connection* con)
 	return con->ptr;
 }
 
+void net_con_destroy(struct net_connection* con)
+{
+	hub_free(con);
+}
+
 void net_con_callback(struct net_connection* con, int events)
 {
 	if (con->flags & NET_CLEANUP)

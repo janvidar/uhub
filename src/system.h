@@ -110,21 +110,17 @@
 
 #ifdef __linux__
 #define USE_EPOLL
-#define HAVE_BACKEND
 #include <sys/epoll.h>
 #endif
 
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
 #define USE_KQUEUE
-#define HAVE_BACKEND
 #include <sys/event.h>
 #endif
 
-#ifndef HAVE_BACKEND
 #define USE_SELECT
 #ifndef WINSOCK
 #include <sys/select.h>
-#endif
 #endif
 
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__sun__)

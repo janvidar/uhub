@@ -33,128 +33,52 @@ struct net_connection_epoll
 	struct epoll_event ev;
 };
 
-struct net_backend
+struct net_backend_epoll
 {
 	int epfd;
-	size_t num;
-	size_t max;
 	struct net_connection_epoll** conns;
 	struct epoll_event events[EPOLL_EVBUFFER];
-	time_t now;
-	struct timeout_queue timeout_queue;
-	struct net_cleanup_handler* cleaner;
+	struct net_backend_common* common;
 };
 
-static struct net_backend* g_backend = 0;
+static void net_backend_set_handlers(struct net_backend_handler* handler);
 
-static void net_con_print(const char* prefix, struct net_connection_epoll* con)
+const char* net_backend_name_epoll()
 {
-	char buf[512];
-	int off = snprintf(buf, 512, "%s: net_connection={ sd=%d, flags=%u, callback=%p, ptr=%p, ev={ events=%s%s, data.ptr=%p }",
-		prefix, con->sd, con->flags, con->callback, con->ptr, (con->ev.events & EPOLLIN ? "R" : ""),(con->ev.events & EPOLLOUT ? "W" : "") , con->ev.data.ptr);
-	if (con->timeout)
-	{
-		sprintf(buf + off, ", timeout={ %d seconds left }", (int) (con->timeout->timestamp - g_backend->now));
-	}
-	else
-	{
-		sprintf(buf + off, ", timeout=NULL");
-	}
-	LOG_TRACE(buf);
+	return "epoll";
 }
 
-/**
- * Initialize the network backend.
- * Returns 1 on success, or 0 on failure.
- */
-int net_backend_initialize()
+int net_backend_poll_epoll(struct net_backend* data, int ms)
 {
-	size_t max = net_get_max_sockets();
-	g_backend = hub_malloc(sizeof(struct net_backend));
-	g_backend->epfd = epoll_create(max);
-	if (g_backend->epfd == -1)
-	{
-		LOG_WARN("Unable to create epoll socket.");
+	struct net_backend_epoll* backend = (struct net_backend_epoll*) data;
+	int res = epoll_wait(backend->epfd, backend->events, MIN(backend->common->num, EPOLL_EVBUFFER), ms);
+	if (res == -1 && errno == EINTR)
 		return 0;
-	}
-	
-	g_backend->num = 0;
-	g_backend->max = max;
-	g_backend->conns = hub_malloc_zero(sizeof(struct net_connection_epoll*) * max);
-	memset(g_backend->events, 0, sizeof(g_backend->events));
-
-	g_backend->now = time(0);
-	timeout_queue_initialize(&g_backend->timeout_queue, g_backend->now, 600); /* look max 10 minutes into the future. */
-	g_backend->cleaner = net_cleanup_initialize(max);
-	return 1;
+	return res;
 }
 
-/**
- * Shutdown the network connection backend.
- */
-void net_backend_shutdown()
+void net_backend_process_epoll(struct net_backend* data, int res)
 {
-	close(g_backend->epfd);
-	timeout_queue_shutdown(&g_backend->timeout_queue);
-	net_cleanup_shutdown(g_backend->cleaner);
-	hub_free(g_backend->conns);
-	hub_free(g_backend);
-	g_backend = 0;
-}
-
-/**
- * Process the network backend.
- */
-int net_backend_process()
-{
-	int n, res;
-	size_t secs = timeout_queue_get_next_timeout(&g_backend->timeout_queue, g_backend->now);
-	LOG_TRACE("epoll_wait: fd=%d, events=%x, max=%zu, seconds=%d", g_backend->epfd, g_backend->events, MIN(g_backend->num, EPOLL_EVBUFFER), (int) secs);
-	res = epoll_wait(g_backend->epfd, g_backend->events, MIN(g_backend->num, EPOLL_EVBUFFER), secs * 1000);
-
-	g_backend->now = time(0);
-	timeout_queue_process(&g_backend->timeout_queue, g_backend->now);
-
-	if (res == -1)
-	{
-		LOG_WARN("epoll_wait returned -1");
-		return 0;
-	}
-
+	int n;
+	struct net_backend_epoll* backend = (struct net_backend_epoll*) data;
 	for (n = 0; n < res; n++)
 	{
-		struct net_connection_epoll* con = (struct net_connection_epoll*) g_backend->events[n].data.ptr;
+		struct net_connection_epoll* con = (struct net_connection_epoll*) backend->events[n].data.ptr;
 		int ev = 0;
-		if (g_backend->events[n].events & EPOLLIN)  ev |= NET_EVENT_READ;
-		if (g_backend->events[n].events & EPOLLOUT) ev |= NET_EVENT_WRITE;
+		if (backend->events[n].events & EPOLLIN)  ev |= NET_EVENT_READ;
+		if (backend->events[n].events & EPOLLOUT) ev |= NET_EVENT_WRITE;
 		net_con_callback((struct net_connection*) con, ev);
 	}
-
-	net_cleanup_process(g_backend->cleaner);
-	return 1;
 }
 
-struct timeout_queue* net_backend_get_timeout_queue()
-{
-	if (!g_backend)
-		return 0;
-
-	return &g_backend->timeout_queue;
-}
-
-struct net_connection* net_con_create()
+struct net_connection* net_con_create_epoll(struct net_backend* data)
 {
 	struct net_connection* con = (struct net_connection*) hub_malloc_zero(sizeof(struct net_connection_epoll));
 	con->sd = -1;
 	return con;
 }
 
-void net_con_destroy(struct net_connection* con)
-{
-	hub_free(con);
-}
-
-void net_con_initialize(struct net_connection* con_, int sd, net_connection_cb callback, const void* ptr, int events)
+void net_con_initialize_epoll(struct net_backend* data, struct net_connection* con_, int sd, net_connection_cb callback, const void* ptr)
 {
 	struct net_connection_epoll* con = (struct net_connection_epoll*) con_;
 	con->sd = sd;
@@ -163,34 +87,29 @@ void net_con_initialize(struct net_connection* con_, int sd, net_connection_cb c
 	con->ev.events = 0;
 	con->ptr = (void*) ptr;
 	con->ev.data.ptr = (void*) con;
+}
 
-	net_set_nonblocking(con->sd, 1);
-	net_set_nosigpipe(con->sd, 1);
+void net_con_backend_add_epoll(struct net_backend* data, struct net_connection* con_, int events)
+{
+	struct net_backend_epoll* backend = (struct net_backend_epoll*) data;
+	struct net_connection_epoll* con = (struct net_connection_epoll*) con_;
 
-	if (events & NET_EVENT_READ) con->ev.events |= EPOLLIN;
+	backend->conns[con->sd] = con;
+
+	if (events & NET_EVENT_READ)  con->ev.events |= EPOLLIN;
 	if (events & NET_EVENT_WRITE) con->ev.events |= EPOLLOUT;
 
-	g_backend->conns[sd] = con;
-	g_backend->num++;
-
-	if (epoll_ctl(g_backend->epfd, EPOLL_CTL_ADD, con->sd, &con->ev) == -1)
+	if (epoll_ctl(backend->epfd, EPOLL_CTL_ADD, con->sd, &con->ev) == -1)
 	{
 		LOG_TRACE("epoll_ctl() add failed.");
 	}
-
-	net_con_print("ADD", con);
 }
 
-void net_con_reinitialize(struct net_connection* con, net_connection_cb callback, const void* ptr, int events)
+void net_con_backend_mod_epoll(struct net_backend* data, struct net_connection* con_, int events)
 {
-	con->callback = callback;
-	con->ptr = (void*) ptr;
-	net_con_update(con, events);
-}
-
-void net_con_update(struct net_connection* con_, int events)
-{
+	struct net_backend_epoll* backend = (struct net_backend_epoll*) data;
 	struct net_connection_epoll* con = (struct net_connection_epoll*) con_;
+
 	int newev = 0;
 	if (events & NET_EVENT_READ)  newev |= EPOLLIN;
 	if (events & NET_EVENT_WRITE) newev |= EPOLLOUT;
@@ -199,37 +118,66 @@ void net_con_update(struct net_connection* con_, int events)
 		return;
 
 	con->ev.events = newev;
-	if (epoll_ctl(g_backend->epfd, EPOLL_CTL_MOD, con->sd, &con->ev) == -1)
+	if (epoll_ctl(backend->epfd, EPOLL_CTL_MOD, con->sd, &con->ev) == -1)
 	{
 		LOG_TRACE("epoll_ctl() modify failed.");
 	}
-	net_con_print("MOD", con);
 }
 
-void net_con_close(struct net_connection* con_)
+void net_con_backend_del_epoll(struct net_backend* data, struct net_connection* con_)
 {
+	struct net_backend_epoll* backend = (struct net_backend_epoll*) data;
 	struct net_connection_epoll* con = (struct net_connection_epoll*) con_;
-	if (con->flags & NET_CLEANUP)
-		return;
 
-	if (con->sd != -1)
-	{
-		g_backend->conns[con->sd] = 0;
-		g_backend->num--;
-	}
+	backend->conns[con->sd] = 0;
 
-	net_con_clear_timeout(con_);
-
-	if (epoll_ctl(g_backend->epfd, EPOLL_CTL_DEL, con->sd, &con->ev) == -1)
+	if (epoll_ctl(backend->epfd, EPOLL_CTL_DEL, con->sd, &con->ev) == -1)
 	{
 		LOG_WARN("epoll_ctl() delete failed.");
 	}
+}
 
-	net_close(con->sd);
-	con->sd = -1;
+void net_backend_shutdown_epoll(struct net_backend* data)
+{
+	struct net_backend_epoll* backend = (struct net_backend_epoll*) data;
+	close(backend->epfd);
+	hub_free(backend->conns);
+	hub_free(backend);
+}
 
-	net_con_print("DEL", con);
-	net_cleanup_delayed_free(g_backend->cleaner, con_);
+struct net_backend* net_backend_init_epoll(struct net_backend_handler* handler, struct net_backend_common* common)
+{
+	struct net_backend_epoll* backend;
+
+	if (getenv("EVENT_NOEPOLL"))
+		return 0;
+
+	backend = hub_malloc_zero(sizeof(struct net_backend_epoll));
+	backend->epfd = epoll_create(common->max);
+	if (backend->epfd == -1)
+	{
+		LOG_WARN("Unable to create epoll socket.");
+		return 0;
+	}
+
+	backend->conns = hub_malloc_zero(sizeof(struct net_connection_epoll*) * common->max);
+	backend->common = common;
+
+	net_backend_set_handlers(handler);
+	return (struct net_backend*) backend;
+}
+
+static void net_backend_set_handlers(struct net_backend_handler* handler)
+{
+	handler->backend_name = net_backend_name_epoll;
+	handler->backend_poll = net_backend_poll_epoll;
+	handler->backend_process = net_backend_process_epoll;
+	handler->backend_shutdown = net_backend_shutdown_epoll;
+	handler->con_create = net_con_create_epoll;
+	handler->con_init = net_con_initialize_epoll;
+	handler->con_add = net_con_backend_add_epoll;
+	handler->con_mod = net_con_backend_mod_epoll;
+	handler->con_del = net_con_backend_del_epoll;
 }
 
 #endif /* USE_EPOLL */

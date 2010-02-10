@@ -33,149 +33,87 @@ struct net_connection_kqueue
 	struct kevent ev;
 };
 
-struct net_backend
+struct net_backend_kqueue
 {
 	int kqfd;
-	size_t num;
-	size_t max;
 	struct net_connection_kqueue** conns;
 	struct kevent** changes;
 	size_t nchanges;
 	struct kevent events[KQUEUE_EVBUFFER];
-	time_t now;
-	struct timeout_queue timeout_queue;
-	struct net_cleanup_handler* cleaner;
+	struct net_backend_common* common;
 };
 
-static struct net_backend* g_backend = 0;
+static void net_backend_set_handlers(struct net_backend_handler* handler);
 
-
-/**
- * Initialize the network backend.
- * Returns 1 on success, or 0 on failure.
- */
-int net_backend_initialize()
+const char* net_backend_name_kqueue()
 {
-	g_backend = hub_malloc_zero(sizeof(struct net_backend));
-	g_backend->kqfd = kqueue();
-	if (g_backend->kqfd == -1)
-	{
-		LOG_WARN("Unable to create epoll socket.");
+	return "kqueue";
+}
+
+int net_backend_poll_kqueue(struct net_backend* data, int ms)
+{
+	int res;
+	struct timespec tspec = { 0, };
+	struct net_backend_kqueue* backend = (struct net_backend_kqueue*) data;
+
+	tspec.tv_sec = (ms / 1000);
+	tspec.tv_nsec = ((ms % 1000) * 1000000); /* FIXME: correct? */
+
+	res = kevent(backend->kqfd, *backend->changes, backend->nchanges, backend->events, KQUEUE_EVBUFFER, &tspec);
+	backend->nchanges = 0;
+
+	if (res == -1 && errno == EINTR)
 		return 0;
-	}
-
-	size_t max = net_get_max_sockets();
-	g_backend->max = max;
-	g_backend->conns = hub_malloc_zero(sizeof(struct net_connection_kqueue*) * max);
-	g_backend->changes = hub_malloc_zero(sizeof(struct kevent*) * max);
-
-	g_backend->now = time(0);
-	timeout_queue_initialize(&g_backend->timeout_queue, g_backend->now, 600); /* look max 10 minutes into the future. */
-	g_backend->cleaner = net_cleanup_initialize(max);
-	return 1;
+	return res;
 }
 
-/**
- * Shutdown the network connection backend.
- */
-void net_backend_shutdown()
-{
-	close(g_backend->kqfd);
-	timeout_queue_shutdown(&g_backend->timeout_queue);
-	net_cleanup_shutdown(g_backend->cleaner);
-	hub_free(g_backend->conns);
-	hub_free(g_backend->changes);
-	hub_free(g_backend);
-	g_backend = 0;
-}
-
-/**
- * Process the network backend.
- */
-int net_backend_process()
+void net_backend_process_kqueue(struct net_backend* data, int res)
 {
 	int n;
-	struct timespec tspec = { 0, };
-	size_t secs = timeout_queue_get_next_timeout(&g_backend->timeout_queue, g_backend->now);
-	tspec.tv_sec = secs;
-	int res = kevent(g_backend->kqfd, *g_backend->changes, g_backend->nchanges, g_backend->events, KQUEUE_EVBUFFER, &tspec);
-	g_backend->nchanges = 0;
-
-        g_backend->now = time(0);
-        timeout_queue_process(&g_backend->timeout_queue, g_backend->now);
-
-	if (res == -1)
-	{
-		LOG_WARN("kevent returned -1");
-		return 0;
-	}
+	struct net_backend_kqueue* backend = (struct net_backend_kqueue*) data;
 
 	for (n = 0; n < res; n++)
 	{
-		struct net_connection_kqueue* con = (struct net_connection_kqueue*) g_backend->events[n].udata;
-                int ev = 0;
-                if (g_backend->events[n].filter & EVFILT_READ)  ev |= NET_EVENT_READ;
-                if (g_backend->events[n].filter & EVFILT_WRITE) ev |= NET_EVENT_WRITE;
-                net_con_callback((struct net_connection*) con, ev);
+		struct net_connection_kqueue* con = (struct net_connection_kqueue*) backend->events[n].udata;
+		int ev = 0;
+		if (backend->events[n].filter & EVFILT_READ)  ev |= NET_EVENT_READ;
+		if (backend->events[n].filter & EVFILT_WRITE) ev |= NET_EVENT_WRITE;
+		net_con_callback((struct net_connection*) con, ev);
 	}
-
-	net_cleanup_process(g_backend->cleaner);
-	return 1;
 }
 
-struct timeout_queue* net_backend_get_timeout_queue()
-{
-	if (!g_backend)
-		return 0;
-
-	return &g_backend->timeout_queue;
-}
-
-struct net_connection* net_con_create()
+struct net_connection* net_con_create_kqueue(struct net_backend* data)
 {
 	struct net_connection* con = (struct net_connection*) hub_malloc_zero(sizeof(struct net_connection_kqueue));
 	con->sd = -1;
 	return con;
 }
 
-void net_con_destroy(struct net_connection* con)
+void net_con_initialize_kqueue(struct net_backend* data, struct net_connection* con_, int sd, net_connection_cb callback, const void* ptr)
 {
-	hub_free(con);
-}
-
-void net_con_initialize(struct net_connection* con_, int sd, net_connection_cb callback, const void* ptr, int events)
-{
-	short filter = 0;
 	struct net_connection_kqueue* con = (struct net_connection_kqueue*) con_;
 	con->sd = sd;
 	con->flags = 0;
 	con->callback = callback;
 	con->ptr = (void*) ptr;
-
-	net_set_nonblocking(con->sd, 1);
-	net_set_nosigpipe(con->sd, 1);
-
-	if  (events & NET_EVENT_READ)  filter |= EVFILT_READ;
-	if  (events & NET_EVENT_WRITE) filter |= EVFILT_READ;
-
-	EV_SET(&con->ev, sd, filter, EV_ADD, 0, 0, con);
-
-	g_backend->changes[g_backend->nchanges++] = &con->ev;
-
-	g_backend->conns[sd] = con;
-	g_backend->num++;
 }
 
-void net_con_reinitialize(struct net_connection* con, net_connection_cb callback, const void* ptr, int events)
-{
-	con->callback = callback;
-	con->ptr = (void*) ptr;
-	net_con_update(con, events);
-}
-
-void net_con_update(struct net_connection* con_, int events)
+void net_con_backend_add_kqueue(struct net_backend* data, struct net_connection* con_, int events)
 {
 	short filter = 0;
+	struct net_backend_kqueue* backend = (struct net_backend_kqueue*) data;
+	struct net_connection_kqueue* con = (struct net_connection_kqueue*) con_;
+	if  (events & NET_EVENT_READ)  filter |= EVFILT_READ;
+	if  (events & NET_EVENT_WRITE) filter |= EVFILT_READ;
+	EV_SET(&con->ev, con->sd, filter, EV_ADD, 0, 0, con);
+	backend->changes[backend->nchanges++] = &con->ev;
+	backend->conns[con->sd] = con;
+}
+
+void net_con_backend_mod_kqueue(struct net_backend* data, struct net_connection* con_, int events)
+{
+	short filter = 0;
+	struct net_backend_kqueue* backend = (struct net_backend_kqueue*) data;
 	struct net_connection_kqueue* con = (struct net_connection_kqueue*) con_;
 
 	if  (events & NET_EVENT_READ)  filter |= EVFILT_READ;
@@ -185,30 +123,64 @@ void net_con_update(struct net_connection* con_, int events)
 		return;
 
 	EV_SET(&con->ev, con->sd, filter, EV_ADD, 0, 0, con);
-	g_backend->changes[g_backend->nchanges++] = &con->ev;
+	backend->changes[backend->nchanges++] = &con->ev;
 }
 
-void net_con_close(struct net_connection* con_)
+void net_con_backend_del_kqueue(struct net_backend* data, struct net_connection* con_)
 {
+	struct net_backend_kqueue* backend = (struct net_backend_kqueue*) data;
 	struct net_connection_kqueue* con = (struct net_connection_kqueue*) con_;
-	if (con->flags & NET_CLEANUP)
-		return;
 
-	if (con->sd != -1)
-	{
-		g_backend->conns[con->sd] = 0;
-		g_backend->num--;
-	}
-
-	net_con_clear_timeout(con_);
+	backend->conns[con->sd] = 0;
 
 	/* No need to remove it from the kqueue filter, the kqueue man page says
 	   it is automatically removed when the descriptor is closed. */
+}
 
-	net_close(con->sd);
-	con->sd = -1;
+void net_backend_shutdown_kqueue(struct net_backend* data)
+{
+	struct net_backend_kqueue* backend = (struct net_backend_kqueue*) data;
+	close(backend->kqfd);
+	hub_free(backend->conns);
+	hub_free(backend->changes);
+	hub_free(backend);
+}
 
-	net_cleanup_delayed_free(g_backend->cleaner, con_);
+struct net_backend* net_backend_init_kqueue(struct net_backend_handler* handler, struct net_backend_common* common)
+{
+	struct net_backend_kqueue* backend;
+
+	if (getenv("EVENT_NOKQUEUE"))
+		return 0;
+
+	backend = hub_malloc_zero(sizeof(struct net_backend_kqueue));
+	backend->kqfd = kqueue(common->max);
+	if (backend->kqfd == -1)
+	{
+		LOG_WARN("Unable to create kqueue socket.");
+		return 0;
+	}
+
+	backend->conns = hub_malloc_zero(sizeof(struct net_connection_kqueue*) * common->max);
+	backend->conns = hub_malloc_zero(sizeof(struct net_connection_kqueue*) * common->max);
+	backend->changes = hub_malloc_zero(sizeof(struct kevent*) * common->max);
+	backend->common = common;
+
+	net_backend_set_handlers(handler);
+	return (struct net_backend*) backend;
+}
+
+static void net_backend_set_handlers(struct net_backend_handler* handler)
+{
+	handler->backend_name = net_backend_name_kqueue;
+	handler->backend_poll = net_backend_poll_kqueue;
+	handler->backend_process = net_backend_process_kqueue;
+	handler->backend_shutdown = net_backend_shutdown_kqueue;
+	handler->con_create = net_con_create_kqueue;
+	handler->con_init = net_con_initialize_kqueue;
+	handler->con_add = net_con_backend_add_kqueue;
+	handler->con_mod = net_con_backend_mod_kqueue;
+	handler->con_del = net_con_backend_del_kqueue;
 }
 
 #endif /* USE_KQUEUE */

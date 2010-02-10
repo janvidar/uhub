@@ -28,10 +28,6 @@
 #define NET_EVENT_READ            0x0002
 #define NET_EVENT_WRITE           0x0004
 
-struct net_connection;
-
-typedef void (*net_connection_cb)(struct net_connection*, int event, void* ptr);
-
 struct net_connection
 {
 	NET_CON_STRUCT_COMMON
