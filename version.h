@@ -1,11 +1,11 @@
 #include "revision.h"
 
 #ifndef PRODUCT
-#define PRODUCT "uHub"
+#define PRODUCT "uhub"
 #endif
 
 #ifndef VERSION
-#define VERSION "0.3.0"
+#define VERSION "0.3.1"
 #endif
 
 #ifndef GIT_REVISION

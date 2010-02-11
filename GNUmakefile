@@ -116,7 +116,7 @@ CFLAGS        += -DSSL_SUPPORT
 LDLIBS        += -lssl
 endif
 
-GIT_VERSION=$(shell git describe --tags 2>/dev/null || echo "")
+GIT_VERSION=$(shell git describe 2>/dev/null || echo "")
 GIT_REVISION=$(shell git show --abbrev-commit  2>/dev/null | head -n 1 | cut -f 2 -d " " || echo "")
 OLD_REVISION=$(shell grep GIT_REVISION revision.h 2>/dev/null | cut -f 3 -d " " | tr -d "\"")
 
