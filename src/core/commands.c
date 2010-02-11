@@ -318,7 +318,12 @@ static int command_shutdown(struct hub_info* hub, struct hub_user* user, struct 
 
 static int command_version(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
 {
-	return command_status(hub, user, cmd, "Powered by " PRODUCT "/" VERSION);
+	const char* tmp;
+	if (hub->config->show_banner_sys_info)
+		tmp = "Powered by " PRODUCT_STRING " on " OPSYS "/" CPUINFO;
+	else
+		tmp = "Powered by " PRODUCT_STRING;
+	return command_status(hub, user, cmd, tmp);
 }
 
 static int command_myip(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
