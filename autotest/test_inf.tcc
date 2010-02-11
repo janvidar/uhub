@@ -42,7 +42,6 @@ static void inf_create_user()
 {
 	if (inf_user) return;
 	inf_user = (struct hub_user*) hub_malloc_zero(sizeof(struct hub_user));
-	inf_user->connection = net_con_create();
 	inf_user->id.sid = 1;
 	inf_user->limits.upload_slots = 1;
 }
@@ -50,7 +49,6 @@ static void inf_create_user()
 static void inf_destroy_user()
 {
 	if (!inf_user) return;
-	hub_free(inf_user->connection);
 	hub_free(inf_user);
 	inf_user = 0;
 }
