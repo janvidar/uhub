@@ -154,7 +154,7 @@ struct net_backend* net_backend_init_kqueue(struct net_backend_handler* handler,
 		return 0;
 
 	backend = hub_malloc_zero(sizeof(struct net_backend_kqueue));
-	backend->kqfd = kqueue(common->max);
+	backend->kqfd = kqueue();
 	if (backend->kqfd == -1)
 	{
 		LOG_WARN("Unable to create kqueue socket.");
