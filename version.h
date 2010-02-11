@@ -1,3 +1,5 @@
+#include "revision.h"
+
 #ifndef PRODUCT
 #define PRODUCT "uHub"
 #endif
