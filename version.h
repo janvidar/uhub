@@ -13,7 +13,11 @@
 #define PRODUCT_STRING PRODUCT "/" VERSION
 #else
 #define REVISION "(git: " GIT_REVISION ")"
+#ifdef GIT_VERSION
+#define PRODUCT_STRING PRODUCT "/" GIT_VERSION
+#else
 #define PRODUCT_STRING PRODUCT "/" VERSION " " REVISION
+#endif
 #endif
 
 #ifndef COPYRIGHT
