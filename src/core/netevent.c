@@ -58,7 +58,11 @@ int handle_net_read(struct hub_user* user)
 	static char buf[MAX_RECV_BUF];
 	struct hub_recvq* q = user->recv_queue;
 	size_t buf_size = hub_recvq_get(q, buf, MAX_RECV_BUF);
-	ssize_t size = net_con_recv(user->connection, buf, MAX_RECV_BUF);
+	ssize_t size;
+
+	if (user_flag_get(user, flag_maxbuf))
+		buf_size = 0;
+	size = net_con_recv(user->connection, buf + buf_size, MAX_RECV_BUF - buf_size);
 
 	if (size > 0)
 		buf_size += size;
