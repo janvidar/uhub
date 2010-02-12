@@ -886,14 +886,14 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 	if (level >= status_level_fatal)
 	{
 		snprintf(buf, 230, "MS%s", escaped_text);
-		adc_msg_add_argument(cmd, buf);
+		adc_msg_add_argument(qui, buf);
 
 		if (reconnect_time != 0)
 		{
 			snprintf(buf, 10, "TL%d", reconnect_time);
-			adc_msg_add_argument(cmd, buf);
+			adc_msg_add_argument(qui, buf);
 		}
-		route_to_user(hub, user, cmd);
+		route_to_user(hub, user, qui);
 	}
 
 	hub_free(escaped_text);
