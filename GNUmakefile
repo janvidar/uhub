@@ -3,6 +3,8 @@
 ## Copyright (C) 2007-2010, Jan Vidar Krey <janvidar@extatic.org>
  #
 
+-include Makefile.private
+
 CC            = gcc
 LD            := $(CC)
 MV            := mv
