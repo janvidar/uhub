@@ -126,6 +126,7 @@ void hub_sendq_add(struct hub_sendq* q, struct adc_message* msg_)
 #ifdef DEBUG_SENDQ
 	debug_msg("hub_sendq_add", msg);
 #endif
+	assert(msg->cache && *msg->cache);
 	list_append(q->queue, msg);
 	q->size += msg->length;
 }
@@ -146,7 +147,7 @@ int hub_sendq_send(struct hub_sendq* q, struct hub_user* user)
 	int ret;
 	struct adc_message* msg = list_get_first(q->queue);
 	if (!msg) return 0;
-
+	assert(msg->cache && *msg->cache);
 	ret = net_con_send(user->connection, msg->cache + q->offset, msg->length - q->offset);
 
 	if (ret > 0)

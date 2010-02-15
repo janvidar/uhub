@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2010, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,6 +27,7 @@
 	uhub_assert(X->length); \
 	uhub_assert(X->length <= X->capacity); \
 	uhub_assert(X->length == strlen(X->cache));
+#define ADC_MSG_NULL_ON_FREE
 #else
 #define ADC_MSG_ASSERT(X) do { } while(0)
 #endif /* DEBUG */
@@ -53,30 +54,12 @@ static void* msg_malloc_zero(size_t size)
 static void msg_free(void* ptr)
 {
 	LOG_MEMORY("msg_free:   %p", ptr);
-	// hub_free(ptr);
+	hub_free(ptr);
 }
-
-#include <sys/mman.h>
-static void adc_msg_protect(struct adc_message* cmd)
-{
-	LOG_MEMORY("msg_prot:   %p %d", cmd, cmd->capacity);
-	mprotect(cmd,        sizeof(cmd),           PROT_READ);
-	mprotect(cmd->cache, sizeof(cmd->capacity), PROT_READ);
-}
-
-static void adc_msg_unprotect(struct adc_message* cmd)
-{
-	LOG_MEMORY("msg_unprot: %p %d", cmd, cmd->capacity);
-	mprotect(cmd,        sizeof(cmd),           PROT_READ | PROT_WRITE);
-	mprotect(cmd->cache, sizeof(cmd->capacity), PROT_READ | PROT_WRITE);
-}
-
 #else
-
 #define msg_malloc(X)       hub_malloc(X)
 #define msg_malloc_zero(X)  hub_malloc_zero(X)
 #define msg_free(X)         hub_free(X)
-
 #endif /* MSG_MEMORY_DEBUG */
 
 
@@ -84,9 +67,6 @@ struct adc_message* adc_msg_incref(struct adc_message* msg)
 {
 	if (!msg) return 0;
 #ifndef ADC_MESSAGE_INCREF
-#ifdef MSG_MEMORY_DEBUG
-	adc_msg_unprotect(msg);
-#endif
 	msg->references++;
 #ifdef MSG_MEMORY_DEBUG
 	adc_msg_protect(msg);
@@ -201,40 +181,37 @@ int adc_msg_is_empty(struct adc_message* msg)
 void adc_msg_free(struct adc_message* msg)
 {
 	if (!msg) return;
-	
+
 	ADC_MSG_ASSERT(msg);
 
 	if (msg->references > 0)
 	{
-#ifdef MSG_MEMORY_DEBUG
-		adc_msg_unprotect(msg);
-#endif
 		msg->references--;
-#ifdef MSG_MEMORY_DEBUG
-		adc_msg_protect(msg);
-#endif
 	}
 	else
 	{
-#ifdef MSG_MEMORY_DEBUG
-		adc_msg_unprotect(msg);
+#ifdef ADC_MSG_NULL_ON_FREE
+		if (msg->cache)
+		{
+			*msg->cache = 0;
+		}
 #endif
 		msg_free(msg->cache);
-		
+
 		if (msg->feature_cast_include)
 		{
 			list_clear(msg->feature_cast_include, &hub_free);
 			list_destroy(msg->feature_cast_include);
 			msg->feature_cast_include = 0;
 		}
-		
+
 		if (msg->feature_cast_exclude)
 		{
 			list_clear(msg->feature_cast_exclude, &hub_free);
 			list_destroy(msg->feature_cast_exclude);
 			msg->feature_cast_exclude = 0;
 		}
-		
+
 		msg_free(msg);
 	}
 }
@@ -295,9 +272,6 @@ struct adc_message* adc_msg_copy(const struct adc_message* cmd)
 
 	ADC_MSG_ASSERT(copy);
 
-#ifdef MSG_MEMORY_DEBUG
-	adc_msg_protect(copy);
-#endif
 	return copy;
 }
 
@@ -510,10 +484,6 @@ struct adc_message* adc_msg_parse(const char* line, size_t length)
 	}
 	
 	ADC_MSG_ASSERT(command);
-
-#ifdef MSG_MEMORY_DEBUG
-	adc_msg_protect(command);
-#endif
 	return command;
 }
 
@@ -554,10 +524,6 @@ struct adc_message* adc_msg_construct(fourcc_t fourcc, size_t size)
 	
 	msg->cmd = fourcc;
 	msg->priority = 0;
-
-#ifdef MSG_MEMORY_DEBUG
-	adc_msg_protect(msg);
-#endif
 
 	return msg;
 }
@@ -698,10 +664,6 @@ void adc_msg_terminate(struct adc_message* cmd)
 		adc_msg_cache_append(cmd, "\n", 1);
 	}
 	ADC_MSG_ASSERT(cmd);
-
-#ifdef MSG_MEMORY_DEBUG
-	adc_msg_protect(cmd);
-#endif
 }
 
 /* FIXME: this looks bogus */
@@ -709,10 +671,6 @@ void adc_msg_unterminate(struct adc_message* cmd)
 {
 	ADC_MSG_ASSERT(cmd);
 
-#ifdef MSG_MEMORY_DEBUG
-	adc_msg_unprotect(cmd);
-#endif
-	
 	if (cmd->length > 0 && cmd->cache[cmd->length-1] == '\n')
 	{
 		cmd->length--;
