@@ -23,7 +23,7 @@ EXO_TEST(hub_net_startup, {
 
 EXO_TEST(hub_config_initialize, {
 	config_defaults(&g_config);
-	g_config.server_port = 15111;
+	g_config.server_port = 65111;
 	return 1;
 });
 

@@ -83,7 +83,14 @@ void user_set_state(struct hub_user* user, enum user_state state)
 void user_set_info(struct hub_user* user, struct adc_message* cmd)
 {
 	adc_msg_free(user->info);
-	user->info = adc_msg_incref(cmd);
+	if (cmd)
+	{
+		user->info = adc_msg_incref(cmd);
+	}
+	else
+	{
+		user->info = 0;
+	}
 }
 
 void user_update_info(struct hub_user* u, struct adc_message* cmd)
@@ -97,7 +104,7 @@ void user_update_info(struct hub_user* u, struct adc_message* cmd)
 		/* FIXME: OOM! */
 		return;
 	}
-	
+
 	/*
 	 * FIXME: Optimization potential:
 	 *

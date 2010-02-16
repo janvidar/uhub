@@ -24,35 +24,6 @@
 /* FIXME: This should not be needed! */
 extern struct hub_info* g_hub;
 
-#ifdef DEBUG_SENDQ
-void debug_sendq_send(struct hub_user* user, int sent, int total)
-{
-	LOG_DUMP("SEND: sd=%d, %d/%d bytes\n", user->connection->sd, sent, total);
-	if (sent == -1)
-	{
-		int err = net_error();
-		LOG_DUMP("    errno: %d - %s\n", err, net_error_string(err));
-	}
-}
-
-void debug_sendq_recv(struct hub_user* user, int received, int max, const char* buffer)
-{
-	LOG_DUMP("RECV: %d/%d bytes\n", received, (int) max);
-	if (received == -1)
-	{
-		int err = net_error();
-		LOG_DUMP("    errno: %d - %s\n", err, net_error_string(err));
-	}
-	else if (received > 0)
-	{
-		char* data = hub_malloc_zero(received + 1);
-		memcpy(data, buffer, received);
-		LOG_DUMP("RECV: \"%s\"\n", data);
-		hub_free(data);
-	}
-}
-#endif
-
 int handle_net_read(struct hub_user* user)
 {
 	static char buf[MAX_RECV_BUF];
@@ -223,7 +194,7 @@ void net_on_accept(struct net_connection* con, int event, void *arg)
 			}
 		}
 
-		addr = ip_convert_to_string(&ipaddr); 
+		addr = ip_convert_to_string(&ipaddr);
 
 		/* FIXME: Should have a plugin log this */
 		LOG_TRACE("Got connection from %s", addr);

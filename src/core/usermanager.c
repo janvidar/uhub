@@ -155,7 +155,7 @@ int uman_remove(struct hub_info* hub, struct hub_user* user)
 		return -1;
 
 	list_remove(hub->users->list, user);
-	
+
 	if (hub->users->count > 0)
 	{
 		hub->users->count--;
@@ -164,12 +164,12 @@ int uman_remove(struct hub_info* hub, struct hub_user* user)
 	{
 		assert(!"negative count!");
 	}
-	
+
 	hub->users->shared_size  -= user->limits.shared_size;
 	hub->users->shared_files -= user->limits.shared_files;
 
 	user->hub = 0;
-	
+
 	return 0;
 }
 
@@ -237,7 +237,7 @@ int uman_send_user_list(struct hub_info* hub, struct hub_user* target)
 		}
 		user = (struct hub_user*) list_get_next(hub->users->list);
 	}
-	
+
 #if 0
 	FIXME: FIXME FIXME handle send queue excess
 	if (!target->send_queue_size)
@@ -248,12 +248,11 @@ int uman_send_user_list(struct hub_info* hub, struct hub_user* target)
 	return ret;
 }
 
-
 void uman_send_quit_message(struct hub_info* hub, struct hub_user* leaving)
 {
 	struct adc_message* command = adc_msg_construct(ADC_CMD_IQUI, 6);
 	adc_msg_add_argument(command, (const char*) sid_to_string(leaving->id.sid));
-	
+
 	if (leaving->quit_reason == quit_banned || leaving->quit_reason == quit_kicked)
 	{
 		adc_msg_add_argument(command, ADC_QUI_FLAG_DISCONNECT);
@@ -261,7 +260,6 @@ void uman_send_quit_message(struct hub_info* hub, struct hub_user* leaving)
 	route_to_all(hub, command);
 	adc_msg_free(command);
 }
-
 
 sid_t uman_get_free_sid(struct hub_info* hub, struct hub_user* user)
 {

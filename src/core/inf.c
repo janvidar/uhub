@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2010, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -42,7 +42,7 @@ static void remove_server_restricted_flags(struct adc_message* cmd)
 static int set_feature_cast_supports(struct hub_user* u, struct adc_message* cmd)
 {
 	char *it, *tmp;
-	
+
 	if (adc_msg_has_named_argument(cmd, ADC_INF_FLAG_SUPPORT))
 	{
 		tmp = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_SUPPORT);
@@ -58,7 +58,7 @@ static int set_feature_cast_supports(struct hub_user* u, struct adc_message* cmd
 			user_set_feature_cast_support(u, it);
 			it = &it[5];
 		}
-		
+
 		if (*it)
 		{
 			user_set_feature_cast_support(u, it);
@@ -74,9 +74,9 @@ static int check_hash_tiger(const char* cid, const char* pid)
 	char x_pid[64];
 	char raw_pid[64];
 	uint64_t tiger_res[3];
-	
+
 	memset(x_pid, 0, MAX_CID_LEN+1);
-	
+
 	base32_decode(pid, (unsigned char*) raw_pid, MAX_CID_LEN);
 	tiger((uint64_t*) raw_pid, TIGERSIZE, (uint64_t*) tiger_res);
 	base32_encode((unsigned char*) tiger_res, TIGERSIZE, x_pid);
@@ -102,7 +102,7 @@ static int check_cid(struct hub_info* hub, struct hub_user* user, struct adc_mes
 		hub_free(pid);
 		return status_msg_error_no_memory;
 	}
-	
+
 	if (strlen(cid) != MAX_CID_LEN)
 	{
 		hub_free(cid);
@@ -125,7 +125,7 @@ static int check_cid(struct hub_info* hub, struct hub_user* user, struct adc_mes
 			hub_free(pid);
 			return status_msg_inf_error_cid_invalid;
 		}
-		
+
 		if (!is_valid_base32_char(pid[pos]))
 		{
 			hub_free(cid);
@@ -415,7 +415,7 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 		int64_t shared_size = atoll(arg);
 		if (shared_size < 0)
 			shared_size = 0;
-		
+
 		if (user_is_logged_in(user))
 		{
 			hub->users->shared_size  -= user->limits.shared_size;
@@ -425,14 +425,14 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 		hub_free(arg);
 		arg = 0;
 	}
-	
+
 	arg = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_SHARED_FILES);
 	if (arg)
 	{
 		ssize_t shared_files = atoll(arg);
 		if (shared_files < 0)
 			shared_files = 0;
-		
+
 		if (user_is_logged_in(user))
 		{
 			hub->users->shared_files -= user->limits.shared_files;
@@ -442,7 +442,7 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 		hub_free(arg);
 		arg = 0;
 	}
-	
+
 	arg = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_COUNT_HUB_NORMAL);
 	if (arg)
 	{
@@ -497,7 +497,7 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 		{
 			return status_msg_user_share_size_high;
 		}
-		
+
 		if ((user->limits.hub_count_user           > hub_get_max_hubs_user(hub)  && hub_get_max_hubs_user(hub)) ||
 			(user->limits.hub_count_registered > hub_get_max_hubs_reg(hub)   && hub_get_max_hubs_reg(hub))  ||
 			(user->limits.hub_count_operator   > hub_get_max_hubs_op(hub)    && hub_get_max_hubs_op(hub))   ||
@@ -505,14 +505,14 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 		{
 			return status_msg_user_hub_limit_high;
 		}
-		
+
 		if ((user->limits.hub_count_user           < hub_get_min_hubs_user(hub)  && hub_get_min_hubs_user(hub)) ||
 			(user->limits.hub_count_registered < hub_get_min_hubs_reg(hub)   && hub_get_min_hubs_reg(hub))  ||
 			(user->limits.hub_count_operator   < hub_get_min_hubs_op(hub)    && hub_get_min_hubs_op(hub)))
 		{
 			return status_msg_user_hub_limit_low;
 		}
-		
+
 		if (user->limits.upload_slots < hub_get_min_slots(hub) && hub_get_min_slots(hub))
 		{
 			return status_msg_user_slots_low;
@@ -559,11 +559,11 @@ static int set_credentials(struct hub_info* hub, struct hub_user* user, struct a
 		case cred_guest:
 			/* Nothing to be added to the info message */
 			break;
-		
+
 		case cred_user:
 			adc_msg_add_argument(cmd, ADC_INF_FLAG_CLIENT_TYPE ADC_CLIENT_TYPE_REGISTERED_USER);
 			break;
-		
+
 		case cred_operator:
 			adc_msg_add_argument(cmd, ADC_INF_FLAG_CLIENT_TYPE ADC_CLIENT_TYPE_OPERATOR);
 			break;
@@ -571,11 +571,11 @@ static int set_credentials(struct hub_info* hub, struct hub_user* user, struct a
 		case cred_super:
 			adc_msg_add_argument(cmd, ADC_INF_FLAG_CLIENT_TYPE ADC_CLIENT_TYPE_SUPER_USER);
 			break;
-		
+
 		case cred_admin:
 			adc_msg_add_argument(cmd, ADC_INF_FLAG_CLIENT_TYPE ADC_CLIENT_TYPE_ADMIN);
 			break;
-		
+
 		case cred_link:
 			break;
  	}
@@ -670,13 +670,12 @@ int hub_handle_info_login(struct hub_info* hub, struct hub_user* user, struct ad
 	int code = 0;
 
 	INF_CHECK(hub_perform_login_checks, hub, user, cmd);
-	
+
 	/* Private ID must never be broadcasted - drop it! */
 	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_PRIVATE_ID);
-	
-	
+
 	code = set_credentials(hub, user, cmd);
-	
+
 	/* Note: this must be done *after* set_credentials. */
 	if (check_is_hub_full(hub, user))
 	{
@@ -785,16 +784,18 @@ int hub_handle_info(struct hub_info* hub, struct hub_user* user, const struct ad
 
 		strip_network(user, cmd);
 		hub_handle_info_low_bandwidth(hub, user, cmd);
-		
+
 		user_update_info(user, cmd);
-		
+
 		if (!adc_msg_is_empty(cmd))
 		{
 			route_message(hub, user, cmd);
 		}
-		
+
 		adc_msg_free(cmd);
 	}
-	
+
 	return 0;
 }
+
+
