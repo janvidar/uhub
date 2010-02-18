@@ -167,16 +167,17 @@ adcrush_SOURCES := src/tools/adcrush.c
 admin_SOURCES := src/tools/admin.c
 
 autotest_SOURCES := \
-		autotest/test_message.tcc \
+		autotest/test_eventqueue.tcc \
+		autotest/test_hub.tcc \
+		autotest/test_inf.tcc \
+		autotest/test_ipfilter.tcc \
 		autotest/test_list.tcc \
 		autotest/test_memory.tcc \
-		autotest/test_ipfilter.tcc \
-		autotest/test_inf.tcc \
-		autotest/test_hub.tcc \
+		autotest/test_message.tcc \
 		autotest/test_misc.tcc \
+		autotest/test_sid.tcc \
 		autotest/test_tiger.tcc \
-		autotest/test_usermanager.tcc \
-		autotest/test_eventqueue.tcc
+		autotest/test_usermanager.tcc
 
 autotest_OBJECTS = autotest.o
 

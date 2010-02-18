@@ -119,6 +119,14 @@ void sid_pool_destroy(struct sid_pool* pool)
 
 sid_t sid_alloc(struct sid_pool* pool, struct hub_user* user)
 {
+	if (pool->count >= (pool->max - pool->min))
+	{
+#ifdef DEBUG_SID
+		LOG_DUMP("SID_POOL:  alloc, sid pool is full.");
+#endif
+		return 0;
+	}
+
 	sid_t n = (++pool->count);
 	for (; (pool->map[n % pool->max]); n++) ;
 
@@ -140,7 +148,7 @@ void sid_free(struct sid_pool* pool, sid_t sid)
 
 struct hub_user* sid_lookup(struct sid_pool* pool, sid_t sid)
 {
-	if (!sid || (sid > pool->max))
+	if (!sid || (sid >= pool->max))
 		return 0;
 	return pool->map[sid];
 }
