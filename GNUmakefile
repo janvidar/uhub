@@ -225,7 +225,8 @@ revision.h.tmp:
 version.h: revision.h
 
 revision.h: revision.h.tmp
-	@if [ '$(GIT_REVISION)' != '$(OLD_REVISION)' ]; then cat $@.tmp > $@; fi
+	@if [ '$(GIT_REVISION)' != '$(OLD_REVISION)' ]; then cp $@.tmp $@; fi
+	@if [ ! -f $@ ]; then cp $@.tmp $@; fi
 
 $(autotest_OBJECTS): autotest.c
 	$(MSG_CC) $(CC) -c $(CFLAGS) -Isrc -o $@ $<
