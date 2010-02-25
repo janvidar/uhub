@@ -177,6 +177,7 @@ autotest_SOURCES := \
 		autotest/test_misc.tcc \
 		autotest/test_sid.tcc \
 		autotest/test_tiger.tcc \
+		autotest/test_timer.tcc \
 		autotest/test_usermanager.tcc
 
 autotest_OBJECTS = autotest.o
