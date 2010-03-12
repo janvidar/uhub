@@ -76,7 +76,7 @@ int net_backend_init()
 	g_backend->common.num = 0;
 	g_backend->common.max = net_get_max_sockets();
 	g_backend->now = time(0);
-	timeout_queue_initialize(&g_backend->timeout_queue, g_backend->now, 600); /* FIXME: max 600 secs! */
+	timeout_queue_initialize(&g_backend->timeout_queue, g_backend->now, 120); /* FIXME: max 120 secs! */
 	g_backend->cleaner = net_cleanup_initialize(g_backend->common.max);
 
 	for (n = 0; n < sizeof(net_backend_init_funcs); n++)
