@@ -35,7 +35,7 @@ void timeout_evt_reset(struct timeout_evt* t)
 
 int timeout_evt_is_scheduled(struct timeout_evt* t)
 {
-	return !!t->prev;
+	return t->prev != NULL;
 }
 
 void timeout_queue_initialize(struct timeout_queue* t, time_t now, size_t max)
