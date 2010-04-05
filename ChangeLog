@@ -1,3 +1,15 @@
+0.3.1:
+- Fixed bug where !getip did not work.
+- Added flood control configuration options.
+- Added configuration options to disallow old/obsolete ADC clients.
+- Fixed crash bugs, an freezes.
+- SSL/TLS fix for tls_require configuration option.
+- Fixed disconnect messages, so that clients can interpret them.
+- Fixed bugs where share limits could be circumvented.
+- Added support for listening to multiple ports.
+- kqueue backend for Mac OS X, and BSD systems.
+
+
 0.3.0:
 - More user commands: ban, broadcast, mute, rules, history, myip, whoip, log
 - Experimental SSL support
