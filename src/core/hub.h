@@ -53,6 +53,10 @@ enum status_message
 	status_msg_user_hub_limit_low        = -44, /* Use is on too few hubs. */
 	status_msg_user_hub_limit_high       = -45, /* Use is on too many hubs. */
 
+	status_msg_proto_no_common_hash      = -50, /* No common hash algorithms */
+	status_msg_proto_obsolete_adc0       = -51, /* Client is using an obsolete protocol version */
+	
+
 };
 
 

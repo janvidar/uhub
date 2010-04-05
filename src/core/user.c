@@ -134,10 +134,9 @@ static int convert_support_fourcc(int fourcc)
 {
 	switch (fourcc)
 	{
-		case FOURCC('B','A','S','0'): /* Obsolete */
-#ifndef OLD_ADC_SUPPORT
-			return 0;
-#endif
+		case FOURCC('B','A','S','0'):
+			return feature_bas0;
+
 		case FOURCC('B','A','S','E'):
 			return feature_base;
 

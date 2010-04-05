@@ -137,17 +137,46 @@ int hub_handle_support(struct hub_info* hub, struct hub_user* u, struct adc_mess
 	if (u->state == state_protocol)
 	{
 		if (index == 0) ok = 0; /* Need to support *SOMETHING*, at least BASE */
-	
-		if (ok)
-		{
-			hub_send_handshake(hub, u);
-			net_con_set_timeout(u->connection, TIMEOUT_HANDSHAKE);
-		}
-		else
+		if (!ok)
 		{
 			/* disconnect user. Do not send crap during initial handshake! */
 			hub_disconnect_user(hub, u, quit_logon_error);
-			ret = -1;
+			return -1;
+		}
+
+		if (user_flag_get(u, feature_base))
+		{
+			/* User supports ADC/1.0 and a hash we know */
+			if (user_flag_get(u, feature_tiger))
+			{
+				hub_send_handshake(hub, u);
+				net_con_set_timeout(u->connection, TIMEOUT_HANDSHAKE);
+			}
+			else
+			{
+				// no common hash algorithm.
+				hub_send_status(hub, u, status_msg_proto_no_common_hash, status_level_fatal);
+				hub_disconnect_user(hub, u, quit_protocol_error);
+			}
+		}
+		else if (user_flag_get(u, feature_bas0))
+		{
+			if (hub->config->obsolete_clients)
+			{
+				hub_send_handshake(hub, u);
+				net_con_set_timeout(u->connection, TIMEOUT_HANDSHAKE);
+			}
+			else
+			{
+				/* disconnect user for using an obsolete client. */
+				hub_send_status(hub, u, status_msg_proto_obsolete_adc0, status_level_fatal);
+				hub_disconnect_user(hub, u, quit_protocol_error);
+			}
+		}
+		else
+		{
+			/* Not speaking a compatible protocol - just disconnect. */
+			hub_disconnect_user(hub, u, quit_logon_error);
 		}
 	}
 
@@ -890,6 +919,8 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 		STATUS(43, msg_user_slots_high,       "FB" ADC_INF_FLAG_UPLOAD_SLOTS, 0);
 		STATUS(43, msg_user_hub_limit_low, 0, 0);
 		STATUS(43, msg_user_hub_limit_high, 0, 0);
+		STATUS(47, msg_proto_no_common_hash, 0, -1);
+		STATUS(40, msg_proto_obsolete_adc0, 0, -1);
 	}
 #undef STATUS
 	
@@ -958,6 +989,8 @@ const char* hub_get_status_message(struct hub_info* hub, enum status_message msg
 		STATUS(msg_user_slots_high);
 		STATUS(msg_user_hub_limit_low);
 		STATUS(msg_user_hub_limit_high);
+		STATUS(msg_proto_no_common_hash);
+		STATUS(msg_proto_obsolete_adc0);
 	}
 #undef STATUS
 	return "Unknown";
@@ -997,6 +1030,8 @@ const char* hub_get_status_message_log(struct hub_info* hub, enum status_message
                 STATUS(msg_user_slots_high);
                 STATUS(msg_user_hub_limit_low);
                 STATUS(msg_user_hub_limit_high);
+		STATUS(msg_proto_no_common_hash);
+		STATUS(msg_proto_obsolete_adc0);
         }
 #undef STATUS
         return "unknown";

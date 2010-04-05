@@ -127,6 +127,7 @@
 #define DEF_SHOW_BANNER                     1
 #define DEF_SHOW_BANNER_SYS_INFO            1
 #define DEF_REGISTERED_USERS_ONLY           0
+#define DEF_OBSOLETE_CLIENTS                0
 #define DEF_CHAT_ONLY                       0
 #define DEF_CHAT_IS_PRIVILEGED              0
 #define DEF_LOW_BANDWIDTH_MODE              0
@@ -174,6 +175,8 @@
 #define DEF_MSG_USER_SLOTS_HIGH             "User have too many upload slots."
 #define DEF_MSG_USER_HUB_LIMIT_LOW          "User is on too few hubs."
 #define DEF_MSG_USER_HUB_LIMIT_HIGH         "User is on too many hubs."
+#define DEF_MSG_PROTO_NO_COMMON_HASH        "No common hash algorithm."
+#define DEF_MSG_PROTO_OBSOLETE_ADC0         "Your client does not support ADC/1.0."
 
 void config_defaults(struct hub_config* config)
 {
@@ -195,11 +198,12 @@ void config_defaults(struct hub_config* config)
 	DEFAULT_INTEGER(max_send_buffer_soft,  DEF_MAX_SEND_BUFFER_SOFT);
 	DEFAULT_BOOLEAN(show_banner,           DEF_SHOW_BANNER);
 	DEFAULT_BOOLEAN(show_banner_sys_info,  DEF_SHOW_BANNER_SYS_INFO);
+	DEFAULT_BOOLEAN(obsolete_clients,      DEF_OBSOLETE_CLIENTS);
 	DEFAULT_BOOLEAN(chat_only,             DEF_CHAT_ONLY);
 	DEFAULT_BOOLEAN(chat_is_privileged,    DEF_CHAT_IS_PRIVILEGED);
 	DEFAULT_BOOLEAN(low_bandwidth_mode,    DEF_LOW_BANDWIDTH_MODE);
 	DEFAULT_BOOLEAN(registered_users_only, DEF_REGISTERED_USERS_ONLY);
-	
+
 	/* Limits enforced on users */
 	DEFAULT_INTEGER(limit_max_hubs_user,   DEF_LIMIT_MAX_HUBS_USER);
 	DEFAULT_INTEGER(limit_max_hubs_reg,    DEF_LIMIT_MAX_HUBS_REG);
@@ -243,6 +247,8 @@ void config_defaults(struct hub_config* config)
 	DEFAULT_STRING (msg_user_slots_high,           DEF_MSG_USER_SLOTS_HIGH);
 	DEFAULT_STRING (msg_user_hub_limit_low,        DEF_MSG_USER_HUB_LIMIT_LOW);
 	DEFAULT_STRING (msg_user_hub_limit_high,       DEF_MSG_USER_HUB_LIMIT_HIGH);
+	DEFAULT_STRING (msg_proto_no_common_hash,      DEF_MSG_PROTO_NO_COMMON_HASH);
+	DEFAULT_STRING (msg_proto_obsolete_adc0,       DEF_MSG_PROTO_OBSOLETE_ADC0);
 
 	DEFAULT_INTEGER(tls_enable,                    DEF_TLS_ENABLE);
 	DEFAULT_INTEGER(tls_require,                   DEF_TLS_REQUIRE);
@@ -271,6 +277,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 	GET_INT (max_send_buffer_soft);
 	GET_BOOL(show_banner);
 	GET_BOOL(show_banner_sys_info);
+	GET_BOOL(obsolete_clients);
 	GET_BOOL(chat_only);
 	GET_BOOL(chat_is_privileged);
 	GET_BOOL(low_bandwidth_mode);
@@ -288,7 +295,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 	GET_INT(limit_max_share);
 	GET_INT(limit_min_slots);
 	GET_INT(limit_max_slots);
-	
+
 	/* Status/error strings */
 	GET_STR (msg_hub_full);
 	GET_STR (msg_hub_disabled);
@@ -319,13 +326,16 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 	GET_STR (msg_user_slots_high);
 	GET_STR (msg_user_hub_limit_low);
 	GET_STR (msg_user_hub_limit_high);
+	GET_STR (msg_proto_no_common_hash);
+	GET_STR (msg_proto_obsolete_adc0);
 
+	/* TLS/SSL related */
 	GET_BOOL(tls_enable);
 	GET_BOOL(tls_require);
 	GET_STR (tls_certificate);
 	GET_STR (tls_private_key);
 
-    /* Still here -- unknown directive */
+	/* Still here -- unknown directive */
 	LOG_ERROR("Unknown configuration directive: '%s'", key);
 	return -1;
 }
@@ -340,7 +350,7 @@ void free_config(struct hub_config* config)
 	hub_free(config->file_rules);
 	hub_free(config->hub_name);
 	hub_free(config->hub_description);
-	
+
 	hub_free(config->msg_hub_full);
 	hub_free(config->msg_hub_disabled);
 	hub_free(config->msg_hub_registered_users_only);
@@ -370,7 +380,9 @@ void free_config(struct hub_config* config)
 	hub_free(config->msg_user_slots_high);
 	hub_free(config->msg_user_hub_limit_low);
 	hub_free(config->msg_user_hub_limit_high);
-	
+	hub_free(config->msg_proto_no_common_hash);
+	hub_free(config->msg_proto_obsolete_adc0);
+
 	hub_free(config->tls_certificate);
 	hub_free(config->tls_private_key);
 	
@@ -425,6 +437,7 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 	DUMP_INT (max_send_buffer_soft, DEF_MAX_SEND_BUFFER_SOFT);
 	DUMP_BOOL(show_banner, DEF_SHOW_BANNER);
 	DUMP_BOOL(show_banner_sys_info, DEF_SHOW_BANNER_SYS_INFO);
+	DUMP_BOOL(obsolete_clients, DEF_OBSOLETE_CLIENTS);
 	DUMP_BOOL(chat_only, DEF_CHAT_ONLY);
 	DUMP_BOOL(chat_is_privileged, DEF_CHAT_IS_PRIVILEGED);
 	DUMP_BOOL(low_bandwidth_mode, DEF_LOW_BANDWIDTH_MODE);
@@ -480,6 +493,8 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 	DUMP_STR (msg_user_slots_high, DEF_MSG_USER_SLOTS_HIGH);
 	DUMP_STR (msg_user_hub_limit_low, DEF_MSG_USER_HUB_LIMIT_LOW);
 	DUMP_STR (msg_user_hub_limit_high, DEF_MSG_USER_HUB_LIMIT_HIGH);
+	DUMP_STR (msg_proto_no_common_hash, DEF_MSG_PROTO_NO_COMMON_HASH);
+	DUMP_STR (msg_proto_obsolete_adc0, DEF_MSG_PROTO_OBSOLETE_ADC0);
 }
 
 

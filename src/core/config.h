@@ -31,6 +31,7 @@ struct hub_config
 	int show_banner_sys_info;    /**<<< "Show banner system information (default: 1). Has no effect unless show_banner is enabled." */
 	int max_users;               /**<<< "Maximum number of users allowed on the hub (default: 500)" */
 	int registered_users_only;   /**<<< "Allow registered users only (default: 0)" */
+	int obsolete_clients;        /**<<< "Support obsolete clients using a ADC protocol prior to 1.0 (default: off)" */
 	int chat_only;               /**<<< "Allow chat only operation on hub (default: 0)" */
 	int chat_is_privileged;      /**<<< "Allow chat for operators and above only (default: 0) */
 	char* file_motd;             /**<<< "File containing the 'message of the day' (default: '' - no motd)" */
@@ -89,6 +90,8 @@ struct hub_config
 	char* msg_user_slots_high;            /**<<< "User have too many upload slots." */
 	char* msg_user_hub_limit_low;         /**<<< "User is on too few hubs." */
 	char* msg_user_hub_limit_high;        /**<<< "User is on too many hubs." */
+	char* msg_proto_no_common_hash;       /**<<< "No common hash algorithm." */
+	char* msg_proto_obsolete_adc0;        /**<<< "Client is using an obsolete ADC protocol version." */
 
 	int tls_enable;                      /**<<< "Enable SSL/TLS support (default: 0)" */
 	int tls_require;                     /**<<< "If SSL/TLS enabled, should it be required (default: 0) */
