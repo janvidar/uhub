@@ -72,6 +72,7 @@ extern "C" {
 
 #include "core/auth.h"
 #include "core/config.h"
+#include "core/floodctl.h"
 #include "core/eventid.h"
 #include "core/eventqueue.h"
 #include "core/netevent.h"

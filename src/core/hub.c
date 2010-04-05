@@ -21,6 +21,31 @@
 
 struct hub_info* g_hub = 0;
 
+#define CHECK_CHAT_ONLY \
+	if (hub->config->chat_only && u->credentials < cred_operator) \
+		break
+
+#define CHECK_FLOOD(TYPE, WARN) \
+	if (flood_control_check(&u->flood_ ## TYPE , hub->config->flood_ctl_  ## TYPE, hub->config->flood_ctl_interval, net_get_time())) \
+	{ \
+		if (WARN) \
+		{ \
+			hub_send_flood_warning(hub, u, hub->config->msg_user_flood_ ## TYPE); \
+		} \
+		break; \
+	}
+
+#define ROUTE_MSG \
+	if (user_is_logged_in(u)) \
+	{ \
+		ret = route_message(hub, u, cmd); \
+	} \
+	else \
+	{ \
+		ret = -1; \
+	} \
+	break;
+
 int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* line, size_t length)
 {
 	int ret = 0;
@@ -36,20 +61,32 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 	{
 		switch (cmd->cmd)
 		{
-			case ADC_CMD_HSUP: ret = hub_handle_support(hub, u, cmd); break;
-			case ADC_CMD_HPAS: ret = hub_handle_password(hub, u, cmd); break;
-			case ADC_CMD_BINF: ret = hub_handle_info(hub, u, cmd); break;
+			case ADC_CMD_HSUP:
+				CHECK_FLOOD(extras, 0);
+				ret = hub_handle_support(hub, u, cmd);
+				break;
+
+			case ADC_CMD_HPAS:
+				CHECK_FLOOD(extras, 0);
+				ret = hub_handle_password(hub, u, cmd);
+				break;
+
+			case ADC_CMD_BINF:
+				CHECK_FLOOD(update, 1);
+				ret = hub_handle_info(hub, u, cmd);
+				break;
+
 			case ADC_CMD_DINF:
 			case ADC_CMD_EINF:
 			case ADC_CMD_FINF:
-				/* these must never be allowed for security reasons,
-				   so we ignore them. */
+				/* these must never be allowed for security reasons, so we ignore them. */
 				break;
 
 			case ADC_CMD_EMSG:
 			case ADC_CMD_DMSG:
 			case ADC_CMD_BMSG:
 			case ADC_CMD_FMSG:
+				CHECK_FLOOD(chat, 1);
 				ret = hub_handle_chat_message(hub, u, cmd);
 				break;
 
@@ -57,26 +94,27 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 			case ADC_CMD_DSCH:
 			case ADC_CMD_ESCH:
 			case ADC_CMD_FSCH:
+				cmd->priority = -1;
+				CHECK_CHAT_ONLY;
+				CHECK_FLOOD(search, 1);
+				ROUTE_MSG;
+
 			case ADC_CMD_DRES:
+				cmd->priority = -1;
+				CHECK_CHAT_ONLY;
+				/* CHECK_FLOOD(search, 0); */
+				ROUTE_MSG;
+
 			case ADC_CMD_DRCM:
 			case ADC_CMD_DCTM:
 				cmd->priority = -1;
-				if (hub->config->chat_only && u->credentials < cred_operator)
-				{
-					/* These below aren't allowed in chat only hubs */
-					break;
-				}
+				CHECK_CHAT_ONLY;
+				CHECK_FLOOD(connect, 1);
+				ROUTE_MSG;
 			
 			default:
-				if (user_is_logged_in(u))
-				{
-					ret = route_message(hub, u, cmd);
-				}
-				else
-				{
-					ret = -1;
-				}
-				break;
+				CHECK_FLOOD(extras, 1);
+				ROUTE_MSG;
 		}
 		adc_msg_free(cmd);
 	}
@@ -420,6 +458,28 @@ void hub_send_password_challenge(struct hub_info* hub, struct hub_user* u)
 	user_set_state(u, state_verify);
 	route_to_user(hub, u, igpa);
 	adc_msg_free(igpa);
+}
+
+void hub_send_flood_warning(struct hub_info* hub, struct hub_user* u, const char* message)
+{
+	struct adc_message* msg;
+	char* tmp;
+
+	if (user_flag_get(u, flag_flood))
+		return;
+
+	msg = adc_msg_construct(ADC_CMD_ISTA, 128);
+	if (msg)
+	{
+		tmp = adc_msg_escape(message);
+		adc_msg_add_argument(msg, "110");
+		adc_msg_add_argument(msg, tmp);
+		hub_free(tmp);
+	}
+
+	route_to_user(hub, u, msg);
+	user_flag_set(u, flag_flood);
+	adc_msg_free(msg);
 }
 
 static void hub_event_dispatcher(void* callback_data, struct event_data* message)

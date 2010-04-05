@@ -54,6 +54,12 @@ struct hub_user* user_create(struct hub_info* hub, struct net_connection* con, s
 
 	memcpy(&user->id.addr, addr, sizeof(struct ip_addr_encap));
 	user_set_state(user, state_protocol);
+
+	flood_control_reset(&user->flood_chat);
+	flood_control_reset(&user->flood_connect);
+	flood_control_reset(&user->flood_search);
+	flood_control_reset(&user->flood_update);
+	flood_control_reset(&user->flood_extras);
 	return user;
 }
 

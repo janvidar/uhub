@@ -142,6 +142,12 @@
 #define DEF_LIMIT_MAX_SHARE                 0
 #define DEF_LIMIT_MIN_SLOTS                 0
 #define DEF_LIMIT_MAX_SLOTS                 0
+#define DEF_FLOOD_INTERVAL                  0
+#define DEF_FLOOD_CHAT                      0
+#define DEF_FLOOD_CONNECT                   0
+#define DEF_FLOOD_SEARCH                    0
+#define DEF_FLOOD_UPDATE                    0
+#define DEF_FLOOD_EXTRAS                    0
 #define DEF_TLS_ENABLE                      0
 #define DEF_TLS_REQUIRE                     1
 #define DEF_TLS_PRIVATE_KEY                 ""
@@ -175,6 +181,11 @@
 #define DEF_MSG_USER_SLOTS_HIGH             "User have too many upload slots."
 #define DEF_MSG_USER_HUB_LIMIT_LOW          "User is on too few hubs."
 #define DEF_MSG_USER_HUB_LIMIT_HIGH         "User is on too many hubs."
+#define DEF_MSG_FLOOD_CHAT                  "Chat flood detected, messages are dropped."
+#define DEF_MSG_FLOOD_CONNECT               "Connect flood detected, connection refused."
+#define DEF_MSG_FLOOD_SEARCH                "Search flood detected, search is stopped."
+#define DEF_MSG_FLOOD_UPDATE                "Update flood detected."
+#define DEF_MSG_FLOOD_EXTRAS                "Flood detected."
 #define DEF_MSG_PROTO_NO_COMMON_HASH        "No common hash algorithm."
 #define DEF_MSG_PROTO_OBSOLETE_ADC0         "Your client does not support ADC/1.0."
 
@@ -217,6 +228,14 @@ void config_defaults(struct hub_config* config)
 	DEFAULT_INTEGER(limit_min_slots,       DEF_LIMIT_MIN_SLOTS);
 	DEFAULT_INTEGER(limit_max_slots,       DEF_LIMIT_MAX_SLOTS);
 
+	/* Flood control */
+	DEFAULT_INTEGER(flood_ctl_interval,    DEF_FLOOD_INTERVAL);
+	DEFAULT_INTEGER(flood_ctl_chat,        DEF_FLOOD_CHAT);
+	DEFAULT_INTEGER(flood_ctl_connect,     DEF_FLOOD_CONNECT);
+	DEFAULT_INTEGER(flood_ctl_search,      DEF_FLOOD_SEARCH);
+	DEFAULT_INTEGER(flood_ctl_update,      DEF_FLOOD_UPDATE);
+	DEFAULT_INTEGER(flood_ctl_extras,      DEF_FLOOD_EXTRAS);
+
 	/* Status/error strings */
 	DEFAULT_STRING (msg_hub_full,                  DEF_MSG_HUB_FULL);
 	DEFAULT_STRING (msg_hub_disabled,              DEF_MSG_HUB_DISABLED)
@@ -247,6 +266,11 @@ void config_defaults(struct hub_config* config)
 	DEFAULT_STRING (msg_user_slots_high,           DEF_MSG_USER_SLOTS_HIGH);
 	DEFAULT_STRING (msg_user_hub_limit_low,        DEF_MSG_USER_HUB_LIMIT_LOW);
 	DEFAULT_STRING (msg_user_hub_limit_high,       DEF_MSG_USER_HUB_LIMIT_HIGH);
+	DEFAULT_STRING (msg_user_flood_chat,           DEF_MSG_FLOOD_CHAT);
+	DEFAULT_STRING (msg_user_flood_connect,        DEF_MSG_FLOOD_CONNECT);
+	DEFAULT_STRING (msg_user_flood_search,         DEF_MSG_FLOOD_SEARCH);
+	DEFAULT_STRING (msg_user_flood_update,         DEF_MSG_FLOOD_UPDATE);
+	DEFAULT_STRING (msg_user_flood_extras,         DEF_MSG_FLOOD_EXTRAS);
 	DEFAULT_STRING (msg_proto_no_common_hash,      DEF_MSG_PROTO_NO_COMMON_HASH);
 	DEFAULT_STRING (msg_proto_obsolete_adc0,       DEF_MSG_PROTO_OBSOLETE_ADC0);
 
@@ -296,6 +320,13 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 	GET_INT(limit_min_slots);
 	GET_INT(limit_max_slots);
 
+	GET_INT(flood_ctl_interval);
+	GET_INT(flood_ctl_chat);
+	GET_INT(flood_ctl_connect);
+	GET_INT(flood_ctl_search);
+	GET_INT(flood_ctl_update);
+	GET_INT(flood_ctl_extras);
+
 	/* Status/error strings */
 	GET_STR (msg_hub_full);
 	GET_STR (msg_hub_disabled);
@@ -326,6 +357,11 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 	GET_STR (msg_user_slots_high);
 	GET_STR (msg_user_hub_limit_low);
 	GET_STR (msg_user_hub_limit_high);
+	GET_STR (msg_user_flood_chat);
+	GET_STR (msg_user_flood_connect);
+	GET_STR (msg_user_flood_search);
+	GET_STR (msg_user_flood_update);
+	GET_STR (msg_user_flood_extras);
 	GET_STR (msg_proto_no_common_hash);
 	GET_STR (msg_proto_obsolete_adc0);
 
@@ -380,6 +416,11 @@ void free_config(struct hub_config* config)
 	hub_free(config->msg_user_slots_high);
 	hub_free(config->msg_user_hub_limit_low);
 	hub_free(config->msg_user_hub_limit_high);
+	hub_free(config->msg_user_flood_chat);
+	hub_free(config->msg_user_flood_connect);
+	hub_free(config->msg_user_flood_search);
+	hub_free(config->msg_user_flood_update);
+	hub_free(config->msg_user_flood_extras);
 	hub_free(config->msg_proto_no_common_hash);
 	hub_free(config->msg_proto_obsolete_adc0);
 
@@ -462,7 +503,14 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 	DUMP_INT(limit_max_share, DEF_LIMIT_MAX_SHARE);
 	DUMP_INT(limit_min_slots, DEF_LIMIT_MIN_SLOTS);
 	DUMP_INT(limit_max_slots, DEF_LIMIT_MAX_SLOTS);
-	
+
+	DUMP_INT(flood_ctl_interval, DEF_FLOOD_INTERVAL);
+	DUMP_INT(flood_ctl_chat,     DEF_FLOOD_CHAT);
+	DUMP_INT(flood_ctl_connect,  DEF_FLOOD_CONNECT);
+	DUMP_INT(flood_ctl_search,   DEF_FLOOD_SEARCH);
+	DUMP_INT(flood_ctl_update,   DEF_FLOOD_UPDATE);
+	DUMP_INT(flood_ctl_extras,   DEF_FLOOD_EXTRAS);
+
 	/* Status/error strings */
 	DUMP_STR (msg_hub_full, DEF_MSG_HUB_FULL);
 	DUMP_STR (msg_hub_disabled, DEF_MSG_HUB_DISABLED);
@@ -493,6 +541,11 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 	DUMP_STR (msg_user_slots_high, DEF_MSG_USER_SLOTS_HIGH);
 	DUMP_STR (msg_user_hub_limit_low, DEF_MSG_USER_HUB_LIMIT_LOW);
 	DUMP_STR (msg_user_hub_limit_high, DEF_MSG_USER_HUB_LIMIT_HIGH);
+	DUMP_STR (msg_user_flood_chat, DEF_MSG_FLOOD_CHAT);
+	DUMP_STR (msg_user_flood_connect, DEF_MSG_FLOOD_CONNECT);
+	DUMP_STR (msg_user_flood_search, DEF_MSG_FLOOD_SEARCH);
+	DUMP_STR (msg_user_flood_update, DEF_MSG_FLOOD_UPDATE);
+	DUMP_STR (msg_user_flood_extras, DEF_MSG_FLOOD_EXTRAS);
 	DUMP_STR (msg_proto_no_common_hash, DEF_MSG_PROTO_NO_COMMON_HASH);
 	DUMP_STR (msg_proto_obsolete_adc0, DEF_MSG_PROTO_OBSOLETE_ADC0);
 }

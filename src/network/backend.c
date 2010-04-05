@@ -155,6 +155,12 @@ int net_backend_process()
 	return 1;
 }
 
+time_t net_get_time()
+{
+	return g_backend->now;
+}
+
+
 void net_con_initialize(struct net_connection* con, int sd, net_connection_cb callback, const void* ptr, int events)
 {
 	g_backend->handler.con_init(g_backend->data, con, sd, callback, ptr);

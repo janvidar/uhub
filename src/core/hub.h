@@ -228,6 +228,11 @@ extern void hub_send_password_challenge(struct hub_info* hub, struct hub_user* u
 extern void hub_send_status(struct hub_info*, struct hub_user* user, enum status_message msg, enum msg_status_level level);
 
 /**
+ * Warn user about flooding.
+ */
+extern void hub_send_flood_warning(struct hub_info*, struct hub_user* user, const char* message);
+
+/**
  * Allocates memory, initializes the hub based on the configuration,
  * and returns a hub handle.
  * This hub handle must be passed to hub_shutdown_service() in order to cleanup before exiting.

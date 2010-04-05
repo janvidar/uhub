@@ -22,6 +22,7 @@
 
 struct hub_info;
 struct hub_iobuf;
+struct flood_control;
 
 enum user_state
 {
@@ -46,6 +47,7 @@ enum user_flags
 	feature_link    = 0x00000100, /** LINK: Hub link (not supported) */
 	feature_adcs    = 0x00000200, /** ADCS: ADC over TLS/SSL */
 	feature_bas0    = 0x00000400, /** BAS0: Obsolete pre-ADC/1.0 protocol version */
+	flag_flood      = 0x00400000, /** User has been notified about flooding. */
 	flag_muted      = 0x00800000, /** User is muted (cannot chat) */
 	flag_ignore     = 0x01000000, /** Ignore further reads */
 	flag_maxbuf     = 0x02000000, /** Hit max buf read, ignore msg */
@@ -117,6 +119,11 @@ struct hub_user
 	struct hub_user_limits  limits;             /** Data used for limitation */
 	enum user_quit_reason   quit_reason;        /** Quit reason (see user_quit_reason) */
 
+	struct flood_control   flood_chat;
+	struct flood_control   flood_connect;
+	struct flood_control   flood_search;
+	struct flood_control   flood_update;
+	struct flood_control   flood_extras;
 };
 
 

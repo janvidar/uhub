@@ -75,6 +75,11 @@ extern void net_backend_shutdown();
  */
 extern int net_backend_process();
 
+/**
+ * Get the current time.
+ */
+time_t net_get_time();
+
 extern struct timeout_queue* net_backend_get_timeout_queue();
 
 struct net_cleanup_handler* net_cleanup_initialize(size_t max);

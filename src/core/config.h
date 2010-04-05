@@ -60,6 +60,13 @@ struct hub_config
 	int limit_min_slots;         /**<<< "Limit minimum number of slots open per user (0=off, default: 0)" */
 	int limit_max_slots;         /**<<< "Limit maximum number of slots open per user (0=off, default: 0)" */
 
+	int flood_ctl_interval;      /**<<< "Time interval in seconds for flood control check. If 0 then all flood control is disabled. (0=off, default: 0)" */
+	int flood_ctl_chat;          /**<<< "Max chat messages allowed inside the time interval (0=off, default: 0)" */
+	int flood_ctl_connect;       /**<<< "Max connect requests allowed inside  the time interval (0=off, default: 0)" */
+	int flood_ctl_search;        /**<<< "Max search requests allowed inside the time interval (0=off, default: 0)" */
+	int flood_ctl_update;        /**<<< "Max updates allowed inside the time interval (0=off, default: 0)" */
+	int flood_ctl_extras;        /**<<< "Max extra protocol messages allowed inside the time interval (0=off, default: 0)" */
+
 	/* Messages that can be sent to a user */
 	char* msg_hub_full;                   /**<<< "hub is full" */
 	char* msg_hub_disabled;               /**<<< "hub is disabled" */
@@ -90,6 +97,11 @@ struct hub_config
 	char* msg_user_slots_high;            /**<<< "User have too many upload slots." */
 	char* msg_user_hub_limit_low;         /**<<< "User is on too few hubs." */
 	char* msg_user_hub_limit_high;        /**<<< "User is on too many hubs." */
+	char* msg_user_flood_chat;            /**<<< "Chat flood detected, messages are dropped." */
+	char* msg_user_flood_connect;         /**<<< "Connect flood detected, connection refused." */
+	char* msg_user_flood_search;          /**<<< "Search flood detected, search is stopped." */
+	char* msg_user_flood_update;          /**<<< "Update flood detected." */
+	char* msg_user_flood_extras;          /**<<< "Flood detected." */
 	char* msg_proto_no_common_hash;       /**<<< "No common hash algorithm." */
 	char* msg_proto_obsolete_adc0;        /**<<< "Client is using an obsolete ADC protocol version." */
 
