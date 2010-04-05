@@ -347,7 +347,7 @@ static int command_getip(struct hub_info* hub, struct hub_user* user, struct hub
 	if (!target)
 		return command_status_user_not_found(hub, user, cmd, nick);
 
-	snprintf(tmp, 128, "%s has address \"%s\"", nick, user_get_address(user));
+	snprintf(tmp, 128, "%s has address \"%s\"", nick, user_get_address(target));
 	return command_status(hub, user, cmd, tmp);
 }
 
