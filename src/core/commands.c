@@ -339,7 +339,7 @@ static int command_getip(struct hub_info* hub, struct hub_user* user, struct hub
 	char* nick = list_get_first(cmd->args);
 	struct hub_user* target;
 
-	if (!nick);
+	if (!nick)
 		return -1; // FIXME: bad syntax/OOM
 
 	target = uman_get_user_by_nick(hub, nick);
