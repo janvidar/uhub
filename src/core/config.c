@@ -190,6 +190,7 @@ int read_config(const char* file, struct hub_config* config, int allow_missing)
 	int ret;
 
 	memset(config, 0, sizeof(struct hub_config));
+	config_defaults(config);
 
 	ret = file_read_lines(file, config, &config_parse_line);
 	if (ret < 0)
@@ -204,7 +205,6 @@ int read_config(const char* file, struct hub_config* config, int allow_missing)
 		}
 	}
 
-	config_defaults(config);
 	return 0;
 }
 
