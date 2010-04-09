@@ -45,7 +45,6 @@
 			LOG_FATAL("Configuration error on line %d: '%s' must be either '1' or '0'", line_count, key); \
 			return -1; \
 		} \
-		TARGET |= 0x80000000; \
 		return 0; \
 	}
 
@@ -86,16 +85,7 @@
 }
 
 #define DEFAULT_BOOLEAN(KEY, VALUE) \
-{ \
-	if (config->KEY & 0x80000000) \
-	{ \
-		config->KEY = config->KEY & 0x000000ff; \
-	} \
-	else \
-	{ \
-		config->KEY = VALUE; \
-	} \
-}
+	config->KEY = config->KEY & 0x000000ff;
 
 #define GET_STR(NAME)  CFG_APPLY_STRING ( #NAME , config->NAME )
 #define GET_INT(NAME)  CFG_APPLY_INTEGER( #NAME , config->NAME )
