@@ -26,9 +26,9 @@ struct hub_config
 	int   limit_max_hubs_reg;              /*<<< Max concurrent hubs as a registered user (default: 10) */
 	int   limit_max_hubs_op;               /*<<< Max concurrent hubs as a operator (or admin) (default: 10) */
 	int   limit_max_hubs;                  /*<<< Max total hub connections allowed, user/reg/op combined. (default: 25) */
-	int   limit_min_hubs_user;             /*<<< Minimum concurrent hubs as a guest user (default: 10) */
-	int   limit_min_hubs_reg;              /*<<< Minimum concurrent hubs as a registered user (default: 10) */
-	int   limit_min_hubs_op;               /*<<< Minimum concurrent hubs as a operator (or admin) (default: 10) */
+	int   limit_min_hubs_user;             /*<<< Minimum concurrent hubs as a guest user (default: 0) */
+	int   limit_min_hubs_reg;              /*<<< Minimum concurrent hubs as a registered user (default: 0) */
+	int   limit_min_hubs_op;               /*<<< Minimum concurrent hubs as a operator (or admin) (default: 0) */
 	int   limit_min_share;                 /*<<< Limit minimum share size in megabytes (default: 0) */
 	int   limit_max_share;                 /*<<< Limit maximum share size in megabytes (default: 0) */
 	int   limit_min_slots;                 /*<<< Limit minimum number of upload slots open per user (default: 0) */

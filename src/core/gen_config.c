@@ -26,9 +26,9 @@ void config_defaults(struct hub_config* config)
 	DEFAULT_INTEGER(limit_max_hubs_reg, 10);
 	DEFAULT_INTEGER(limit_max_hubs_op, 10);
 	DEFAULT_INTEGER(limit_max_hubs, 25);
-	DEFAULT_INTEGER(limit_min_hubs_user, 10);
-	DEFAULT_INTEGER(limit_min_hubs_reg, 10);
-	DEFAULT_INTEGER(limit_min_hubs_op, 10);
+	DEFAULT_INTEGER(limit_min_hubs_user, 0);
+	DEFAULT_INTEGER(limit_min_hubs_reg, 0);
+	DEFAULT_INTEGER(limit_min_hubs_op, 0);
 	DEFAULT_INTEGER(limit_min_share, 0);
 	DEFAULT_INTEGER(limit_max_share, 0);
 	DEFAULT_INTEGER(limit_min_slots, 0);
@@ -246,9 +246,9 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 	DUMP_INT (limit_max_hubs_reg, 10);
 	DUMP_INT (limit_max_hubs_op, 10);
 	DUMP_INT (limit_max_hubs, 25);
-	DUMP_INT (limit_min_hubs_user, 10);
-	DUMP_INT (limit_min_hubs_reg, 10);
-	DUMP_INT (limit_min_hubs_op, 10);
+	DUMP_INT (limit_min_hubs_user, 0);
+	DUMP_INT (limit_min_hubs_reg, 0);
+	DUMP_INT (limit_min_hubs_op, 0);
 	DUMP_INT (limit_min_share, 0);
 	DUMP_INT (limit_max_share, 0);
 	DUMP_INT (limit_min_slots, 0);

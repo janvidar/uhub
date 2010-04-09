@@ -251,7 +251,7 @@
 		<since>0.2.0</since>
 	</option>
 
-	<option name="limit_min_hubs_user" type="int" default="10">
+	<option name="limit_min_hubs_user" type="int" default="0">
 		<check min="0" />
 		<short>Minimum concurrent hubs as a guest user</short>
 		<description>
@@ -261,7 +261,7 @@
 		<since>0.2.0</since>
 	</option>
 
-	<option name="limit_min_hubs_reg" type="int" default="10">
+	<option name="limit_min_hubs_reg" type="int" default="0">
 		<check min="0" />
 		<short>Minimum concurrent hubs as a registered user</short>
 		<description>
@@ -271,7 +271,7 @@
 		<since>0.2.0</since>
 	</option>
 
-	<option name="limit_min_hubs_op" type="int" default="10">
+	<option name="limit_min_hubs_op" type="int" default="0">
 		<check min="0" />
 		<short>Minimum concurrent hubs as a operator (or admin)</short>
 		<description>
