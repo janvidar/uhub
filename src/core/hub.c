@@ -207,8 +207,10 @@ int hub_handle_support(struct hub_info* hub, struct hub_user* u, struct adc_mess
 			else
 			{
 				/* disconnect user for using an obsolete client. */
-				struct adc_message* message = adc_msg_construct(ADC_CMD_IMSG, 6);
-				adc_msg_add_argument(message, hub->config->msg_proto_obsolete_adc0);
+				char* tmp = adc_msg_escape(hub->config->msg_proto_obsolete_adc0);
+				struct adc_message* message = adc_msg_construct(ADC_CMD_IMSG, 6 + strlen(tmp));
+				adc_msg_add_argument(message, tmp);
+				hub_free(tmp);
 				route_to_user(hub, u, message);
 				adc_msg_free(message);
 				hub_disconnect_user(hub, u, quit_protocol_error);
