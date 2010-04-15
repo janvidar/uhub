@@ -3,9 +3,9 @@
 
 	<option name="hub_enabled" type="boolean" default="1">
 		<short>Is server enabled</short>
-		<description>
+		<description><![CDATA[
 			Use this to disable the hub for a while.
-		</description>
+		]]></description>
 		<since>0.1.3</since>
 	</option>
 
@@ -13,21 +13,21 @@
 		<check min="1" max="65535" />
 		<since>0.1.0</since>
 		<short>Server port to bind to</short>
-		<description>This is specifies the port number the hub should listen on.</description>
+		<description><![CDATA[This is specifies the port number the hub should listen on.]]></description>
 	</option>
 
 	<option name="server_bind_addr" type="string" default="any">
 		<check regexp="(\d\.\d\.\d\.\d\)|(any)|(loopback)|(.*)" /><!-- FIXME: add better IPv6 regexp in the future! -->
 		<short>Server bind address</short>
-		<description>
+		<description><![CDATA[
 			Specify the IP address the local hub should bind to. This can be an IPv4 or IPv6 address, or one of the special addresses "any" or "loopback". <br />
 			When "any" or "loopback" is used, the hub will automatically detect if IPv6 is supported and prefer that.
-		</description>
+		]]></description>
 		<syntax>
 			IPv4 address, IPv6 address, "any" or "loopback"
 		</syntax>
 		<since>0.1.2</since>
-		<example>
+		<example><![CDATA[
 				<p>
 				To listen to a specific IP:<br />
 				server_bind_addr = "192.168.12.69"
@@ -40,183 +40,183 @@
 				Or to listen to any address including IPv6 (if supported):<br />
 				server_bind_addr = "any"
 				</p>
-		</example>
+		]]></example>
 	</option>
 
 	<option name="server_listen_backlog" type="int" default="50">
 		<check min="5" />
 		<short>Server listen backlog</short>
-		<description>
+		<description><![CDATA[
 			<p>
 			This specifies the number of connections the hub will be able to accept in the backlog before they must be processed by the hub.
 			</p>
 			<p>
 			A too low number here will mean the hub will not accept connections fast enough when users are reconnecting really fast. The hub should under normal circumstances be able to empty the listen backlog several times per second.
 			</p>
-		</description>
+		]]></description>
 		<since>0.3.0</since>
 	</option>
 
 	<option name="server_alt_ports" type="string" default="">
 		<check regexp="((\d+)(,(\d+))*)?" />
 		<short>Comma separated list of alternative ports to listen to</short>
-		<description>
+		<description><![CDATA[
 		In addition to the server_port the hub can listen to a list of alternative ports.
-		</description>
-		<example>
+		]]></description>
+		<example><![CDATA[
 			server_alt_ports = 1295,1512,53990
-		</example>
+		]]></example>
 		<since>0.3.0</since>
 	</option>
 
 	<option name="show_banner" type="boolean" default="1">
 		<short>Show banner on connect</short>
-		<description>
+		<description><![CDATA[
 			If enabled, the hub will announce the software version running to clients when they connect with a message like: "Powered by uhub/0.x.y"
-		</description>
+		]]></description>
 		<since>0.1.0</since>
 	</option>
 
 	<option name="show_banner_sys_info" type="boolean" default="1">
 		<short>Show banner on connect</short>
-		<description>
+		<description><![CDATA[
 			If enabled, the hub will announce the operating system and CPU architecture to clients when they join.<br />
 			This option has no effect if show_banner is disabled.
-		</description>
+		]]></description>
 		<since>0.3.0</since>
 	</option>
 
 	<option name="max_users" type="int" default="500">
 		<check min="1" max="1048576" />
 		<short>Maximum number of users allowed on the hub</short>
-		<description>
+		<description><![CDATA[
 			The maximum amount of users allowed on the hub.
 			No new users will be allowed to enter the hub if this number is exceeded, however privileged users (operators, admins, etc) are still able to log in.
-		</description>
+		]]></description>
 		<since>0.1.0</since>
-		<example>
+		<example><![CDATA[
 			To run a hub for max 25 users:<br />
 				max_users = 25
-		</example>
+		]]></example>
 	</option>
 
 	<option name="registered_users_only" type="boolean" default="0">
 		<short>Allow registered users only</short>
-		<description>
+		<description><![CDATA[
 			If this is enabled only registered users will be able to use the hub. A user must be registered in the acl file (file_acl).
-		</description>
+		]]></description>
 		<since>0.1.1</since>
 	</option>
 
 	<option name="obsolete_clients" type="boolean" default="0">
 		<short>Support obsolete clients using a ADC protocol prior to 1.0</short>
-		<description>
+		<description><![CDATA[
 			If this is enabled users using old ADC clients are allowed to enter the hub,
 			however they cannot log in using passwords since the protocols are incompatible.
-		</description>
+		]]></description>
 		<since>0.3.1</since>
 	</option>
 
 	<option name="chat_only" type="boolean" default="0">
 		<short>Allow chat only operation on hub</short>
-		<description>
+		<description><![CDATA[
 			If this is enabled the hub will refuse to relay messages for search and connection setup. This effectively makes the hub viable for chat only.
-		</description>
+		]]></description>
 		<since>0.1.1</since>
 	</option>
 
 	<option name="chat_is_privileged" type="boolean" default="0">
 		<short>Allow chat for operators and above only</short>
-		<description>
+		<description><![CDATA[
 			If enabled only operators and admins are allowed to chat in the main chat.
-		</description>
+		]]></description>
 		<since>0.2.4</since>
 	</option>
 
 	<option name="hub_name" type="string" default="uhub">
 		<short>Name of hub</short>
-		<description>
+		<description><![CDATA[
 		Configures the name of the hub
-		</description>
+		]]></description>
 		<since>0.1.0</since>
-		<example>
+		<example><![CDATA[
 			hub_name = "my hub"
-		</example>
+		]]></example>
 	</option>
 
 	<option name="hub_description" type="string" default="no description">
 		<short>Short hub description, topic or subject.</short>
-		<description>
+		<description><![CDATA[
 		This is the description of the hub, as seen by users and hub lists.
-		</description>
+		]]></description>
 		<since>0.1.0</since>
-		<example>
+		<example><![CDATA[
 			hub_description = "a friendly hub for friendly people"
-		</example>
+		]]></example>
 	</option>
 
 	<option name="max_recv_buffer" type="int" default="4096" advanced="true" >
 		<check min="1024" max="1048576" />
 		<short>Max read buffer before parse, per user</short>
-		<description>
+		<description><![CDATA[
 			Maximum receive buffer allowed before commands are procesed. If a single ADC message exceeds this limit, it will be discarded by the hub. Use with caution.
-		</description>
+		]]></description>
 		<since>0.1.3</since>
 	</option>
 
 	<option name="max_send_buffer" type="int" default="131072" advanced="true" >
 		<check min="2048" />
 		<short>Max send buffer before disconnect, per user</short>
-		<description>
+		<description><![CDATA[
 			Maximum amount of bytes allowed to be queued for sending to any particular user before the hub will disconnect the user. The lower the limit, the more aggressive the hub will be to disconnect slow clients. Use with caution.
-		</description>
+		]]></description>
 		<since>0.1.3</since>
 	</option>
 
 	<option name="max_send_buffer_soft" type="int" default="98304" advanced="true" >
 		<check min="1024" />
 		<short>Max send buffer before message drops, per user</short>
-		<description>
+		<description><![CDATA[
 			Same as max_send_buffer, however low priority messages may be discarded if this limit is reached. Use with caution.
-		</description>
+		]]></description>
 		<since>0.1.3</since>
 	</option>
 
 	<option name="low_bandwidth_mode" type="boolean" default="0" advanced="true" >
 		<short>Enable bandwidth saving measures</short>
-		<description>
+		<description><![CDATA[
 			If this is enabled the hub will remove excessive information from each user's info message before broadcasting to all connected users.
 			Description, e-mail address will be removed. This saves upload bandwidth for the hub.
-		</description>
+		]]></description>
 		<since>0.2.2</since>
 	</option>
 
 	<option name="max_chat_history" type="int" default="20">
 		<check min="0" max="250" />
 		<short>Number of chat messages kept in history</short>
-		<description>
+		<description><![CDATA[
 			This specifies the number of main chat messages that are kept in the history buffer.
 			Users can use the "!history" command to list these messages.
-		</description>
+		]]></description>
 		<since>0.3.0</since>
 	</option>
 
 	<option name="max_logout_log" type="int" default="20">
 		<check min="0" max="2000" />
 		<short>Number of log entries for people leaving the hub</short>
-		<description>
+		<description><![CDATA[
 			Operators can use the "!log" command to list users who have recently left the hub.
 			This option specifies the maximum size of this log.
-		</description>
+		]]></description>
 		<since>0.3.0</since>
 	</option>
 
 	<option name="limit_max_hubs_user" type="int" default="10">
 		<check min="0" />
 		<short>Max concurrent hubs as a guest user</short>
-		<description>
+		<description><![CDATA[
 		This limits the number of hubs a user can be logged into as a guest user. If this number is exceeded, the user will not be allowed to enter the hub.
-		</description>
+		]]></description>
 		<syntax>0 = off</syntax>
 		<since>0.2.0</since>
 	</option>
@@ -224,9 +224,9 @@
 	<option name="limit_max_hubs_reg" type="int" default="10">
 		<check min="0" />
 		<short>Max concurrent hubs as a registered user</short>
-		<description>
+		<description><![CDATA[
 		This limits the number of hubs a user can be logged into as a registered user. If this number is exceeded, the user will not be allowed to enter the hub.
-		</description>
+		]]></description>
 		<syntax>0 = off</syntax>
 		<since>0.2.0</since>
 	</option>
@@ -234,9 +234,9 @@
 	<option name="limit_max_hubs_op" type="int" default="10">
 		<check min="0" />
 		<short>Max concurrent hubs as a operator (or admin)</short>
-		<description>
+		<description><![CDATA[
 		This limits the number of hubs a user can be logged into as an operator. If this number is exceeded, the user will not be allowed to enter the hub.
-		</description>
+		]]></description>
 		<syntax>0 = off</syntax>
 		<since>0.2.0</since>
 	</option>
@@ -244,10 +244,10 @@
 	<option name="limit_max_hubs" type="int" default="25">
 		<check min="0" />
 		<short>Max total hub connections allowed, user/reg/op combined.</short>
-		<description>
+		<description><![CDATA[
 		Limit the number of hubs a user can be logged into in total regardless of registrations or privileges.
 		If this number is exceeded, the user will not be allowed to enter the hub.
-		</description>
+		]]></description>
 		<syntax>0 = off</syntax>
 		<since>0.2.0</since>
 	</option>
@@ -255,9 +255,9 @@
 	<option name="limit_min_hubs_user" type="int" default="0">
 		<check min="0" />
 		<short>Minimum concurrent hubs as a guest user</short>
-		<description>
+		<description><![CDATA[
 		Only allow users that are logged into other hubs with guest privileges to enter this hub.
-		</description>
+		]]></description>
 		<syntax>0 = off</syntax>
 		<since>0.2.0</since>
 	</option>
@@ -265,9 +265,9 @@
 	<option name="limit_min_hubs_reg" type="int" default="0">
 		<check min="0" />
 		<short>Minimum concurrent hubs as a registered user</short>
-		<description>
+		<description><![CDATA[
 		Only allow users that are logged into other hubs as a registered user to enter this hub.
-		</description>
+		]]></description>
 		<syntax>0 = off</syntax>
 		<since>0.2.0</since>
 	</option>
@@ -275,9 +275,9 @@
 	<option name="limit_min_hubs_op" type="int" default="0">
 		<check min="0" />
 		<short>Minimum concurrent hubs as a operator (or admin)</short>
-		<description>
+		<description><![CDATA[
 		Only allow users that are logged into other hubs with operator privileges to enter this hub.
-		</description>
+		]]></description>
 		<syntax>0 = off</syntax>
 		<since>0.2.0</since>
 	</option>
@@ -285,23 +285,23 @@
 	<option name="limit_min_share" type="int" default="0">
 		<check min="0" />
 		<short>Limit minimum share size in megabytes</short>
-		<description>
+		<description><![CDATA[
 		Minimum share limit in megabytes (MiB). Users sharing less than this will not be allowed to enter the hub.
-		</description>
+		]]></description>
 		<syntax>0 = off</syntax>
 		<since>0.2.0</since>
-		<example>
+		<example><![CDATA[
 			To require users to share at least 1 GB in order to enter the hub:<br />
 			limit_min_share = 1024
-		</example>
+		]]></example>
 	</option>
 
 	<option name="limit_max_share" type="int" default="0">
 		<check min="0" />
 		<short>Limit maximum share size in megabytes</short>
-		<description>
+		<description><![CDATA[
 		Maximum share limit in megabytes (MiB). Users sharing more than this will not be allowed to enter the hub.
-		</description>
+		]]></description>
 		<syntax>0 = off</syntax>
 		<since>0.2.0</since>
 	</option>
@@ -310,9 +310,9 @@
 	<option name="limit_min_slots" type="int" default="0">
 		<check min="0" />
 		<short>Limit minimum number of upload slots open per user</short>
-		<description>
+		<description><![CDATA[
 		Minimum number of upload slots required. Users with less than this will not be allowed to enter the hub.
-		</description>
+		]]></description>
 		<syntax>0 = off</syntax>
 		<since>0.2.0</since>
 	</option>
@@ -320,9 +320,9 @@
 	<option name="limit_max_slots" type="int" default="0">
 		<check min="0" />
 		<short>Limit minimum number of upload slots open per user</short>
-		<description>
+		<description><![CDATA[
 		Maximum number of upload slots allowed. Users with more than this will not be allowed to enter the hub.
-		</description>
+		]]></description>
 		<syntax>0 = off</syntax>
 		<since>0.2.0</since>
 	</option>
@@ -330,42 +330,42 @@
 	<option name="flood_ctl_interval" type="int" default="0">
 		<check min="1" max="60" />
 		<short>Time interval in seconds for flood control check.</short>
-		<description>
+		<description><![CDATA[
 			This is the time interval that will be used for all flood control calculations.
 			If this is 0 then all flood control is disabled.
-		</description>
-		<example>
+		]]></description>
+		<example><![CDATA[
 			To limit maximum chat messages to 5 messages on 10 seconds: <br />
 			flood_ctl_interval = 10 <br />
 			flood_ctl_chat = 5<br />
-		</example>
+		]]></example>
 		<syntax>0 = off</syntax>
 		<since>0.3.1</since>
 	</option>
 
 	<option name="flood_ctl_chat" type="int" default="0">
 		<short>Max chat messages allowed in time interval</short>
-		<description>
+		<description><![CDATA[
 			If this is 0 then no flood control is disabled for chat messages.
-		</description>
+		]]></description>
 		<syntax>0 = off</syntax>
 		<since>0.3.1</since>
 	</option>
 
 	<option name="flood_ctl_connect" type="int" default="0">
 		<short>Max connections requests allowed in time interval</short>
-		<description>
+		<description><![CDATA[
 			If this is 0 then no flood control is disabled for connection requests.
-		</description>
+		]]></description>
 		<syntax>0 = off</syntax>
 		<since>0.3.1</since>
 	</option>
 
 	<option name="flood_ctl_search" type="int" default="0">
 		<short>Max search requests allowed in time interval</short>
-		<description>
+		<description><![CDATA[
 			If this is 0 then no flood control is disabled for search requests.
-		</description>
+		]]></description>
 		<syntax>0 = off</syntax>
 		<since>0.3.1</since>
 	</option>
@@ -373,63 +373,63 @@
 
 	<option name="flood_ctl_update" type="int" default="0">
 		<short>Max updates allowed in time interval</short>
-		<description>
+		<description><![CDATA[
 			If this is 0 then no flood control is disabled for info updates (INF messages).
-		</description>
+		]]></description>
 		<syntax>0 = off</syntax>
 		<since>0.3.1</since>
 	</option>
 
 	<option name="flood_ctl_extras" type="int" default="0">
 		<short>Max extra messages allowed in time interval</short>
-		<description>
+		<description><![CDATA[
 			Extra messages are messages that don't fit into the category of chat, search, update or connect.
-		</description>
+		]]></description>
 		<syntax>0 = off</syntax>
 		<since>0.3.1</since>
 	</option>
 
 	<option name="tls_enable" type="boolean" default="0">
 		<short>Enable SSL/TLS support</short>
-		<description>
+		<description><![CDATA[
 			Enables/disables TLS/SSL support. tls_certificate and tls_private_key must be set if this is enabled.
-		</description>
+		]]></description>
 		<since>0.3.0</since>
 	</option>
 
 	<option name="tls_require" type="boolean" default="0">
 		<short>If SSL/TLS enabled, should it be required (default: 0)</short>
-		<description>
+		<description><![CDATA[
 			If TLS/SSL support is enabled it can either be optional or mandatory.
 			If this option is disabled then SSL/TLS is not required to enter the hub, however it is possible to enter either with or without.
 			This option has no effect unless tls_enable is enabled.
-		</description>
+		]]></description>
 		<since>0.3.0</since>
 	</option>
 
 	<option name="tls_certificate" type="file" default="">
 		<short>Certificate file</short>
-		<description>
+		<description><![CDATA[
 			Path to a TLS/SSL certificate (PEM format).
-		</description>
+		]]></description>
 		<since>0.3.0</since>
 	</option>
 
 	<option name="tls_private_key" type="file" default="">
 		<short>Private key file</short>
-		<description>
+		<description><![CDATA[
 			Path to a TLS/SSL private key (PEM format).
-		</description>
+		]]></description>
 		<since>0.3.0</since>
 	</option>
 
 	<option name="file_motd" type="file" default="">
 		<short>File containing the 'message of the day</short>
-		<description>
+		<description><![CDATA[
 			This can be specified as a message of the day file. If a valid file is given here it's content will be sent to all users after they have logged in to the hub. If the file is missing or empty this configuration entry will be ignored.
-		</description>
+		]]></description>
 		<since>0.1.3</since>
-		<example>
+		<example><![CDATA[
 			<p>
 			Unix users: <br />
 				file_acl = "/etc/uhub/motd.txt"
@@ -438,18 +438,18 @@
 			Windows users: <br />
 				file_acl = "c:\uhub\motd.txt"
 			</p>
-		</example>
+		]]></example>
 	</option>
 
 	<option name="file_acl" type="file" default="">
 		<short>File containing access control lists</short>
-		<description>
+		<description><![CDATA[
 			This is an access control list (acl) file.
 			In this file all registered users, bans, etc should be stored.
 			If the file is missing, or empty no registered users, or ban records are used.
-		</description>
+		]]></description>
 		<since>0.1.3</since>
-		<example>
+		<example><![CDATA[
 			<p>
 			Unix users: <br />
 				file_acl = "/etc/uhub/users.conf"
@@ -458,17 +458,17 @@
 			Windows users: <br />
 				file_acl = "c:\uhub\users.conf"
 			</p>
-		</example>
+		]]></example>
 	</option>
 
 	<option name="file_rules" type="file" default="">
 		<short>File containing hub rules</short>
-		<description>
+		<description><![CDATA[
 			This is a text file that is displayed on login as an extended message of the day.
 			In addition the contents of the file is displayed when a user uses the "!rules" command.
-		</description>
+		]]></description>
 		<since>0.3.0</since>
-		<example>
+		<example><![CDATA[
 			<p>
 			Unix users: <br />
 				file_acl = "/etc/uhub/rules.txt"
@@ -477,187 +477,187 @@
 			Windows users: <br />
 				file_acl = "c:\uhub\rules.txt"
 			</p>
-		</example>
+		]]></example>
 	</option>
 
 	<option name="msg_hub_full" type="message" default="Hub is full" >
-		<description>This will be sent if the hub is full</description>
+		<description><![CDATA[This will be sent if the hub is full]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_hub_disabled" type="message" default="Hub is disabled" >
-		<description>This will be sent if the hub is disabled (hub_enable = off)</description>
+		<description><![CDATA[This will be sent if the hub is disabled (hub_enable = off)]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_hub_registered_users_only" type="message" default="Hub is for registered users only" >
-		<description>This will be sent if the hub is configured to only accept registered users (registered_users_only = yes)</description>
+		<description><![CDATA[This will be sent if the hub is configured to only accept registered users (registered_users_only = yes)]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_inf_error_nick_missing" type="message" default="No nickname given">
-		<description>This is an error message that will be sent to clients that do not provide a nickname.</description>
+		<description><![CDATA[This is an error message that will be sent to clients that do not provide a nickname.]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_inf_error_nick_multiple" type="message" default="Multiple nicknames given">
-		<description>This is an error message that will be sent to clients that provide multiple nicknames.</description>
+		<description><![CDATA[This is an error message that will be sent to clients that provide multiple nicknames.]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_inf_error_nick_invalid" type="message" default="Nickname is invalid">
-		<description>This is an error message that will be sent to clients that provides an invalid nickname.</description>
+		<description><![CDATA[This is an error message that will be sent to clients that provides an invalid nickname.]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_inf_error_nick_long" type="message" default="Nickname too long">
-		<description>This is an error message that will be sent to clients that provides a too long nickname.</description>
+		<description><![CDATA[This is an error message that will be sent to clients that provides a too long nickname.]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_inf_error_nick_short" type="message" default="Nickname too short">
-		<description>This is an error message that will be sent to clients that provides a too short nickname.</description>
+		<description><![CDATA[This is an error message that will be sent to clients that provides a too short nickname.]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_inf_error_nick_spaces" type="message" default="Nickname cannot start with spaces">
-		<description>This is an error message that will be sent to clients that provides a nickname that starts with a space.</description>
+		<description><![CDATA[This is an error message that will be sent to clients that provides a nickname that starts with a space.]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_inf_error_nick_bad_chars" type="message" default="Nickname contains invalid characters">
-		<description>This is an error message that will be sent to clients that provides invalid characters in the nickname.</description>
+		<description><![CDATA[This is an error message that will be sent to clients that provides invalid characters in the nickname.]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_inf_error_nick_not_utf8" type="message" default="Nickname is not valid UTF-8">
-		<description>This is an error message that will be sent to clients that provides a nick name that is not valid UTF-8 encoded.</description>
+		<description><![CDATA[This is an error message that will be sent to clients that provides a nick name that is not valid UTF-8 encoded.]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_inf_error_nick_taken" type="message" default="Nickname is already in use">
-		<description>This message will be sent to clients if their provided nickname is alredy in use on the hub.</description>
+		<description><![CDATA[This message will be sent to clients if their provided nickname is alredy in use on the hub.]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_inf_error_nick_restricted" type="message" default="Nickname cannot be used on this hub">
-		<description>This message will be sent to clients if they provide a restricted nickname. Restricted names can be configured in the acl.</description>
+		<description><![CDATA[This message will be sent to clients if they provide a restricted nickname. Restricted names can be configured in the acl.]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_inf_error_cid_invalid" type="message" default="CID is not valid">
-		<description>This is an error message that will be sent to clients that provides an invalid client ID (CID)</description>
+		<description><![CDATA[This is an error message that will be sent to clients that provides an invalid client ID (CID)]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_inf_error_cid_missing" type="message" default="CID is not specified">
-		<description>This is an error message that will be sent to clients that does not provide a client ID (CID)</description>
+		<description><![CDATA[This is an error message that will be sent to clients that does not provide a client ID (CID)]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_inf_error_cid_taken" type="message" default="CID is taken">
-		<description>This is an error message that will be sent to clients that provides a client ID (CID) already in use on the hub.</description>
+		<description><![CDATA[This is an error message that will be sent to clients that provides a client ID (CID) already in use on the hub.]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_inf_error_pid_missing" type="message" default="PID is not specified">
-		<description>This is an error message that will be sent to clients that does not provide a private ID (PID)</description>
+		<description><![CDATA[This is an error message that will be sent to clients that does not provide a private ID (PID)]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_inf_error_pid_invalid" type="message" default="PID is invalid">
-		<description>This is an error message that will be sent to clients that provides an invalid private ID (PID)</description>
+		<description><![CDATA[This is an error message that will be sent to clients that provides an invalid private ID (PID)]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_ban_permanently" type="message" default="Banned permanently">
-		<description>This message is sent to users if they are banned (see acl)</description>
+		<description><![CDATA[This message is sent to users if they are banned (see acl)]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_ban_temporarily"  type="message" default="Banned temporarily">
-		<description>This message is sent to users if they are banned temporarily</description>
+		<description><![CDATA[This message is sent to users if they are banned temporarily]]></description>
 		<since>0.2.0</since>
 	</option>
 
 
 	<option name="msg_auth_invalid_password" type="message" default="Password is wrong">
-		<description>This message is sent to users if they provide a wrong password.</description>
+		<description><![CDATA[This message is sent to users if they provide a wrong password.]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_auth_user_not_found" type="message" default="User not found in password database">
-		<description>This message is used if a user cannot be found in the password database.</description>
+		<description><![CDATA[This message is used if a user cannot be found in the password database.]]></description>
 		<since>0.2.0</since> <!-- FIXME? -->
 	</option>
 
 	<option name="msg_error_no_memory" type="message" default="No memory">
-		<description></description>
+		<description><![CDATA[]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_user_share_size_low" type="message" default="User is not sharing enough">
-		<description>This message is sent to users if they are not sharing enough.</description>
+		<description><![CDATA[This message is sent to users if they are not sharing enough.]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_user_share_size_high" type="message" default="User is sharing too much">
-		<description>This message is sent to users if they are sharing too much.</description>
+		<description><![CDATA[This message is sent to users if they are sharing too much.]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_user_slots_low" type="message" default="User have too few upload slots.">
-		<description>This message is sent to users if they do not have enough upload slots.</description>
+		<description><![CDATA[This message is sent to users if they do not have enough upload slots.]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_user_slots_high" type="message" default="User have too many upload slots.">
-		<description>This message is sent to users if they have too many upload slots.</description>
+		<description><![CDATA[This message is sent to users if they have too many upload slots.]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_user_hub_limit_low" type="message" default="User is on too few hubs.">
-		<description>This message is sent to users if they are on too few other hubs.</description>
+		<description><![CDATA[This message is sent to users if they are on too few other hubs.]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_user_hub_limit_high" type="message" default="User is on too many hubs.">
-		<description>This message is sent to users if they are on too many other hubs.</description>
+		<description><![CDATA[This message is sent to users if they are on too many other hubs.]]></description>
 		<since>0.2.0</since>
 	</option>
 
 	<option name="msg_user_flood_chat" type="message" default="Chat flood detected, messages are dropped.">
-		<description>This message is sent once to users who are flooding the chat.</description>
+		<description><![CDATA[This message is sent once to users who are flooding the chat.]]></description>
 		<since>0.3.1</since>
 	</option>
 
 	<option name="msg_user_flood_connect" type="message" default="Connect flood detected, connection refused.">
-		<description>This message is sent once to users who are sending too many connect requests too fast.</description>
+		<description><![CDATA[This message is sent once to users who are sending too many connect requests too fast.]]></description>
 		<since>0.3.1</since>
 	</option>
 
 	<option name="msg_user_flood_search" type="message" default="Search flood detected, search is stopped.">
-		<description>This message is sent once to users who are sending too many search requests too fast.</description>
+		<description><![CDATA[This message is sent once to users who are sending too many search requests too fast.]]></description>
 		<since>0.3.1</since>
 	</option>
 
 	<option name="msg_user_flood_update" type="message" default="Update flood detected.">
-		<description>This message is sent once to users who are sending too many updates too fast.</description>
+		<description><![CDATA[This message is sent once to users who are sending too many updates too fast.]]></description>
 		<since>0.3.1</since>
 	</option>
 
 	<option name="msg_user_flood_extras" type="message" default="Flood detected.">
-		<description>This message is sent once to users who are sending too many messages to the hub that neither are chat, searhes, updates nor connection requests..</description>
+		<description><![CDATA[This message is sent once to users who are sending too many messages to the hub that neither are chat, searhes, updates nor connection requests..]]></description>
 		<since>0.3.1</since>
 	</option>
 
 	<option name="msg_proto_no_common_hash" type="message" default="No common hash algorithm.">
-		<description>This message is sent if a client connects that does support ADC/1.0 but not a hash algorithm that the hub supports.</description>
+		<description><![CDATA[This message is sent if a client connects that does support ADC/1.0 but not a hash algorithm that the hub supports.]]></description>
 		<since>0.3.1</since>
 	</option>
 
 	<option name="msg_proto_obsolete_adc0" type="message" default="Client is using an obsolete ADC protocol version.">
-		<description>This message is sent if a client connects that does not support ADC/1.0, but rather the obsolete ADC/0.1 version.</description>
+		<description><![CDATA[This message is sent if a client connects that does not support ADC/1.0, but rather the obsolete ADC/0.1 version.]]></description>
 		<since>0.3.1</since>
 	</option>
 
