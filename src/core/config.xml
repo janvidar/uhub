@@ -1,5 +1,14 @@
 <?xml version='1.0' standalone="yes" ?>
 <config>
+
+	<option name="hub_enabled" type="boolean" default="1">
+		<short>Is server enabled</short>
+		<description>
+			Use this to disable the hub for a while.
+		</description>
+		<since>0.1.3</since>
+	</option>
+
 	<option name="server_port" type="int" default="1511">
 		<check min="1" max="65535" />
 		<since>0.1.0</since>
@@ -60,14 +69,6 @@
 		<since>0.3.0</since>
 	</option>
 
-	<option name="hub_enabled" type="boolean" default="1">
-		<short>Is server enabled</short>
-		<description>
-			Use this to disable the hub for a while.
-		</description>
-		<since>0.1.3</since>
-	</option>
-
 	<option name="show_banner" type="boolean" default="1">
 		<short>Show banner on connect</short>
 		<description>
@@ -86,7 +87,7 @@
 	</option>
 
 	<option name="max_users" type="int" default="500">
-		<check min="1" />
+		<check min="1" max="1048576" />
 		<short>Maximum number of users allowed on the hub</short>
 		<description>
 			The maximum amount of users allowed on the hub.
@@ -327,7 +328,7 @@
 	</option>
 
 	<option name="flood_ctl_interval" type="int" default="0">
-		<check min="0" max="60" />
+		<check min="1" max="60" />
 		<short>Time interval in seconds for flood control check.</short>
 		<description>
 			This is the time interval that will be used for all flood control calculations.

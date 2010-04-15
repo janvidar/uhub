@@ -2,170 +2,898 @@
 
 void config_defaults(struct hub_config* config)
 {
-	DEFAULT_INTEGER(server_port, 1511);
-	DEFAULT_STRING (server_bind_addr, "any");
-	DEFAULT_INTEGER(server_listen_backlog, 50);
-	DEFAULT_STRING (server_alt_ports, "");
-	DEFAULT_BOOLEAN(hub_enabled, 1);
-	DEFAULT_BOOLEAN(show_banner, 1);
-	DEFAULT_BOOLEAN(show_banner_sys_info, 1);
-	DEFAULT_INTEGER(max_users, 500);
-	DEFAULT_BOOLEAN(registered_users_only, 0);
-	DEFAULT_BOOLEAN(obsolete_clients, 0);
-	DEFAULT_BOOLEAN(chat_only, 0);
-	DEFAULT_BOOLEAN(chat_is_privileged, 0);
-	DEFAULT_STRING (hub_name, "uhub");
-	DEFAULT_STRING (hub_description, "no description");
-	DEFAULT_INTEGER(max_recv_buffer, 4096);
-	DEFAULT_INTEGER(max_send_buffer, 131072);
-	DEFAULT_INTEGER(max_send_buffer_soft, 98304);
-	DEFAULT_BOOLEAN(low_bandwidth_mode, 0);
-	DEFAULT_INTEGER(max_chat_history, 20);
-	DEFAULT_INTEGER(max_logout_log, 20);
-	DEFAULT_INTEGER(limit_max_hubs_user, 10);
-	DEFAULT_INTEGER(limit_max_hubs_reg, 10);
-	DEFAULT_INTEGER(limit_max_hubs_op, 10);
-	DEFAULT_INTEGER(limit_max_hubs, 25);
-	DEFAULT_INTEGER(limit_min_hubs_user, 0);
-	DEFAULT_INTEGER(limit_min_hubs_reg, 0);
-	DEFAULT_INTEGER(limit_min_hubs_op, 0);
-	DEFAULT_INTEGER(limit_min_share, 0);
-	DEFAULT_INTEGER(limit_max_share, 0);
-	DEFAULT_INTEGER(limit_min_slots, 0);
-	DEFAULT_INTEGER(limit_max_slots, 0);
-	DEFAULT_INTEGER(flood_ctl_interval, 0);
-	DEFAULT_INTEGER(flood_ctl_chat, 0);
-	DEFAULT_INTEGER(flood_ctl_connect, 0);
-	DEFAULT_INTEGER(flood_ctl_search, 0);
-	DEFAULT_INTEGER(flood_ctl_update, 0);
-	DEFAULT_INTEGER(flood_ctl_extras, 0);
-	DEFAULT_BOOLEAN(tls_enable, 0);
-	DEFAULT_BOOLEAN(tls_require, 0);
-	DEFAULT_STRING (tls_certificate, "");
-	DEFAULT_STRING (tls_private_key, "");
-	DEFAULT_STRING (file_motd, "");
-	DEFAULT_STRING (file_acl, "");
-	DEFAULT_STRING (file_rules, "");
-	DEFAULT_STRING (msg_hub_full, "Hub is full");
-	DEFAULT_STRING (msg_hub_disabled, "Hub is disabled");
-	DEFAULT_STRING (msg_hub_registered_users_only, "Hub is for registered users only");
-	DEFAULT_STRING (msg_inf_error_nick_missing, "No nickname given");
-	DEFAULT_STRING (msg_inf_error_nick_multiple, "Multiple nicknames given");
-	DEFAULT_STRING (msg_inf_error_nick_invalid, "Nickname is invalid");
-	DEFAULT_STRING (msg_inf_error_nick_long, "Nickname too long");
-	DEFAULT_STRING (msg_inf_error_nick_short, "Nickname too short");
-	DEFAULT_STRING (msg_inf_error_nick_spaces, "Nickname cannot start with spaces");
-	DEFAULT_STRING (msg_inf_error_nick_bad_chars, "Nickname contains invalid characters");
-	DEFAULT_STRING (msg_inf_error_nick_not_utf8, "Nickname is not valid UTF-8");
-	DEFAULT_STRING (msg_inf_error_nick_taken, "Nickname is already in use");
-	DEFAULT_STRING (msg_inf_error_nick_restricted, "Nickname cannot be used on this hub");
-	DEFAULT_STRING (msg_inf_error_cid_invalid, "CID is not valid");
-	DEFAULT_STRING (msg_inf_error_cid_missing, "CID is not specified");
-	DEFAULT_STRING (msg_inf_error_cid_taken, "CID is taken");
-	DEFAULT_STRING (msg_inf_error_pid_missing, "PID is not specified");
-	DEFAULT_STRING (msg_inf_error_pid_invalid, "PID is invalid");
-	DEFAULT_STRING (msg_ban_permanently, "Banned permanently");
-	DEFAULT_STRING (msg_ban_temporarily, "Banned temporarily");
-	DEFAULT_STRING (msg_auth_invalid_password, "Password is wrong");
-	DEFAULT_STRING (msg_auth_user_not_found, "User not found in password database");
-	DEFAULT_STRING (msg_error_no_memory, "No memory");
-	DEFAULT_STRING (msg_user_share_size_low, "User is not sharing enough");
-	DEFAULT_STRING (msg_user_share_size_high, "User is sharing too much");
-	DEFAULT_STRING (msg_user_slots_low, "User have too few upload slots.");
-	DEFAULT_STRING (msg_user_slots_high, "User have too many upload slots.");
-	DEFAULT_STRING (msg_user_hub_limit_low, "User is on too few hubs.");
-	DEFAULT_STRING (msg_user_hub_limit_high, "User is on too many hubs.");
-	DEFAULT_STRING (msg_user_flood_chat, "Chat flood detected, messages are dropped.");
-	DEFAULT_STRING (msg_user_flood_connect, "Connect flood detected, connection refused.");
-	DEFAULT_STRING (msg_user_flood_search, "Search flood detected, search is stopped.");
-	DEFAULT_STRING (msg_user_flood_update, "Update flood detected.");
-	DEFAULT_STRING (msg_user_flood_extras, "Flood detected.");
-	DEFAULT_STRING (msg_proto_no_common_hash, "No common hash algorithm.");
-	DEFAULT_STRING (msg_proto_obsolete_adc0, "Client is using an obsolete ADC protocol version.");
+	config->hub_enabled = 1;
+	config->server_port = 1511;
+	config->server_bind_addr = hub_strdup("any");
+	config->server_listen_backlog = 50;
+	config->server_alt_ports = hub_strdup("");
+	config->show_banner = 1;
+	config->show_banner_sys_info = 1;
+	config->max_users = 500;
+	config->registered_users_only = 0;
+	config->obsolete_clients = 0;
+	config->chat_only = 0;
+	config->chat_is_privileged = 0;
+	config->hub_name = hub_strdup("uhub");
+	config->hub_description = hub_strdup("no description");
+	config->max_recv_buffer = 4096;
+	config->max_send_buffer = 131072;
+	config->max_send_buffer_soft = 98304;
+	config->low_bandwidth_mode = 0;
+	config->max_chat_history = 20;
+	config->max_logout_log = 20;
+	config->limit_max_hubs_user = 10;
+	config->limit_max_hubs_reg = 10;
+	config->limit_max_hubs_op = 10;
+	config->limit_max_hubs = 25;
+	config->limit_min_hubs_user = 0;
+	config->limit_min_hubs_reg = 0;
+	config->limit_min_hubs_op = 0;
+	config->limit_min_share = 0;
+	config->limit_max_share = 0;
+	config->limit_min_slots = 0;
+	config->limit_max_slots = 0;
+	config->flood_ctl_interval = 0;
+	config->flood_ctl_chat = 0;
+	config->flood_ctl_connect = 0;
+	config->flood_ctl_search = 0;
+	config->flood_ctl_update = 0;
+	config->flood_ctl_extras = 0;
+	config->tls_enable = 0;
+	config->tls_require = 0;
+	config->tls_certificate = hub_strdup("");
+	config->tls_private_key = hub_strdup("");
+	config->file_motd = hub_strdup("");
+	config->file_acl = hub_strdup("");
+	config->file_rules = hub_strdup("");
+	config->msg_hub_full = hub_strdup("Hub is full");
+	config->msg_hub_disabled = hub_strdup("Hub is disabled");
+	config->msg_hub_registered_users_only = hub_strdup("Hub is for registered users only");
+	config->msg_inf_error_nick_missing = hub_strdup("No nickname given");
+	config->msg_inf_error_nick_multiple = hub_strdup("Multiple nicknames given");
+	config->msg_inf_error_nick_invalid = hub_strdup("Nickname is invalid");
+	config->msg_inf_error_nick_long = hub_strdup("Nickname too long");
+	config->msg_inf_error_nick_short = hub_strdup("Nickname too short");
+	config->msg_inf_error_nick_spaces = hub_strdup("Nickname cannot start with spaces");
+	config->msg_inf_error_nick_bad_chars = hub_strdup("Nickname contains invalid characters");
+	config->msg_inf_error_nick_not_utf8 = hub_strdup("Nickname is not valid UTF-8");
+	config->msg_inf_error_nick_taken = hub_strdup("Nickname is already in use");
+	config->msg_inf_error_nick_restricted = hub_strdup("Nickname cannot be used on this hub");
+	config->msg_inf_error_cid_invalid = hub_strdup("CID is not valid");
+	config->msg_inf_error_cid_missing = hub_strdup("CID is not specified");
+	config->msg_inf_error_cid_taken = hub_strdup("CID is taken");
+	config->msg_inf_error_pid_missing = hub_strdup("PID is not specified");
+	config->msg_inf_error_pid_invalid = hub_strdup("PID is invalid");
+	config->msg_ban_permanently = hub_strdup("Banned permanently");
+	config->msg_ban_temporarily = hub_strdup("Banned temporarily");
+	config->msg_auth_invalid_password = hub_strdup("Password is wrong");
+	config->msg_auth_user_not_found = hub_strdup("User not found in password database");
+	config->msg_error_no_memory = hub_strdup("No memory");
+	config->msg_user_share_size_low = hub_strdup("User is not sharing enough");
+	config->msg_user_share_size_high = hub_strdup("User is sharing too much");
+	config->msg_user_slots_low = hub_strdup("User have too few upload slots.");
+	config->msg_user_slots_high = hub_strdup("User have too many upload slots.");
+	config->msg_user_hub_limit_low = hub_strdup("User is on too few hubs.");
+	config->msg_user_hub_limit_high = hub_strdup("User is on too many hubs.");
+	config->msg_user_flood_chat = hub_strdup("Chat flood detected, messages are dropped.");
+	config->msg_user_flood_connect = hub_strdup("Connect flood detected, connection refused.");
+	config->msg_user_flood_search = hub_strdup("Search flood detected, search is stopped.");
+	config->msg_user_flood_update = hub_strdup("Update flood detected.");
+	config->msg_user_flood_extras = hub_strdup("Flood detected.");
+	config->msg_proto_no_common_hash = hub_strdup("No common hash algorithm.");
+	config->msg_proto_obsolete_adc0 = hub_strdup("Client is using an obsolete ADC protocol version.");
 }
 
 static int apply_config(struct hub_config* config, char* key, char* data, int line_count)
 {
-	GET_INT (server_port);
-	GET_STR (server_bind_addr);
-	GET_INT (server_listen_backlog);
-	GET_STR (server_alt_ports);
-	GET_BOOL(hub_enabled);
-	GET_BOOL(show_banner);
-	GET_BOOL(show_banner_sys_info);
-	GET_INT (max_users);
-	GET_BOOL(registered_users_only);
-	GET_BOOL(obsolete_clients);
-	GET_BOOL(chat_only);
-	GET_BOOL(chat_is_privileged);
-	GET_STR (hub_name);
-	GET_STR (hub_description);
-	GET_INT (max_recv_buffer);
-	GET_INT (max_send_buffer);
-	GET_INT (max_send_buffer_soft);
-	GET_BOOL(low_bandwidth_mode);
-	GET_INT (max_chat_history);
-	GET_INT (max_logout_log);
-	GET_INT (limit_max_hubs_user);
-	GET_INT (limit_max_hubs_reg);
-	GET_INT (limit_max_hubs_op);
-	GET_INT (limit_max_hubs);
-	GET_INT (limit_min_hubs_user);
-	GET_INT (limit_min_hubs_reg);
-	GET_INT (limit_min_hubs_op);
-	GET_INT (limit_min_share);
-	GET_INT (limit_max_share);
-	GET_INT (limit_min_slots);
-	GET_INT (limit_max_slots);
-	GET_INT (flood_ctl_interval);
-	GET_INT (flood_ctl_chat);
-	GET_INT (flood_ctl_connect);
-	GET_INT (flood_ctl_search);
-	GET_INT (flood_ctl_update);
-	GET_INT (flood_ctl_extras);
-	GET_BOOL(tls_enable);
-	GET_BOOL(tls_require);
-	GET_STR (tls_certificate);
-	GET_STR (tls_private_key);
-	GET_STR (file_motd);
-	GET_STR (file_acl);
-	GET_STR (file_rules);
-	GET_STR (msg_hub_full);
-	GET_STR (msg_hub_disabled);
-	GET_STR (msg_hub_registered_users_only);
-	GET_STR (msg_inf_error_nick_missing);
-	GET_STR (msg_inf_error_nick_multiple);
-	GET_STR (msg_inf_error_nick_invalid);
-	GET_STR (msg_inf_error_nick_long);
-	GET_STR (msg_inf_error_nick_short);
-	GET_STR (msg_inf_error_nick_spaces);
-	GET_STR (msg_inf_error_nick_bad_chars);
-	GET_STR (msg_inf_error_nick_not_utf8);
-	GET_STR (msg_inf_error_nick_taken);
-	GET_STR (msg_inf_error_nick_restricted);
-	GET_STR (msg_inf_error_cid_invalid);
-	GET_STR (msg_inf_error_cid_missing);
-	GET_STR (msg_inf_error_cid_taken);
-	GET_STR (msg_inf_error_pid_missing);
-	GET_STR (msg_inf_error_pid_invalid);
-	GET_STR (msg_ban_permanently);
-	GET_STR (msg_ban_temporarily);
-	GET_STR (msg_auth_invalid_password);
-	GET_STR (msg_auth_user_not_found);
-	GET_STR (msg_error_no_memory);
-	GET_STR (msg_user_share_size_low);
-	GET_STR (msg_user_share_size_high);
-	GET_STR (msg_user_slots_low);
-	GET_STR (msg_user_slots_high);
-	GET_STR (msg_user_hub_limit_low);
-	GET_STR (msg_user_hub_limit_high);
-	GET_STR (msg_user_flood_chat);
-	GET_STR (msg_user_flood_connect);
-	GET_STR (msg_user_flood_search);
-	GET_STR (msg_user_flood_update);
-	GET_STR (msg_user_flood_extras);
-	GET_STR (msg_proto_no_common_hash);
-	GET_STR (msg_proto_obsolete_adc0);
+	int max = 0;
+	int min = 0;
+
+	if (!strcmp(key, "hub_enabled"))
+	{
+		if (!apply_boolean(key, data, &config->hub_enabled))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "server_port"))
+	{
+		if (!apply_integer(key, data, &config->server_port, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "server_bind_addr"))
+	{
+		if (!apply_string(key, data, &config->server_bind_addr, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "server_listen_backlog"))
+	{
+		if (!apply_integer(key, data, &config->server_listen_backlog, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "server_alt_ports"))
+	{
+		if (!apply_string(key, data, &config->server_alt_ports, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "show_banner"))
+	{
+		if (!apply_boolean(key, data, &config->show_banner))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "show_banner_sys_info"))
+	{
+		if (!apply_boolean(key, data, &config->show_banner_sys_info))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "max_users"))
+	{
+		min = 1;
+		max = 1048576;
+		if (!apply_integer(key, data, &config->max_users, &min, &max))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "registered_users_only"))
+	{
+		if (!apply_boolean(key, data, &config->registered_users_only))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "obsolete_clients"))
+	{
+		if (!apply_boolean(key, data, &config->obsolete_clients))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "chat_only"))
+	{
+		if (!apply_boolean(key, data, &config->chat_only))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "chat_is_privileged"))
+	{
+		if (!apply_boolean(key, data, &config->chat_is_privileged))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "hub_name"))
+	{
+		if (!apply_string(key, data, &config->hub_name, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "hub_description"))
+	{
+		if (!apply_string(key, data, &config->hub_description, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "max_recv_buffer"))
+	{
+		if (!apply_integer(key, data, &config->max_recv_buffer, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "max_send_buffer"))
+	{
+		if (!apply_integer(key, data, &config->max_send_buffer, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "max_send_buffer_soft"))
+	{
+		if (!apply_integer(key, data, &config->max_send_buffer_soft, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "low_bandwidth_mode"))
+	{
+		if (!apply_boolean(key, data, &config->low_bandwidth_mode))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "max_chat_history"))
+	{
+		if (!apply_integer(key, data, &config->max_chat_history, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "max_logout_log"))
+	{
+		if (!apply_integer(key, data, &config->max_logout_log, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "limit_max_hubs_user"))
+	{
+		if (!apply_integer(key, data, &config->limit_max_hubs_user, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "limit_max_hubs_reg"))
+	{
+		if (!apply_integer(key, data, &config->limit_max_hubs_reg, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "limit_max_hubs_op"))
+	{
+		if (!apply_integer(key, data, &config->limit_max_hubs_op, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "limit_max_hubs"))
+	{
+		if (!apply_integer(key, data, &config->limit_max_hubs, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "limit_min_hubs_user"))
+	{
+		if (!apply_integer(key, data, &config->limit_min_hubs_user, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "limit_min_hubs_reg"))
+	{
+		if (!apply_integer(key, data, &config->limit_min_hubs_reg, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "limit_min_hubs_op"))
+	{
+		if (!apply_integer(key, data, &config->limit_min_hubs_op, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "limit_min_share"))
+	{
+		min = 0;
+		if (!apply_integer(key, data, &config->limit_min_share, &min, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "limit_max_share"))
+	{
+		if (!apply_integer(key, data, &config->limit_max_share, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "limit_min_slots"))
+	{
+		if (!apply_integer(key, data, &config->limit_min_slots, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "limit_max_slots"))
+	{
+		if (!apply_integer(key, data, &config->limit_max_slots, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "flood_ctl_interval"))
+	{
+		min = 1;
+		max = 60;
+		if (!apply_integer(key, data, &config->flood_ctl_interval, &min, &max))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "flood_ctl_chat"))
+	{
+		if (!apply_integer(key, data, &config->flood_ctl_chat, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "flood_ctl_connect"))
+	{
+		if (!apply_integer(key, data, &config->flood_ctl_connect, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "flood_ctl_search"))
+	{
+		if (!apply_integer(key, data, &config->flood_ctl_search, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "flood_ctl_update"))
+	{
+		if (!apply_integer(key, data, &config->flood_ctl_update, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "flood_ctl_extras"))
+	{
+		if (!apply_integer(key, data, &config->flood_ctl_extras, 0, 0))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "tls_enable"))
+	{
+		if (!apply_boolean(key, data, &config->tls_enable))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "tls_require"))
+	{
+		if (!apply_boolean(key, data, &config->tls_require))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "tls_certificate"))
+	{
+		if (!apply_string(key, data, &config->tls_certificate, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "tls_private_key"))
+	{
+		if (!apply_string(key, data, &config->tls_private_key, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "file_motd"))
+	{
+		if (!apply_string(key, data, &config->file_motd, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "file_acl"))
+	{
+		if (!apply_string(key, data, &config->file_acl, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "file_rules"))
+	{
+		if (!apply_string(key, data, &config->file_rules, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_hub_full"))
+	{
+		if (!apply_string(key, data, &config->msg_hub_full, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_hub_disabled"))
+	{
+		if (!apply_string(key, data, &config->msg_hub_disabled, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_hub_registered_users_only"))
+	{
+		if (!apply_string(key, data, &config->msg_hub_registered_users_only, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_inf_error_nick_missing"))
+	{
+		if (!apply_string(key, data, &config->msg_inf_error_nick_missing, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_inf_error_nick_multiple"))
+	{
+		if (!apply_string(key, data, &config->msg_inf_error_nick_multiple, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_inf_error_nick_invalid"))
+	{
+		if (!apply_string(key, data, &config->msg_inf_error_nick_invalid, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_inf_error_nick_long"))
+	{
+		if (!apply_string(key, data, &config->msg_inf_error_nick_long, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_inf_error_nick_short"))
+	{
+		if (!apply_string(key, data, &config->msg_inf_error_nick_short, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_inf_error_nick_spaces"))
+	{
+		if (!apply_string(key, data, &config->msg_inf_error_nick_spaces, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_inf_error_nick_bad_chars"))
+	{
+		if (!apply_string(key, data, &config->msg_inf_error_nick_bad_chars, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_inf_error_nick_not_utf8"))
+	{
+		if (!apply_string(key, data, &config->msg_inf_error_nick_not_utf8, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_inf_error_nick_taken"))
+	{
+		if (!apply_string(key, data, &config->msg_inf_error_nick_taken, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_inf_error_nick_restricted"))
+	{
+		if (!apply_string(key, data, &config->msg_inf_error_nick_restricted, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_inf_error_cid_invalid"))
+	{
+		if (!apply_string(key, data, &config->msg_inf_error_cid_invalid, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_inf_error_cid_missing"))
+	{
+		if (!apply_string(key, data, &config->msg_inf_error_cid_missing, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_inf_error_cid_taken"))
+	{
+		if (!apply_string(key, data, &config->msg_inf_error_cid_taken, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_inf_error_pid_missing"))
+	{
+		if (!apply_string(key, data, &config->msg_inf_error_pid_missing, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_inf_error_pid_invalid"))
+	{
+		if (!apply_string(key, data, &config->msg_inf_error_pid_invalid, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_ban_permanently"))
+	{
+		if (!apply_string(key, data, &config->msg_ban_permanently, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_ban_temporarily"))
+	{
+		if (!apply_string(key, data, &config->msg_ban_temporarily, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_auth_invalid_password"))
+	{
+		if (!apply_string(key, data, &config->msg_auth_invalid_password, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_auth_user_not_found"))
+	{
+		if (!apply_string(key, data, &config->msg_auth_user_not_found, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_error_no_memory"))
+	{
+		if (!apply_string(key, data, &config->msg_error_no_memory, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_user_share_size_low"))
+	{
+		if (!apply_string(key, data, &config->msg_user_share_size_low, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_user_share_size_high"))
+	{
+		if (!apply_string(key, data, &config->msg_user_share_size_high, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_user_slots_low"))
+	{
+		if (!apply_string(key, data, &config->msg_user_slots_low, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_user_slots_high"))
+	{
+		if (!apply_string(key, data, &config->msg_user_slots_high, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_user_hub_limit_low"))
+	{
+		if (!apply_string(key, data, &config->msg_user_hub_limit_low, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_user_hub_limit_high"))
+	{
+		if (!apply_string(key, data, &config->msg_user_hub_limit_high, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_user_flood_chat"))
+	{
+		if (!apply_string(key, data, &config->msg_user_flood_chat, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_user_flood_connect"))
+	{
+		if (!apply_string(key, data, &config->msg_user_flood_connect, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_user_flood_search"))
+	{
+		if (!apply_string(key, data, &config->msg_user_flood_search, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_user_flood_update"))
+	{
+		if (!apply_string(key, data, &config->msg_user_flood_update, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_user_flood_extras"))
+	{
+		if (!apply_string(key, data, &config->msg_user_flood_extras, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_proto_no_common_hash"))
+	{
+		if (!apply_string(key, data, &config->msg_proto_no_common_hash, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "msg_proto_obsolete_adc0"))
+	{
+		if (!apply_string(key, data, &config->msg_proto_obsolete_adc0, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
 	/* Still here -- unknown directive */
 	LOG_ERROR("Unknown configuration directive: '%s'", key);
 		return -1;
@@ -174,133 +902,338 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 void free_config(struct hub_config* config)
 {
 	hub_free(config->server_bind_addr);
+
 	hub_free(config->server_alt_ports);
+
 	hub_free(config->hub_name);
+
 	hub_free(config->hub_description);
+
 	hub_free(config->tls_certificate);
+
 	hub_free(config->tls_private_key);
+
 	hub_free(config->file_motd);
+
 	hub_free(config->file_acl);
+
 	hub_free(config->file_rules);
+
 	hub_free(config->msg_hub_full);
+
 	hub_free(config->msg_hub_disabled);
+
 	hub_free(config->msg_hub_registered_users_only);
+
 	hub_free(config->msg_inf_error_nick_missing);
+
 	hub_free(config->msg_inf_error_nick_multiple);
+
 	hub_free(config->msg_inf_error_nick_invalid);
+
 	hub_free(config->msg_inf_error_nick_long);
+
 	hub_free(config->msg_inf_error_nick_short);
+
 	hub_free(config->msg_inf_error_nick_spaces);
+
 	hub_free(config->msg_inf_error_nick_bad_chars);
+
 	hub_free(config->msg_inf_error_nick_not_utf8);
+
 	hub_free(config->msg_inf_error_nick_taken);
+
 	hub_free(config->msg_inf_error_nick_restricted);
+
 	hub_free(config->msg_inf_error_cid_invalid);
+
 	hub_free(config->msg_inf_error_cid_missing);
+
 	hub_free(config->msg_inf_error_cid_taken);
+
 	hub_free(config->msg_inf_error_pid_missing);
+
 	hub_free(config->msg_inf_error_pid_invalid);
+
 	hub_free(config->msg_ban_permanently);
+
 	hub_free(config->msg_ban_temporarily);
+
 	hub_free(config->msg_auth_invalid_password);
+
 	hub_free(config->msg_auth_user_not_found);
+
 	hub_free(config->msg_error_no_memory);
+
 	hub_free(config->msg_user_share_size_low);
+
 	hub_free(config->msg_user_share_size_high);
+
 	hub_free(config->msg_user_slots_low);
+
 	hub_free(config->msg_user_slots_high);
+
 	hub_free(config->msg_user_hub_limit_low);
+
 	hub_free(config->msg_user_hub_limit_high);
+
 	hub_free(config->msg_user_flood_chat);
+
 	hub_free(config->msg_user_flood_connect);
+
 	hub_free(config->msg_user_flood_search);
+
 	hub_free(config->msg_user_flood_update);
+
 	hub_free(config->msg_user_flood_extras);
+
 	hub_free(config->msg_proto_no_common_hash);
+
 	hub_free(config->msg_proto_obsolete_adc0);
+
 }
 
 void dump_config(struct hub_config* config, int ignore_defaults)
 {
-	DUMP_INT (server_port, 1511);
-	DUMP_STR(server_bind_addr, "any");
-	DUMP_INT (server_listen_backlog, 50);
-	DUMP_STR(server_alt_ports, "");
-	DUMP_BOOL(hub_enabled, 1);
-	DUMP_BOOL(show_banner, 1);
-	DUMP_BOOL(show_banner_sys_info, 1);
-	DUMP_INT (max_users, 500);
-	DUMP_BOOL(registered_users_only, 0);
-	DUMP_BOOL(obsolete_clients, 0);
-	DUMP_BOOL(chat_only, 0);
-	DUMP_BOOL(chat_is_privileged, 0);
-	DUMP_STR(hub_name, "uhub");
-	DUMP_STR(hub_description, "no description");
-	DUMP_INT (max_recv_buffer, 4096);
-	DUMP_INT (max_send_buffer, 131072);
-	DUMP_INT (max_send_buffer_soft, 98304);
-	DUMP_BOOL(low_bandwidth_mode, 0);
-	DUMP_INT (max_chat_history, 20);
-	DUMP_INT (max_logout_log, 20);
-	DUMP_INT (limit_max_hubs_user, 10);
-	DUMP_INT (limit_max_hubs_reg, 10);
-	DUMP_INT (limit_max_hubs_op, 10);
-	DUMP_INT (limit_max_hubs, 25);
-	DUMP_INT (limit_min_hubs_user, 0);
-	DUMP_INT (limit_min_hubs_reg, 0);
-	DUMP_INT (limit_min_hubs_op, 0);
-	DUMP_INT (limit_min_share, 0);
-	DUMP_INT (limit_max_share, 0);
-	DUMP_INT (limit_min_slots, 0);
-	DUMP_INT (limit_max_slots, 0);
-	DUMP_INT (flood_ctl_interval, 0);
-	DUMP_INT (flood_ctl_chat, 0);
-	DUMP_INT (flood_ctl_connect, 0);
-	DUMP_INT (flood_ctl_search, 0);
-	DUMP_INT (flood_ctl_update, 0);
-	DUMP_INT (flood_ctl_extras, 0);
-	DUMP_BOOL(tls_enable, 0);
-	DUMP_BOOL(tls_require, 0);
-	DUMP_STR(tls_certificate, "");
-	DUMP_STR(tls_private_key, "");
-	DUMP_STR(file_motd, "");
-	DUMP_STR(file_acl, "");
-	DUMP_STR(file_rules, "");
-	DUMP_STR(msg_hub_full, "Hub is full");
-	DUMP_STR(msg_hub_disabled, "Hub is disabled");
-	DUMP_STR(msg_hub_registered_users_only, "Hub is for registered users only");
-	DUMP_STR(msg_inf_error_nick_missing, "No nickname given");
-	DUMP_STR(msg_inf_error_nick_multiple, "Multiple nicknames given");
-	DUMP_STR(msg_inf_error_nick_invalid, "Nickname is invalid");
-	DUMP_STR(msg_inf_error_nick_long, "Nickname too long");
-	DUMP_STR(msg_inf_error_nick_short, "Nickname too short");
-	DUMP_STR(msg_inf_error_nick_spaces, "Nickname cannot start with spaces");
-	DUMP_STR(msg_inf_error_nick_bad_chars, "Nickname contains invalid characters");
-	DUMP_STR(msg_inf_error_nick_not_utf8, "Nickname is not valid UTF-8");
-	DUMP_STR(msg_inf_error_nick_taken, "Nickname is already in use");
-	DUMP_STR(msg_inf_error_nick_restricted, "Nickname cannot be used on this hub");
-	DUMP_STR(msg_inf_error_cid_invalid, "CID is not valid");
-	DUMP_STR(msg_inf_error_cid_missing, "CID is not specified");
-	DUMP_STR(msg_inf_error_cid_taken, "CID is taken");
-	DUMP_STR(msg_inf_error_pid_missing, "PID is not specified");
-	DUMP_STR(msg_inf_error_pid_invalid, "PID is invalid");
-	DUMP_STR(msg_ban_permanently, "Banned permanently");
-	DUMP_STR(msg_ban_temporarily, "Banned temporarily");
-	DUMP_STR(msg_auth_invalid_password, "Password is wrong");
-	DUMP_STR(msg_auth_user_not_found, "User not found in password database");
-	DUMP_STR(msg_error_no_memory, "No memory");
-	DUMP_STR(msg_user_share_size_low, "User is not sharing enough");
-	DUMP_STR(msg_user_share_size_high, "User is sharing too much");
-	DUMP_STR(msg_user_slots_low, "User have too few upload slots.");
-	DUMP_STR(msg_user_slots_high, "User have too many upload slots.");
-	DUMP_STR(msg_user_hub_limit_low, "User is on too few hubs.");
-	DUMP_STR(msg_user_hub_limit_high, "User is on too many hubs.");
-	DUMP_STR(msg_user_flood_chat, "Chat flood detected, messages are dropped.");
-	DUMP_STR(msg_user_flood_connect, "Connect flood detected, connection refused.");
-	DUMP_STR(msg_user_flood_search, "Search flood detected, search is stopped.");
-	DUMP_STR(msg_user_flood_update, "Update flood detected.");
-	DUMP_STR(msg_user_flood_extras, "Flood detected.");
-	DUMP_STR(msg_proto_no_common_hash, "No common hash algorithm.");
-	DUMP_STR(msg_proto_obsolete_adc0, "Client is using an obsolete ADC protocol version.");
+	if (!ignore_defaults || config->hub_enabled != 1)
+		fprintf(stdout, "hub_enabled = %s\n", config->hub_enabled ? "yes" : "no");
+
+	if (!ignore_defaults || config->server_port != 1511)
+		fprintf(stdout, "server_port = %d\n", config->server_port);
+
+	if (!ignore_defaults || strcmp(config->server_bind_addr, "any") != 0)
+		fprintf(stdout, "server_bind_addr = \"%s\"\n", config->server_bind_addr);
+
+	if (!ignore_defaults || config->server_listen_backlog != 50)
+		fprintf(stdout, "server_listen_backlog = %d\n", config->server_listen_backlog);
+
+	if (!ignore_defaults || strcmp(config->server_alt_ports, "") != 0)
+		fprintf(stdout, "server_alt_ports = \"%s\"\n", config->server_alt_ports);
+
+	if (!ignore_defaults || config->show_banner != 1)
+		fprintf(stdout, "show_banner = %s\n", config->show_banner ? "yes" : "no");
+
+	if (!ignore_defaults || config->show_banner_sys_info != 1)
+		fprintf(stdout, "show_banner_sys_info = %s\n", config->show_banner_sys_info ? "yes" : "no");
+
+	if (!ignore_defaults || config->max_users != 500)
+		fprintf(stdout, "max_users = %d\n", config->max_users);
+
+	if (!ignore_defaults || config->registered_users_only != 0)
+		fprintf(stdout, "registered_users_only = %s\n", config->registered_users_only ? "yes" : "no");
+
+	if (!ignore_defaults || config->obsolete_clients != 0)
+		fprintf(stdout, "obsolete_clients = %s\n", config->obsolete_clients ? "yes" : "no");
+
+	if (!ignore_defaults || config->chat_only != 0)
+		fprintf(stdout, "chat_only = %s\n", config->chat_only ? "yes" : "no");
+
+	if (!ignore_defaults || config->chat_is_privileged != 0)
+		fprintf(stdout, "chat_is_privileged = %s\n", config->chat_is_privileged ? "yes" : "no");
+
+	if (!ignore_defaults || strcmp(config->hub_name, "uhub") != 0)
+		fprintf(stdout, "hub_name = \"%s\"\n", config->hub_name);
+
+	if (!ignore_defaults || strcmp(config->hub_description, "no description") != 0)
+		fprintf(stdout, "hub_description = \"%s\"\n", config->hub_description);
+
+	if (!ignore_defaults || config->max_recv_buffer != 4096)
+		fprintf(stdout, "max_recv_buffer = %d\n", config->max_recv_buffer);
+
+	if (!ignore_defaults || config->max_send_buffer != 131072)
+		fprintf(stdout, "max_send_buffer = %d\n", config->max_send_buffer);
+
+	if (!ignore_defaults || config->max_send_buffer_soft != 98304)
+		fprintf(stdout, "max_send_buffer_soft = %d\n", config->max_send_buffer_soft);
+
+	if (!ignore_defaults || config->low_bandwidth_mode != 0)
+		fprintf(stdout, "low_bandwidth_mode = %s\n", config->low_bandwidth_mode ? "yes" : "no");
+
+	if (!ignore_defaults || config->max_chat_history != 20)
+		fprintf(stdout, "max_chat_history = %d\n", config->max_chat_history);
+
+	if (!ignore_defaults || config->max_logout_log != 20)
+		fprintf(stdout, "max_logout_log = %d\n", config->max_logout_log);
+
+	if (!ignore_defaults || config->limit_max_hubs_user != 10)
+		fprintf(stdout, "limit_max_hubs_user = %d\n", config->limit_max_hubs_user);
+
+	if (!ignore_defaults || config->limit_max_hubs_reg != 10)
+		fprintf(stdout, "limit_max_hubs_reg = %d\n", config->limit_max_hubs_reg);
+
+	if (!ignore_defaults || config->limit_max_hubs_op != 10)
+		fprintf(stdout, "limit_max_hubs_op = %d\n", config->limit_max_hubs_op);
+
+	if (!ignore_defaults || config->limit_max_hubs != 25)
+		fprintf(stdout, "limit_max_hubs = %d\n", config->limit_max_hubs);
+
+	if (!ignore_defaults || config->limit_min_hubs_user != 0)
+		fprintf(stdout, "limit_min_hubs_user = %d\n", config->limit_min_hubs_user);
+
+	if (!ignore_defaults || config->limit_min_hubs_reg != 0)
+		fprintf(stdout, "limit_min_hubs_reg = %d\n", config->limit_min_hubs_reg);
+
+	if (!ignore_defaults || config->limit_min_hubs_op != 0)
+		fprintf(stdout, "limit_min_hubs_op = %d\n", config->limit_min_hubs_op);
+
+	if (!ignore_defaults || config->limit_min_share != 0)
+		fprintf(stdout, "limit_min_share = %d\n", config->limit_min_share);
+
+	if (!ignore_defaults || config->limit_max_share != 0)
+		fprintf(stdout, "limit_max_share = %d\n", config->limit_max_share);
+
+	if (!ignore_defaults || config->limit_min_slots != 0)
+		fprintf(stdout, "limit_min_slots = %d\n", config->limit_min_slots);
+
+	if (!ignore_defaults || config->limit_max_slots != 0)
+		fprintf(stdout, "limit_max_slots = %d\n", config->limit_max_slots);
+
+	if (!ignore_defaults || config->flood_ctl_interval != 0)
+		fprintf(stdout, "flood_ctl_interval = %d\n", config->flood_ctl_interval);
+
+	if (!ignore_defaults || config->flood_ctl_chat != 0)
+		fprintf(stdout, "flood_ctl_chat = %d\n", config->flood_ctl_chat);
+
+	if (!ignore_defaults || config->flood_ctl_connect != 0)
+		fprintf(stdout, "flood_ctl_connect = %d\n", config->flood_ctl_connect);
+
+	if (!ignore_defaults || config->flood_ctl_search != 0)
+		fprintf(stdout, "flood_ctl_search = %d\n", config->flood_ctl_search);
+
+	if (!ignore_defaults || config->flood_ctl_update != 0)
+		fprintf(stdout, "flood_ctl_update = %d\n", config->flood_ctl_update);
+
+	if (!ignore_defaults || config->flood_ctl_extras != 0)
+		fprintf(stdout, "flood_ctl_extras = %d\n", config->flood_ctl_extras);
+
+	if (!ignore_defaults || config->tls_enable != 0)
+		fprintf(stdout, "tls_enable = %s\n", config->tls_enable ? "yes" : "no");
+
+	if (!ignore_defaults || config->tls_require != 0)
+		fprintf(stdout, "tls_require = %s\n", config->tls_require ? "yes" : "no");
+
+	if (!ignore_defaults || strcmp(config->tls_certificate, "") != 0)
+		fprintf(stdout, "tls_certificate = \"%s\"\n", config->tls_certificate);
+
+	if (!ignore_defaults || strcmp(config->tls_private_key, "") != 0)
+		fprintf(stdout, "tls_private_key = \"%s\"\n", config->tls_private_key);
+
+	if (!ignore_defaults || strcmp(config->file_motd, "") != 0)
+		fprintf(stdout, "file_motd = \"%s\"\n", config->file_motd);
+
+	if (!ignore_defaults || strcmp(config->file_acl, "") != 0)
+		fprintf(stdout, "file_acl = \"%s\"\n", config->file_acl);
+
+	if (!ignore_defaults || strcmp(config->file_rules, "") != 0)
+		fprintf(stdout, "file_rules = \"%s\"\n", config->file_rules);
+
+	if (!ignore_defaults || strcmp(config->msg_hub_full, "Hub is full") != 0)
+		fprintf(stdout, "msg_hub_full = \"%s\"\n", config->msg_hub_full);
+
+	if (!ignore_defaults || strcmp(config->msg_hub_disabled, "Hub is disabled") != 0)
+		fprintf(stdout, "msg_hub_disabled = \"%s\"\n", config->msg_hub_disabled);
+
+	if (!ignore_defaults || strcmp(config->msg_hub_registered_users_only, "Hub is for registered users only") != 0)
+		fprintf(stdout, "msg_hub_registered_users_only = \"%s\"\n", config->msg_hub_registered_users_only);
+
+	if (!ignore_defaults || strcmp(config->msg_inf_error_nick_missing, "No nickname given") != 0)
+		fprintf(stdout, "msg_inf_error_nick_missing = \"%s\"\n", config->msg_inf_error_nick_missing);
+
+	if (!ignore_defaults || strcmp(config->msg_inf_error_nick_multiple, "Multiple nicknames given") != 0)
+		fprintf(stdout, "msg_inf_error_nick_multiple = \"%s\"\n", config->msg_inf_error_nick_multiple);
+
+	if (!ignore_defaults || strcmp(config->msg_inf_error_nick_invalid, "Nickname is invalid") != 0)
+		fprintf(stdout, "msg_inf_error_nick_invalid = \"%s\"\n", config->msg_inf_error_nick_invalid);
+
+	if (!ignore_defaults || strcmp(config->msg_inf_error_nick_long, "Nickname too long") != 0)
+		fprintf(stdout, "msg_inf_error_nick_long = \"%s\"\n", config->msg_inf_error_nick_long);
+
+	if (!ignore_defaults || strcmp(config->msg_inf_error_nick_short, "Nickname too short") != 0)
+		fprintf(stdout, "msg_inf_error_nick_short = \"%s\"\n", config->msg_inf_error_nick_short);
+
+	if (!ignore_defaults || strcmp(config->msg_inf_error_nick_spaces, "Nickname cannot start with spaces") != 0)
+		fprintf(stdout, "msg_inf_error_nick_spaces = \"%s\"\n", config->msg_inf_error_nick_spaces);
+
+	if (!ignore_defaults || strcmp(config->msg_inf_error_nick_bad_chars, "Nickname contains invalid characters") != 0)
+		fprintf(stdout, "msg_inf_error_nick_bad_chars = \"%s\"\n", config->msg_inf_error_nick_bad_chars);
+
+	if (!ignore_defaults || strcmp(config->msg_inf_error_nick_not_utf8, "Nickname is not valid UTF-8") != 0)
+		fprintf(stdout, "msg_inf_error_nick_not_utf8 = \"%s\"\n", config->msg_inf_error_nick_not_utf8);
+
+	if (!ignore_defaults || strcmp(config->msg_inf_error_nick_taken, "Nickname is already in use") != 0)
+		fprintf(stdout, "msg_inf_error_nick_taken = \"%s\"\n", config->msg_inf_error_nick_taken);
+
+	if (!ignore_defaults || strcmp(config->msg_inf_error_nick_restricted, "Nickname cannot be used on this hub") != 0)
+		fprintf(stdout, "msg_inf_error_nick_restricted = \"%s\"\n", config->msg_inf_error_nick_restricted);
+
+	if (!ignore_defaults || strcmp(config->msg_inf_error_cid_invalid, "CID is not valid") != 0)
+		fprintf(stdout, "msg_inf_error_cid_invalid = \"%s\"\n", config->msg_inf_error_cid_invalid);
+
+	if (!ignore_defaults || strcmp(config->msg_inf_error_cid_missing, "CID is not specified") != 0)
+		fprintf(stdout, "msg_inf_error_cid_missing = \"%s\"\n", config->msg_inf_error_cid_missing);
+
+	if (!ignore_defaults || strcmp(config->msg_inf_error_cid_taken, "CID is taken") != 0)
+		fprintf(stdout, "msg_inf_error_cid_taken = \"%s\"\n", config->msg_inf_error_cid_taken);
+
+	if (!ignore_defaults || strcmp(config->msg_inf_error_pid_missing, "PID is not specified") != 0)
+		fprintf(stdout, "msg_inf_error_pid_missing = \"%s\"\n", config->msg_inf_error_pid_missing);
+
+	if (!ignore_defaults || strcmp(config->msg_inf_error_pid_invalid, "PID is invalid") != 0)
+		fprintf(stdout, "msg_inf_error_pid_invalid = \"%s\"\n", config->msg_inf_error_pid_invalid);
+
+	if (!ignore_defaults || strcmp(config->msg_ban_permanently, "Banned permanently") != 0)
+		fprintf(stdout, "msg_ban_permanently = \"%s\"\n", config->msg_ban_permanently);
+
+	if (!ignore_defaults || strcmp(config->msg_ban_temporarily, "Banned temporarily") != 0)
+		fprintf(stdout, "msg_ban_temporarily = \"%s\"\n", config->msg_ban_temporarily);
+
+	if (!ignore_defaults || strcmp(config->msg_auth_invalid_password, "Password is wrong") != 0)
+		fprintf(stdout, "msg_auth_invalid_password = \"%s\"\n", config->msg_auth_invalid_password);
+
+	if (!ignore_defaults || strcmp(config->msg_auth_user_not_found, "User not found in password database") != 0)
+		fprintf(stdout, "msg_auth_user_not_found = \"%s\"\n", config->msg_auth_user_not_found);
+
+	if (!ignore_defaults || strcmp(config->msg_error_no_memory, "No memory") != 0)
+		fprintf(stdout, "msg_error_no_memory = \"%s\"\n", config->msg_error_no_memory);
+
+	if (!ignore_defaults || strcmp(config->msg_user_share_size_low, "User is not sharing enough") != 0)
+		fprintf(stdout, "msg_user_share_size_low = \"%s\"\n", config->msg_user_share_size_low);
+
+	if (!ignore_defaults || strcmp(config->msg_user_share_size_high, "User is sharing too much") != 0)
+		fprintf(stdout, "msg_user_share_size_high = \"%s\"\n", config->msg_user_share_size_high);
+
+	if (!ignore_defaults || strcmp(config->msg_user_slots_low, "User have too few upload slots.") != 0)
+		fprintf(stdout, "msg_user_slots_low = \"%s\"\n", config->msg_user_slots_low);
+
+	if (!ignore_defaults || strcmp(config->msg_user_slots_high, "User have too many upload slots.") != 0)
+		fprintf(stdout, "msg_user_slots_high = \"%s\"\n", config->msg_user_slots_high);
+
+	if (!ignore_defaults || strcmp(config->msg_user_hub_limit_low, "User is on too few hubs.") != 0)
+		fprintf(stdout, "msg_user_hub_limit_low = \"%s\"\n", config->msg_user_hub_limit_low);
+
+	if (!ignore_defaults || strcmp(config->msg_user_hub_limit_high, "User is on too many hubs.") != 0)
+		fprintf(stdout, "msg_user_hub_limit_high = \"%s\"\n", config->msg_user_hub_limit_high);
+
+	if (!ignore_defaults || strcmp(config->msg_user_flood_chat, "Chat flood detected, messages are dropped.") != 0)
+		fprintf(stdout, "msg_user_flood_chat = \"%s\"\n", config->msg_user_flood_chat);
+
+	if (!ignore_defaults || strcmp(config->msg_user_flood_connect, "Connect flood detected, connection refused.") != 0)
+		fprintf(stdout, "msg_user_flood_connect = \"%s\"\n", config->msg_user_flood_connect);
+
+	if (!ignore_defaults || strcmp(config->msg_user_flood_search, "Search flood detected, search is stopped.") != 0)
+		fprintf(stdout, "msg_user_flood_search = \"%s\"\n", config->msg_user_flood_search);
+
+	if (!ignore_defaults || strcmp(config->msg_user_flood_update, "Update flood detected.") != 0)
+		fprintf(stdout, "msg_user_flood_update = \"%s\"\n", config->msg_user_flood_update);
+
+	if (!ignore_defaults || strcmp(config->msg_user_flood_extras, "Flood detected.") != 0)
+		fprintf(stdout, "msg_user_flood_extras = \"%s\"\n", config->msg_user_flood_extras);
+
+	if (!ignore_defaults || strcmp(config->msg_proto_no_common_hash, "No common hash algorithm.") != 0)
+		fprintf(stdout, "msg_proto_no_common_hash = \"%s\"\n", config->msg_proto_no_common_hash);
+
+	if (!ignore_defaults || strcmp(config->msg_proto_obsolete_adc0, "Client is using an obsolete ADC protocol version.") != 0)
+		fprintf(stdout, "msg_proto_obsolete_adc0 = \"%s\"\n", config->msg_proto_obsolete_adc0);
+
 }
 

@@ -29,101 +29,52 @@
 #define INT_MIN (-0x7fffffff - 1)
 #endif
 
-#define CFG_APPLY_BOOLEAN(KEY, TARGET) \
-	if (strcmp(KEY, key) == 0) \
-	{ \
-		if      (strlen(data) == 1 && (data[0] == '1')) TARGET = 1; \
-		else if (strlen(data) == 1 && (data[0] == '0')) TARGET = 0; \
-		else if (strncasecmp(data, "true",  4) == 0) TARGET = 1; \
-		else if (strncasecmp(data, "false", 5) == 0) TARGET = 0; \
-		else if (strncasecmp(data, "yes",   3) == 0) TARGET = 1; \
-		else if (strncasecmp(data, "no",    2) == 0) TARGET = 0; \
-		else if (strncasecmp(data, "on",    2) == 0) TARGET = 1; \
-		else if (strncasecmp(data, "off",   3) == 0) TARGET = 0; \
-		else\
-		{ \
-			LOG_FATAL("Configuration error on line %d: '%s' must be either '1' or '0'", line_count, key); \
-			return -1; \
-		} \
-		return 0; \
-	}
-
-#define CFG_APPLY_STRING(KEY, TARGET) \
-	if (strcmp(KEY, key) == 0) \
-	{ \
-		TARGET = hub_strdup(data); \
-		return 0; \
-	}
-
-
-#define CFG_APPLY_INTEGER(KEY, TARGET) \
-	if (strcmp(KEY, key) == 0) \
-	{ \
-		char* endptr; \
-		int val; \
-		errno = 0; \
-		val = strtol(data, &endptr, 10); \
-		if (((errno == ERANGE && (val == INT_MAX || val == INT_MIN)) || (errno != 0 && val == 0)) || endptr == data) { \
-			LOG_FATAL("Configuration error on line %d: '%s' must be a number", line_count, key); \
-			return -1; \
-		} \
-		TARGET = val; \
-		return 0; \
-	}
-
-
-#define DEFAULT_STRING(KEY, VALUE) \
-{ \
-	if (config->KEY == 0) \
-		config->KEY = hub_strdup(VALUE); \
+static int apply_boolean(const char* key, const char* data, int* target)
+{
+	if      (strlen(data) == 1 && (data[0] == '1')) *target = 1;
+	else if (strlen(data) == 1 && (data[0] == '0')) *target = 0;
+	else if (strncasecmp(data, "true",  4) == 0) *target = 1;
+	else if (strncasecmp(data, "false", 5) == 0) *target = 0;
+	else if (strncasecmp(data, "yes",   3) == 0) *target = 1;
+	else if (strncasecmp(data, "no",    2) == 0) *target = 0;
+	else if (strncasecmp(data, "on",    2) == 0) *target = 1;
+	else if (strncasecmp(data, "off",   3) == 0) *target = 0;
+	else
+		return 0;
+	return 1;
 }
 
-#define DEFAULT_INTEGER(KEY, VALUE) \
-{ \
-	if (config->KEY == 0) \
-		config->KEY = VALUE; \
+static int apply_string(const char* key, const char* data, char** target, char* regexp)
+{
+	(void) regexp;
+	// FIXME: Add regexp checks for correct data
+
+	if (*target)
+		hub_free(*target);
+
+	*target = hub_strdup(data);
+	return 1;
 }
 
-#define DEFAULT_BOOLEAN(KEY, VALUE) \
-	config->KEY = config->KEY & 0x000000ff;
+static int apply_integer(const char* key, const char* data, int* target, int* min, int* max)
+{
+	char* endptr;
+	int val;
+	errno = 0;
+	val = strtol(data, &endptr, 10);
 
-#define GET_STR(NAME)  CFG_APPLY_STRING ( #NAME , config->NAME )
-#define GET_INT(NAME)  CFG_APPLY_INTEGER( #NAME , config->NAME )
-#define GET_BOOL(NAME) CFG_APPLY_BOOLEAN( #NAME , config->NAME )
-#define IGNORED(NAME) \
-    if (strcmp(#NAME, key) == 0) \
-    { \
-        LOG_WARN("Configuration option %s deprecated and ingnored.", key); \
-        return 0; \
-    }
+	if (((errno == ERANGE && (val == INT_MAX || val == INT_MIN)) || (errno != 0 && val == 0)) || endptr == data)
+			return 0;
 
-#define DUMP_STR(NAME, DEFAULT) \
-	if (ignore_defaults) \
-	{ \
-		if (strcmp(config->NAME, DEFAULT) != 0) \
-			fprintf(stdout, "%s = \"%s\"\n", #NAME , config->NAME); \
-	} \
-	else \
-		fprintf(stdout, "%s = \"%s\"\n", #NAME , config->NAME); \
-		
-#define DUMP_INT(NAME, DEFAULT) \
-	if (ignore_defaults) \
-	{ \
-		if (config->NAME != DEFAULT) \
-			fprintf(stdout, "%s = %d\n", #NAME , config->NAME); \
-	} \
-	else \
-		fprintf(stdout, "%s = %d\n", #NAME , config->NAME); \
+	if (min && val < *min)
+		return 0;
 
-#define DUMP_BOOL(NAME, DEFAULT) \
-	if (ignore_defaults) \
-	{ \
-		if (config->NAME != DEFAULT) \
-			fprintf(stdout, "%s = %s\n", #NAME , (config->NAME ? "yes" : "no")); \
-	} \
-	else \
-		fprintf(stdout, "%s = %s\n", #NAME , (config->NAME ? "yes" : "no"));
+	if (max && val > *max)
+		return 0;
 
+	*target = val;
+	return 1;
+}
 
 #include "gen_config.c"
 
