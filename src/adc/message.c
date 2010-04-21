@@ -88,6 +88,9 @@ static int adc_msg_grow(struct adc_message* msg, size_t size)
 	char* buf;
 	size_t newsize = 0;
 
+	if (!msg)
+		return 0;
+
 	if (msg->capacity > size)
 		return 1;
 
@@ -242,7 +245,10 @@ struct adc_message* adc_msg_copy(const struct adc_message* cmd)
 	}
 
 	if (!copy->cache)
+	{
+		adc_msg_free(copy);
 		return NULL;
+	}
 
 	memcpy(copy->cache, cmd->cache, cmd->length);
 	copy->cache[copy->length] = 0;

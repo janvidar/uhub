@@ -950,7 +950,12 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 	char* escaped_text = 0;
 	int reconnect_time = 0;
 
-	if (!cmd) return;
+	if (!cmd || !qui)
+	{
+		adc_msg_free(cmd);
+		adc_msg_free(qui);
+		return;
+	}
 
 #define STATUS(CODE, MSG, FLAG, RCONTIME) case status_ ## MSG : set_status_code(level, CODE, code); text = cfg->MSG; flag = FLAG; reconnect_time = RCONTIME; break
 	switch (msg)

@@ -358,20 +358,10 @@ int acl_is_user_denied(struct acl_handle* handle, const char* data)
 
 int acl_user_ban_nick(struct acl_handle* handle, const char* nick)
 {
-	char* data = 0;
-	struct hub_user_access_info* info = hub_malloc_zero(sizeof(struct hub_user_access_info));
-
-	if (!info)
-	{
-		LOG_ERROR("ACL error: Out of memory!");
-		return -1;
-	}
-
-	data = hub_strdup(nick);
+	char* data = hub_strdup(nick);
 	if (!data)
 	{
 		LOG_ERROR("ACL error: Out of memory!");
-		hub_free(info);
 		return -1;
 	}
 
@@ -381,19 +371,10 @@ int acl_user_ban_nick(struct acl_handle* handle, const char* nick)
 
 int acl_user_ban_cid(struct acl_handle* handle, const char* cid)
 {
-	char* data;
-	struct hub_user_access_info* info = hub_malloc_zero(sizeof(struct hub_user_access_info));
-	if (!info)
-	{
-		LOG_ERROR("ACL error: Out of memory!");
-		return -1;
-	}
-
-	data = hub_strdup(cid);
+	char* data = hub_strdup(cid);
 	if (!data)
 	{
 		LOG_ERROR("ACL error: Out of memory!");
-		hub_free(info);
 		return -1;
 	}
 

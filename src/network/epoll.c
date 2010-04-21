@@ -160,6 +160,7 @@ struct net_backend* net_backend_init_epoll(struct net_backend_handler* handler, 
 	if (backend->epfd == -1)
 	{
 		LOG_WARN("Unable to create epoll socket.");
+		hub_free(backend);
 		return 0;
 	}
 
