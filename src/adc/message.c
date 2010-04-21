@@ -235,16 +235,17 @@ struct adc_message* adc_msg_copy(const struct adc_message* cmd)
 	copy->feature_cast_include = 0;
 	copy->feature_cast_exclude = 0;
 
-	if (cmd->cache)
+	if (!adc_msg_grow(copy, copy->length))
 	{
-		if (!adc_msg_grow(copy, copy->length))
-		{
-			adc_msg_free(copy);
-			return NULL; /* OOM */
-		}
-		memcpy(copy->cache, cmd->cache, cmd->length);
-		copy->cache[copy->length] = 0;
+		adc_msg_free(copy);
+		return NULL; /* OOM */
 	}
+
+	if (!copy->cache)
+		return NULL;
+
+	memcpy(copy->cache, cmd->cache, cmd->length);
+	copy->cache[copy->length] = 0;
 
 	if (cmd->feature_cast_include)
 	{
