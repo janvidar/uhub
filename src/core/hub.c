@@ -942,13 +942,14 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 {
 	struct hub_config* cfg = hub->config;
 	struct adc_message* cmd = adc_msg_construct(ADC_CMD_ISTA, 6);
-	struct adc_message* qui = adc_msg_construct(ADC_CMD_IQUI, 256);
+	struct adc_message* qui = adc_msg_construct(ADC_CMD_IQUI, 512);
 	char code[4];
 	char buf[250];
 	const char* text = 0;
 	const char* flag = 0;
 	char* escaped_text = 0;
 	int reconnect_time = 0;
+	int redirect = 0;
 
 	if (!cmd || !qui)
 	{
@@ -957,40 +958,40 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 		return;
 	}
 
-#define STATUS(CODE, MSG, FLAG, RCONTIME) case status_ ## MSG : set_status_code(level, CODE, code); text = cfg->MSG; flag = FLAG; reconnect_time = RCONTIME; break
+#define STATUS(CODE, MSG, FLAG, RCONTIME, REDIRECT) case status_ ## MSG : set_status_code(level, CODE, code); text = cfg->MSG; flag = FLAG; reconnect_time = RCONTIME; redirect = REDIRECT; break
 	switch (msg)
 	{
-		STATUS(11, msg_hub_full, 0, 600); /* FIXME: Proper timeout? */
-		STATUS(12, msg_hub_disabled, 0, -1);
-		STATUS(26, msg_hub_registered_users_only, 0, 0);
-		STATUS(43, msg_inf_error_nick_missing, 0, 0);
-		STATUS(43, msg_inf_error_nick_multiple, 0, 0);
-		STATUS(21, msg_inf_error_nick_invalid, 0, 0);
-		STATUS(21, msg_inf_error_nick_long, 0, 0);
-		STATUS(21, msg_inf_error_nick_short, 0, 0);
-		STATUS(21, msg_inf_error_nick_spaces, 0, 0);
-		STATUS(21, msg_inf_error_nick_bad_chars, 0, 0);
-		STATUS(21, msg_inf_error_nick_not_utf8, 0, 0);
-		STATUS(22, msg_inf_error_nick_taken, 0, 0);
-		STATUS(21, msg_inf_error_nick_restricted, 0, 0);
-		STATUS(43, msg_inf_error_cid_invalid, "FBID", 0);
-		STATUS(43, msg_inf_error_cid_missing, "FMID", 0);
-		STATUS(24, msg_inf_error_cid_taken, 0, 0);
-		STATUS(43, msg_inf_error_pid_missing, "FMPD", 0);
-		STATUS(27, msg_inf_error_pid_invalid, "FBPD", 0);
-		STATUS(31, msg_ban_permanently, 0, 0);
-		STATUS(32, msg_ban_temporarily, "TL600", 600); /* FIXME: Proper timeout? */
-		STATUS(23, msg_auth_invalid_password, 0, 0);
-		STATUS(20, msg_auth_user_not_found, 0, 0);
-		STATUS(30, msg_error_no_memory, 0, 0);
-		STATUS(43, msg_user_share_size_low,   "FB" ADC_INF_FLAG_SHARED_SIZE, 0);
-		STATUS(43, msg_user_share_size_high,  "FB" ADC_INF_FLAG_SHARED_SIZE, 0);
-		STATUS(43, msg_user_slots_low,        "FB" ADC_INF_FLAG_UPLOAD_SLOTS, 0);
-		STATUS(43, msg_user_slots_high,       "FB" ADC_INF_FLAG_UPLOAD_SLOTS, 0);
-		STATUS(43, msg_user_hub_limit_low, 0, 0);
-		STATUS(43, msg_user_hub_limit_high, 0, 0);
-		STATUS(47, msg_proto_no_common_hash, 0, -1);
-		STATUS(40, msg_proto_obsolete_adc0, 0, -1);
+		STATUS(11, msg_hub_full, 0, 600, 1); /* FIXME: Proper timeout? */
+		STATUS(12, msg_hub_disabled, 0, -1, 1);
+		STATUS(26, msg_hub_registered_users_only, 0, 0, 1);
+		STATUS(43, msg_inf_error_nick_missing, 0, 0, 0);
+		STATUS(43, msg_inf_error_nick_multiple, 0, 0, 0);
+		STATUS(21, msg_inf_error_nick_invalid, 0, 0, 0);
+		STATUS(21, msg_inf_error_nick_long, 0, 0, 0);
+		STATUS(21, msg_inf_error_nick_short, 0, 0, 0);
+		STATUS(21, msg_inf_error_nick_spaces, 0, 0, 0);
+		STATUS(21, msg_inf_error_nick_bad_chars, 0, 0, 0);
+		STATUS(21, msg_inf_error_nick_not_utf8, 0, 0, 0);
+		STATUS(22, msg_inf_error_nick_taken, 0, 0, 0);
+		STATUS(21, msg_inf_error_nick_restricted, 0, 0, 0);
+		STATUS(43, msg_inf_error_cid_invalid, "FBID", 0, 0);
+		STATUS(43, msg_inf_error_cid_missing, "FMID", 0, 0);
+		STATUS(24, msg_inf_error_cid_taken, 0, 0, 0);
+		STATUS(43, msg_inf_error_pid_missing, "FMPD", 0, 0);
+		STATUS(27, msg_inf_error_pid_invalid, "FBPD", 0, 0);
+		STATUS(31, msg_ban_permanently, 0, 0, 0);
+		STATUS(32, msg_ban_temporarily, "TL600", 600, 0); /* FIXME: Proper timeout? */
+		STATUS(23, msg_auth_invalid_password, 0, 0, 0);
+		STATUS(20, msg_auth_user_not_found, 0, 0, 0);
+		STATUS(30, msg_error_no_memory, 0, 0, 0);
+		STATUS(43, msg_user_share_size_low,   "FB" ADC_INF_FLAG_SHARED_SIZE, 0, 1);
+		STATUS(43, msg_user_share_size_high,  "FB" ADC_INF_FLAG_SHARED_SIZE, 0, 1);
+		STATUS(43, msg_user_slots_low,        "FB" ADC_INF_FLAG_UPLOAD_SLOTS, 0, 1);
+		STATUS(43, msg_user_slots_high,       "FB" ADC_INF_FLAG_UPLOAD_SLOTS, 0, 1);
+		STATUS(43, msg_user_hub_limit_low, 0, 0, 1);
+		STATUS(43, msg_user_hub_limit_high, 0, 0, 1);
+		STATUS(47, msg_proto_no_common_hash, 0, -1, 1);
+		STATUS(40, msg_proto_obsolete_adc0, 0, -1, 1);
 	}
 #undef STATUS
 	
@@ -1014,6 +1015,12 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 		if (reconnect_time != 0)
 		{
 			snprintf(buf, 10, "TL%d", reconnect_time);
+			adc_msg_add_argument(qui, buf);
+		}
+
+		if (redirect && *hub->config->redirect_addr)
+		{
+			snprintf(buf, 255, "RD%s", hub->config->redirect_addr);
 			adc_msg_add_argument(qui, buf);
 		}
 		route_to_user(hub, user, qui);

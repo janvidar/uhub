@@ -155,6 +155,16 @@
 		]]></example>
 	</option>
 
+	<option name="redirect_addr" type="string" default="">
+		<check regexp="(adc|adcs|dchub)://.*" />
+		<short>A common hub redirect address.</short>
+		<description><![CDATA[
+		This is the redirect address used when the hub wants to redirect a client for not fulfilling some requirements.
+		]]></description>
+		<since>0.3.2</since>
+	</option>
+
+
 	<option name="max_recv_buffer" type="int" default="4096" advanced="true" >
 		<check min="1024" max="1048576" />
 		<short>Max read buffer before parse, per user</short>
