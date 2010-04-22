@@ -30,7 +30,8 @@
 struct net_connection_kqueue
 {
 	NET_CON_STRUCT_COMMON
-	struct kevent ev;
+	struct kevent ev_r;
+	struct kevent ev_w;
 };
 
 struct net_backend_kqueue
@@ -57,7 +58,7 @@ int net_backend_poll_kqueue(struct net_backend* data, int ms)
 	struct net_backend_kqueue* backend = (struct net_backend_kqueue*) data;
 
 	tspec.tv_sec = (ms / 1000);
-	tspec.tv_nsec = ((ms % 1000) * 1000000); /* FIXME: correct? */
+	tspec.tv_nsec = ((ms % 1000) * 1000000);
 
 	res = kevent(backend->kqfd, *backend->changes, backend->nchanges, backend->events, KQUEUE_EVBUFFER, &tspec);
 	backend->nchanges = 0;
@@ -75,10 +76,11 @@ void net_backend_process_kqueue(struct net_backend* data, int res)
 	for (n = 0; n < res; n++)
 	{
 		struct net_connection_kqueue* con = (struct net_connection_kqueue*) backend->events[n].udata;
-		int ev = 0;
-		if (backend->events[n].filter & EVFILT_READ)  ev |= NET_EVENT_READ;
-		if (backend->events[n].filter & EVFILT_WRITE) ev |= NET_EVENT_WRITE;
-		net_con_callback((struct net_connection*) con, ev);
+		int ev = -1;
+		if (backend->events[n].filter == EVFILT_READ)  ev = NET_EVENT_READ;
+		else if (backend->events[n].filter == EVFILT_WRITE) ev = NET_EVENT_WRITE;
+		if (con)
+			net_con_callback((struct net_connection*) con, ev);
 	}
 }
 
@@ -100,30 +102,58 @@ void net_con_initialize_kqueue(struct net_backend* data, struct net_connection* 
 
 void net_con_backend_add_kqueue(struct net_backend* data, struct net_connection* con_, int events)
 {
-	short filter = 0;
+	unsigned short flags_r = EV_ADD;
+	unsigned short flags_w = EV_ADD;
 	struct net_backend_kqueue* backend = (struct net_backend_kqueue*) data;
 	struct net_connection_kqueue* con = (struct net_connection_kqueue*) con_;
-	if  (events & NET_EVENT_READ)  filter |= EVFILT_READ;
-	if  (events & NET_EVENT_WRITE) filter |= EVFILT_READ;
-	EV_SET(&con->ev, con->sd, filter, EV_ADD, 0, 0, con);
-	backend->changes[backend->nchanges++] = &con->ev;
+
 	backend->conns[con->sd] = con;
+
+	if (events & NET_EVENT_READ)
+	    flags_r |= EV_ENABLE;
+	else
+	    flags_r |= EV_DISABLE;
+
+	EV_SET(&con->ev_r, con->sd, EVFILT_READ, flags_r, 0, 0, con);
+	backend->changes[backend->nchanges++] = &con->ev_r;
+
+	if (events & NET_EVENT_WRITE)
+	    flags_w |= EV_ENABLE;
+	else
+	    flags_w |= EV_DISABLE;
+
+	EV_SET(&con->ev_w, con->sd, EVFILT_WRITE, flags_w, 0, 0, con);
+	backend->changes[backend->nchanges++] = &con->ev_w;
 }
 
 void net_con_backend_mod_kqueue(struct net_backend* data, struct net_connection* con_, int events)
 {
-	short filter = 0;
+	unsigned short flags_r = 0;
+	unsigned short flags_w = 0;
 	struct net_backend_kqueue* backend = (struct net_backend_kqueue*) data;
 	struct net_connection_kqueue* con = (struct net_connection_kqueue*) con_;
 
-	if  (events & NET_EVENT_READ)  filter |= EVFILT_READ;
-	if  (events & NET_EVENT_WRITE) filter |= EVFILT_READ;
+	if (events & NET_EVENT_READ)
+	    flags_r |= EV_ENABLE;
+	else
+	    flags_r |= EV_DISABLE;
 
-	if (filter == con->ev.filter)
-		return;
+	if (!(con->ev_r.flags & flags_r))
+	{
+	    EV_SET(&con->ev_r, con->sd, EVFILT_READ, flags_r, 0, 0, con);
+	    backend->changes[backend->nchanges++] = &con->ev_r;
+	}
 
-	EV_SET(&con->ev, con->sd, filter, EV_ADD, 0, 0, con);
-	backend->changes[backend->nchanges++] = &con->ev;
+	if (events & NET_EVENT_WRITE)
+	    flags_r |= EV_ENABLE;
+	else
+	    flags_r |= EV_DISABLE;
+
+	if (!(con->ev_w.flags & flags_w))
+	{
+	    EV_SET(&con->ev_w, con->sd, EVFILT_WRITE, flags_w, 0, 0, con);
+	    backend->changes[backend->nchanges++] = &con->ev_w;
+	}
 }
 
 void net_con_backend_del_kqueue(struct net_backend* data, struct net_connection* con_)
@@ -131,10 +161,15 @@ void net_con_backend_del_kqueue(struct net_backend* data, struct net_connection*
 	struct net_backend_kqueue* backend = (struct net_backend_kqueue*) data;
 	struct net_connection_kqueue* con = (struct net_connection_kqueue*) con_;
 
-	backend->conns[con->sd] = 0;
-
 	/* No need to remove it from the kqueue filter, the kqueue man page says
 	   it is automatically removed when the descriptor is closed. */
+	EV_SET(&con->ev_r, con->sd, EVFILT_READ,  EV_DELETE, 0, 0, 0);
+	backend->changes[backend->nchanges++] = &con->ev_r;
+	EV_SET(&con->ev_w, con->sd, EVFILT_WRITE, EV_DELETE, 0, 0, 0);
+	backend->changes[backend->nchanges++] = &con->ev_w;
+
+	// Unmap the socket descriptor.
+	backend->conns[con->sd] = 0;
 }
 
 void net_backend_shutdown_kqueue(struct net_backend* data)
@@ -163,7 +198,7 @@ struct net_backend* net_backend_init_kqueue(struct net_backend_handler* handler,
 
 	backend->conns = hub_malloc_zero(sizeof(struct net_connection_kqueue*) * common->max);
 	backend->conns = hub_malloc_zero(sizeof(struct net_connection_kqueue*) * common->max);
-	backend->changes = hub_malloc_zero(sizeof(struct kevent*) * common->max);
+	backend->changes = hub_malloc_zero(sizeof(struct kevent*) * common->max * 2);
 	backend->common = common;
 
 	net_backend_set_handlers(handler);
