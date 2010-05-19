@@ -132,19 +132,40 @@ static int command_status_user_not_found(struct hub_info* hub, struct hub_user* 
 const char* command_get_syntax(struct commands_handler* handler)
 {
 	static char args[128];
+	int optional = 0;
 	size_t n = 0;
 	args[0] = 0;
 	if (handler->args)
 	{
 		for (n = 0; n < strlen(handler->args); n++)
 		{
+			// detect optionals
+			if (handler->args[n] == '?')
+			{
+				optional = 1;
+				continue;
+			}
+
 			if (n > 0) strcat(args, " ");
+
+			if (optional)
+			{
+				strcat(args, "[");
+			}
+
 			switch (handler->args[n])
 			{
 				case 'n': strcat(args, "<nick>"); break;
 				case 'c': strcat(args, "<cid>");  break;
 				case 'a': strcat(args, "<addr>"); break;
 				case 'm': strcat(args, "<message>"); break;
+				case 'i': strcat(args, "<number>"); break;
+			}
+
+			if (optional)
+			{
+				strcat(args, "]");
+				optional = 0;
 			}
 		}
 	}
@@ -606,7 +627,7 @@ static struct commands_handler command_handlers[] = {
 #endif
 	{ "getip",      5, "n", cred_operator,  command_getip,    "Show IP address for a user"   },
 	{ "help",       4, 0,   cred_guest,     command_help,     "Show this help message."      },
-	{ "history",    7, 0,   cred_guest,     command_history,  "Show the last chat messages." },
+	{ "history",    7, "?i",cred_guest,     command_history,  "Show the last chat messages." },
 	{ "kick",       4, "n", cred_operator,  command_kick,     "Kick a user"                  },
 	{ "log",        3, 0,   cred_operator,  command_log,      "Display log"                  },
 	{ "motd",       4, 0,   cred_guest,     command_motd,     "Show the message of the day"  },
