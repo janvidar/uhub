@@ -944,7 +944,7 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 	struct adc_message* cmd = adc_msg_construct(ADC_CMD_ISTA, 6);
 	struct adc_message* qui = adc_msg_construct(ADC_CMD_IQUI, 512);
 	char code[4];
-	char buf[250];
+	char buf[256];
 	const char* text = 0;
 	const char* flag = 0;
 	char* escaped_text = 0;
