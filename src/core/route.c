@@ -145,7 +145,7 @@ int route_to_all(struct hub_info* hub, struct adc_message* command) /* iterate u
 		route_to_user(hub, user, command);
 		user = (struct hub_user*) list_get_next(hub->users->list);
 	}
-	
+
 	return 0;
 }
 

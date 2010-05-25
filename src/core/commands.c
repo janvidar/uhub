@@ -412,11 +412,38 @@ static int command_whoip(struct hub_info* hub, struct hub_user* user, struct hub
 
 static int command_broadcast(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
 {
-	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen((cmd->message + 12)) + 6);
-	adc_msg_add_argument(command, (cmd->message + 12));
+	size_t offset = 12;
+#if USE_OLD_BROADCAST_STYLE
+	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen((cmd->message + offset)) + 6);
+	adc_msg_add_argument(command, (cmd->message + offset));
 	route_to_all(hub, command);
 	adc_msg_free(command);
 	return 0;
+#else
+	size_t message_len = strlen(cmd->message + offset);
+	struct adc_message* command = 0;
+	char pm_flag[7] = "PM";
+	char from_sid[5];
+
+	memcpy(from_sid, sid_to_string(user->id.sid), sizeof(from_sid));
+	memcpy(pm_flag + 2, from_sid, sizeof(from_sid));
+
+	struct hub_user* target = (struct hub_user*) list_get_first(hub->users->list);
+	while (target)
+	{
+		command = adc_msg_construct(ADC_CMD_DMSG, message_len + 23);
+		adc_msg_add_argument(command, from_sid);
+		adc_msg_add_argument(command, sid_to_string(target->id.sid));
+		adc_msg_add_argument(command, (cmd->message + offset));
+		adc_msg_add_argument(command, pm_flag);
+
+		route_to_user(hub, target, command);
+
+		target = (struct hub_user*) list_get_next(hub->users->list);
+		adc_msg_free(command);
+	}
+	return 0;
+#endif
 }
 
 static int command_history(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
