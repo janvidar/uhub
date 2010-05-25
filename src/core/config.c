@@ -85,11 +85,8 @@ static int config_parse_line(char* line, int line_count, void* ptr_data)
 	char* data;
 	struct hub_config* config = (struct hub_config*) ptr_data;
 
-	if ((pos = strchr(line, '#')) != NULL)
-	{
-		pos[0] = 0;
-	}
-
+	strip_off_ini_line_comments(line, line_count);
+	
 	if (!*line) return 0;
 
 	LOG_DUMP("config_parse_line(): '%s'", line);

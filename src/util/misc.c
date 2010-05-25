@@ -400,3 +400,51 @@ const char* get_timestamp(time_t now)
 	sprintf(ts, "[%02d:%02d]", t->tm_hour, t->tm_min);
 	return ts;
 }
+
+void strip_off_ini_line_comments(char* line, int line_count)
+{
+	char* p = line;
+	char* out = line;
+	int backslash = 0;
+
+	if (!*line)
+		return;
+
+	for (; *p; p++)
+	{
+		if (!backslash)
+		{
+			if (*p == '\\')
+			{
+				backslash = 1;
+			}
+			else if (*p == '#')
+			{
+				*out = '\0';
+				out++;
+				break;
+			}
+			else
+			{
+				*out = *p;
+				out++;
+			}
+		}
+		else
+		{
+			if (*p == '\\' || *p == '#' || *p == '\"')
+			{
+				*out = *p;
+				out++;
+			}
+			else
+			{
+				LOG_WARN("Invalid backslash escape on line %d", line_count);
+				*out = *p;
+				out++;
+			}
+			backslash = 0;
+		}
+	}
+	*out = '\0';
+}

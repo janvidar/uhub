@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2010, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -176,14 +176,10 @@ static int check_cmd_addr(const char* cmd, struct linked_list* list, char* line,
 
 static int acl_parse_line(char* line, int line_count, void* ptr_data)
 {
-	char* pos;
 	struct acl_handle* handle = (struct acl_handle*) ptr_data;
 	int ret;
 
-	if ((pos = strchr(line, '#')) != NULL)
-	{
-		pos[0] = 0;
-	}
+	strip_off_ini_line_comments(line, line_count);
 
 	line = strip_white_space(line);
 	if (!*line)
