@@ -79,11 +79,8 @@ int net_backend_init()
 	timeout_queue_initialize(&g_backend->timeout_queue, g_backend->now, 120); /* FIXME: max 120 secs! */
 	g_backend->cleaner = net_cleanup_initialize(g_backend->common.max);
 
-	for (n = 0; n < sizeof(net_backend_init_funcs); n++)
+	for (n = 0; net_backend_init_funcs[n]; n++)
 	{
-		if (!net_backend_init_funcs[n])
-			break;
-
 		g_backend->data = net_backend_init_funcs[n](&g_backend->handler, &g_backend->common);
 		if (g_backend->data)
 		{

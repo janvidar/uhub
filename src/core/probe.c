@@ -92,9 +92,10 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 				net_con_ssl_handshake(con, net_con_ssl_mode_server, probe->hub->ssl_ctx);
 				return;
 			}
-#endif
+#else
 			probe_destroy(probe);
 			return;
+#endif
 		}
 	}
 }

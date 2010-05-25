@@ -257,8 +257,14 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 	int relay = 1;
 	int offset;
 
-	if (!message || !user_is_logged_in(u))
+	if (!message)
 		return 0;
+
+	if (!user_is_logged_in(u))
+	{
+		hub_free(message);
+		return 0;
+	}
 
 	if ((cmd->cache[0] == 'B') && (message[0] == '!' || message[0] == '+'))
 	{
@@ -480,11 +486,11 @@ void hub_send_flood_warning(struct hub_info* hub, struct hub_user* u, const char
 		adc_msg_add_argument(msg, "110");
 		adc_msg_add_argument(msg, tmp);
 		hub_free(tmp);
-	}
 
-	route_to_user(hub, u, msg);
-	user_flag_set(u, flag_flood);
-	adc_msg_free(msg);
+		route_to_user(hub, u, msg);
+		user_flag_set(u, flag_flood);
+		adc_msg_free(msg);
+	}
 }
 
 static void hub_event_dispatcher(void* callback_data, struct event_data* message)
