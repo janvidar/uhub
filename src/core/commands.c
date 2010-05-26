@@ -424,6 +424,8 @@ static int command_broadcast(struct hub_info* hub, struct hub_user* user, struct
 	struct adc_message* command = 0;
 	char pm_flag[7] = "PM";
 	char from_sid[5];
+	char buffer[128];
+	size_t recipients = 0;
 
 	memcpy(from_sid, sid_to_string(user->id.sid), sizeof(from_sid));
 	memcpy(pm_flag + 2, from_sid, sizeof(from_sid));
@@ -431,17 +433,25 @@ static int command_broadcast(struct hub_info* hub, struct hub_user* user, struct
 	struct hub_user* target = (struct hub_user*) list_get_first(hub->users->list);
 	while (target)
 	{
-		command = adc_msg_construct(ADC_CMD_DMSG, message_len + 23);
-		adc_msg_add_argument(command, from_sid);
-		adc_msg_add_argument(command, sid_to_string(target->id.sid));
-		adc_msg_add_argument(command, (cmd->message + offset));
-		adc_msg_add_argument(command, pm_flag);
+		if (target != user)
+		{
+			recipients++;
+			command = adc_msg_construct(ADC_CMD_DMSG, message_len + 23);
+			if (!command)
+				break;
 
-		route_to_user(hub, target, command);
+			adc_msg_add_argument(command, from_sid);
+			adc_msg_add_argument(command, sid_to_string(target->id.sid));
+			adc_msg_add_argument(command, (cmd->message + offset));
+			adc_msg_add_argument(command, pm_flag);
 
+			route_to_user(hub, target, command);
+			adc_msg_free(command);
+		}
 		target = (struct hub_user*) list_get_next(hub->users->list);
-		adc_msg_free(command);
 	}
+
+	snprintf(buffer, sizeof(buffer), "*** %s: Delivered to " PRINTF_SIZE_T " user%s", cmd->prefix, recipients, (recipients != 1 ? "s" : ""));
 	return 0;
 #endif
 }
