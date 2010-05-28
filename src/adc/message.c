@@ -756,7 +756,7 @@ char* adc_msg_get_argument(struct adc_message* cmd, int offset)
 			else
 			{
 				argument = hub_strdup(&start[1]);
-				if (argument && argument[strlen(argument)-1] == '\n')
+				if (argument && *argument && argument[strlen(argument)-1] == '\n')
 					argument[strlen(argument)-1] = 0;
 			}
 
