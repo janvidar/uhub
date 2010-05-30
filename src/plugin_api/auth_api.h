@@ -23,9 +23,9 @@
 enum user_credentials
 {
 	cred_none,                 /**<<< "User has no credentials (not yet logged in)" */
- 	cred_bot,                  /**<<< "User is a robot" */
+	cred_bot,                  /**<<< "User is a robot" */
 	cred_guest,                /**<<< "User is a guest (unregistered user)" */
- 	cred_user,                 /**<<< "User is identified as a registered user" */
+	cred_user,                 /**<<< "User is identified as a registered user" */
 	cred_operator,             /**<<< "User is identified as a hub operator" */
 	cred_super,                /**<<< "User is a super user" (not used) */
 	cred_link,                 /**<<< "User is a link (not used currently)" */

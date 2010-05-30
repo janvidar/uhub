@@ -12,6 +12,7 @@ RANLIB        := ranlib
 CFLAGS        += -pipe -Wall
 USE_SSL       ?= NO
 USE_BIGENDIAN ?= AUTO
+USE_PLUGINS   ?= YES
 BITS          ?= AUTO
 SILENT        ?= YES
 TERSE         ?= NO
@@ -42,6 +43,7 @@ UHUB_PREFIX   ?= c:/uhub/
 CFLAGS        += -mno-cygwin
 LDFLAGS       += -mno-cygwin
 BIN_EXT       ?= .exe
+USE_PLUGINS   := NO
 else
 DESTDIR       ?= /
 UHUB_CONF_DIR ?= $(DESTDIR)/etc/uhub
@@ -118,6 +120,12 @@ CFLAGS        += -DSSL_SUPPORT
 LDLIBS        += -lssl
 endif
 
+ifeq ($(USE_PLUGINS),YES)
+CFLAGS        += -DPLUGIN_SUPPORT
+LDLIBS        += -ldl
+endif
+
+
 GIT_VERSION=$(shell git describe --tags 2>/dev/null || echo "")
 GIT_REVISION=$(shell git show --abbrev-commit  2>/dev/null | head -n 1 | cut -f 2 -d " " || echo "")
 OLD_REVISION=$(shell grep GIT_REVISION revision.h 2>/dev/null | cut -f 3 -d " " | tr -d "\"")
@@ -138,6 +146,7 @@ libuhub_SOURCES := \
 		src/core/route.c \
 		src/core/user.c \
 		src/core/usermanager.c \
+		src/core/pluginloader.c \
 		src/network/backend.c \
 		src/network/connection.c \
 		src/network/epoll.c \

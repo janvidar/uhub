@@ -84,6 +84,7 @@ extern "C" {
 #include "core/commands.h"
 #include "core/inf.h"
 #include "core/hubevent.h"
+#include "core/pluginloader.h"
 
 #ifdef __cplusplus
 }
