@@ -1,3 +1,13 @@
+0.3.2:
+- Fixed bugs in the kqueue network backend (OSX/BSD)
+- Rewrote the configuration backend code.
+- Added support for escaping characters in the configuration files.
+- Updated the !broadcast command to send private messages instead of main chat messages.
+- Adding support for redirecting clients to other hubs when they fail to log in.
+- Fix some out of memory related crashes.
+- Fixed minor memory leaks.
+
+
 0.3.1:
 - Fixed bug where !getip did not work.
 - Added flood control configuration options.

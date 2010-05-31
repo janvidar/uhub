@@ -1,6 +1,6 @@
 Summary: High performance ADC p2p hub.
 Name: uhub
-Version: 0.3.1
+Version: 0.3.2
 Release: 3
 License: GPLv3
 Group: Networking/File transfer
