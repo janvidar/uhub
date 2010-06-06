@@ -22,6 +22,8 @@
 
 #ifdef PLUGIN_SUPPORT
 
+struct uhub_plugin_handle;
+
 struct uhub_plugin
 {
 #ifdef HAVE_DLOPEN
@@ -29,11 +31,16 @@ struct uhub_plugin
 #endif
 };
 
-extern struct uhub_plugin* uhub_plugin_open(const char* filename);
+extern struct uhub_plugin* plugin_open(const char* filename);
 
-extern void uhub_plugin_close(struct uhub_plugin*);
+extern void plugin_close(struct uhub_plugin*);
 
-extern void* uhub_plugin_lookup_symbol(struct uhub_plugin*, const char* symbol);
+extern void* plugin_lookup_symbol(struct uhub_plugin*, const char* symbol);
+
+
+// Load and register a plugin
+extern struct uhub_plugin_handle* plugin_load(const char* filename, const char* config);
+extern void plugin_unload(struct uhub_plugin_handle*);
 
 #endif /* PLUGIN_SUPPORT */
 

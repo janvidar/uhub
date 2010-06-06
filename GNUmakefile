@@ -192,6 +192,10 @@ autotest_SOURCES := \
 
 autotest_OBJECTS = autotest.o
 
+plugin_example_SOURCES := src/plugins/mod_example.c
+plugin_example_TARGET := $(plugin_example_SOURCES:.c=.so)
+
+
 # Source to objects
 libuhub_OBJECTS       := $(libuhub_SOURCES:.c=.o)
 libadc_client_OBJECTS := $(libadc_client_SOURCES:.c=.o)
@@ -202,13 +206,22 @@ adcrush_OBJECTS       := $(adcrush_SOURCES:.c=.o)
 admin_OBJECTS         := $(admin_SOURCES:.c=.o)
 
 all_OBJECTS     := $(libuhub_OBJECTS) $(uhub_OBJECTS) $(adcrush_OBJECTS) $(autotest_OBJECTS) $(admin_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
+all_plugins     := $(plugin_example_TARGET)
 
 uhub_BINARY=uhub$(BIN_EXT)
 adcrush_BINARY=adcrush$(BIN_EXT)
 admin_BINARY=uhub-admin$(BIN_EXT)
 autotest_BINARY=autotest/test$(BIN_EXT)
 
+ifeq ($(USE_PLUGINS),YES)
+all_OBJECTS     += $(plugins)
+endif
+
+
 .PHONY: revision.h.tmp
+
+%.so: %.c
+	$(MSG_CC) $(CC) -shared  -fPIC -o $@ $< $(CFLAGS)
 
 %.o: %.c version.h revision.h
 	$(MSG_CC) $(CC) -c $(CFLAGS) -o $@ $<

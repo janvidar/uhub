@@ -45,6 +45,7 @@
 
 #define MAX_CID_LEN  39
 #define MAX_NICK_LEN 64
+#define MAX_PASS_LEN 64
 #define MAX_UA_LEN   32
 #define TIGERSIZE    24
 
