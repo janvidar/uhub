@@ -490,6 +490,19 @@
 		]]></example>
 	</option>
 
+	<option name="file_plugins" type="file" default="">
+		<short>Plugin configuration file</short>
+		<description><![CDATA[
+			Plugin configuration file.
+		]]></description>
+		<since>0.3.3</since>
+		<example><![CDATA[
+			<p>
+				file_plugins = "/etc/uhub/plugins.conf"
+			</p>
+		]]></example>
+	</option>
+
 	<option name="msg_hub_full" type="message" default="Hub is full" >
 		<description><![CDATA[This will be sent if the hub is full]]></description>
 		<since>0.2.0</since>

@@ -47,6 +47,7 @@ void config_defaults(struct hub_config* config)
 	config->file_motd = hub_strdup("");
 	config->file_acl = hub_strdup("");
 	config->file_rules = hub_strdup("");
+	config->file_plugins = hub_strdup("");
 	config->msg_hub_full = hub_strdup("Hub is full");
 	config->msg_hub_disabled = hub_strdup("Hub is disabled");
 	config->msg_hub_registered_users_only = hub_strdup("Hub is for registered users only");
@@ -545,6 +546,16 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		return 0;
 	}
 
+	if (!strcmp(key, "file_plugins"))
+	{
+		if (!apply_string(key, data, &config->file_plugins, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
 	if (!strcmp(key, "msg_hub_full"))
 	{
 		if (!apply_string(key, data, &config->msg_hub_full, (char*) ""))
@@ -932,6 +943,8 @@ void free_config(struct hub_config* config)
 
 	hub_free(config->file_rules);
 
+	hub_free(config->file_plugins);
+
 	hub_free(config->msg_hub_full);
 
 	hub_free(config->msg_hub_disabled);
@@ -1142,6 +1155,9 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 
 	if (!ignore_defaults || strcmp(config->file_rules, "") != 0)
 		fprintf(stdout, "file_rules = \"%s\"\n", config->file_rules);
+
+	if (!ignore_defaults || strcmp(config->file_plugins, "") != 0)
+		fprintf(stdout, "file_plugins = \"%s\"\n", config->file_plugins);
 
 	if (!ignore_defaults || strcmp(config->msg_hub_full, "Hub is full") != 0)
 		fprintf(stdout, "msg_hub_full = \"%s\"\n", config->msg_hub_full);

@@ -47,6 +47,7 @@ struct hub_config
 	char* file_motd;                       /*<<< File containing the 'message of the day (default: ) */
 	char* file_acl;                        /*<<< File containing access control lists (default: ) */
 	char* file_rules;                      /*<<< File containing hub rules (default: ) */
+	char* file_plugins;                    /*<<< Plugin configuration file (default: ) */
 	char* msg_hub_full;                    /*<<< "Hub is full" */
 	char* msg_hub_disabled;                /*<<< "Hub is disabled" */
 	char* msg_hub_registered_users_only;   /*<<< "Hub is for registered users only" */
