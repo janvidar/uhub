@@ -452,6 +452,7 @@ static int command_broadcast(struct hub_info* hub, struct hub_user* user, struct
 	}
 
 	snprintf(buffer, sizeof(buffer), "*** %s: Delivered to " PRINTF_SIZE_T " user%s", cmd->prefix, recipients, (recipients != 1 ? "s" : ""));
+	send_message(hub, user, buffer);
 	return 0;
 #endif
 }
