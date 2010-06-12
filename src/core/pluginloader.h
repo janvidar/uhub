@@ -22,6 +22,8 @@
 
 #ifdef PLUGIN_SUPPORT
 
+struct hub_config;
+struct linked_list;
 struct uhub_plugin_handle;
 
 struct uhub_plugin
@@ -31,16 +33,25 @@ struct uhub_plugin
 #endif
 };
 
+struct uhub_plugins
+{
+	struct linked_list* loaded;
+	char* plugin_dir;
+};
+
+// High level plugin loader ode
+extern struct uhub_plugin_handle* plugin_load(const char* filename, const char* config);
+extern void plugin_unload(struct uhub_plugin_handle* plugin);
+
+// extern void plugin_unload(struct uhub_plugin_handle*);
+extern int plugin_initialize(struct hub_config* config, struct uhub_plugins* handle);
+
+// Low level plugin loader code (used internally)
 extern struct uhub_plugin* plugin_open(const char* filename);
-
 extern void plugin_close(struct uhub_plugin*);
-
 extern void* plugin_lookup_symbol(struct uhub_plugin*, const char* symbol);
 
 
-// Load and register a plugin
-extern struct uhub_plugin_handle* plugin_load(const char* filename, const char* config);
-extern void plugin_unload(struct uhub_plugin_handle*);
 
 #endif /* PLUGIN_SUPPORT */
 

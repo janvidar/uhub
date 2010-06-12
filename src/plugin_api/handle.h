@@ -22,11 +22,19 @@
 
 #define PLUGIN_API_VERSION 0
 
+#ifndef MAX_NICK_LEN
+#define MAX_NICK_LEN 64
+#endif
+
+#ifndef MAX_PASS_LEN
+#define MAX_PASS_LEN 64
+#endif
+
 struct ip_addr_encap;
 
 struct plugin_user
 {
-	sid_t sid;
+	unsigned int sid;
 	const char* nick;
 	const char* cid;
 	struct ip_addr_encap addr;

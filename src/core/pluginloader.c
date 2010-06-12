@@ -111,5 +111,73 @@ struct uhub_plugin_handle* plugin_load(const char* filename, const char* config)
 	return NULL;
 }
 
+void plugin_unload(struct uhub_plugin_handle* plugin)
+{
+	plugin_close(plugin->handle);
+}
+
+static int plugin_parse_line(char* line, int line_count, void* ptr_data)
+{
+	struct uhub_plugins* handle = (struct uhub_plugins*) ptr_data;
+	char* pos;
+
+	strip_off_ini_line_comments(line, line_count);
+
+	line = strip_white_space(line);
+	if (!*line)
+		return 0;
+
+	LOG_TRACE("plugin: parse line %d: \"%s\"", line_count, line);
+
+	// Set plugin directory.
+	pos = strstr(line, "plugin_directory");
+	if (pos && is_white_space(line[(pos - line) + strlen("plugin_directory")]))
+	{
+		if (handle->plugin_dir)
+			hub_free(handle->plugin_dir);
+		handle->plugin_dir = strdup(strip_white_space(pos + strlen("plugin_directory") + 1));
+		return 0;
+	}
+
+	// Load plugin
+	pos = strstr(line, "plugin");
+	if (pos && is_white_space(line[(pos - line) + strlen("plugin")]))
+	{
+		char* data = strip_white_space(pos + strlen("plugin") + 1);
+		if (*data)
+		{
+			LOG_TRACE("Load plugin: \"%s\"", data);
+			struct uhub_plugin_handle* plugin = plugin_load(data, "");
+			if (plugin)
+			{
+				list_append(handle->loaded, plugin);
+				return 0;
+			}
+		}
+	}
+
+	return -1;
+}
+
+int plugin_initialize(struct hub_config* config, struct uhub_plugins* handle)
+{
+	int ret;
+
+	handle->loaded = list_create();
+	if (!handle->loaded)
+		return -1;
+
+	if (config)
+	{
+		if (!*config->file_plugins)
+			return 0;
+
+		ret = file_read_lines(config->file_plugins, handle, &plugin_parse_line);
+		if (ret == -1)
+			return -1;
+	}
+	return 0;
+}
+
 
 #endif /* PLUGIN_SUPPORT */

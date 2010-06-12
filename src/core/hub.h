@@ -114,6 +114,10 @@ struct hub_info
 	struct linked_list* chat_history;    /* Chat history */
 	struct linked_list* logout_info;     /* Log of people logging out. */
 
+#ifdef PLUGIN_SUPPORT
+	struct uhub_plugins* plugins;
+#endif
+
 #ifdef SSL_SUPPORT
 	SSL_METHOD* ssl_method;
 	SSL_CTX* ssl_ctx;
