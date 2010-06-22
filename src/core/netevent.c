@@ -175,8 +175,10 @@ void net_on_accept(struct net_connection* con, int event, void *arg)
 	struct hub_info* hub = (struct hub_info*) arg;
 	struct hub_probe* probe = 0;
 	struct ip_addr_encap ipaddr;
-	const char* addr;
 	int server_fd = net_con_get_sd(con);
+#ifdef PLUGIN_SUPPORT
+	plugin_st status;
+#endif
 
 	for (;;)
 	{
@@ -194,18 +196,17 @@ void net_on_accept(struct net_connection* con, int event, void *arg)
 			}
 		}
 
-		addr = ip_convert_to_string(&ipaddr);
-
-		/* FIXME: Should have a plugin log this */
-		LOG_TRACE("Got connection from %s", addr);
-
-		/* FIXME: A plugin should perform this check: is IP banned? */
-		if (acl_is_ip_banned(hub->acl, addr))
+#ifdef PLUGIN_SUPPORT
+		status = plugin_check_ip_early(hub, &ipaddr);
+		if (status == st_deny)
 		{
-			LOG_INFO("Denied      [%s] (IP banned)", addr);
+			plugin_log_connection_denied(hub, &ipaddr);
 			net_close(fd);
 			continue;
 		}
+
+		plugin_log_connection_accepted(hub, &ipaddr);
+#endif
 
 		probe = probe_create(hub, fd, &ipaddr);
 		if (!probe)
