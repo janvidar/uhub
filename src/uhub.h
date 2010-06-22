@@ -45,6 +45,7 @@
 
 #define MAX_CID_LEN  39
 #define MAX_NICK_LEN 64
+#define MAX_PASS_LEN 64
 #define MAX_UA_LEN   32
 #define TIGERSIZE    24
 
@@ -80,10 +81,12 @@ extern "C" {
 #include "core/user.h"
 #include "core/usermanager.h"
 #include "core/route.h"
+#include "core/pluginloader.h"
 #include "core/hub.h"
 #include "core/commands.h"
 #include "core/inf.h"
 #include "core/hubevent.h"
+#include "core/pluginloader.h"
 
 #ifdef __cplusplus
 }

@@ -806,6 +806,40 @@ void hub_shutdown_service(struct hub_info* hub)
 	g_hub = 0;
 }
 
+#ifdef PLUGIN_SUPPORT
+void hub_plugins_load(struct hub_info* hub)
+{
+	if (!hub->config->file_plugins || !*hub->config->file_plugins)
+		return;
+
+	hub->plugins = hub_malloc_zero(sizeof(struct uhub_plugins));
+	if (!hub->plugins)
+		return;
+	
+	if (plugin_initialize(hub->config, hub->plugins) < 0)
+	{
+		hub_free(hub->plugins);
+		hub->plugins = 0;
+		return;
+	}
+}
+
+void hub_plugins_unload(struct hub_info* hub)
+{
+	struct uhub_plugin_handle* plugin = (struct uhub_plugin_handle*) list_get_first(hub->plugins->loaded);
+	while (plugin)
+	{
+		plugin_unload(plugin);
+		plugin = (struct uhub_plugin_handle*) list_get_next(hub->plugins->loaded);
+	}
+	
+	list_destroy(hub->plugins->loaded);
+	hub_free(hub->plugins->plugin_dir);
+	hub_free(hub->plugins);
+	hub->plugins = 0;
+}
+#endif
+
 void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 {
 	int fd, ret;
@@ -880,6 +914,10 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 		hub_free(tmp);
 	}
 
+#ifdef PLUGIN_SUPPORT
+	hub_plugins_load(hub);
+#endif
+
 	hub->status = (hub->config->hub_enabled ? hub_status_running : hub_status_disabled);
 	hub_free(server);
 }
@@ -887,6 +925,10 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 
 void hub_free_variables(struct hub_info* hub)
 {
+#ifdef PLUGIN_SUPPORT
+	hub_plugins_unload(hub);
+#endif
+
 	adc_msg_free(hub->command_info);
 	adc_msg_free(hub->command_banner);
 

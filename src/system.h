@@ -89,6 +89,8 @@
 #include <pwd.h>
 #include <sys/resource.h>
 #define HAVE_STRNDUP
+#define HAVE_DLOPEN
+#include <dlfcn.h>
 #ifndef __HAIKU__
 #define HAVE_MEMMEM
 #endif
