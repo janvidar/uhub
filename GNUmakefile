@@ -146,6 +146,7 @@ libuhub_SOURCES := \
 		src/core/route.c \
 		src/core/user.c \
 		src/core/usermanager.c \
+		src/core/plugininvoke.c \
 		src/core/pluginloader.c \
 		src/network/backend.c \
 		src/network/connection.c \
@@ -195,6 +196,9 @@ autotest_OBJECTS = autotest.o
 plugin_example_SOURCES := src/plugins/mod_example.c
 plugin_example_TARGET := $(plugin_example_SOURCES:.c=.so)
 
+plugin_logging_SOURCES := src/plugins/mod_logging.c
+plugin_logging_TARGET := $(plugin_example_SOURCES:.c=.so)
+
 
 # Source to objects
 libuhub_OBJECTS       := $(libuhub_SOURCES:.c=.o)
@@ -206,7 +210,7 @@ adcrush_OBJECTS       := $(adcrush_SOURCES:.c=.o)
 admin_OBJECTS         := $(admin_SOURCES:.c=.o)
 
 all_OBJECTS     := $(libuhub_OBJECTS) $(uhub_OBJECTS) $(adcrush_OBJECTS) $(autotest_OBJECTS) $(admin_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
-all_plugins     := $(plugin_example_TARGET)
+all_plugins     := $(plugin_example_TARGET) $(plugin_logging_TARGET)
 
 uhub_BINARY=uhub$(BIN_EXT)
 adcrush_BINARY=adcrush$(BIN_EXT)

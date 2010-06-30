@@ -826,6 +826,11 @@ void hub_plugins_load(struct hub_info* hub)
 
 void hub_plugins_unload(struct hub_info* hub)
 {
+	if (!hub->plugins || !hub->plugins->loaded)
+	{
+		return;
+	}
+
 	struct uhub_plugin_handle* plugin = (struct uhub_plugin_handle*) list_get_first(hub->plugins->loaded);
 	while (plugin)
 	{

@@ -24,6 +24,7 @@
 
 struct uhub_plugin* plugin_open(const char* filename)
 {
+	LOG_TRACE("plugin_open: \"%s\"", filename);
 #ifdef HAVE_DLOPEN
 	struct uhub_plugin* plugin = (struct uhub_plugin*) hub_malloc_zero(sizeof(struct uhub_plugin));
 	if (!plugin)
@@ -92,7 +93,9 @@ struct uhub_plugin_handle* plugin_load(const char* filename, const char* config)
 		{
 			if (handle->plugin_api_version == PLUGIN_API_VERSION && handle->plugin_funcs_size == sizeof(struct plugin_funcs))
 			{
-				LOG_INFO("Loaded plugin: %s: \"%s\", version %s.", filename, handle->name, handle->version);
+				LOG_INFO("Loaded plugin: %s: %s, version %s.", filename, handle->name, handle->version);
+				LOG_TRACE("Plugin API version: %d (func table size: " PRINTF_SIZE_T ")", handle->plugin_api_version, handle->plugin_funcs_size);
+				plugin->unregister = unregister_f;
 				return handle;
 			}
 			else
@@ -113,6 +116,7 @@ struct uhub_plugin_handle* plugin_load(const char* filename, const char* config)
 
 void plugin_unload(struct uhub_plugin_handle* plugin)
 {
+	plugin->handle->unregister(plugin);
 	plugin_close(plugin->handle);
 }
 

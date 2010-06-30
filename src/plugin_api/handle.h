@@ -17,6 +17,9 @@
  *
  */
 
+#ifndef HAVE_UHUB_PLUGIN_HANDLE_H
+#define HAVE_UHUB_PLUGIN_HANDLE_H
+
 #include "system.h"
 #include "util/ipcalc.h"
 
@@ -45,7 +48,6 @@ enum plugin_status
 	st_default = 0,    /* Use default */
 	st_allow = 1,      /* Allow action */
 	st_deny = -1,      /* Deny action */
-	st_restrict = -2,  /* Further action required */
 };
 
 typedef enum plugin_status plugin_st;
@@ -69,17 +71,24 @@ struct auth_info
 	enum auth_credentials credentials;
 };
 
-typedef plugin_st (*on_connect_t)(struct ip_addr_encap*);
 typedef plugin_st (*on_chat_msg_t)(struct plugin_user* from, const char* message);
 typedef plugin_st (*on_private_msg_t)(struct plugin_user* from, struct plugin_user* to, const char* message);
 typedef plugin_st (*on_search_t)(struct plugin_user* from, const char* data);
 typedef plugin_st (*on_p2p_connect_t)(struct plugin_user* from, struct plugin_user* to);
 typedef plugin_st (*on_p2p_revconnect_t)(struct plugin_user* from, struct plugin_user* to);
+
+typedef void (*on_user_connect_t)(struct ip_addr_encap*);
 typedef void (*on_user_login_t)(struct plugin_user*);
 typedef void (*on_user_logout_t)(struct plugin_user*);
+typedef void (*on_user_nick_change_t)(struct plugin_user*, const char* new_nick);
+
+typedef plugin_st (*on_change_nick_t)(struct plugin_user*, const char* new_nick);
+
+typedef plugin_st (*on_check_ip_early_t)(struct ip_addr_encap*);
+typedef plugin_st (*on_check_ip_late_t)(struct ip_addr_encap*);
 typedef plugin_st (*on_validate_nick_t)(const char* nick);
 typedef plugin_st (*on_validate_cid_t)(const char* cid);
-typedef plugin_st (*on_change_nick_t)(struct plugin_user*, const char* new_nick);
+
 typedef int (*auth_get_user_t)(const char* nickname, struct auth_info* info);
 typedef plugin_st (*auth_register_user_t)(struct auth_info* user);
 typedef plugin_st (*auth_update_user_t)(struct auth_info* user);
@@ -88,23 +97,28 @@ typedef plugin_st (*auth_delete_user_t)(struct auth_info* user);
 struct plugin_funcs
 {
 	// Users logging in and out
-	on_connect_t            on_connect;
-	on_user_login_t         on_user_login;
-	on_user_logout_t        on_user_logout;
-	on_change_nick_t        on_user_change_nick;
+	on_user_connect_t       on_user_connect;     /* A user has connected to the hub */
+	on_user_login_t         on_user_login;       /* A user has successfully logged in to the hub */
+	on_user_logout_t        on_user_logout;      /* A user has logged out of the hub (was previously logged in) */
+	on_user_nick_change_t   on_user_nick_change; /* A user has changed nickname */
 
-	// Activity events
-	on_chat_msg_t           on_chat_msg;
-	on_private_msg_t        on_private_msg;
-	on_search_t             on_search;
-	on_p2p_connect_t        on_p2p_connect;
-	on_p2p_revconnect_t     on_p2p_revconnect;
+	// Activity events (can be intercepted and refused by a plugin)
+	on_chat_msg_t           on_chat_msg;         /* A public chat message is about to be sent (can be intercepted) */
+	on_private_msg_t        on_private_msg;      /* A public chat message is about to be sent (can be intercepted) */
+	on_search_t             on_search;           /* A search is about to be sent (can be intercepted) */
+	on_p2p_connect_t        on_p2p_connect;      /* A user is about to connect to another user (can be intercepted) */
+	on_p2p_revconnect_t     on_p2p_revconnect;   /* A user is about to connect to another user (can be intercepted) */
 
-	// Authentication
-	auth_get_user_t         auth_get_user;
-	auth_register_user_t    auth_register_user;
-	auth_update_user_t      auth_update_user;
-	auth_delete_user_t      auth_delete_user;
+	// Authentication actions.
+	auth_get_user_t         auth_get_user;       /* Get authentication info from plugin */
+	auth_register_user_t    auth_register_user;  /* Register user */
+	auth_update_user_t      auth_update_user;    /* Update a registered user */
+	auth_delete_user_t      auth_delete_user;    /* Delete a registered user */
+
+	// Login check functions
+	on_check_ip_early_t     login_check_ip_early;
+	on_check_ip_late_t      login_check_ip_late;
+
 };
 
 struct uhub_plugin_handle
@@ -135,3 +149,5 @@ extern int plugin_unregister(struct uhub_plugin_handle*);
 
 typedef int (*plugin_register_f)(struct uhub_plugin_handle* handle, const char* config);
 typedef int (*plugin_unregister_f)(struct uhub_plugin_handle*);
+
+#endif /* HAVE_UHUB_PLUGIN_HANDLE_H */

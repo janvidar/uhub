@@ -20,6 +20,8 @@
 #ifndef HAVE_UHUB_PLUGIN_LOADER_H
 #define HAVE_UHUB_PLUGIN_LOADER_H
 
+#include "plugin_api/handle.h"
+
 #ifdef PLUGIN_SUPPORT
 
 struct hub_config;
@@ -31,6 +33,7 @@ struct uhub_plugin
 #ifdef HAVE_DLOPEN
 	void* handle;
 #endif
+	plugin_unregister_f unregister;
 };
 
 struct uhub_plugins

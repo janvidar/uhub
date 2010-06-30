@@ -18,6 +18,7 @@
  */
 
 #include "uhub.h"
+#include "plugin_api/handle.h"
 
 static void log_user_login(struct hub_user* u)
 {
@@ -67,6 +68,10 @@ void on_login_success(struct hub_info* hub, struct hub_user* u)
 	/* Print log message */
 	log_user_login(u);
 
+#ifdef PLUGIN_SUPPORT
+	plugin_log_user_login_success(hub, u);
+#endif
+
 	/* Announce new user to all connected users */
 	if (user_is_logged_in(u))
 		route_info_message(hub, u);
@@ -109,6 +114,11 @@ void on_logout_user(struct hub_info* hub, struct hub_user* user)
 {
 	const char* reason = user_get_quit_reason_string(user->quit_reason);
 	log_user_logout(user, reason);
+
+#ifdef PLUGIN_SUPPORT
+	plugin_log_user_logout(hub, user);
+#endif
+
 	hub_logout_log(hub, user);
 }
 
