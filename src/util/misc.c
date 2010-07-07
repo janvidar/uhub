@@ -448,3 +448,24 @@ void strip_off_ini_line_comments(char* line, int line_count)
 	}
 	*out = '\0';
 }
+
+char* strip_off_quotes(char* line)
+{
+	size_t len;
+
+	if (!*line)
+		return line;
+
+	len = strlen(line);
+	if (len < 2)
+		return line;
+
+	if ((line[0] == '"' && line[len - 1] == '"') ||
+	    (line[0] == '\'' && line[len - 1] == '\''))
+	{
+		line[len-1] = '\0';
+		return line + 1;
+	}
+	return line;
+}
+

@@ -34,6 +34,7 @@ extern void base32_encode(const unsigned char* buffer, size_t len, char* result)
 extern void base32_decode(const char* src, unsigned char* dst, size_t len);
 extern char* strip_white_space(char* string);
 extern void strip_off_ini_line_comments(char* line, int line_count);
+extern char* strip_off_quotes(char* line);
 
 extern int file_read_lines(const char* file, void* data, file_line_handler_t handler);
 

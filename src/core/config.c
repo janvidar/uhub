@@ -110,6 +110,7 @@ static int config_parse_line(char* line, int line_count, void* ptr_data)
 
 	key = strip_white_space(key);
 	data = strip_white_space(data);
+	data = strip_off_quotes(data);
 
 	if (!*key || !*data)
 	{
