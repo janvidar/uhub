@@ -38,12 +38,12 @@ int plugin_register(struct uhub_plugin_handle* plugin, const char* config)
 	plugin->plugin_api_version = PLUGIN_API_VERSION;
 	plugin->plugin_funcs_size = sizeof(struct plugin_funcs);
 	memset(&plugin->funcs, 0, sizeof(struct plugin_funcs));
-
+/*
 	plugin->funcs.on_connect = log_connect;
 	plugin->funcs.on_user_login = log_user_login;
 	plugin->funcs.on_user_logout = log_user_logout;
 	plugin->funcs.on_user_change_nick = log_change_nick;
-
+*/
 	puts("* plugin register");
 	return 0;
 }

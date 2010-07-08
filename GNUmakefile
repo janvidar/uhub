@@ -155,7 +155,14 @@ libuhub_SOURCES := \
 		src/network/network.c \
 		src/network/select.c \
 		src/network/timeout.c \
-		src/network/timer.c \
+		src/network/timer.c
+
+
+libadc_common_SOURCES := \
+		src/adc/message.c \
+		src/adc/sid.c
+
+libutils_SOURCES := \
 		src/util/ipcalc.c \
 		src/util/list.c \
 		src/util/log.c \
@@ -163,10 +170,6 @@ libuhub_SOURCES := \
 		src/util/misc.c \
 		src/util/rbtree.c \
 		src/util/tiger.c
-
-libadc_common_SOURCES := \
-		src/adc/message.c \
-		src/adc/sid.c
 
 libadc_client_SOURCES := \
 		src/tools/adcclient.c
@@ -193,15 +196,20 @@ autotest_SOURCES := \
 
 autotest_OBJECTS = autotest.o
 
+# Plugin targets:
 plugin_example_SOURCES := src/plugins/mod_example.c
-plugin_example_TARGET := $(plugin_example_SOURCES:.c=.so)
+plugin_example_TARGET  := mod_example.so
 
 plugin_logging_SOURCES := src/plugins/mod_logging.c
-plugin_logging_TARGET := $(plugin_example_SOURCES:.c=.so)
+plugin_logging_TARGET  := mod_logging.so
+
+plugin_auth_SOURCES    := src/plugins/mod_auth_simple.c
+plugin_auth_TARGET     := mod_auth_simple.so
 
 
 # Source to objects
 libuhub_OBJECTS       := $(libuhub_SOURCES:.c=.o)
+libutils_OBJECTS      := $(libutils_SOURCES:.c=.o)
 libadc_client_OBJECTS := $(libadc_client_SOURCES:.c=.o)
 libadc_common_OBJECTS := $(libadc_common_SOURCES:.c=.o)
 
@@ -209,8 +217,8 @@ uhub_OBJECTS          := $(uhub_SOURCES:.c=.o)
 adcrush_OBJECTS       := $(adcrush_SOURCES:.c=.o)
 admin_OBJECTS         := $(admin_SOURCES:.c=.o)
 
-all_OBJECTS     := $(libuhub_OBJECTS) $(uhub_OBJECTS) $(adcrush_OBJECTS) $(autotest_OBJECTS) $(admin_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
-all_plugins     := $(plugin_example_TARGET) $(plugin_logging_TARGET)
+all_OBJECTS     := $(libuhub_OBJECTS) $(uhub_OBJECTS) $(libutils_OBJECTS) $(adcrush_OBJECTS) $(autotest_OBJECTS) $(admin_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
+all_plugins     := $(plugin_example_TARGET) $(plugin_logging_TARGET) $(plugin_auth_TARGET)
 
 uhub_BINARY=uhub$(BIN_EXT)
 adcrush_BINARY=adcrush$(BIN_EXT)
@@ -221,24 +229,31 @@ ifeq ($(USE_PLUGINS),YES)
 all_OBJECTS     += $(plugins)
 endif
 
-
-.PHONY: revision.h.tmp
-
-%.so: %.c
-	$(MSG_CC) $(CC) -shared  -fPIC -o $@ $< $(CFLAGS)
+.PHONY: revision.h.tmp all plugins
 
 %.o: %.c version.h revision.h
-	$(MSG_CC) $(CC) -c $(CFLAGS) -o $@ $<
+	$(MSG_CC) $(CC) -fPIC -c $(CFLAGS) -o $@ $<
 
 all: $(uhub_BINARY)
 
-$(adcrush_BINARY): $(adcrush_OBJECTS) $(libuhub_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
+plugins: $(uhub_BINARY) $(all_plugins)
+
+$(plugin_auth_TARGET): $(plugin_auth_SOURCES) $(libutils_OBJECTS)
+	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
+
+$(plugin_example_TARGET): $(plugin_example_SOURCES)
+	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
+
+$(plugin_logging_TARGET): $(plugin_logging_SOURCES)
+	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
+
+$(adcrush_BINARY): $(adcrush_OBJECTS) $(libuhub_OBJECTS) $(libutils_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
 	$(MSG_LD) $(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-$(admin_BINARY): $(admin_OBJECTS) $(libuhub_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
+$(admin_BINARY): $(admin_OBJECTS) $(libuhub_OBJECTS) $(libutils_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
 	$(MSG_LD) $(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-$(uhub_BINARY): $(uhub_OBJECTS) $(libuhub_OBJECTS) $(libadc_common_OBJECTS)
+$(uhub_BINARY): $(uhub_OBJECTS) $(libuhub_OBJECTS) $(libutils_OBJECTS) $(libadc_common_OBJECTS)
 	$(MSG_LD) $(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 autotest.c: $(autotest_SOURCES)
@@ -259,7 +274,7 @@ revision.h: revision.h.tmp
 $(autotest_OBJECTS): autotest.c
 	$(MSG_CC) $(CC) -c $(CFLAGS) -Isrc -o $@ $<
 
-$(autotest_BINARY): $(autotest_OBJECTS) $(libuhub_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
+$(autotest_BINARY): $(autotest_OBJECTS) $(libuhub_OBJECTS) $(libutils_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
 	$(MSG_LD) $(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 autotest: $(autotest_BINARY)
@@ -283,7 +298,7 @@ dist-clean:
 	@rm -rf $(all_OBJECTS) *~ core
 
 clean:
-	@rm -rf $(libuhub_OBJECTS) *~ core $(uhub_BINARY) $(admin_BINARY) $(autotest_BINARY) $(adcrush_BINARY) $(all_OBJECTS) autotest.c revision.h revision.h.tmp && \
+	@rm -rf $(libuhub_OBJECTS) *~ core $(uhub_BINARY) $(admin_BINARY) $(autotest_BINARY) $(adcrush_BINARY) $(all_OBJECTS) $(all_plugins) autotest.c revision.h revision.h.tmp && \
 	echo $(MSG_CLEAN)
 
 
