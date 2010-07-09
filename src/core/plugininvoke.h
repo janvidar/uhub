@@ -41,6 +41,8 @@ plugin_st plugin_check_nickname_valid(struct hub_info* hub, const char* nick);
 plugin_st plugin_check_nickname_reserved(struct hub_info* hub, const char* nick);
 
 
+
 #endif
 
 #endif // HAVE_UHUB_PLUGIN_INVOKE_H
+

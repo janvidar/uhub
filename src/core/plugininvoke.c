@@ -82,8 +82,8 @@ void plugin_log_user_logout(struct hub_info* hub, struct hub_user* user)
 
 void convert_user_to_plugin_user(struct plugin_user* puser, struct hub_user* user)
 {
-		puser->sid  = user->id.sid;
-		puser->nick = user->id.nick;
-		puser->cid  = user->id.cid;
-		puser->addr = user->id.addr;
+	puser->sid  = user->id.sid;
+	puser->nick = user->id.nick;
+	puser->cid  = user->id.cid;
+	puser->addr = user->id.addr;
 }
