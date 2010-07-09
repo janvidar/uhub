@@ -163,6 +163,7 @@ libadc_common_SOURCES := \
 		src/adc/sid.c
 
 libutils_SOURCES := \
+		src/util/config_token.c \
 		src/util/ipcalc.c \
 		src/util/list.c \
 		src/util/log.c \
@@ -192,6 +193,7 @@ autotest_SOURCES := \
 		autotest/test_sid.tcc \
 		autotest/test_tiger.tcc \
 		autotest/test_timer.tcc \
+		autotest/test_tokenizer.tcc \
 		autotest/test_usermanager.tcc
 
 autotest_OBJECTS = autotest.o
