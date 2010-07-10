@@ -123,40 +123,31 @@ void plugin_unload(struct uhub_plugin_handle* plugin)
 static int plugin_parse_line(char* line, int line_count, void* ptr_data)
 {
 	struct uhub_plugins* handle = (struct uhub_plugins*) ptr_data;
-	char* pos;
+	struct linked_list* tokens = cfg_tokenize(line);
+	char *directive, *soname, *params;
 
-	strip_off_ini_line_comments(line, line_count);
-
-	line = strip_white_space(line);
-	if (!*line)
+	if (list_size(tokens) == 0)
 		return 0;
 
-	LOG_TRACE("plugin: parse line %d: \"%s\"", line_count, line);
+	if (list_size(tokens) < 2)
+		return -1;
 
-	// Set plugin directory.
-	pos = strstr(line, "plugin_directory");
-	if (pos && is_white_space(line[(pos - line) + strlen("plugin_directory")]))
-	{
-		if (handle->plugin_dir)
-			hub_free(handle->plugin_dir);
-		handle->plugin_dir = strdup(strip_white_space(pos + strlen("plugin_directory") + 1));
-		return 0;
-	}
+	directive = list_get_first(tokens);
+	soname    = list_get_next(tokens);
+	params    = list_get_next(tokens);
 
-	// Load plugin
-	pos = strstr(line, "plugin");
-	if (pos && is_white_space(line[(pos - line) + strlen("plugin")]))
+	if (strcmp(directive, "plugin") == 0 && soname && *soname)
 	{
-		char* data = strip_white_space(pos + strlen("plugin") + 1);
-		if (*data)
+		if (!params)
+			params = "";
+
+
+		LOG_TRACE("Load plugin: \"%s\", params=\"%s\"", soname, params);
+		struct uhub_plugin_handle* plugin = plugin_load(soname, params);
+		if (plugin)
 		{
-			LOG_TRACE("Load plugin: \"%s\"", data);
-			struct uhub_plugin_handle* plugin = plugin_load(data, "");
-			if (plugin)
-			{
-				list_append(handle->loaded, plugin);
-				return 0;
-			}
+			list_append(handle->loaded, plugin);
+			return 0;
 		}
 	}
 

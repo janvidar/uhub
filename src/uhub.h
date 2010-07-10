@@ -58,6 +58,7 @@ extern "C" {
 
 #include "adc/adcconst.h"
 
+#include "util/config_token.h"
 #include "util/ipcalc.h"
 #include "util/list.h"
 #include "util/log.h"

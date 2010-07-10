@@ -7,38 +7,69 @@
 #include "util/memory.h"
 #include "util/list.h"
 #include "util/ipcalc.h"
-
-
-struct user_access_info
-{
-	char* username;
-	char* password;
-	enum auth_credentials credentials;
-};
+#include "util/misc.h"
+#include "util/log.h"
+#include "util/config_token.h"
 
 struct acl_list
 {
-	struct linked_list* users; /* see struct user_access_info */
+	struct linked_list* users;
 };
 
-static void free_user_access_info(void* ptr)
+void insert_user(struct linked_list* users, const char* nick, const char* pass, enum auth_credentials cred)
 {
-	struct user_access_info* info = (struct user_access_info*) ptr;
-	hub_free(info->username);
-	hub_free(info->password);
-	hub_free(info);
+	struct auth_info* data = (struct auth_info*) hub_malloc_zero(sizeof(struct auth_info));
+	strncpy(data->nickname, nick, MAX_NICK_LEN);
+	strncpy(data->password, pass, MAX_PASS_LEN);
+	data->credentials = cred;
+	list_append(users, data);
 }
+
+
+static int parse_line(char* line, int line_count, void* ptr_data)
+{
+	struct linked_list* users = (struct linked_list*) ptr_data;
+	struct linked_list* tokens = cfg_tokenize(line);
+	enum auth_credentials cred;
+
+	if (list_size(tokens) != 3)
+		return 0;
+
+	char* credential = (char*) list_get_first(tokens);
+	char* username   = (char*) list_get_next(tokens);
+	char* password   = (char*) list_get_next(tokens);
+
+	if (strcmp(credential, "user_admin"))           cred = auth_cred_admin;
+	else if (strcmp(credential, "user_super"))      cred = auth_cred_super;
+	else if (strcmp(credential, "user_op"))         cred = auth_cred_operator;
+	else if (strcmp(credential, "user_reg"))        cred = auth_cred_user;
+	else
+		return -1;
+
+	insert_user(users, username, password, cred);
+	cfg_tokens_free(tokens);
+	return 0;
+}
+
 
 static struct acl_list* load_acl(const char* filename)
 {
 	struct acl_list* list = (struct acl_list*) hub_malloc(sizeof(struct acl_list));
 	struct linked_list* users = list_create();
 
-	if (!list || !users)
+	if (!list || !users || !filename || !*filename)
 	{
 		list_destroy(users);
 		hub_free(list);
 		return 0;
+	}
+
+	if (users)
+	{
+		if (file_read_lines(filename, users, &parse_line) == -1)
+		{
+			fprintf(stderr, "Unable to load %s\n", filename);
+		}
 	}
 
 	list->users = users;
@@ -50,9 +81,29 @@ static void unload_acl(struct acl_list* list)
 	if (!list)
 		return;
 
-	list_clear(list->users, free_user_access_info);
+	list_clear(list->users, hub_free);
 	list_destroy(list->users);
 	hub_free(list);
+}
+
+static int get_user(const char* nickname, struct auth_info* info)
+{
+	return 0;
+}
+
+static plugin_st register_user(struct auth_info* user)
+{
+	return st_deny;
+}
+
+static plugin_st update_user(struct auth_info* user)
+{
+	return st_deny;
+}
+
+static plugin_st delete_user(struct auth_info* user)
+{
+	return st_deny;
 }
 
 
@@ -65,14 +116,14 @@ int plugin_register(struct uhub_plugin_handle* plugin, const char* config)
 	plugin->plugin_funcs_size = sizeof(struct plugin_funcs);
 	memset(&plugin->funcs, 0, sizeof(struct plugin_funcs));
 
+	// Authentication actions.
+	plugin->funcs.auth_get_user = get_user;
+	plugin->funcs.auth_register_user = register_user;
+	plugin->funcs.auth_update_user = update_user;
+	plugin->funcs.auth_delete_user = delete_user;
+
 	plugin->ptr = load_acl(config);	
 
-/*
-	plugin->funcs.on_connect = log_connect;
-	plugin->funcs.on_user_login = log_user_login;
-	plugin->funcs.on_user_logout = log_user_logout;
-	plugin->funcs.on_user_change_nick = log_change_nick;
-*/
 	return 0;
 }
 
