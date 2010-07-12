@@ -544,39 +544,39 @@ static int set_credentials(struct hub_info* hub, struct hub_user* user, struct a
 	}
 	else
 	{
-		user->credentials = cred_guest;
+		user->credentials = auth_cred_guest;
 	}
 	
 	switch (user->credentials)
 	{
-		case cred_none:
+		case auth_cred_none:
 			break;
 			
-		case cred_bot:
+		case auth_cred_bot:
 			adc_msg_add_argument(cmd, ADC_INF_FLAG_CLIENT_TYPE ADC_CLIENT_TYPE_BOT);
 			break;
 			
-		case cred_guest:
+		case auth_cred_guest:
 			/* Nothing to be added to the info message */
 			break;
 
-		case cred_user:
+		case auth_cred_user:
 			adc_msg_add_argument(cmd, ADC_INF_FLAG_CLIENT_TYPE ADC_CLIENT_TYPE_REGISTERED_USER);
 			break;
 
-		case cred_operator:
+		case auth_cred_operator:
 			adc_msg_add_argument(cmd, ADC_INF_FLAG_CLIENT_TYPE ADC_CLIENT_TYPE_OPERATOR);
 			break;
 			
-		case cred_super:
+		case auth_cred_super:
 			adc_msg_add_argument(cmd, ADC_INF_FLAG_CLIENT_TYPE ADC_CLIENT_TYPE_SUPER_USER);
 			break;
 
-		case cred_admin:
+		case auth_cred_admin:
 			adc_msg_add_argument(cmd, ADC_INF_FLAG_CLIENT_TYPE ADC_CLIENT_TYPE_ADMIN);
 			break;
 
-		case cred_link:
+		case auth_cred_link:
 			break;
  	}
 	

@@ -22,7 +22,7 @@
 
 static void log_user_login(struct hub_user* u)
 {
-	const char* cred = get_user_credential_string(u->credentials);
+	const char* cred = auth_cred_to_string(u->credentials);
 	const char* addr = user_get_address(u);
 	LOG_USER("LoginOK     %s/%s %s \"%s\" (%s) \"%s\"", sid_to_string(u->id.sid), u->id.cid, addr, u->id.nick, cred, u->user_agent);
 }

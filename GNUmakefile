@@ -164,6 +164,7 @@ libadc_common_SOURCES := \
 
 libutils_SOURCES := \
 		src/util/config_token.c \
+		src/util/credentials.c \
 		src/util/ipcalc.c \
 		src/util/list.c \
 		src/util/log.c \

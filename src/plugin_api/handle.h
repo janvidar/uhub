@@ -21,6 +21,7 @@
 #define HAVE_UHUB_PLUGIN_HANDLE_H
 
 #include "system.h"
+#include "util/credentials.h"
 #include "util/ipcalc.h"
 
 #define PLUGIN_API_VERSION 0
@@ -41,6 +42,7 @@ struct plugin_user
 	const char* nick;
 	const char* cid;
 	struct ip_addr_encap addr;
+	enum auth_credentials credentials;
 };
 
 enum plugin_status
@@ -51,18 +53,6 @@ enum plugin_status
 };
 
 typedef enum plugin_status plugin_st;
-
-enum auth_credentials
-{
-	auth_cred_none,                 /**<<< "User has no credentials (not yet logged in)" */
-	auth_cred_bot,                  /**<<< "User is a robot" */
-	auth_cred_guest,                /**<<< "User is a guest (unregistered user)" */
-	auth_cred_user,                 /**<<< "User is identified as a registered user" */
-	auth_cred_operator,             /**<<< "User is identified as a hub operator" */
-	auth_cred_super,                /**<<< "User is a super user" (not used) */
-	auth_cred_link,                 /**<<< "User is a link (not used currently)" */
-	auth_cred_admin,                /**<<< "User is identified as a hub administrator/owner" */
-};
 
 struct auth_info
 {

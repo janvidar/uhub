@@ -24,25 +24,11 @@ struct hub_config;
 struct hub_user;
 struct ip_addr_encap;
 
-enum user_credentials
-{
-	cred_none,                 /**<<< "User has no credentials (not yet logged in)" */
- 	cred_bot,                  /**<<< "User is a robot" */
-	cred_guest,                /**<<< "User is a guest (unregistered user)" */
- 	cred_user,                 /**<<< "User is identified as a registered user" */
-	cred_operator,             /**<<< "User is identified as a hub operator" */
-	cred_super,                /**<<< "User is a super user" (not used) */
-	cred_admin,                /**<<< "User is identified as a hub administrator/owner" */
- 	cred_link,                 /**<<< "User is a link (not used currently)" */
-};
-
-const char* get_user_credential_string(enum user_credentials cred);
-
 struct hub_user_access_info
 {
 	char* username;          /* name of user, cid or IP range */
 	char* password;          /* password */
-	enum user_credentials status;
+	enum auth_credentials status;
 };
 
 struct acl_handle

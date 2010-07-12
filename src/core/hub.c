@@ -22,7 +22,7 @@
 struct hub_info* g_hub = 0;
 
 #define CHECK_CHAT_ONLY \
-	if (hub->config->chat_only && u->credentials < cred_operator) \
+	if (hub->config->chat_only && u->credentials < auth_cred_operator) \
 		break
 
 #define CHECK_FLOOD(TYPE, WARN) \

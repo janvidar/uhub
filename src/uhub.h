@@ -59,6 +59,7 @@ extern "C" {
 #include "adc/adcconst.h"
 
 #include "util/config_token.h"
+#include "util/credentials.h"
 #include "util/ipcalc.h"
 #include "util/list.h"
 #include "util/log.h"
@@ -68,6 +69,7 @@ extern "C" {
 
 #include "adc/sid.h"
 #include "adc/message.h"
+
 #include "network/network.h"
 #include "network/connection.h"
 #include "network/timeout.h"
@@ -89,6 +91,8 @@ extern "C" {
 #include "core/hubevent.h"
 #include "core/plugininvoke.h"
 #include "core/pluginloader.h"
+
+
 
 #ifdef __cplusplus
 }

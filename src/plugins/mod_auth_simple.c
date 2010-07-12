@@ -25,7 +25,6 @@ void insert_user(struct linked_list* users, const char* nick, const char* pass, 
 	list_append(users, data);
 }
 
-
 static int parse_line(char* line, int line_count, void* ptr_data)
 {
 	struct linked_list* users = (struct linked_list*) ptr_data;
@@ -39,10 +38,10 @@ static int parse_line(char* line, int line_count, void* ptr_data)
 	char* username   = (char*) list_get_next(tokens);
 	char* password   = (char*) list_get_next(tokens);
 
-	if (strcmp(credential, "user_admin"))           cred = auth_cred_admin;
-	else if (strcmp(credential, "user_super"))      cred = auth_cred_super;
-	else if (strcmp(credential, "user_op"))         cred = auth_cred_operator;
-	else if (strcmp(credential, "user_reg"))        cred = auth_cred_user;
+	if (strcmp(credential,      "admin")) cred = auth_cred_admin;
+	else if (strcmp(credential, "super")) cred = auth_cred_super;
+	else if (strcmp(credential, "op")) cred = auth_cred_operator;
+	else if (strcmp(credential, "reg")) cred = auth_cred_user;
 	else
 		return -1;
 

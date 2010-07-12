@@ -23,23 +23,6 @@
 #define ACL_ADD_BOOL(S, L)    do { ret = check_cmd_bool(S,    L, line, line_count); if (ret != 0) return ret; } while(0)
 #define ACL_ADD_ADDR(S, L)    do { ret = check_cmd_addr(S,    L, line, line_count); if (ret != 0) return ret; } while(0)
 
-const char* get_user_credential_string(enum user_credentials cred)
-{
-	switch (cred)
-	{
-		case cred_none:         return "none";
-		case cred_bot:          return "bot";
-		case cred_guest:        return "guest";
-		case cred_user:         return "user";
-		case cred_operator:     return "operator";
-		case cred_super:        return "super";
-		case cred_admin:        return "admin";
-		case cred_link:         return "link";
-	}
-	
-	return "";
-};
-
 static int check_cmd_bool(const char* cmd, struct linked_list* list, char* line, int line_count)
 {
 	char* data;
@@ -108,7 +91,7 @@ static int check_cmd_user(const char* cmd, int status, struct linked_list* list,
 		info->password = data_extra ? hub_strdup(data_extra) : 0;
 		info->status = status;
 		list_append(list, info);
-		LOG_DEBUG("ACL: Added user '%s' (%s)", info->username, get_user_credential_string(info->status));
+		LOG_DEBUG("ACL: Added user '%s' (%s)", info->username, auth_cred_to_string(info->status));
 		return 1;
 	}
 	return 0;
@@ -187,12 +170,12 @@ static int acl_parse_line(char* line, int line_count, void* ptr_data)
 
 	LOG_DEBUG("acl_parse_line: '%s'", line);
 
-	ACL_ADD_USER("bot",        handle->users, cred_bot);
-	ACL_ADD_USER("user_admin", handle->users, cred_admin);
-	ACL_ADD_USER("user_super", handle->users, cred_super);
-	ACL_ADD_USER("user_op",    handle->users, cred_operator);
-	ACL_ADD_USER("user_reg",   handle->users, cred_user);
-	ACL_ADD_USER("link",       handle->users, cred_link);
+	ACL_ADD_USER("bot",        handle->users, auth_cred_bot);
+	ACL_ADD_USER("user_admin", handle->users, auth_cred_admin);
+	ACL_ADD_USER("user_super", handle->users, auth_cred_super);
+	ACL_ADD_USER("user_op",    handle->users, auth_cred_operator);
+	ACL_ADD_USER("user_reg",   handle->users, auth_cred_user);
+	ACL_ADD_USER("link",       handle->users, auth_cred_link);
 	ACL_ADD_BOOL("deny_nick",  handle->users_denied);
 	ACL_ADD_BOOL("ban_nick",   handle->users_banned);
 	ACL_ADD_BOOL("ban_cid",    handle->cids);

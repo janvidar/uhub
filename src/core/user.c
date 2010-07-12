@@ -288,18 +288,7 @@ int user_is_disconnecting(struct hub_user* user)
 
 int user_is_protected(struct hub_user* user)
 {
-	switch (user->credentials)
-	{
-		case cred_bot:
-		case cred_operator:
-		case cred_super:
-		case cred_admin:
-		case cred_link:
-			return 1;
-		default:
-			break;
-	}
-	return 0;
+	return auth_cred_is_protected(user->credentials);
 }
 
 /**
@@ -309,19 +298,7 @@ int user_is_protected(struct hub_user* user)
  */
 int user_is_registered(struct hub_user* user)
 {
-	switch (user->credentials)
-	{
-		case cred_bot:
-		case cred_user:
-		case cred_operator:
-		case cred_super:
-		case cred_admin:
-		case cred_link:
-			return 1;
-		default:
-			break;
-	}
-	return 0;
+	return auth_cred_is_registered(user->credentials);
 }
 
 void user_net_io_want_write(struct hub_user* user)

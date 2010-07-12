@@ -33,7 +33,7 @@ static void clear_user_list_callback(void* ptr)
 		 * This prevents the hub from trying to send
 		 * quit messages to other users.
 		 */
-		u->credentials = cred_none;
+		u->credentials = auth_cred_none;
 		user_destroy(u);
 	}
 }

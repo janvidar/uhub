@@ -106,7 +106,7 @@ struct hub_user_limits
 struct hub_user
 {
 	enum user_state         state;              /** see enum user_state */
-	enum user_credentials   credentials;        /** see enum user_credentials */
+	enum auth_credentials   credentials;        /** see enum user_credentials */
 	struct hub_user_info    id;                 /** Contains nick name and CID */
 	uint32_t                flags;              /** see enum user_features */
 	char                    user_agent[MAX_UA_LEN+1];/** User agent string */
