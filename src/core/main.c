@@ -115,6 +115,11 @@ int main_loop()
 		{
 			LOG_INFO("Reloading configuration files...");
 			LOG_DEBUG("Hub status: %d", (int) hub->status);
+
+			/* Reinitialize logs */
+			hub_log_shutdown();
+			hub_log_initialize(arg_log, arg_log_syslog);
+			hub_set_log_verbosity(arg_verbose);
 		}
 	
 		if (read_config(arg_config, &configuration, !arg_have_config) == -1)
