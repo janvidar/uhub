@@ -1,7 +1,8 @@
 #include <uhub.h>
 
-#define SETUP(X, STR) struct linked_list* tokens = cfg_tokenize(STR)
-#define CLEANUP(X) do { list_clear(X, hub_free); list_destroy(X); } while(0)
+#define SETUP(X, STR) struct cfg_tokens* tokens = cfg_tokenize(STR)
+#define CLEANUP_LIST(X) do { list_clear(X, hub_free); list_destroy(X); } while(0)
+#define CLEANUP_TOKENS(X) do { cfg_tokens_free(X); } while(0)
 
 static int match_str(const char* str1, char* str2)
 {
@@ -21,8 +22,8 @@ static int match_str(const char* str1, char* str2)
 
 static int count(const char* STR, size_t EXPECT) {
 	SETUP(tokens, STR);
-	int pass = list_size(tokens) == EXPECT;
-	CLEANUP(tokens);
+	int pass = cfg_token_count(tokens) == EXPECT;
+	CLEANUP_TOKENS(tokens);
 	return pass;
 }
 
@@ -31,11 +32,11 @@ static int compare(const char* str, const char* ref) {
 	struct linked_list* compare = list_create();
 	SETUP(tokens, str);
 	split_string(ref, " ", compare, 0);
-	int pass = list_size(tokens) == list_size(compare);
+	int pass = cfg_token_count(tokens) == list_size(compare);
 	if (pass) {
-		max = list_size(tokens);
+		max = cfg_token_count(tokens);
 		for (i = 0; i < max; i++) {
-			char* token = (char*) list_get_index(tokens, i);
+			char* token = (char*) cfg_token_get(tokens, i);
 			char* refer = (char*) list_get_index(compare, i);
 			if (match_str(token, refer)) {
 				pass = 0;
@@ -43,8 +44,8 @@ static int compare(const char* str, const char* ref) {
 			}
 		}
 	}
-	CLEANUP(tokens);
-	CLEANUP(compare);
+	CLEANUP_TOKENS(tokens);
+	CLEANUP_LIST(compare);
 	return pass;
 }
 

@@ -20,21 +20,17 @@
 #include "uhub.h"
 
 #define ADD_CHAR(X) do { *out = X; out++; token_size++; } while(0)
-#define RESET_TOKEN do { ADD_CHAR('\0'); out = buffer; if (add_token(tokens, out)) token_count++; token_size = 0; buffer[0] = '\0'; } while (0)
+#define RESET_TOKEN do { ADD_CHAR('\0'); out = buffer; if (cfg_token_add(tokens, out)) token_count++; token_size = 0; buffer[0] = '\0'; } while (0)
 
-static int add_token(struct linked_list* list, const char* token)
+struct cfg_tokens
 {
-	if (*token)
-	{
-		list_append(list, hub_strdup(token));
-		return 1;
-	}
-	return 0;
-}
+    struct linked_list* list;
+};
 
-struct linked_list* cfg_tokenize(const char* line)
+struct cfg_tokens* cfg_tokenize(const char* line)
 {
-	struct linked_list* tokens = list_create();
+	struct cfg_tokens* tokens = hub_malloc_zero(sizeof(struct cfg_tokens));
+	tokens->list = list_create();
 	char* buffer = hub_malloc_zero(strlen(line));
 	char* out = buffer;
 	const char* p = line;
@@ -122,27 +118,39 @@ struct linked_list* cfg_tokenize(const char* line)
 	return tokens;
 }
 
-void cfg_tokens_free(struct linked_list* list)
+void cfg_tokens_free(struct cfg_tokens* tokens)
 {
-	list_clear(list, hub_free);
-	list_destroy(list);
+	list_clear(tokens->list, hub_free);
+	list_destroy(tokens->list);
+	hub_free(tokens);
 }
 
-/*
-size_t cfg_token_count(const char* line)
+int cfg_token_add(struct cfg_tokens* tokens, char* new_token)
 {
-	if (!line || !*line)
-		return 0;
-
-
-	
+	if (*new_token)
+	{
+		list_append(tokens->list, hub_strdup(new_token));
+		return 1;
+	}
+	return 0;
 }
 
-char* cfg_token_get(const char* line, size_t token)
+size_t cfg_token_count(struct cfg_tokens* tokens)
 {
+	return list_size(tokens->list);
 }
 
-char* cfg_token_add(const char* line, char* new_token)
+char* cfg_token_get(struct cfg_tokens* tokens, size_t offset)
 {
+	return list_get_index(tokens->list, offset);
 }
-*/
+
+char* cfg_token_get_first(struct cfg_tokens* tokens)
+{
+	return list_get_first(tokens->list);
+}
+
+char* cfg_token_get_next(struct cfg_tokens* tokens)
+{
+	return list_get_next(tokens->list);
+}
