@@ -123,18 +123,18 @@ void plugin_unload(struct uhub_plugin_handle* plugin)
 static int plugin_parse_line(char* line, int line_count, void* ptr_data)
 {
 	struct uhub_plugins* handle = (struct uhub_plugins*) ptr_data;
-	struct linked_list* tokens = cfg_tokenize(line);
+	struct cfg_tokens* tokens = cfg_tokenize(line);
 	char *directive, *soname, *params;
 
-	if (list_size(tokens) == 0)
+	if (cfg_token_count(tokens) == 0)
 		return 0;
 
-	if (list_size(tokens) < 2)
+	if (cfg_token_count(tokens) < 2)
 		return -1;
 
-	directive = list_get_first(tokens);
-	soname    = list_get_next(tokens);
-	params    = list_get_next(tokens);
+	directive = cfg_token_get_first(tokens);
+	soname    = cfg_token_get_next(tokens);
+	params    = cfg_token_get_next(tokens);
 
 	if (strcmp(directive, "plugin") == 0 && soname && *soname)
 	{
@@ -151,6 +151,7 @@ static int plugin_parse_line(char* line, int line_count, void* ptr_data)
 		}
 	}
 
+	cfg_tokens_free(tokens);
 	return -1;
 }
 

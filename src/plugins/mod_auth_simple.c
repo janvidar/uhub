@@ -28,15 +28,18 @@ void insert_user(struct linked_list* users, const char* nick, const char* pass, 
 static int parse_line(char* line, int line_count, void* ptr_data)
 {
 	struct linked_list* users = (struct linked_list*) ptr_data;
-	struct linked_list* tokens = cfg_tokenize(line);
+	struct cfg_tokens* tokens = cfg_tokenize(line);
 	enum auth_credentials cred;
 
-	if (list_size(tokens) != 3)
+	if (cfg_token_count(tokens) == 0)
 		return 0;
 
-	char* credential = (char*) list_get_first(tokens);
-	char* username   = (char*) list_get_next(tokens);
-	char* password   = (char*) list_get_next(tokens);
+	if (cfg_token_count(tokens) < 2)
+		return -1;
+
+	char* credential = cfg_token_get_first(tokens);
+	char* username   = cfg_token_get_next(tokens);
+	char* password   = cfg_token_get_next(tokens);
 
 	if (strcmp(credential,      "admin")) cred = auth_cred_admin;
 	else if (strcmp(credential, "super")) cred = auth_cred_super;
@@ -51,7 +54,7 @@ static int parse_line(char* line, int line_count, void* ptr_data)
 }
 
 
-static struct acl_list* load_acl(const char* filename)
+static struct acl_list* load_acl(const char* filename, struct uhub_plugin_handle* handle)
 {
 	struct acl_list* list = (struct acl_list*) hub_malloc(sizeof(struct acl_list));
 	struct linked_list* users = list_create();
@@ -92,25 +95,34 @@ static int get_user(const char* nickname, struct auth_info* info)
 
 static plugin_st register_user(struct auth_info* user)
 {
+	/* Read only mode - so rejected */
 	return st_deny;
 }
 
 static plugin_st update_user(struct auth_info* user)
 {
+	/* Read only mode - so rejected */
 	return st_deny;
 }
 
 static plugin_st delete_user(struct auth_info* user)
 {
+	/* Read only mode - so rejected */
 	return st_deny;
 }
 
+static void set_error_message(struct uhub_plugin_handle* plugin, const char* msg)
+{
+	// if (plugin->error_msg)
+	//	hub_free(plugin->error_msg);
+	plugin->error_msg = msg;
+}
 
 int plugin_register(struct uhub_plugin_handle* plugin, const char* config)
 {
 	plugin->name = "File authentication plugin";
 	plugin->version = "0.1";
-	plugin->description = "Simple authentication plugin that authenticates users based on a file.";
+	plugin->description = "Authenticated users based on a read-only text file.";
 	plugin->plugin_api_version = PLUGIN_API_VERSION;
 	plugin->plugin_funcs_size = sizeof(struct plugin_funcs);
 	memset(&plugin->funcs, 0, sizeof(struct plugin_funcs));
@@ -121,13 +133,13 @@ int plugin_register(struct uhub_plugin_handle* plugin, const char* config)
 	plugin->funcs.auth_update_user = update_user;
 	plugin->funcs.auth_delete_user = delete_user;
 
-	plugin->ptr = load_acl(config);	
-
+	plugin->ptr = load_acl(config, plugin);	
 	return 0;
 }
 
 int plugin_unregister(struct uhub_plugin_handle* plugin)
 {
+	set_error_message(plugin, 0);
 	unload_acl(plugin->ptr);
 	return 0;
 }

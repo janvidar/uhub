@@ -34,8 +34,6 @@
 #define MAX_PASS_LEN 64
 #endif
 
-struct ip_addr_encap;
-
 struct plugin_user
 {
 	unsigned int sid;
@@ -118,6 +116,7 @@ struct uhub_plugin_handle
 	const char* version;            /* plugin version */
 	const char* description;        /* plugin description */
 	void* ptr;                      /* Plugin specific data */
+	const char* error_msg;          /* Error message for registration error. */
 	size_t plugin_api_version;      /* Plugin API version */
 	size_t plugin_funcs_size;       /* Size of the plugin funcs */
 	struct plugin_funcs funcs;

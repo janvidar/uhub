@@ -40,7 +40,16 @@ plugin_st plugin_check_ip_late(struct hub_info* hub, struct ip_addr_encap* addr)
 plugin_st plugin_check_nickname_valid(struct hub_info* hub, const char* nick);
 plugin_st plugin_check_nickname_reserved(struct hub_info* hub, const char* nick);
 
+/* Handle chat messages */
+plugin_st plugin_handle_chat_message(struct hub_info* hub, struct hub_user* from, const char* message, int flags);
+plugin_st plugin_handle_private_message(struct hub_info* hub, struct hub_user* from, struct hub_user* to, const char* message, int flags);
 
+/* Handle searches */
+plugin_st plugin_handle_search(struct hub_info* hub, struct hub_user* user, const char* data);
+
+/* Handle p2p connections */
+plugin_st plugin_handle_connect(struct hub_info* hub, struct hub_user* from, struct hub_user* to);
+plugin_st plugin_handle_revconnect(struct hub_info* hub, struct hub_user* from, struct hub_user* to);
 
 #endif
 

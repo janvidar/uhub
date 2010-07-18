@@ -32,28 +32,34 @@
 		} \
 	}
 
+#define PLUGIN_INVOKE_STATUS(HUB, FUNCNAME, ARGS) \
+	plugin_st status = st_default; \
+	PLUGIN_INVOKE(HUB, FUNCNAME, { \
+		status = plugin->funcs.FUNCNAME ARGS ; \
+		if (status != st_default) \
+			break; \
+	}); \
+	return status
+
+
+static void convert_user_type(struct plugin_user* puser, struct hub_user* user)
+{
+	puser->sid  = user->id.sid;
+	puser->nick = user->id.nick;
+	puser->cid  = user->id.cid;
+	puser->addr = user->id.addr;
+	puser->credentials = user->credentials;
+}
+
 plugin_st plugin_check_ip_early(struct hub_info* hub, struct ip_addr_encap* addr)
 {
-	plugin_st status = st_default;
-	PLUGIN_INVOKE(hub, login_check_ip_early, {
-		status = plugin->funcs.login_check_ip_early(addr);
-		if (status != st_default)
-			break;
-	});
-	return status;
+	PLUGIN_INVOKE_STATUS(hub, login_check_ip_early, (addr));
 }
 
 plugin_st plugin_check_ip_late(struct hub_info* hub, struct ip_addr_encap* addr)
 {
-	plugin_st status = st_default;
-	PLUGIN_INVOKE(hub, login_check_ip_late, {
-		status = plugin->funcs.login_check_ip_late(addr);
-		if (status != st_default)
-			break;
-	});
-	return status;
+	PLUGIN_INVOKE_STATUS(hub, login_check_ip_late, (addr));
 }
-
 
 void plugin_log_connection_accepted(struct hub_info* hub, struct ip_addr_encap* ipaddr)
 {
@@ -80,12 +86,29 @@ void plugin_log_user_logout(struct hub_info* hub, struct hub_user* user)
 {
 }
 
-
-static void convert_user_to_plugin_user(struct plugin_user* puser, struct hub_user* user)
+plugin_st plugin_handle_chat_message(struct hub_info* hub, struct hub_user* from, const char* message, int flags)
 {
-	puser->sid  = user->id.sid;
-	puser->nick = user->id.nick;
-	puser->cid  = user->id.cid;
-	puser->addr = user->id.addr;
-	puser->credentials = user->credentials;
+	return st_default;
 }
+
+plugin_st plugin_handle_private_message(struct hub_info* hub, struct hub_user* from, struct hub_user* to, const char* message, int flags)
+{
+	return st_default;
+}
+
+plugin_st plugin_handle_search(struct hub_info* hub, struct hub_user* user, const char* data)
+{
+	return st_default;
+}
+
+plugin_st plugin_handle_connect(struct hub_info* hub, struct hub_user* from, struct hub_user* to)
+{
+	return st_default;
+}
+
+plugin_st plugin_handle_revconnect(struct hub_info* hub, struct hub_user* from, struct hub_user* to)
+{
+	return st_default;
+}
+
+
