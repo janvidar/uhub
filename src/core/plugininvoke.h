@@ -31,8 +31,10 @@ struct ip_addr_encap;
 void plugin_log_connection_accepted(struct hub_info* hub, struct ip_addr_encap* addr);
 void plugin_log_connection_denied(struct hub_info* hub, struct ip_addr_encap* addr);
 void plugin_log_user_login_success(struct hub_info* hub, struct hub_user* user);
-void plugin_log_user_login_error(struct hub_info* hub, struct hub_user* user);
-void plugin_log_user_logout(struct hub_info* hub, struct hub_user* user);
+void plugin_log_user_login_error(struct hub_info* hub, struct hub_user* user, const char* reason);
+void plugin_log_user_logout(struct hub_info* hub, struct hub_user* user, const char* reason);
+void plugin_log_user_nick_change(struct hub_info* hub, struct hub_user* user, const char* new_nick);
+void plugin_log_user_update_error(struct hub_info* hub, struct hub_user* user, const char* reason);
 
 plugin_st plugin_check_ip_early(struct hub_info* hub, struct ip_addr_encap* addr);
 plugin_st plugin_check_ip_late(struct hub_info* hub, struct ip_addr_encap* addr);
