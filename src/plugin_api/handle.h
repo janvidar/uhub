@@ -79,7 +79,7 @@ typedef plugin_st (*on_check_ip_late_t)(struct ip_addr_encap*);
 typedef plugin_st (*on_validate_nick_t)(const char* nick);
 typedef plugin_st (*on_validate_cid_t)(const char* cid);
 
-typedef int (*auth_get_user_t)(const char* nickname, struct auth_info* info);
+typedef plugin_st (*auth_get_user_t)(const char* nickname, struct auth_info* info);
 typedef plugin_st (*auth_register_user_t)(struct auth_info* user);
 typedef plugin_st (*auth_update_user_t)(struct auth_info* user);
 typedef plugin_st (*auth_delete_user_t)(struct auth_info* user);

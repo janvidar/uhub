@@ -53,30 +53,30 @@ static int check_cmd_user(const char* cmd, int status, struct linked_list* list,
 {
 	char* data;
 	char* data_extra;
-	struct hub_user_access_info* info = 0;
-	
+	struct auth_info* info = 0;
+
 	if (!strncmp(line, cmd, strlen(cmd)))
 	{
 		data = &line[strlen(cmd)];
 		data_extra = 0;
 		data[0] = '\0';
 		data++;
-		
+
 		data = strip_white_space(data);
 		if (!*data)
 		{
 			LOG_FATAL("ACL parse error on line %d", line_count);
 			return -1;
 		}
-		
-		info = hub_malloc_zero(sizeof(struct hub_user_access_info));
-		
+
+		info = hub_malloc_zero(sizeof(struct auth_info));
+
 		if (!info)
 		{
 			LOG_ERROR("ACL parse error. Out of memory!");
 			return -1;
 		}
-		
+
 		if (strncmp(cmd, "user_", 5) == 0)
 		{
 			data_extra = strrchr(data, ':');
@@ -86,12 +86,12 @@ static int check_cmd_user(const char* cmd, int status, struct linked_list* list,
 				data_extra++;
 			}
 		}
-		
-		info->username = hub_strdup(data);
-		info->password = data_extra ? hub_strdup(data_extra) : 0;
-		info->status = status;
+
+		strncpy(info->nickname, data, MAX_NICK_LEN);
+		strncpy(info->password, data_extra, MAX_PASS_LEN);
+		info->credentials = status;
 		list_append(list, info);
-		LOG_DEBUG("ACL: Added user '%s' (%s)", info->username, auth_cred_to_string(info->status));
+		LOG_DEBUG("ACL: Added user '%s' (%s)", info->nickname, auth_cred_to_string(info->credentials));
 		return 1;
 	}
 	return 0;
@@ -226,11 +226,9 @@ int acl_initialize(struct hub_config* config, struct acl_handle* handle)
 
 static void acl_free_access_info(void* ptr)
 {
-	struct hub_user_access_info* info = (struct hub_user_access_info*) ptr;
+	struct auth_info* info = (struct auth_info*) ptr;
 	if (info)
 	{
-		hub_free(info->username);
-		hub_free(info->password);
 		hub_free(info);
 	}
 }
@@ -290,16 +288,16 @@ int acl_shutdown(struct acl_handle* handle)
 }
 
 
-struct hub_user_access_info* acl_get_access_info(struct acl_handle* handle, const char* name)
+struct auth_info* acl_get_access_info(struct acl_handle* handle, const char* name)
 {
-	struct hub_user_access_info* info = (struct hub_user_access_info*) list_get_first(handle->users);
+	struct auth_info* info = (struct auth_info*) list_get_first(handle->users);
 	while (info)
 	{
-		if (strcasecmp(info->username, name) == 0)
+		if (strcasecmp((char*)info->nickname, name) == 0)
 		{
 			return info;
 		}
-		info = (struct hub_user_access_info*) list_get_next(handle->users);
+		info = (struct auth_info*) list_get_next(handle->users);
 	}
 	return NULL;
 }
@@ -432,32 +430,42 @@ const char* acl_password_generate_challenge(struct acl_handle* acl, struct hub_u
 int acl_password_verify(struct acl_handle* acl, struct hub_user* user, const char* password)
 {
 	char buf[1024];
-	struct hub_user_access_info* access;
+	struct auth_info* access;
 	const char* challenge;
 	char raw_challenge[64];
 	char password_calc[64];
 	uint64_t tiger_res[3];
-	
+	size_t password_len;
+
 	if (!password || !user || strlen(password) != MAX_CID_LEN)
 		return 0;
 
-	access = acl_get_access_info(acl, user->id.nick);
-	if (!access || !access->password)
+#ifdef PLUGIN_SUPPORT
+	access = (struct auth_info*) hub_malloc(sizeof(struct auth_info));
+	if (!plugin_auth_get_user(user->hub, user->id.nick, access))
 		return 0;
-
-	if (TIGERSIZE+strlen(access->password) >= 1024)
+#else
+	access = acl_get_access_info(acl, user->id.nick);
+#endif
+	if (!access || !access->password)
 		return 0;
 
 	challenge = acl_password_generate_challenge(acl, user);
 
 	base32_decode(challenge, (unsigned char*) raw_challenge, MAX_CID_LEN);
 
-	memcpy(&buf[0], (char*) access->password, strlen(access->password));
-	memcpy(&buf[strlen(access->password)], raw_challenge, TIGERSIZE);
+	password_len = strlen(access->password);
 	
-	tiger((uint64_t*) buf, TIGERSIZE+strlen(access->password), (uint64_t*) tiger_res);
+	memcpy(&buf[0], access->password, password_len);
+	memcpy(&buf[password_len], raw_challenge, TIGERSIZE);
+	
+	tiger((uint64_t*) buf, TIGERSIZE+password_len, (uint64_t*) tiger_res);
 	base32_encode((unsigned char*) tiger_res, TIGERSIZE, password_calc);
 	password_calc[MAX_CID_LEN] = 0;
+
+#ifdef PLUGIN_SUPPORT
+	hub_free(access);
+#endif
 
 	if (strcasecmp(password, password_calc) == 0)
 	{

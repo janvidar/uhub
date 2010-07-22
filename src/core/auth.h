@@ -24,13 +24,6 @@ struct hub_config;
 struct hub_user;
 struct ip_addr_encap;
 
-struct hub_user_access_info
-{
-	char* username;          /* name of user, cid or IP range */
-	char* password;          /* password */
-	enum auth_credentials status;
-};
-
 struct acl_handle
 {
 	struct linked_list* users;          /* Known users. See enum user_status */
@@ -45,7 +38,7 @@ struct acl_handle
 extern int acl_initialize(struct hub_config* config, struct acl_handle* handle);
 extern int acl_shutdown(struct acl_handle* handle);
 
-extern struct hub_user_access_info* acl_get_access_info(struct acl_handle* handle, const char* name);
+extern struct auth_info* acl_get_access_info(struct acl_handle* handle, const char* name);
 extern int acl_is_cid_banned(struct acl_handle* handle, const char* cid);
 extern int acl_is_ip_banned(struct acl_handle* handle, const char* ip_address);
 extern int acl_is_ip_nat_override(struct acl_handle* handle, const char* ip_address);

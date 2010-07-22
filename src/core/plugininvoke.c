@@ -153,4 +153,22 @@ plugin_st plugin_handle_revconnect(struct hub_info* hub, struct hub_user* from, 
 	PLUGIN_INVOKE_STATUS(hub, on_p2p_revconnect, (&user1, &user2));
 }
 
+plugin_st plugin_auth_get_user(struct hub_info* hub, const char* nickname, struct auth_info* info)
+{
+	PLUGIN_INVOKE_STATUS(hub, auth_get_user, (nickname, info));
+}
 
+plugin_st plugin_auth_register_user(struct hub_info* hub, struct auth_info* info)
+{
+	PLUGIN_INVOKE_STATUS(hub, auth_register_user, (info));
+}
+
+plugin_st plugin_auth_update_user(struct hub_info* hub, struct auth_info* info)
+{
+	PLUGIN_INVOKE_STATUS(hub, auth_update_user, (info));
+}
+
+plugin_st plugin_auth_delete_user(struct hub_info* hub, struct auth_info* info)
+{
+	PLUGIN_INVOKE_STATUS(hub, auth_delete_user, (info));
+}

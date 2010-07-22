@@ -535,11 +535,11 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 static int set_credentials(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	int ret = 0;
-	struct hub_user_access_info* info = acl_get_access_info(hub->acl, user->id.nick);
+	struct auth_info* info = acl_get_access_info(hub->acl, user->id.nick);
 	
 	if (info)
 	{
-		user->credentials = info->status;
+		user->credentials = info->credentials;
 		ret = 1;
 	}
 	else
