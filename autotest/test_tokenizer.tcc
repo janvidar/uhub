@@ -52,7 +52,7 @@ static int compare(const char* str, const char* ref) {
 EXO_TEST(tokenizer_basic_0,  { return count("", 0); });
 EXO_TEST(tokenizer_basic_1,  { return count("a", 1); });
 EXO_TEST(tokenizer_basic_1a, { return count(" a", 1); })
-EXO_TEST(tokenizer_basic_1b, { return count("	a", 1); })
+EXO_TEST(tokenizer_basic_1b, { return count("\ta", 1); })
 EXO_TEST(tokenizer_basic_1c, { return count("      a", 1); })
 EXO_TEST(tokenizer_basic_1d, { return count(" a ", 1); })
 EXO_TEST(tokenizer_basic_1e, { return count("  a  ", 1); })
@@ -60,7 +60,7 @@ EXO_TEST(tokenizer_basic_2,  { return count("a b", 2); });
 EXO_TEST(tokenizer_basic_2a, { return count("  a   b  ", 2); });
 EXO_TEST(tokenizer_basic_3,  { return count("a b c", 3); });
 EXO_TEST(tokenizer_basic_3a, { return count("a b   c", 3); });
-EXO_TEST(tokenizer_basic_3b, { return count("a b	c", 3); });
+EXO_TEST(tokenizer_basic_3b, { return count("a b\tc", 3); });
 EXO_TEST(tokenizer_basic_3c, { return count("a b c ", 3); });
 EXO_TEST(tokenizer_basic_3d, { return count("a b c   ", 3); });
 
