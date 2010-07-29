@@ -82,8 +82,8 @@ static const char* sql_escape_string(const char* str)
 	size_t n = 0;
 	for (; n < strlen(str); n++)
 	{
-		if (str[n] == '\'' || str[n] == '\\')
-			out[i++] = '\\';
+		if (str[n] == '\'')
+			out[i++] = '\'';
 		out[i++] = str[n];
 	}
 	return out;
