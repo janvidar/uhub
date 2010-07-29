@@ -448,3 +448,38 @@ void strip_off_ini_line_comments(char* line, int line_count)
 	}
 	*out = '\0';
 }
+
+int string_to_boolean(const char* str, int* boolean)
+{
+	if (!str || !*str || !boolean)
+		return 0;
+
+	switch (strlen(str))
+	{
+		case 1:
+			if      (str[0] == '1') { *boolean = 1; return 1; }
+			else if (str[0] == '0') { *boolean = 0; return 1; }
+			return 0;
+
+		case 2:
+			if (!strcasecmp(str, "on")) { *boolean = 1; return 1; }
+			if (!strcasecmp(str, "no")) { *boolean = 0; return 1; }
+			return 0;
+
+		case 3:
+			if (!strcasecmp(str, "yes")) { *boolean = 1; return 1; }
+			if (!strcasecmp(str, "off")) { *boolean = 0; return 1; }
+			return 0;
+
+		case 4:
+			if (!strcasecmp(str, "true")) { *boolean = 1; return 1; }
+			return 0;
+
+		case 5:
+			if (!strcasecmp(str, "false")) { *boolean = 0; return 1; }
+			return 0;
+
+		default:
+			return 0;
+	}
+}

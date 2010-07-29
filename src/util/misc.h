@@ -37,6 +37,14 @@ extern void strip_off_ini_line_comments(char* line, int line_count);
 
 extern int file_read_lines(const char* file, void* data, file_line_handler_t handler);
 
+/**
+ * Convert a string to a boolean (0 or 1).
+ * Example:
+ * "yes", "true", "1", "on" sets 1 in boolean, and returns 1.
+ * "no", "false", "0", "off" sets 0 in boolean, and returns 1.
+ * All other values return 0, and boolean is unchanged.
+ */
+extern int string_to_boolean(const char* str, int* boolean);
 
 
 extern const char* uhub_itoa(int val);
