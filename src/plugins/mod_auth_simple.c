@@ -103,21 +103,26 @@ static int parse_line(char* line, int line_count, void* ptr_data)
 	enum auth_credentials cred;
 
 	if (cfg_token_count(tokens) == 0)
+	{
+		cfg_tokens_free(tokens);
 		return 0;
+	}
 
 	if (cfg_token_count(tokens) < 2)
+	{
+		cfg_tokens_free(tokens);
 		return -1;
+	}
 
 	char* credential = cfg_token_get_first(tokens);
 	char* username   = cfg_token_get_next(tokens);
 	char* password   = cfg_token_get_next(tokens);
 
-	if (strcmp(credential,      "admin")) cred = auth_cred_admin;
-	else if (strcmp(credential, "super")) cred = auth_cred_super;
-	else if (strcmp(credential, "op"))    cred = auth_cred_operator;
-	else if (strcmp(credential, "reg"))   cred = auth_cred_user;
-	else
+	if (!auth_string_to_cred(credential, &cred))
+	{
+		cfg_tokens_free(tokens);
 		return -1;
+	}
 
 	insert_user(users, username, password, cred);
 	cfg_tokens_free(tokens);
