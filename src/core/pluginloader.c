@@ -65,12 +65,12 @@ void* plugin_lookup_symbol(struct uhub_plugin* plugin, const char* symbol)
 #endif
 }
 
-struct uhub_plugin_handle* plugin_load(const char* filename, const char* config)
+struct plugin_handle* plugin_load(const char* filename, const char* config)
 {
 	plugin_register_f register_f;
 	plugin_unregister_f unregister_f;
 	int ret;
-	struct uhub_plugin_handle* handle = hub_malloc_zero(sizeof(struct uhub_plugin_handle));
+	struct plugin_handle* handle = hub_malloc_zero(sizeof(struct plugin_handle));
 	struct uhub_plugin* plugin = plugin_open(filename);
 
 	if (!plugin)
@@ -114,7 +114,7 @@ struct uhub_plugin_handle* plugin_load(const char* filename, const char* config)
 	return NULL;
 }
 
-void plugin_unload(struct uhub_plugin_handle* plugin)
+void plugin_unload(struct plugin_handle* plugin)
 {
 	plugin->handle->unregister(plugin);
 	plugin_close(plugin->handle);
@@ -148,7 +148,7 @@ static int plugin_parse_line(char* line, int line_count, void* ptr_data)
 			params = "";
 
 		LOG_TRACE("Load plugin: \"%s\", params=\"%s\"", soname, params);
-		struct uhub_plugin_handle* plugin = plugin_load(soname, params);
+		struct plugin_handle* plugin = plugin_load(soname, params);
 		if (plugin)
 		{
 			list_append(handle->loaded, plugin);
@@ -183,12 +183,12 @@ int plugin_initialize(struct hub_config* config, struct uhub_plugins* handle)
 
 void plugin_shutdown(struct uhub_plugins* handle)
 {
-	struct uhub_plugin_handle* plugin = (struct uhub_plugin_handle*) list_get_first(handle->loaded);
+	struct plugin_handle* plugin = (struct plugin_handle*) list_get_first(handle->loaded);
 	while (plugin)
 	{
 		list_remove(handle->loaded, plugin);
 		plugin_unload(plugin);
-		plugin = (struct uhub_plugin_handle*) list_get_first(handle->loaded);
+		plugin = (struct plugin_handle*) list_get_first(handle->loaded);
 	}
 
 	list_destroy(handle->loaded);

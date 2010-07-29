@@ -2,10 +2,9 @@
  * This is a minimal example plugin for uhub.
  */
 
-// #include "uhub.h"
 #include "plugin_api/handle.h"
 
-int plugin_register(struct uhub_plugin_handle* plugin, const char* config)
+int plugin_register(struct plugin_handle* plugin, const char* config)
 {
 	plugin->name = "Example plugin";
 	plugin->version = "1.0";
@@ -19,7 +18,7 @@ int plugin_register(struct uhub_plugin_handle* plugin, const char* config)
 	return 0;
 }
 
-int plugin_unregister(struct uhub_plugin_handle* plugin)
+int plugin_unregister(struct plugin_handle* plugin)
 {
 	/* No need to do anything! */
 	puts("plugin unregister");

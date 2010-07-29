@@ -7,29 +7,29 @@
 
 struct ip_addr_encap;
 
-plugin_st log_connect(struct ip_addr_encap* addr)
+plugin_st log_connect(struct plugin_handle* plugin, struct ip_addr_encap* addr)
 {
 	return st_default;
 }
 
-void log_user_login(struct plugin_user* user)
+void log_user_login(struct plugin_handle* plugin, struct plugin_user* user)
 {
 	printf("login: \"%s\"\n", user->nick);
 }
 
-void log_user_logout(struct plugin_user* user)
+void log_user_logout(struct plugin_handle* plugin, struct plugin_user* user)
 {
 	printf("logout: \"%s\"\n", user->nick);
 }
 
-plugin_st log_change_nick(struct plugin_user* user, const char* new_nick)
+plugin_st log_change_nick(struct plugin_handle* plugin, struct plugin_user* user, const char* new_nick)
 {
 	printf("\"%s\" -> \"%s\"\n", user->nick, new_nick);
 	return st_default;
 }
 
 
-int plugin_register(struct uhub_plugin_handle* plugin, const char* config)
+int plugin_register(struct plugin_handle* plugin, const char* config)
 {
 	plugin->name = "Logging plugin";
 	plugin->version = "1.0";
@@ -48,7 +48,7 @@ int plugin_register(struct uhub_plugin_handle* plugin, const char* config)
 	return 0;
 }
 
-int plugin_unregister(struct uhub_plugin_handle* plugin)
+int plugin_unregister(struct plugin_handle* plugin)
 {
 	/* No need to do anything! */
 	puts("* plugin unregister");

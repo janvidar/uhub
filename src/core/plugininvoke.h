@@ -54,7 +54,7 @@ plugin_st plugin_handle_connect(struct hub_info* hub, struct hub_user* from, str
 plugin_st plugin_handle_revconnect(struct hub_info* hub, struct hub_user* from, struct hub_user* to);
 
 /* Authentication related */
-int plugin_auth_get_user(struct hub_info* hub, const char* nickname, struct auth_info* info);
+plugin_st plugin_auth_get_user(struct hub_info* hub, const char* nickname, struct auth_info* info);
 plugin_st plugin_auth_register_user(struct hub_info* hub, struct auth_info* user);
 plugin_st plugin_auth_update_user(struct hub_info* hub, struct auth_info* user);
 plugin_st plugin_auth_delete_user(struct hub_info* hub, struct auth_info* user);

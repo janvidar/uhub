@@ -535,7 +535,7 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 static int set_credentials(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	int ret = 0;
-	struct auth_info* info = acl_get_access_info(hub->acl, user->id.nick);
+	struct auth_info* info = acl_get_access_info(hub, user->id.nick);
 	
 	if (info)
 	{

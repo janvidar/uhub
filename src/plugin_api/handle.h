@@ -34,6 +34,8 @@
 #define MAX_PASS_LEN 64
 #endif
 
+struct plugin_handle;
+
 struct plugin_user
 {
 	unsigned int sid;
@@ -59,30 +61,30 @@ struct auth_info
 	enum auth_credentials credentials;
 };
 
-typedef plugin_st (*on_chat_msg_t)(struct plugin_user* from, const char* message);
-typedef plugin_st (*on_private_msg_t)(struct plugin_user* from, struct plugin_user* to, const char* message);
-typedef plugin_st (*on_search_t)(struct plugin_user* from, const char* data);
-typedef plugin_st (*on_p2p_connect_t)(struct plugin_user* from, struct plugin_user* to);
-typedef plugin_st (*on_p2p_revconnect_t)(struct plugin_user* from, struct plugin_user* to);
+typedef plugin_st (*on_chat_msg_t)(struct plugin_handle*, struct plugin_user* from, const char* message);
+typedef plugin_st (*on_private_msg_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to, const char* message);
+typedef plugin_st (*on_search_t)(struct plugin_handle*, struct plugin_user* from, const char* data);
+typedef plugin_st (*on_p2p_connect_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to);
+typedef plugin_st (*on_p2p_revconnect_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to);
 
-typedef void (*on_user_connect_t)(struct ip_addr_encap*);
-typedef void (*on_user_login_t)(struct plugin_user*);
-typedef void (*on_user_login_error_t)(struct plugin_user*, const char* reason);
-typedef void (*on_user_logout_t)(struct plugin_user*, const char* reason);
-typedef void (*on_user_nick_change_t)(struct plugin_user*, const char* new_nick);
-typedef void (*on_user_update_error_t)(struct plugin_user*, const char* reason);
+typedef void (*on_user_connect_t)(struct plugin_handle*, struct ip_addr_encap*);
+typedef void (*on_user_login_t)(struct plugin_handle*, struct plugin_user*);
+typedef void (*on_user_login_error_t)(struct plugin_handle*, struct plugin_user*, const char* reason);
+typedef void (*on_user_logout_t)(struct plugin_handle*, struct plugin_user*, const char* reason);
+typedef void (*on_user_nick_change_t)(struct plugin_handle*, struct plugin_user*, const char* new_nick);
+typedef void (*on_user_update_error_t)(struct plugin_handle*, struct plugin_user*, const char* reason);
 
-typedef plugin_st (*on_change_nick_t)(struct plugin_user*, const char* new_nick);
+typedef plugin_st (*on_change_nick_t)(struct plugin_handle*, struct plugin_user*, const char* new_nick);
 
-typedef plugin_st (*on_check_ip_early_t)(struct ip_addr_encap*);
-typedef plugin_st (*on_check_ip_late_t)(struct ip_addr_encap*);
-typedef plugin_st (*on_validate_nick_t)(const char* nick);
-typedef plugin_st (*on_validate_cid_t)(const char* cid);
+typedef plugin_st (*on_check_ip_early_t)(struct plugin_handle*, struct ip_addr_encap*);
+typedef plugin_st (*on_check_ip_late_t)(struct plugin_handle*, struct ip_addr_encap*);
+typedef plugin_st (*on_validate_nick_t)(struct plugin_handle*, const char* nick);
+typedef plugin_st (*on_validate_cid_t)(struct plugin_handle*, const char* cid);
 
-typedef plugin_st (*auth_get_user_t)(const char* nickname, struct auth_info* info);
-typedef plugin_st (*auth_register_user_t)(struct auth_info* user);
-typedef plugin_st (*auth_update_user_t)(struct auth_info* user);
-typedef plugin_st (*auth_delete_user_t)(struct auth_info* user);
+typedef plugin_st (*auth_get_user_t)(struct plugin_handle*, const char* nickname, struct auth_info* info);
+typedef plugin_st (*auth_register_user_t)(struct plugin_handle*, struct auth_info* user);
+typedef plugin_st (*auth_update_user_t)(struct plugin_handle*, struct auth_info* user);
+typedef plugin_st (*auth_delete_user_t)(struct plugin_handle*, struct auth_info* user);
 
 struct plugin_funcs
 {
@@ -113,7 +115,7 @@ struct plugin_funcs
 
 };
 
-struct uhub_plugin_handle
+struct plugin_handle
 {
 	struct uhub_plugin* handle;     /* Must NOT be modified by the plugin */
 	const char* name;               /* plugin name */
@@ -133,14 +135,14 @@ struct uhub_plugin_handle
  * @param config A configuration string
  * @return 0 on success, -1 on error.
  */
-extern int plugin_register(struct uhub_plugin_handle* handle, const char* config);
+extern int plugin_register(struct plugin_handle* handle, const char* config);
 
 /**
  * @return 0 on success, -1 on error.
  */
-extern int plugin_unregister(struct uhub_plugin_handle*);
+extern int plugin_unregister(struct plugin_handle*);
 
-typedef int (*plugin_register_f)(struct uhub_plugin_handle* handle, const char* config);
-typedef int (*plugin_unregister_f)(struct uhub_plugin_handle*);
+typedef int (*plugin_register_f)(struct plugin_handle* handle, const char* config);
+typedef int (*plugin_unregister_f)(struct plugin_handle*);
 
 #endif /* HAVE_UHUB_PLUGIN_HANDLE_H */

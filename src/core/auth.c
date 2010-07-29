@@ -288,18 +288,29 @@ int acl_shutdown(struct acl_handle* handle)
 }
 
 
-struct auth_info* acl_get_access_info(struct acl_handle* handle, const char* name)
+struct auth_info* acl_get_access_info(struct hub_info* hub, const char* name)
 {
-	struct auth_info* info = (struct auth_info*) list_get_first(handle->users);
+	struct auth_info* info = 0;
+#ifdef PLUGIN_SUPPORT
+	info = (struct auth_info*) hub_malloc(sizeof(struct auth_info));
+	if (plugin_auth_get_user(hub, name, info) != st_allow)
+	{
+		hub_free(info);
+		return NULL;
+	}
+	return info;
+#else
+	info = (struct auth_info*) list_get_first(hub->acl->users);
 	while (info)
 	{
 		if (strcasecmp((char*)info->nickname, name) == 0)
 		{
 			return info;
 		}
-		info = (struct auth_info*) list_get_next(handle->users);
+		info = (struct auth_info*) list_get_next(hub->acl->users);
 	}
 	return NULL;
+#endif
 }
 
 #define STR_LIST_CONTAINS(LIST, STR) \
@@ -411,7 +422,7 @@ int acl_is_ip_nat_override(struct acl_handle* handle, const char* ip_address)
  * seconds since the unix epoch (modulus 1 million)
  * and the SID of the user (0-1 million).
  */
-const char* acl_password_generate_challenge(struct acl_handle* acl, struct hub_user* user)
+const char* acl_password_generate_challenge(struct hub_info* hub, struct hub_user* user)
 {
 	char buf[64];
 	uint64_t tiger_res[3];
@@ -427,7 +438,7 @@ const char* acl_password_generate_challenge(struct acl_handle* acl, struct hub_u
 }
 
 
-int acl_password_verify(struct acl_handle* acl, struct hub_user* user, const char* password)
+int acl_password_verify(struct hub_info* hub, struct hub_user* user, const char* password)
 {
 	char buf[1024];
 	struct auth_info* access;
@@ -440,17 +451,11 @@ int acl_password_verify(struct acl_handle* acl, struct hub_user* user, const cha
 	if (!password || !user || strlen(password) != MAX_CID_LEN)
 		return 0;
 
-#ifdef PLUGIN_SUPPORT
-	access = (struct auth_info*) hub_malloc(sizeof(struct auth_info));
-	if (!plugin_auth_get_user(user->hub, user->id.nick, access))
-		return 0;
-#else
-	access = acl_get_access_info(acl, user->id.nick);
-#endif
-	if (!access || !access->password)
+	access = acl_get_access_info(hub, user->id.nick);
+	if (!access)
 		return 0;
 
-	challenge = acl_password_generate_challenge(acl, user);
+	challenge = acl_password_generate_challenge(hub, user);
 
 	base32_decode(challenge, (unsigned char*) raw_challenge, MAX_CID_LEN);
 
