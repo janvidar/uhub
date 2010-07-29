@@ -92,6 +92,7 @@ int auth_string_to_cred(const char* str, enum auth_credentials* out)
 			return 0;
 
 		case 4:
+			if (!strcasecmp(str, "none")) { *out = auth_cred_none; return 1; }
 			if (!strcasecmp(str, "user")) { *out = auth_cred_user; return 1; }
 			if (!strcasecmp(str, "link")) { *out = auth_cred_link; return 1; }
 			return 0;
