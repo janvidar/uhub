@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # chkconfig: - 91 35
-# description: Starts and stops the Uhub ( http://www.extatic.org/uhub ) daemons on RHEL\CentOS \
+# description: Starts and stops the Uhub ( http://www.uhub.org ) daemons on RHEL\CentOS \
 #	       used to provide p2p network services.
 #
 # pidfile: /var/run/uhub.pid
@@ -69,12 +69,12 @@ reload() {
 }	
 
 rhstatus() {
-	status uhub                                                                                                                                                   
-        RETVAL=$?                                                                                                                                                     
-        if [ $RETVAL -ne 0 ] ; then                                                                                                                                   
-                return $RETVAL                                                                                                                                        
-        fi                                                                                                                                                            
-}                 
+	status uhub
+        RETVAL=$?
+        if [ $RETVAL -ne 0 ] ; then
+                return $RETVAL
+        fi
+}
 
 
 case "$1" in

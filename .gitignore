@@ -2,7 +2,8 @@
 *.[oa]
 *.exe
 *.gch
+*.so
 uhub-admin
 adcrush
 uhub
-
+revision.*
