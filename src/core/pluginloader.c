@@ -105,7 +105,7 @@ struct uhub_plugin_handle* plugin_load(const char* filename, const char* config)
 		}
 		else
 		{
-			LOG_ERROR("Unable to load plugin: %s - Failed to initialize", filename);
+			LOG_ERROR("Unable to load plugin: %s - Failed to initialize: %s", filename, handle->error_msg);
 		}
 	}
 
@@ -127,10 +127,16 @@ static int plugin_parse_line(char* line, int line_count, void* ptr_data)
 	char *directive, *soname, *params;
 
 	if (cfg_token_count(tokens) == 0)
+	{
+		cfg_tokens_free(tokens);
 		return 0;
+	}
 
 	if (cfg_token_count(tokens) < 2)
+	{
+		cfg_tokens_free(tokens);
 		return -1;
+	}
 
 	directive = cfg_token_get_first(tokens);
 	soname    = cfg_token_get_next(tokens);
@@ -141,12 +147,12 @@ static int plugin_parse_line(char* line, int line_count, void* ptr_data)
 		if (!params)
 			params = "";
 
-
 		LOG_TRACE("Load plugin: \"%s\", params=\"%s\"", soname, params);
 		struct uhub_plugin_handle* plugin = plugin_load(soname, params);
 		if (plugin)
 		{
 			list_append(handle->loaded, plugin);
+			cfg_tokens_free(tokens);
 			return 0;
 		}
 	}
@@ -175,5 +181,17 @@ int plugin_initialize(struct hub_config* config, struct uhub_plugins* handle)
 	return 0;
 }
 
+void plugin_shutdown(struct uhub_plugins* handle)
+{
+	struct uhub_plugin_handle* plugin = (struct uhub_plugin_handle*) list_get_first(handle->loaded);
+	while (plugin)
+	{
+		list_remove(handle->loaded, plugin);
+		plugin_unload(plugin);
+		plugin = (struct uhub_plugin_handle*) list_get_first(handle->loaded);
+	}
+
+	list_destroy(handle->loaded);
+}
 
 #endif /* PLUGIN_SUPPORT */

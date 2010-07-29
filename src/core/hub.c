@@ -826,22 +826,12 @@ void hub_plugins_load(struct hub_info* hub)
 
 void hub_plugins_unload(struct hub_info* hub)
 {
-	if (!hub->plugins || !hub->plugins->loaded)
+	if (hub->plugins)
 	{
-		return;
+		plugin_shutdown(hub->plugins);
+		hub_free(hub->plugins);
+		hub->plugins = 0;
 	}
-
-	struct uhub_plugin_handle* plugin = (struct uhub_plugin_handle*) list_get_first(hub->plugins->loaded);
-	while (plugin)
-	{
-		plugin_unload(plugin);
-		plugin = (struct uhub_plugin_handle*) list_get_next(hub->plugins->loaded);
-	}
-	
-	list_destroy(hub->plugins->loaded);
-	hub_free(hub->plugins->plugin_dir);
-	hub_free(hub->plugins);
-	hub->plugins = 0;
 }
 #endif
 

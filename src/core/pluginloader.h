@@ -39,7 +39,6 @@ struct uhub_plugin
 struct uhub_plugins
 {
 	struct linked_list* loaded;
-	char* plugin_dir;
 };
 
 // High level plugin loader ode
@@ -48,6 +47,7 @@ extern void plugin_unload(struct uhub_plugin_handle* plugin);
 
 // extern void plugin_unload(struct uhub_plugin_handle*);
 extern int plugin_initialize(struct hub_config* config, struct uhub_plugins* handle);
+extern void plugin_shutdown(struct uhub_plugins* handle);
 
 // Low level plugin loader code (used internally)
 extern struct uhub_plugin* plugin_open(const char* filename);

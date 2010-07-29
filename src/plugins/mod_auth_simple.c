@@ -11,6 +11,11 @@
 #include "util/log.h"
 #include "util/config_token.h"
 
+static void set_error_message(struct uhub_plugin_handle* plugin, const char* msg)
+{
+	plugin->error_msg = msg;
+}
+
 struct acl_list
 {
 	struct linked_list* users;
@@ -59,10 +64,19 @@ static struct acl_list* load_acl(const char* filename, struct uhub_plugin_handle
 	struct acl_list* list = (struct acl_list*) hub_malloc(sizeof(struct acl_list));
 	struct linked_list* users = list_create();
 
-	if (!list || !users || !filename || !*filename)
+	if (!list || !users)
 	{
 		list_destroy(users);
 		hub_free(list);
+		set_error_message(handle, "Unable to allocate memory");
+		return 0;
+	}
+
+	if (!filename || !*filename)
+	{
+		list_destroy(users);
+		hub_free(list);
+		set_error_message(handle, "No configuration file given");
 		return 0;
 	}
 
@@ -71,6 +85,7 @@ static struct acl_list* load_acl(const char* filename, struct uhub_plugin_handle
 		if (file_read_lines(filename, users, &parse_line) == -1)
 		{
 			fprintf(stderr, "Unable to load %s\n", filename);
+			set_error_message(handle, "Unable to load file");
 		}
 	}
 
@@ -111,13 +126,6 @@ static plugin_st delete_user(struct auth_info* user)
 	return st_deny;
 }
 
-static void set_error_message(struct uhub_plugin_handle* plugin, const char* msg)
-{
-	// if (plugin->error_msg)
-	//	hub_free(plugin->error_msg);
-	plugin->error_msg = msg;
-}
-
 int plugin_register(struct uhub_plugin_handle* plugin, const char* config)
 {
 	plugin->name = "File authentication plugin";
@@ -133,8 +141,10 @@ int plugin_register(struct uhub_plugin_handle* plugin, const char* config)
 	plugin->funcs.auth_update_user = update_user;
 	plugin->funcs.auth_delete_user = delete_user;
 
-	plugin->ptr = load_acl(config, plugin);	
-	return 0;
+	plugin->ptr = load_acl(config, plugin);
+	if (plugin->ptr)
+		return 0;
+	return -1;
 }
 
 int plugin_unregister(struct uhub_plugin_handle* plugin)
