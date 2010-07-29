@@ -75,3 +75,38 @@ const char* auth_cred_to_string(enum auth_credentials cred)
 	return "";
 };
 
+int auth_string_to_cred(const char* str, enum auth_credentials* out)
+{
+	if (!str || !*str || !out)
+		return 0;
+
+	switch (strlen(str))
+	{
+		case 2:
+			if (!strcasecmp(str, "op")) { *out = auth_cred_operator; return 1; }
+			return 0;
+
+		case 3:
+			if (!strcasecmp(str, "bot")) { *out = auth_cred_bot; return 1; }
+			if (!strcasecmp(str, "reg")) { *out = auth_cred_user; return 1; }
+			return 0;
+
+		case 4:
+			if (!strcasecmp(str, "user")) { *out = auth_cred_user; return 1; }
+			if (!strcasecmp(str, "link")) { *out = auth_cred_link; return 1; }
+			return 0;
+
+		case 5:
+			if (!strcasecmp(str, "admin")) { *out = auth_cred_admin; return 1; }
+			if (!strcasecmp(str, "super")) { *out = auth_cred_super; return 1; }
+			if (!strcasecmp(str, "guest")) { *out = auth_cred_guest; return 1; }
+			return 0;
+
+		case 8:
+			if (!strcasecmp(str, "operator")) { *out = auth_cred_operator; return 1; }
+			return 0;
+
+		default:
+			return 0;
+	}
+}

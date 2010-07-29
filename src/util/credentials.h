@@ -51,4 +51,7 @@ int auth_cred_is_registered(enum auth_credentials cred);
  */
 const char* auth_cred_to_string(enum auth_credentials cred);
 
+
+int auth_string_to_cred(const char* str, enum auth_credentials* out);
+
 #endif /* HAVE_UHUB_CREDENTIALS_H */

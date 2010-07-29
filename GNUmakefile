@@ -209,6 +209,10 @@ plugin_logging_TARGET  := mod_logging.so
 plugin_auth_SOURCES    := src/plugins/mod_auth_simple.c
 plugin_auth_TARGET     := mod_auth_simple.so
 
+plugin_auth_sqlite_SOURCES := src/plugins/mod_auth_sqlite.c
+plugin_auth_sqlite_TARGET  := mod_auth_sqlite.so
+plugin_auth_sqlite_LIBS    := -lsqlite3
+
 
 # Source to objects
 libuhub_OBJECTS       := $(libuhub_SOURCES:.c=.o)
@@ -221,7 +225,7 @@ adcrush_OBJECTS       := $(adcrush_SOURCES:.c=.o)
 admin_OBJECTS         := $(admin_SOURCES:.c=.o)
 
 all_OBJECTS     := $(libuhub_OBJECTS) $(uhub_OBJECTS) $(libutils_OBJECTS) $(adcrush_OBJECTS) $(autotest_OBJECTS) $(admin_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
-all_plugins     := $(plugin_example_TARGET) $(plugin_logging_TARGET) $(plugin_auth_TARGET)
+all_plugins     := $(plugin_example_TARGET) $(plugin_logging_TARGET) $(plugin_auth_TARGET) $(plugin_auth_sqlite_TARGET)
 
 uhub_BINARY=uhub$(BIN_EXT)
 adcrush_BINARY=adcrush$(BIN_EXT)
@@ -243,6 +247,9 @@ plugins: $(uhub_BINARY) $(all_plugins)
 
 $(plugin_auth_TARGET): $(plugin_auth_SOURCES) $(libutils_OBJECTS)
 	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
+
+$(plugin_auth_sqlite_TARGET): $(plugin_auth_sqlite_SOURCES) $(libutils_OBJECTS) 
+	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS) $(plugin_auth_sqlite_LIBS)
 
 $(plugin_example_TARGET): $(plugin_example_SOURCES)
 	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
