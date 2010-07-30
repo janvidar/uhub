@@ -68,6 +68,14 @@ reload() {
 	return $RETVAL
 }	
 
+relog() {
+    echo -n $"Reopen main log file: "
+     killproc uhub -SIGHUP
+     RETVAL=$?
+     echo ""
+     return $RETVAL
+}
+
 rhstatus() {
 	status uhub
         RETVAL=$?
@@ -90,11 +98,14 @@ case "$1" in
   reload)
   	reload
 	;;
+  relog)
+	relog
+	;;
   status)
   	rhstatus
 	;;
   *)
-	echo $"Usage: $0 {start|stop|restart|reload|status}"
+	echo $"Usage: $0 {start|stop|restart|reload|relog|status}"
 	exit 2
 esac
 
