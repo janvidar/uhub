@@ -25,6 +25,7 @@ struct hub_info* g_hub = 0;
 	if (hub->config->chat_only && u->credentials < auth_cred_operator) \
 		break
 
+/* FIXME: Flood control should be done in a plugin! */
 #define CHECK_FLOOD(TYPE, WARN) \
 	if (flood_control_check(&u->flood_ ## TYPE , hub->config->flood_ctl_  ## TYPE, hub->config->flood_ctl_interval, net_get_time())) \
 	{ \
@@ -255,6 +256,8 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 	char* message = adc_msg_get_argument(cmd, 0);
 	int ret = 0;
 	int relay = 1;
+	int broadcast;
+	int command;
 	int offset;
 
 	if (!message)
@@ -266,7 +269,10 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 		return 0;
 	}
 
-	if ((cmd->cache[0] == 'B') && (message[0] == '!' || message[0] == '+'))
+	broadcast = (cmd->cache[0] == 'B' || cmd->cache[0] == 'F');
+	command = (message[0] == '!' || message[0] == '+');
+
+	if (broadcast && command)
 	{
 		/*
 		 * A message such as "++message" is handled as "+message", by removing the first character.
@@ -285,14 +291,35 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 		}
 	}
 
-	if (((hub->config->chat_is_privileged && !user_is_protected(u)) || (user_flag_get(u, flag_muted))) && (cmd->cache[0] == 'B' || cmd->cache[0] == 'F'))
+	/* FIXME: Plugin should do this! */
+	if (relay && (((hub->config->chat_is_privileged && !user_is_protected(u)) || (user_flag_get(u, flag_muted))) && broadcast))
 	{
 		relay = 0;
+	}
+
+
+	if (relay)
+	{
+		plugin_st status;
+		if (broadcast)
+		{
+			status = plugin_handle_chat_message(hub, u, message, 0);
+		}
+		else
+		{
+			struct hub_user* target = uman_get_user_by_sid(hub, cmd->target);
+			status = plugin_handle_private_message(hub, u, target, message, 0);
+		}
+
+		if (status == st_deny)
+			relay = 0;
 	}
 
 	if (relay)
 	{
 		/* adc_msg_remove_named_argument(cmd, "PM"); */
+
+		/* FIXME: Plugin should do history management */
 		if (cmd->cache[0] == 'B')
 			hub_chat_history_add(hub, u, cmd);
 		ret = route_message(hub, u, cmd);

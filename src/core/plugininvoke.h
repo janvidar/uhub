@@ -36,6 +36,7 @@ void plugin_log_user_logout(struct hub_info* hub, struct hub_user* user, const c
 void plugin_log_user_nick_change(struct hub_info* hub, struct hub_user* user, const char* new_nick);
 void plugin_log_user_update_error(struct hub_info* hub, struct hub_user* user, const char* reason);
 
+/* IP ban related */
 plugin_st plugin_check_ip_early(struct hub_info* hub, struct ip_addr_encap* addr);
 plugin_st plugin_check_ip_late(struct hub_info* hub, struct ip_addr_encap* addr);
 

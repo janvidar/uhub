@@ -34,6 +34,11 @@
 #define MAX_PASS_LEN 64
 #endif
 
+#ifndef MAX_CID_LEN
+#define MAX_CID_LEN 39
+#endif
+
+
 struct plugin_handle;
 
 struct plugin_user
@@ -59,6 +64,23 @@ struct auth_info
 	char nickname[MAX_NICK_LEN+1];
 	char password[MAX_PASS_LEN+1];
 	enum auth_credentials credentials;
+};
+
+enum ban_flags
+{
+	ban_nickname = 0x01, /* Nickname is banned */
+	ban_cid      = 0x02, /* CID is banned */
+	ban_ip       = 0x04, /* IP address (range) is banned */
+};
+
+struct ban_info
+{
+	unsigned int flags;                 /* See enum ban_flags. */
+	char nickname[MAX_NICK_LEN+1];      /* Nickname - only defined if (ban_nickname & flags). */
+	char cid[MAX_CID_LEN+1];            /* CID - only defined if (ban_cid & flags). */
+	struct ip_addr_encap ip_addr_lo;    /* Low IP address of an IP range */
+	struct ip_addr_encap ip_addr_hi;    /* High IP address of an IP range */
+	time_t expiry;                      /* Time when the ban record expires */
 };
 
 typedef plugin_st (*on_chat_msg_t)(struct plugin_handle*, struct plugin_user* from, const char* message);
