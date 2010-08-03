@@ -86,6 +86,7 @@ static const char* sql_escape_string(const char* str)
 			out[i++] = '\'';
 		out[i++] = str[n];
 	}
+	out[i++] = '\0';
 	return out;
 }
 
