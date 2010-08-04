@@ -46,6 +46,7 @@ struct plugin_user
 	unsigned int sid;
 	const char* nick;
 	const char* cid;
+	const char* user_agent;
 	struct ip_addr_encap addr;
 	enum auth_credentials credentials;
 };

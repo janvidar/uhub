@@ -78,6 +78,7 @@ static void convert_user_type(struct plugin_user* puser, struct hub_user* user)
 	puser->sid  = user->id.sid;
 	puser->nick = user->id.nick;
 	puser->cid  = user->id.cid;
+	puser->user_agent = user->user_agent;
 	puser->addr = user->id.addr;
 	puser->credentials = user->credentials;
 }

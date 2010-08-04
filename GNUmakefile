@@ -255,7 +255,7 @@ $(plugin_auth_sqlite_TARGET): $(plugin_auth_sqlite_SOURCES) $(libutils_OBJECTS)
 $(plugin_example_TARGET): $(plugin_example_SOURCES)
 	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
 
-$(plugin_logging_TARGET): $(plugin_logging_SOURCES)
+$(plugin_logging_TARGET): $(plugin_logging_SOURCES) $(libutils_OBJECTS) $(libadc_common_OBJECTS) src/network/network.o
 	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
 
 $(adcrush_BINARY): $(adcrush_OBJECTS) $(libuhub_OBJECTS) $(libutils_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
