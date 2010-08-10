@@ -95,6 +95,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_boolean(key, data, &config->hub_enabled))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"hub_enabled\" (boolean), default=1");
 			return -1;
 		}
 		return 0;
@@ -105,6 +106,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->server_port, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"server_port\" (integer), default=1511");
 			return -1;
 		}
 		return 0;
@@ -115,6 +117,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->server_bind_addr, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"server_bind_addr\" (string), default=\"any\"");
 			return -1;
 		}
 		return 0;
@@ -125,6 +128,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->server_listen_backlog, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"server_listen_backlog\" (integer), default=50");
 			return -1;
 		}
 		return 0;
@@ -135,6 +139,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->server_alt_ports, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"server_alt_ports\" (string), default=\"\"");
 			return -1;
 		}
 		return 0;
@@ -145,6 +150,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_boolean(key, data, &config->show_banner))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"show_banner\" (boolean), default=1");
 			return -1;
 		}
 		return 0;
@@ -155,6 +161,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_boolean(key, data, &config->show_banner_sys_info))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"show_banner_sys_info\" (boolean), default=1");
 			return -1;
 		}
 		return 0;
@@ -167,6 +174,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->max_users, &min, &max))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"max_users\" (integer), default=500, min=1, max=1048576");
 			return -1;
 		}
 		return 0;
@@ -177,6 +185,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_boolean(key, data, &config->registered_users_only))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"registered_users_only\" (boolean), default=0");
 			return -1;
 		}
 		return 0;
@@ -187,6 +196,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_boolean(key, data, &config->obsolete_clients))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"obsolete_clients\" (boolean), default=0");
 			return -1;
 		}
 		return 0;
@@ -197,6 +207,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_boolean(key, data, &config->chat_only))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"chat_only\" (boolean), default=0");
 			return -1;
 		}
 		return 0;
@@ -207,6 +218,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_boolean(key, data, &config->chat_is_privileged))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"chat_is_privileged\" (boolean), default=0");
 			return -1;
 		}
 		return 0;
@@ -217,6 +229,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->hub_name, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"hub_name\" (string), default=\"uhub\"");
 			return -1;
 		}
 		return 0;
@@ -227,6 +240,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->hub_description, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"hub_description\" (string), default=\"no description\"");
 			return -1;
 		}
 		return 0;
@@ -237,6 +251,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->redirect_addr, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"redirect_addr\" (string), default=\"\"");
 			return -1;
 		}
 		return 0;
@@ -247,6 +262,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->max_recv_buffer, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"max_recv_buffer\" (integer), default=4096");
 			return -1;
 		}
 		return 0;
@@ -257,6 +273,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->max_send_buffer, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"max_send_buffer\" (integer), default=131072");
 			return -1;
 		}
 		return 0;
@@ -267,6 +284,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->max_send_buffer_soft, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"max_send_buffer_soft\" (integer), default=98304");
 			return -1;
 		}
 		return 0;
@@ -277,6 +295,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_boolean(key, data, &config->low_bandwidth_mode))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"low_bandwidth_mode\" (boolean), default=0");
 			return -1;
 		}
 		return 0;
@@ -287,6 +306,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->max_chat_history, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"max_chat_history\" (integer), default=20");
 			return -1;
 		}
 		return 0;
@@ -297,6 +317,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->max_logout_log, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"max_logout_log\" (integer), default=20");
 			return -1;
 		}
 		return 0;
@@ -307,6 +328,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->limit_max_hubs_user, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"limit_max_hubs_user\" (integer), default=10");
 			return -1;
 		}
 		return 0;
@@ -317,6 +339,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->limit_max_hubs_reg, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"limit_max_hubs_reg\" (integer), default=10");
 			return -1;
 		}
 		return 0;
@@ -327,6 +350,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->limit_max_hubs_op, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"limit_max_hubs_op\" (integer), default=10");
 			return -1;
 		}
 		return 0;
@@ -337,6 +361,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->limit_max_hubs, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"limit_max_hubs\" (integer), default=25");
 			return -1;
 		}
 		return 0;
@@ -347,6 +372,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->limit_min_hubs_user, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"limit_min_hubs_user\" (integer), default=0");
 			return -1;
 		}
 		return 0;
@@ -357,6 +383,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->limit_min_hubs_reg, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"limit_min_hubs_reg\" (integer), default=0");
 			return -1;
 		}
 		return 0;
@@ -367,6 +394,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->limit_min_hubs_op, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"limit_min_hubs_op\" (integer), default=0");
 			return -1;
 		}
 		return 0;
@@ -378,6 +406,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->limit_min_share, &min, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"limit_min_share\" (integer), default=0, min=0");
 			return -1;
 		}
 		return 0;
@@ -388,6 +417,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->limit_max_share, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"limit_max_share\" (integer), default=0");
 			return -1;
 		}
 		return 0;
@@ -398,6 +428,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->limit_min_slots, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"limit_min_slots\" (integer), default=0");
 			return -1;
 		}
 		return 0;
@@ -408,6 +439,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->limit_max_slots, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"limit_max_slots\" (integer), default=0");
 			return -1;
 		}
 		return 0;
@@ -420,6 +452,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->flood_ctl_interval, &min, &max))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"flood_ctl_interval\" (integer), default=0, min=1, max=60");
 			return -1;
 		}
 		return 0;
@@ -430,6 +463,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->flood_ctl_chat, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"flood_ctl_chat\" (integer), default=0");
 			return -1;
 		}
 		return 0;
@@ -440,6 +474,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->flood_ctl_connect, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"flood_ctl_connect\" (integer), default=0");
 			return -1;
 		}
 		return 0;
@@ -450,6 +485,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->flood_ctl_search, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"flood_ctl_search\" (integer), default=0");
 			return -1;
 		}
 		return 0;
@@ -460,6 +496,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->flood_ctl_update, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"flood_ctl_update\" (integer), default=0");
 			return -1;
 		}
 		return 0;
@@ -470,6 +507,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_integer(key, data, &config->flood_ctl_extras, 0, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"flood_ctl_extras\" (integer), default=0");
 			return -1;
 		}
 		return 0;
@@ -480,6 +518,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_boolean(key, data, &config->tls_enable))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"tls_enable\" (boolean), default=0");
 			return -1;
 		}
 		return 0;
@@ -490,6 +529,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_boolean(key, data, &config->tls_require))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"tls_require\" (boolean), default=0");
 			return -1;
 		}
 		return 0;
@@ -500,6 +540,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->tls_certificate, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"tls_certificate\" (file), default=\"\"");
 			return -1;
 		}
 		return 0;
@@ -510,6 +551,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->tls_private_key, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"tls_private_key\" (file), default=\"\"");
 			return -1;
 		}
 		return 0;
@@ -520,6 +562,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->file_motd, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"file_motd\" (file), default=\"\"");
 			return -1;
 		}
 		return 0;
@@ -530,6 +573,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->file_acl, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"file_acl\" (file), default=\"\"");
 			return -1;
 		}
 		return 0;
@@ -540,6 +584,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->file_rules, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"file_rules\" (file), default=\"\"");
 			return -1;
 		}
 		return 0;
@@ -550,6 +595,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_hub_full, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_hub_full\" (message), default=\"Hub is full\"");
 			return -1;
 		}
 		return 0;
@@ -560,6 +606,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_hub_disabled, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_hub_disabled\" (message), default=\"Hub is disabled\"");
 			return -1;
 		}
 		return 0;
@@ -570,6 +617,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_hub_registered_users_only, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_hub_registered_users_only\" (message), default=\"Hub is for registered users only\"");
 			return -1;
 		}
 		return 0;
@@ -580,6 +628,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_inf_error_nick_missing, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_inf_error_nick_missing\" (message), default=\"No nickname given\"");
 			return -1;
 		}
 		return 0;
@@ -590,6 +639,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_inf_error_nick_multiple, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_inf_error_nick_multiple\" (message), default=\"Multiple nicknames given\"");
 			return -1;
 		}
 		return 0;
@@ -600,6 +650,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_inf_error_nick_invalid, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_inf_error_nick_invalid\" (message), default=\"Nickname is invalid\"");
 			return -1;
 		}
 		return 0;
@@ -610,6 +661,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_inf_error_nick_long, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_inf_error_nick_long\" (message), default=\"Nickname too long\"");
 			return -1;
 		}
 		return 0;
@@ -620,6 +672,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_inf_error_nick_short, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_inf_error_nick_short\" (message), default=\"Nickname too short\"");
 			return -1;
 		}
 		return 0;
@@ -630,6 +683,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_inf_error_nick_spaces, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_inf_error_nick_spaces\" (message), default=\"Nickname cannot start with spaces\"");
 			return -1;
 		}
 		return 0;
@@ -640,6 +694,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_inf_error_nick_bad_chars, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_inf_error_nick_bad_chars\" (message), default=\"Nickname contains invalid characters\"");
 			return -1;
 		}
 		return 0;
@@ -650,6 +705,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_inf_error_nick_not_utf8, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_inf_error_nick_not_utf8\" (message), default=\"Nickname is not valid UTF-8\"");
 			return -1;
 		}
 		return 0;
@@ -660,6 +716,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_inf_error_nick_taken, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_inf_error_nick_taken\" (message), default=\"Nickname is already in use\"");
 			return -1;
 		}
 		return 0;
@@ -670,6 +727,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_inf_error_nick_restricted, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_inf_error_nick_restricted\" (message), default=\"Nickname cannot be used on this hub\"");
 			return -1;
 		}
 		return 0;
@@ -680,6 +738,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_inf_error_cid_invalid, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_inf_error_cid_invalid\" (message), default=\"CID is not valid\"");
 			return -1;
 		}
 		return 0;
@@ -690,6 +749,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_inf_error_cid_missing, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_inf_error_cid_missing\" (message), default=\"CID is not specified\"");
 			return -1;
 		}
 		return 0;
@@ -700,6 +760,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_inf_error_cid_taken, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_inf_error_cid_taken\" (message), default=\"CID is taken\"");
 			return -1;
 		}
 		return 0;
@@ -710,6 +771,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_inf_error_pid_missing, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_inf_error_pid_missing\" (message), default=\"PID is not specified\"");
 			return -1;
 		}
 		return 0;
@@ -720,6 +782,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_inf_error_pid_invalid, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_inf_error_pid_invalid\" (message), default=\"PID is invalid\"");
 			return -1;
 		}
 		return 0;
@@ -730,6 +793,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_ban_permanently, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_ban_permanently\" (message), default=\"Banned permanently\"");
 			return -1;
 		}
 		return 0;
@@ -740,6 +804,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_ban_temporarily, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_ban_temporarily\" (message), default=\"Banned temporarily\"");
 			return -1;
 		}
 		return 0;
@@ -750,6 +815,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_auth_invalid_password, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_auth_invalid_password\" (message), default=\"Password is wrong\"");
 			return -1;
 		}
 		return 0;
@@ -760,6 +826,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_auth_user_not_found, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_auth_user_not_found\" (message), default=\"User not found in password database\"");
 			return -1;
 		}
 		return 0;
@@ -770,6 +837,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_error_no_memory, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_error_no_memory\" (message), default=\"No memory\"");
 			return -1;
 		}
 		return 0;
@@ -780,6 +848,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_user_share_size_low, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_user_share_size_low\" (message), default=\"User is not sharing enough\"");
 			return -1;
 		}
 		return 0;
@@ -790,6 +859,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_user_share_size_high, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_user_share_size_high\" (message), default=\"User is sharing too much\"");
 			return -1;
 		}
 		return 0;
@@ -800,6 +870,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_user_slots_low, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_user_slots_low\" (message), default=\"User have too few upload slots.\"");
 			return -1;
 		}
 		return 0;
@@ -810,6 +881,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_user_slots_high, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_user_slots_high\" (message), default=\"User have too many upload slots.\"");
 			return -1;
 		}
 		return 0;
@@ -820,6 +892,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_user_hub_limit_low, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_user_hub_limit_low\" (message), default=\"User is on too few hubs.\"");
 			return -1;
 		}
 		return 0;
@@ -830,6 +903,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_user_hub_limit_high, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_user_hub_limit_high\" (message), default=\"User is on too many hubs.\"");
 			return -1;
 		}
 		return 0;
@@ -840,6 +914,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_user_flood_chat, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_user_flood_chat\" (message), default=\"Chat flood detected, messages are dropped.\"");
 			return -1;
 		}
 		return 0;
@@ -850,6 +925,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_user_flood_connect, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_user_flood_connect\" (message), default=\"Connect flood detected, connection refused.\"");
 			return -1;
 		}
 		return 0;
@@ -860,6 +936,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_user_flood_search, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_user_flood_search\" (message), default=\"Search flood detected, search is stopped.\"");
 			return -1;
 		}
 		return 0;
@@ -870,6 +947,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_user_flood_update, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_user_flood_update\" (message), default=\"Update flood detected.\"");
 			return -1;
 		}
 		return 0;
@@ -880,6 +958,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_user_flood_extras, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_user_flood_extras\" (message), default=\"Flood detected.\"");
 			return -1;
 		}
 		return 0;
@@ -890,6 +969,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_proto_no_common_hash, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_proto_no_common_hash\" (message), default=\"No common hash algorithm.\"");
 			return -1;
 		}
 		return 0;
@@ -900,6 +980,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		if (!apply_string(key, data, &config->msg_proto_obsolete_adc0, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"msg_proto_obsolete_adc0\" (message), default=\"Client is using an obsolete ADC protocol version.\"");
 			return -1;
 		}
 		return 0;

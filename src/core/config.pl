@@ -125,6 +125,7 @@ sub write_c_impl_apply(@)
 	my $min;
 	my $max;
 	my $regexp;
+	my $expect = "";
 
 	if (defined $p)
 	{
@@ -141,14 +142,21 @@ sub write_c_impl_apply(@)
 
 	print GENIMPL "\tif (!strcmp(key, \"" . $name . "\"))\n\t{\n";
 
+	$expect = "\\\"$name\\\"";
+
 	if ($type eq "int")
 	{
+		$expect .= " (integer)";
+		$expect .= ", default=" . $default;
+
 		if (defined $min)
 		{
+			$expect .= ", min=" . $min;
 			print GENIMPL "\t\tmin = $min;\n"
 		}
 		if (defined $max)
 		{
+			$expect .= ", max=" . $max;
 			print GENIMPL "\t\tmax = $max;\n"
 		}
 
@@ -178,16 +186,27 @@ sub write_c_impl_apply(@)
 	}
 	elsif ($type eq "boolean")
 	{
+		$expect .= " (boolean)";
+		$expect .= ", default=" . $default;
 		print GENIMPL "\t\tif (!apply_boolean(key, data, &config->$name))\n";
 	}
 	elsif ($type =~ /(string|file|message)/)
 	{
+		$expect .= " (" . $type . ")";
+		$expect .= ", default=\\\"" . $default . "\\\"";
 		print GENIMPL "\t\tif (!apply_string(key, data, &config->$name, (char*) \"\"))\n";
+	}
+	else
+	{
+		$expect = " is unknown.";
 	}
 
 	print GENIMPL "\t\t{\n" .
-				  "\t\t\tLOG_ERROR(\"Configuration parse error on line %d\", line_count);\n" .
-				  "\t\t\treturn -1;\n" .
+				  "\t\t\tLOG_ERROR(\"Configuration parse error on line %d\", line_count);\n";
+
+	print GENIMPL 		  "\t\t\tLOG_ERROR(\"" . $expect . "\");\n" if ($expect ne "");
+
+	print GENIMPL		  "\t\t\treturn -1;\n" .
 				  "\t\t}\n" .
 				  "\t\treturn 0;\n" .
 				  "\t}\n\n";
