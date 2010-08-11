@@ -60,6 +60,7 @@ extern "C" {
 
 #include "util/config_token.h"
 #include "util/credentials.h"
+#include "util/floodctl.h"
 #include "util/ipcalc.h"
 #include "util/list.h"
 #include "util/log.h"
@@ -76,7 +77,6 @@ extern "C" {
 
 #include "core/auth.h"
 #include "core/config.h"
-#include "core/floodctl.h"
 #include "core/eventid.h"
 #include "core/eventqueue.h"
 #include "core/netevent.h"

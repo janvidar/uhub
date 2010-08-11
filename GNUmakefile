@@ -136,7 +136,6 @@ libuhub_SOURCES := \
 		src/core/commands.c \
 		src/core/config.c \
 		src/core/eventqueue.c \
-		src/core/floodctl.c \
 		src/core/hub.c \
 		src/core/hubevent.c \
 		src/core/hubio.c \
@@ -165,6 +164,7 @@ libadc_common_SOURCES := \
 libutils_SOURCES := \
 		src/util/config_token.c \
 		src/util/credentials.c \
+		src/util/floodctl.c \
 		src/util/ipcalc.c \
 		src/util/list.c \
 		src/util/log.c \
