@@ -51,9 +51,9 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 {
 	int ret = 0;
 	struct adc_message* cmd = 0;
-	
+
 	LOG_PROTO("recv %s: %s", sid_to_string(u->id.sid), line);
-	
+
 	if (user_is_disconnecting(u))
 		return -1;
 
@@ -112,7 +112,7 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 				CHECK_CHAT_ONLY;
 				CHECK_FLOOD(connect, 1);
 				ROUTE_MSG;
-			
+
 			default:
 				CHECK_FLOOD(extras, 1);
 				ROUTE_MSG;
@@ -126,7 +126,7 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 			ret = -1;
 		}
 	}
-	
+
 	return ret;
 }
 
@@ -167,7 +167,7 @@ int hub_handle_support(struct hub_info* hub, struct hub_user* u, struct adc_mess
 		{
 			ok = 0;
 		}
-		
+
 		index++;
 		hub_free(arg);
 		arg = adc_msg_get_argument(cmd, index);
@@ -245,7 +245,7 @@ int hub_handle_password(struct hub_info* hub, struct hub_user* u, struct adc_mes
 			ret = -1;
 		}
 	}
-	
+
 	hub_free(password);
 	return ret;
 }
@@ -257,6 +257,7 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 	int ret = 0;
 	int relay = 1;
 	int broadcast;
+	int private_msg;
 	int command;
 	int offset;
 
@@ -269,7 +270,8 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 		return 0;
 	}
 
-	broadcast = (cmd->cache[0] == 'B' || cmd->cache[0] == 'F');
+	broadcast = (cmd->cache[0] == 'B');
+	private_msg = (cmd->cache[0] == 'D' || cmd->cache[0] == 'E');
 	command = (message[0] == '!' || message[0] == '+');
 
 	if (broadcast && command)
@@ -297,7 +299,6 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 		relay = 0;
 	}
 
-
 	if (relay)
 	{
 		plugin_st status;
@@ -305,7 +306,7 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 		{
 			status = plugin_handle_chat_message(hub, u, message, 0);
 		}
-		else
+		else if (private_msg)
 		{
 			struct hub_user* target = uman_get_user_by_sid(hub, cmd->target);
 			status = plugin_handle_private_message(hub, u, target, message, 0);
@@ -318,10 +319,11 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 	if (relay)
 	{
 		/* adc_msg_remove_named_argument(cmd, "PM"); */
-
-		/* FIXME: Plugin should do history management */
-		if (cmd->cache[0] == 'B')
+		if (broadcast)
+		{
 			hub_chat_history_add(hub, u, cmd);
+			plugin_log_chat_message(hub, u, message, 0);
+		}
 		ret = route_message(hub, u, cmd);
 	}
 	hub_free(message);
@@ -391,7 +393,7 @@ void hub_send_hubinfo(struct hub_info* hub, struct hub_user* u)
 {
 	struct adc_message* info = adc_msg_copy(hub->command_info);
 	int value = 0;
-	
+
 	if (user_flag_get(u, feature_ping))
 	{
 /*
@@ -405,47 +407,47 @@ void hub_send_hubinfo(struct hub_info* hub, struct hub_user* u)
 		adc_msg_add_named_argument(info, "MC", uhub_itoa(hub_get_max_user_count(hub)));
 		adc_msg_add_named_argument(info, "SS", uhub_ulltoa(hub_get_shared_size(hub)));
 		adc_msg_add_named_argument(info, "SF", uhub_itoa(hub_get_shared_files(hub)));
-		
+
 		/* Maximum/minimum share size */
 		value = hub_get_max_share(hub);
 		if (value) adc_msg_add_named_argument(info, "XS", uhub_itoa(value));
 		value = hub_get_min_share(hub);
 		if (value) adc_msg_add_named_argument(info, "MS", uhub_itoa(value));
-		
+
 		/* Maximum/minimum upload slots allowed per user */
 		value = hub_get_max_slots(hub);
 		if (value) adc_msg_add_named_argument(info, "XL", uhub_itoa(value));
 		value = hub_get_min_slots(hub);
 		if (value) adc_msg_add_named_argument(info, "ML", uhub_itoa(value));
-		
+
 		/* guest users must be on min/max hubs */
 		value = hub_get_max_hubs_user(hub);
 		if (value) adc_msg_add_named_argument(info, "XU", uhub_itoa(value));
 		value = hub_get_min_hubs_user(hub);
 		if (value) adc_msg_add_named_argument(info, "MU", uhub_itoa(value));
-		
+
 		/* registered users must be on min/max hubs */
 		value = hub_get_max_hubs_reg(hub);
 		if (value) adc_msg_add_named_argument(info, "XR", uhub_itoa(value));
 		value = hub_get_min_hubs_reg(hub);
 		if (value) adc_msg_add_named_argument(info, "MR", uhub_itoa(value));
-		
+
 		/* operators must be on min/max hubs */
 		value = hub_get_max_hubs_op(hub);
 		if (value) adc_msg_add_named_argument(info, "XO", uhub_itoa(value));
 		value = hub_get_min_hubs_op(hub);
 		if (value) adc_msg_add_named_argument(info, "MO", uhub_itoa(value));
-		
+
 		/* uptime in seconds */
 		adc_msg_add_named_argument(info, "UP", uhub_itoa((int) difftime(time(0), hub->tm_started)));
 	}
-	
+
 	if (user_is_connecting(u) || user_is_logged_in(u))
 	{
 		route_to_user(hub, u, info);
 	}
 	adc_msg_free(info);
-	
+
 	/* Only send banner when connecting */
 	if (hub->config->show_banner && user_is_connecting(u))
 	{
@@ -525,14 +527,14 @@ static void hub_event_dispatcher(void* callback_data, struct event_data* message
 	struct hub_info* hub = (struct hub_info*) callback_data;
 	struct hub_user* user = (struct hub_user*) message->ptr;
 	assert(hub != NULL);
-	
+
 	switch (message->id)
 	{
 		case UHUB_EVENT_USER_JOIN:
 		{
 			if (user_is_disconnecting(user))
 				break;
-		
+
 			if (message->flags)
 			{
 				hub_send_password_challenge(hub, user);
@@ -552,7 +554,7 @@ static void hub_event_dispatcher(void* callback_data, struct event_data* message
 			hub_schedule_destroy_user(hub, user);
 			break;
 		}
-		
+
 		case UHUB_EVENT_USER_DESTROY:
 		{
 			user_destroy(user);
@@ -842,7 +844,7 @@ void hub_plugins_load(struct hub_info* hub)
 	hub->plugins = hub_malloc_zero(sizeof(struct uhub_plugins));
 	if (!hub->plugins)
 		return;
-	
+
 	if (plugin_initialize(hub->config, hub->plugins) < 0)
 	{
 		hub_free(hub->plugins);
@@ -868,18 +870,18 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 	char buf[MAX_RECV_BUF];
 	char* tmp;
 	char* server = adc_msg_escape(PRODUCT_STRING); /* FIXME: OOM */
-	
+
 	hub->acl = acl;
 	hub->command_info = adc_msg_construct(ADC_CMD_IINF, 15);
 	if (hub->command_info)
 	{
 		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_CLIENT_TYPE, ADC_CLIENT_TYPE_HUB);
 		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_USER_AGENT, server);
-	
+
 		tmp = adc_msg_escape(hub->config->hub_name);
 		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_NICK, tmp);
 		hub_free(tmp);
-	
+
 		tmp = adc_msg_escape(hub->config->hub_description);
 		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_DESCRIPTION, tmp);
 		hub_free(tmp);
@@ -1064,7 +1066,7 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 		STATUS(40, msg_proto_obsolete_adc0, 0, -1, 1);
 	}
 #undef STATUS
-	
+
 	escaped_text = adc_msg_escape(text);
 
 	adc_msg_add_argument(cmd, code);
@@ -1146,42 +1148,42 @@ const char* hub_get_status_message(struct hub_info* hub, enum status_message msg
 const char* hub_get_status_message_log(struct hub_info* hub, enum status_message msg)
 {
 #define STATUS(MSG) case status_ ## MSG : return #MSG; break
-        switch (msg)
-        {
-                STATUS(msg_hub_full);
-                STATUS(msg_hub_disabled);
-                STATUS(msg_hub_registered_users_only);
-                STATUS(msg_inf_error_nick_missing);
-                STATUS(msg_inf_error_nick_multiple);
-                STATUS(msg_inf_error_nick_invalid);
-                STATUS(msg_inf_error_nick_long);
-                STATUS(msg_inf_error_nick_short);
-                STATUS(msg_inf_error_nick_spaces);
-                STATUS(msg_inf_error_nick_bad_chars);
-                STATUS(msg_inf_error_nick_not_utf8);
-                STATUS(msg_inf_error_nick_taken);
-                STATUS(msg_inf_error_nick_restricted);
-                STATUS(msg_inf_error_cid_invalid);
-                STATUS(msg_inf_error_cid_missing);
-                STATUS(msg_inf_error_cid_taken);
-                STATUS(msg_inf_error_pid_missing);
-                STATUS(msg_inf_error_pid_invalid);
-                STATUS(msg_ban_permanently);
-                STATUS(msg_ban_temporarily);
-                STATUS(msg_auth_invalid_password);
-                STATUS(msg_auth_user_not_found);
-                STATUS(msg_error_no_memory);
-                STATUS(msg_user_share_size_low);
-                STATUS(msg_user_share_size_high);
-                STATUS(msg_user_slots_low);
-                STATUS(msg_user_slots_high);
-                STATUS(msg_user_hub_limit_low);
-                STATUS(msg_user_hub_limit_high);
+	switch (msg)
+	{
+		STATUS(msg_hub_full);
+		STATUS(msg_hub_disabled);
+		STATUS(msg_hub_registered_users_only);
+		STATUS(msg_inf_error_nick_missing);
+		STATUS(msg_inf_error_nick_multiple);
+		STATUS(msg_inf_error_nick_invalid);
+		STATUS(msg_inf_error_nick_long);
+		STATUS(msg_inf_error_nick_short);
+		STATUS(msg_inf_error_nick_spaces);
+		STATUS(msg_inf_error_nick_bad_chars);
+		STATUS(msg_inf_error_nick_not_utf8);
+		STATUS(msg_inf_error_nick_taken);
+		STATUS(msg_inf_error_nick_restricted);
+		STATUS(msg_inf_error_cid_invalid);
+		STATUS(msg_inf_error_cid_missing);
+		STATUS(msg_inf_error_cid_taken);
+		STATUS(msg_inf_error_pid_missing);
+		STATUS(msg_inf_error_pid_invalid);
+		STATUS(msg_ban_permanently);
+		STATUS(msg_ban_temporarily);
+		STATUS(msg_auth_invalid_password);
+		STATUS(msg_auth_user_not_found);
+		STATUS(msg_error_no_memory);
+		STATUS(msg_user_share_size_low);
+		STATUS(msg_user_share_size_high);
+		STATUS(msg_user_slots_low);
+		STATUS(msg_user_slots_high);
+		STATUS(msg_user_hub_limit_low);
+		STATUS(msg_user_hub_limit_high);
 		STATUS(msg_proto_no_common_hash);
 		STATUS(msg_proto_obsolete_adc0);
-        }
+	}
 #undef STATUS
-        return "unknown";
+	return "unknown";
 }
 
 
@@ -1291,7 +1293,7 @@ void hub_event_loop(struct hub_info* hub)
 		event_queue_process(hub->queue);
 	}
 	while (hub->status == hub_status_running || hub->status == hub_status_disabled);
-	
+
 
 	if (hub->status == hub_status_shutdown)
 	{
@@ -1322,11 +1324,11 @@ void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason
 	user->connection = 0;
 
 	LOG_TRACE("hub_disconnect_user(), user=%p, reason=%d, state=%d", user, reason, user->state);
-	
+
 	need_notify = user_is_logged_in(user) && hub->status == hub_status_running;
 	user->quit_reason = reason;
 	user_set_state(user, state_cleanup);
-	
+
 	if (need_notify)
 	{
 		memset(&post, 0, sizeof(post));

@@ -96,6 +96,7 @@ typedef void (*on_user_login_error_t)(struct plugin_handle*, struct plugin_user*
 typedef void (*on_user_logout_t)(struct plugin_handle*, struct plugin_user*, const char* reason);
 typedef void (*on_user_nick_change_t)(struct plugin_handle*, struct plugin_user*, const char* new_nick);
 typedef void (*on_user_update_error_t)(struct plugin_handle*, struct plugin_user*, const char* reason);
+typedef void (*on_user_chat_msg_t)(struct plugin_handle*, struct plugin_user*, const char* message, int flags);
 
 typedef plugin_st (*on_change_nick_t)(struct plugin_handle*, struct plugin_user*, const char* new_nick);
 
@@ -112,12 +113,13 @@ typedef plugin_st (*auth_delete_user_t)(struct plugin_handle*, struct auth_info*
 struct plugin_funcs
 {
 	// Log events for users
-	on_user_connect_t       on_user_connect;     /* A user has connected to the hub */
-	on_user_login_t         on_user_login;       /* A user has successfully logged in to the hub */
-	on_user_login_error_t   on_user_login_error; /* A user has failed to log in to the hub */
-	on_user_logout_t        on_user_logout;      /* A user has logged out of the hub (was previously logged in) */
-	on_user_nick_change_t   on_user_nick_change; /* A user has changed nickname */
-	on_user_update_error_t  on_user_update_error;/* A user has failed to update - nickname, etc. */
+        on_user_connect_t       on_user_connect;     /* A user has connected to the hub */
+        on_user_login_t         on_user_login;       /* A user has successfully logged in to the hub */
+        on_user_login_error_t   on_user_login_error; /* A user has failed to log in to the hub */
+        on_user_logout_t        on_user_logout;      /* A user has logged out of the hub (was previously logged in) */
+        on_user_nick_change_t   on_user_nick_change; /* A user has changed nickname */
+        on_user_update_error_t  on_user_update_error;/* A user has failed to update - nickname, etc. */
+        on_user_chat_msg_t      on_user_chat_message;/* A user has sent a public chat message */
 
 	// Activity events (can be intercepted and refused by a plugin)
 	on_chat_msg_t           on_chat_msg;         /* A public chat message is about to be sent (can be intercepted) */

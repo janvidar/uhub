@@ -63,15 +63,10 @@
 	}); \
 	return status
 
-#define PLUGIN_INVOKE_1(HUB, FUNCNAME, ARG1) \
-	INVOKE(HUB, FUNCNAME, { \
-		plugin->funcs.FUNCNAME(plugin, ARG1); \
-	})
+#define PLUGIN_INVOKE_1(HUB, FUNCNAME, ARG1) INVOKE(HUB, FUNCNAME, { plugin->funcs.FUNCNAME(plugin, ARG1); })
+#define PLUGIN_INVOKE_2(HUB, FUNCNAME, ARG1, ARG2) INVOKE(HUB, FUNCNAME, { plugin->funcs.FUNCNAME(plugin, ARG1, ARG2); })
+#define PLUGIN_INVOKE_3(HUB, FUNCNAME, ARG1, ARG2, ARG3) INVOKE(HUB, FUNCNAME, { plugin->funcs.FUNCNAME(plugin, ARG1, ARG2, ARG3); })
 
-#define PLUGIN_INVOKE_2(HUB, FUNCNAME, ARG1, ARG2) \
-	INVOKE(HUB, FUNCNAME, { \
-		plugin->funcs.FUNCNAME(plugin, ARG1, ARG2); \
-	})
 
 static void convert_user_type(struct plugin_user* puser, struct hub_user* user)
 {
@@ -138,7 +133,14 @@ void plugin_log_user_update_error(struct hub_info* hub, struct hub_user* who, co
 	struct plugin_user user;
 	convert_user_type(&user, who);
 	PLUGIN_INVOKE_2(hub, on_user_update_error, &user, reason);
-} 
+}
+
+void plugin_log_chat_message(struct hub_info* hub, struct hub_user* who, const char* message, int flags)
+{
+	struct plugin_user user;
+	convert_user_type(&user, who);
+	PLUGIN_INVOKE_3(hub, on_user_chat_message, &user, message, flags);
+}
 
 plugin_st plugin_handle_chat_message(struct hub_info* hub, struct hub_user* from, const char* message, int flags)
 {
