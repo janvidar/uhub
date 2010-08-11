@@ -90,14 +90,12 @@ plugin_st plugin_check_ip_late(struct hub_info* hub, struct ip_addr_encap* addr)
 
 void plugin_log_connection_accepted(struct hub_info* hub, struct ip_addr_encap* ipaddr)
 {
-	const char* addr = ip_convert_to_string(ipaddr);
-	LOG_TRACE("Got connection from %s", addr);
+	PLUGIN_INVOKE_1(hub, on_connection_accepted, ipaddr);
 }
 
 void plugin_log_connection_denied(struct hub_info* hub, struct ip_addr_encap* ipaddr)
 {
-	const char* addr = ip_convert_to_string(ipaddr);
-	LOG_INFO("Denied connection from %s", addr);
+	PLUGIN_INVOKE_1(hub, on_connection_refused, ipaddr);
 }
 
 void plugin_log_user_login_success(struct hub_info* hub, struct hub_user* who)

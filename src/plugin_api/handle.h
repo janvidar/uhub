@@ -90,7 +90,9 @@ typedef plugin_st (*on_search_t)(struct plugin_handle*, struct plugin_user* from
 typedef plugin_st (*on_p2p_connect_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to);
 typedef plugin_st (*on_p2p_revconnect_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to);
 
-typedef void (*on_user_connect_t)(struct plugin_handle*, struct ip_addr_encap*);
+typedef void (*on_connection_accepted_t)(struct plugin_handle*, struct ip_addr_encap*);
+typedef void (*on_connection_refused_t)(struct plugin_handle*, struct ip_addr_encap*);
+
 typedef void (*on_user_login_t)(struct plugin_handle*, struct plugin_user*);
 typedef void (*on_user_login_error_t)(struct plugin_handle*, struct plugin_user*, const char* reason);
 typedef void (*on_user_logout_t)(struct plugin_handle*, struct plugin_user*, const char* reason);
@@ -112,16 +114,19 @@ typedef plugin_st (*auth_delete_user_t)(struct plugin_handle*, struct auth_info*
 
 struct plugin_funcs
 {
-	// Log events for users
-        on_user_connect_t       on_user_connect;     /* A user has connected to the hub */
-        on_user_login_t         on_user_login;       /* A user has successfully logged in to the hub */
-        on_user_login_error_t   on_user_login_error; /* A user has failed to log in to the hub */
-        on_user_logout_t        on_user_logout;      /* A user has logged out of the hub (was previously logged in) */
-        on_user_nick_change_t   on_user_nick_change; /* A user has changed nickname */
-        on_user_update_error_t  on_user_update_error;/* A user has failed to update - nickname, etc. */
-        on_user_chat_msg_t      on_user_chat_message;/* A user has sent a public chat message */
+	// Log events for connections
+	on_connection_accepted_t on_connection_accepted; /* Someone successfully connected to the hub */
+	on_connection_refused_t on_connection_refused;   /* Someone was refused connection to the hub */
 
-	// Activity events (can be intercepted and refused by a plugin)
+	// Log events for users
+	on_user_login_t         on_user_login;       /* A user has successfully logged in to the hub */
+	on_user_login_error_t   on_user_login_error; /* A user has failed to log in to the hub */
+	on_user_logout_t        on_user_logout;      /* A user has logged out of the hub (was previously logged in) */
+	on_user_nick_change_t   on_user_nick_change; /* A user has changed nickname */
+	on_user_update_error_t  on_user_update_error;/* A user has failed to update - nickname, etc. */
+	on_user_chat_msg_t      on_user_chat_message;/* A user has sent a public chat message */
+
+	// Activity events (can be intercepted and refused/accepted by a plugin)
 	on_chat_msg_t           on_chat_msg;         /* A public chat message is about to be sent (can be intercepted) */
 	on_private_msg_t        on_private_msg;      /* A public chat message is about to be sent (can be intercepted) */
 	on_search_t             on_search;           /* A search is about to be sent (can be intercepted) */
