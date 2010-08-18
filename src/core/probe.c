@@ -71,9 +71,8 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 				probe_destroy(probe);
 				return;
 			}
-
 #ifdef SSL_SUPPORT
-			if (bytes >= 11 &&
+			else if (bytes >= 11 &&
 				probe_recvbuf[0] == 22 && 
 				probe_recvbuf[1] == 3 && /* protocol major version */
 				probe_recvbuf[5] == 1 && /* message type */

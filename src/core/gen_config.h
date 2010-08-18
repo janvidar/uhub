@@ -42,6 +42,7 @@ struct hub_config
 	int   flood_ctl_extras;                /*<<< Max extra messages allowed in time interval (default: 0) */
 	int   tls_enable;                      /*<<< Enable SSL/TLS support (default: 0) */
 	int   tls_require;                     /*<<< If SSL/TLS enabled, should it be required (default: 0) (default: 0) */
+	char* tls_require_redirect_addr;       /*<<< A redirect address in case a client connects using "adc://" when "adcs://" is required. (default: ) */
 	char* tls_certificate;                 /*<<< Certificate file (default: ) */
 	char* tls_private_key;                 /*<<< Private key file (default: ) */
 	char* file_motd;                       /*<<< File containing the 'message of the day (default: ) */
