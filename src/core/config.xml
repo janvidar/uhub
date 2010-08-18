@@ -417,6 +417,17 @@
 		<since>0.3.0</since>
 	</option>
 
+	<option name="tls_require_redirect_addr" type="string" default="">
+		<check regexp="(adc|adcs|dchub)://.*" />
+		<short>A redirect address in case a client connects using "adc://" when "adcs://" is required.</short>
+		<description><![CDATA[
+		This is the redirect address used when the hub wants to redirect a client for not using ADCS.
+		For instance a hub at adc://adc.example.com might redirect to adcs://adc.example.com
+		]]></description>
+		<since>0.3.3</since>
+	</option>
+
+
 	<option name="tls_certificate" type="file" default="">
 		<short>Certificate file</short>
 		<description><![CDATA[

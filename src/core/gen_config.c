@@ -42,6 +42,7 @@ void config_defaults(struct hub_config* config)
 	config->flood_ctl_extras = 0;
 	config->tls_enable = 0;
 	config->tls_require = 0;
+	config->tls_require_redirect_addr = hub_strdup("");
 	config->tls_certificate = hub_strdup("");
 	config->tls_private_key = hub_strdup("");
 	config->file_motd = hub_strdup("");
@@ -535,6 +536,17 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		return 0;
 	}
 
+	if (!strcmp(key, "tls_require_redirect_addr"))
+	{
+		if (!apply_string(key, data, &config->tls_require_redirect_addr, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			LOG_ERROR("\"tls_require_redirect_addr\" (string), default=\"\"");
+			return -1;
+		}
+		return 0;
+	}
+
 	if (!strcmp(key, "tls_certificate"))
 	{
 		if (!apply_string(key, data, &config->tls_certificate, (char*) ""))
@@ -1003,6 +1015,8 @@ void free_config(struct hub_config* config)
 
 	hub_free(config->redirect_addr);
 
+	hub_free(config->tls_require_redirect_addr);
+
 	hub_free(config->tls_certificate);
 
 	hub_free(config->tls_private_key);
@@ -1208,6 +1222,9 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 
 	if (!ignore_defaults || config->tls_require != 0)
 		fprintf(stdout, "tls_require = %s\n", config->tls_require ? "yes" : "no");
+
+	if (!ignore_defaults || strcmp(config->tls_require_redirect_addr, "") != 0)
+		fprintf(stdout, "tls_require_redirect_addr = \"%s\"\n", config->tls_require_redirect_addr);
 
 	if (!ignore_defaults || strcmp(config->tls_certificate, "") != 0)
 		fprintf(stdout, "tls_certificate = \"%s\"\n", config->tls_certificate);

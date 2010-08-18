@@ -49,7 +49,17 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 #ifdef SSL_SUPPORT
 				if (probe->hub->config->tls_enable && probe->hub->config->tls_require)
 				{
-					LOG_TRACE("Not TLS connection - closing connection.");
+					if (*probe->hub->config->tls_require_redirect_addr)
+					{
+						char buf[512];
+						ssize_t len = snprintf(buf, sizeof(buf), "ISUP " ADC_PROTO_SUPPORT "\nISID AAAB\nIINF NIRedirecting...\nIQUI AAAB RD%s\n", probe->hub->config->tls_require_redirect_addr);
+						net_con_send(con, buf, (size_t) len);
+						LOG_TRACE("Not TLS connection - Redirecting to %s.", probe->hub->config->tls_require_redirect_addr);
+					}
+					else
+					{
+						LOG_TRACE("Not TLS connection - closing connection.");
+					}
 				}
 				else
 #endif
@@ -60,9 +70,8 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 				probe_destroy(probe);
 				return;
 			}
-
 #ifdef SSL_SUPPORT
-			if (bytes >= 11 &&
+			else if (bytes >= 11 &&
 				probe_recvbuf[0] == 22 && 
 				probe_recvbuf[1] == 3 && /* protocol major version */
 				probe_recvbuf[5] == 1 && /* message type */
