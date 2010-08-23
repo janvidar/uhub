@@ -251,6 +251,9 @@ void* net_con_get_ptr(struct net_connection* con)
 
 void net_con_destroy(struct net_connection* con)
 {
+#ifdef SSL_SUPPORT
+	SSL_free(con->ssl);
+#endif
 	hub_free(con);
 }
 
