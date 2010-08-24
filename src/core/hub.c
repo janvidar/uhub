@@ -824,7 +824,6 @@ void hub_shutdown_service(struct hub_info* hub)
 
 	event_queue_shutdown(hub->queue);
 	net_con_close(hub->server);
-	hub_free(hub->server);
 	server_alt_port_stop(hub);
 	uman_shutdown(hub);
 	hub->status = hub_status_stopped;
