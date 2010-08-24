@@ -1,3 +1,13 @@
+0.3.3:
+- Fix SSL/TLS related memory leak.
+- Fix 100% CPU issue with SSL connections.
+- Added option to redirect from adc:// to adcs:// if tls is required.
+- Added more informative error messages for the configuration file parser.
+- Made sure logs can be rotated by sending a SIGHUP to the hub
+- Fix bug #139: Unable to use TLS - due to not handling quotes around configuration strings.
+- Fix bug #136 - !broadcast does not report status back to to sender.
+
+
 0.3.2:
 - Fixed bugs in the kqueue network backend (OSX/BSD)
 - Rewrote the configuration backend code.
