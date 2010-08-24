@@ -71,6 +71,12 @@ void user_destroy(struct hub_user* user)
 	hub_recvq_destroy(user->recv_queue);
 	hub_sendq_destroy(user->send_queue);
 
+	if (user->connection)
+	{
+		LOG_TRACE("user_destory() -> net_con_close(%p)", user->connection);
+		net_con_close(user->connection);
+	}
+
 	adc_msg_free(user->info);
 	user_clear_feature_cast_support(user);
 	hub_free(user);

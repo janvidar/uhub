@@ -60,6 +60,7 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 					{
 						LOG_TRACE("Not TLS connection - closing connection.");
 					}
+					probe_destroy(probe);
 				}
 				else
 #endif
@@ -116,6 +117,8 @@ struct hub_probe* probe_create(struct hub_info* hub, int sd, struct ip_addr_enca
 	if (probe == NULL)
 		return NULL; /* OOM */
 
+	LOG_TRACE("probe_create(): %p", probe);
+
 	probe->hub = hub;
 	probe->connection = net_con_create();
 	net_con_initialize(probe->connection, sd, probe_net_event, probe, NET_EVENT_READ);
@@ -127,6 +130,7 @@ struct hub_probe* probe_create(struct hub_info* hub, int sd, struct ip_addr_enca
 
 void probe_destroy(struct hub_probe* probe)
 {
+	LOG_TRACE("probe_destroy(): %p (connection=%p)", probe, probe->connection);
 	if (probe->connection)
 	{
 		net_con_close(probe->connection);

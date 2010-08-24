@@ -60,7 +60,6 @@ int net_initialize()
 		LOG_TRACE("Initializing OpenSSL...");
 		SSL_library_init();
 		SSL_load_error_strings();
-		OpenSSL_add_all_algorithms();
 #endif /*  SSL_SUPPORT */
 
 		net_initialized = 1;
@@ -100,7 +99,9 @@ int net_destroy()
 		net_backend_shutdown();
 		
 #ifdef SSL_SUPPORT
-		/* FIXME: Shutdown OpenSSL here. */
+		ERR_free_strings();
+		EVP_cleanup();
+		CRYPTO_cleanup_all_ex_data();
 #endif
 
 #ifdef WINSOCK
