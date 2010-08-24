@@ -61,7 +61,6 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 					{
 						LOG_TRACE("Not TLS connection - closing connection.");
 					}
-					probe_destroy(probe);
 				}
 				else
 #endif
