@@ -31,17 +31,7 @@
 
 static int apply_boolean(const char* key, const char* data, int* target)
 {
-	if      (strlen(data) == 1 && (data[0] == '1')) *target = 1;
-	else if (strlen(data) == 1 && (data[0] == '0')) *target = 0;
-	else if (strncasecmp(data, "true",  4) == 0) *target = 1;
-	else if (strncasecmp(data, "false", 5) == 0) *target = 0;
-	else if (strncasecmp(data, "yes",   3) == 0) *target = 1;
-	else if (strncasecmp(data, "no",    2) == 0) *target = 0;
-	else if (strncasecmp(data, "on",    2) == 0) *target = 1;
-	else if (strncasecmp(data, "off",   3) == 0) *target = 0;
-	else
-		return 0;
-	return 1;
+	return string_to_boolean(data, target);
 }
 
 static int apply_string(const char* key, const char* data, char** target, char* regexp)
