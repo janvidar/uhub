@@ -24,7 +24,7 @@
 #include "util/credentials.h"
 #include "util/ipcalc.h"
 
-#define PLUGIN_API_VERSION 0
+#define PLUGIN_API_VERSION 1
 
 #ifndef MAX_NICK_LEN
 #define MAX_NICK_LEN 64
@@ -157,6 +157,18 @@ struct plugin_handle
 	size_t plugin_funcs_size;       /* Size of the plugin funcs */
 	struct plugin_funcs funcs;
 };
+
+#define PLUGIN_INITIALIZE(PTR, NAME, VERSION, DESCRIPTION) \
+	do { \
+		PTR->name = NAME; \
+		PTR->version = VERSION; \
+		PTR->description = DESCRIPTION; \
+		PTR->ptr = NULL; \
+		PTR->error_msg = NULL; \
+		PTR->plugin_api_version = PLUGIN_API_VERSION; \
+		PTR->plugin_funcs_size = sizeof(struct plugin_funcs); \
+		memset(&PTR->funcs, 0, sizeof(struct plugin_funcs)); \
+	} while (0)
 
 /**
  * Implemented by the plugin.

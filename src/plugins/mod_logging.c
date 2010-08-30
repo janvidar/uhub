@@ -94,13 +94,7 @@ static void log_change_nick(struct plugin_handle* plugin, struct plugin_user* us
 
 int plugin_register(struct plugin_handle* plugin, const char* config)
 {
-	plugin->name = "Logging plugin";
-	plugin->version = "1.0";
-	plugin->description = "Logs users entering and leaving the hub.";
-	plugin->ptr = NULL;
-	plugin->plugin_api_version = PLUGIN_API_VERSION;
-	plugin->plugin_funcs_size = sizeof(struct plugin_funcs);
-	memset(&plugin->funcs, 0, sizeof(struct plugin_funcs));
+	PLUGIN_INITIALIZE(plugin, "Logging plugin", "1.0", "Logs users entering and leaving the hub.");
 
 	plugin->funcs.on_user_login = log_user_login;
 	plugin->funcs.on_user_login_error = log_user_login_error;

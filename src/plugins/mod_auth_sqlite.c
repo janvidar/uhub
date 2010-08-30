@@ -174,12 +174,7 @@ static plugin_st delete_user(struct plugin_handle* plugin, struct auth_info* use
 
 int plugin_register(struct plugin_handle* plugin, const char* config)
 {
-	plugin->name = "SQLite authentication plugin";
-	plugin->version = "0.1";
-	plugin->description = "Authenticate users based on a SQLite database.";
-	plugin->plugin_api_version = PLUGIN_API_VERSION;
-	plugin->plugin_funcs_size = sizeof(struct plugin_funcs);
-	memset(&plugin->funcs, 0, sizeof(struct plugin_funcs));
+	PLUGIN_INITIALIZE(plugin, "SQLite authentication plugin", "0.1", "Authenticate users based on a SQLite database.");
 
 	// Authentication actions.
 	plugin->funcs.auth_get_user = get_user;
