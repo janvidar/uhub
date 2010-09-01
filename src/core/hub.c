@@ -662,6 +662,7 @@ static int load_ssl_certificates(struct hub_info* hub, struct hub_config* config
 
 		/* Disable SSLv2 */
 		SSL_CTX_set_options(hub->ssl_ctx, SSL_OP_NO_SSLv2);
+		SSL_CTX_set_quiet_shutdown(hub->ssl_ctx, 1);
 
 		if (SSL_CTX_use_certificate_file(hub->ssl_ctx, config->tls_certificate, SSL_FILETYPE_PEM) < 0)
 		{
