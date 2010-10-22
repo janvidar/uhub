@@ -154,3 +154,77 @@ char* cfg_token_get_next(struct cfg_tokens* tokens)
 {
 	return list_get_next(tokens->list);
 }
+
+struct cfg_settings
+{
+	char* key;
+	char* value;
+};
+
+struct cfg_settings* cfg_settings_split(const char* line)
+{
+	struct cfg_settings* s = NULL;
+	struct cfg_tokens* tok = NULL;
+	char* pos = NULL;
+
+	if (   !line
+		|| !*line
+		|| ((pos = (char*) strchr(line, '=')) == NULL)
+		|| ((s = hub_malloc_zero(sizeof(struct cfg_settings))) == NULL)
+		|| ((tok = cfg_tokenize(line)) == NULL)
+		|| (cfg_token_count(tok) < 2)
+		|| (cfg_token_count(tok) > 3)
+		|| (cfg_token_count(tok) == 3 && strcmp(cfg_token_get(tok, 1), "="))
+		)
+	{
+		cfg_tokens_free(tok);
+		cfg_settings_free(s);
+		return NULL;
+	}
+
+	if (cfg_token_count(tok) == 2)
+	{
+		char* key = cfg_token_get_first(tok);
+		pos = strchr(key, '=');
+		pos[0] = 0;
+		key = strip_white_space(key);
+
+		if (!*key)
+		{
+			cfg_tokens_free(tok);
+			cfg_settings_free(s);
+			return NULL;
+		}
+
+		s->key = strdup(key);
+		s->value = strdup(strip_white_space(cfg_token_get_next(tok)));
+	}
+	else
+	{
+		s->key = strdup(strip_white_space(cfg_token_get(tok, 0)));
+		s->value = strdup(strip_white_space(cfg_token_get(tok, 2)));
+	}
+	cfg_tokens_free(tok);
+	return s;
+}
+
+const char* cfg_settings_get_key(struct cfg_settings* s)
+{
+	return s->key;
+}
+
+const char* cfg_settings_get_value(struct cfg_settings* s)
+{
+	return s->value;
+}
+
+void cfg_settings_free(struct cfg_settings* s)
+{
+	if (s)
+	{
+		hub_free(s->key);
+		hub_free(s->value);
+		hub_free(s);
+	}
+}
+

@@ -37,31 +37,45 @@ static struct sql_data* parse_config(const char* line, struct plugin_handle* plu
 
 	while (token)
 	{
-		char* split = strchr(token, '=');
-		size_t len = strlen(token);
-		size_t key = split ? (split - token) : len;
-		if (key == 4 && strncmp(token, "file", 4) == 0 && data->db == 0)
-		{
-			if (sqlite3_open(split + 1, &data->db))
-			{
-				cfg_tokens_free(tokens);
-				hub_free(data);
-				set_error_message(plugin, "Unable to open database file");
-				return 0;
-			}
-		}
-		else if (key == 9 && strncmp(token, "exclusive", 9) == 0)
-		{
-			if (!string_to_boolean(split + 1, &data->exclusive))
-				data->exclusive = 1;
-		}
-		else
+		struct cfg_settings* setting = cfg_settings_split(token);
+
+		if (!setting)
 		{
 			set_error_message(plugin, "Unable to parse startup parameters");
 			cfg_tokens_free(tokens);
 			hub_free(data);
 			return 0;
 		}
+
+		if (strcmp(cfg_settings_get_key(setting), "file") == 0)
+		{
+			if (!data->db)
+			{
+				if (sqlite3_open(cfg_settings_get_value(setting), &data->db))
+				{
+					cfg_tokens_free(tokens);
+					cfg_settings_free(setting);
+					hub_free(data);
+					set_error_message(plugin, "Unable to open database file");
+					return 0;
+				}
+			}
+		}
+		else if (strcmp(cfg_settings_get_key(setting), "exclusive") == 0)
+		{
+			if (!string_to_boolean(cfg_settings_get_value(setting), &data->exclusive))
+				data->exclusive = 1;
+		}
+		else
+		{
+			set_error_message(plugin, "Unknown startup parameters given");
+			cfg_tokens_free(tokens);
+			cfg_settings_free(setting);
+			hub_free(data);
+			return 0;
+		}
+
+		cfg_settings_free(setting);
 		token = cfg_token_get_next(tokens);
 	}
 	cfg_tokens_free(tokens);

@@ -33,5 +33,12 @@ char* cfg_token_get(struct cfg_tokens*, size_t offset);
 char* cfg_token_get_first(struct cfg_tokens*);
 char* cfg_token_get_next(struct cfg_tokens*);
 
+
+struct cfg_settings;
+struct cfg_settings* cfg_settings_split(const char* line);
+const char* cfg_settings_get_key(struct cfg_settings*);
+const char* cfg_settings_get_value(struct cfg_settings*);
+void cfg_settings_free(struct cfg_settings*);
+
 #endif /* HAVE_UHUB_CONFIG_TOKEN_H */
 
