@@ -82,7 +82,8 @@ int main(int argc, char** argv)
 
 	while (running)
 	{
-		net_backend_process();
+		if (!net_backend_process())
+		  break;
 	}
 
 	ADC_client_destroy(&client);

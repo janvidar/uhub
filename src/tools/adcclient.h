@@ -105,6 +105,7 @@ struct ADC_client
 	struct adc_message* info;
 	char recvbuf[ADC_BUFSIZE];
 	char sendbuf[ADC_BUFSIZE];
+	int ssl;
 	adc_client_cb callback;
 	size_t s_offset;
 	size_t r_offset;

@@ -76,6 +76,12 @@ extern ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len);
 extern ssize_t net_con_peek(struct net_connection* con, void* buf, size_t len);
 
 /**
+ * Returns 1 if connected, 0 if net_con_connect needs to be called again,
+ * and -1 if an error occured.
+ */
+extern int net_con_connect(struct net_connection* con, struct sockaddr* addr, size_t addr_len);
+
+/**
  * Set timeout for connetion.
  *
  * @param seconds the number of seconds into the future.

@@ -376,13 +376,13 @@ int ADC_client_connect(struct ADC_client* client, const char* address)
 	
 		client->callback(client, ADC_CLIENT_CONNECTING, 0);
 	}
-
-	int ret = net_connect(net_con_get_sd(client->con), (struct sockaddr*) &client->addr, sizeof(struct sockaddr_in));
-	if (ret == 0 || (ret == -1 && net_error() == EISCONN))
+    
+	int ret = net_con_connect(client->con, (struct sockaddr*) &client->addr, sizeof(struct sockaddr_in));
+	if (ret == 1)
 	{
 		ADC_client_on_connected(client);
 	}
-	else if (ret == -1 && (net_error() == EALREADY || net_error() == EINPROGRESS || net_error() == EWOULDBLOCK || net_error() == EINTR))
+	else if (ret == 0)
 	{
 		if (client->state != ps_conn)
 		{
@@ -400,10 +400,17 @@ int ADC_client_connect(struct ADC_client* client, const char* address)
 
 static void ADC_client_on_connected(struct ADC_client* client)
 {
-	net_con_update(client->con, NET_EVENT_READ);
-	client->callback(client, ADC_CLIENT_CONNECTED, 0);
-	ADC_client_send(client, ADC_HANDSHAKE);
-	ADC_client_set_state(client, ps_protocol);
+	if (client->ssl)
+	{
+		net_con_ssl_handshake(client->con, net_con_ssl_mode_client, NULL);
+	}
+	else
+	{
+		net_con_update(client->con, NET_EVENT_READ);
+		client->callback(client, ADC_CLIENT_CONNECTED, 0);
+		ADC_client_send(client, ADC_HANDSHAKE);
+		ADC_client_set_state(client, ps_protocol);
+	}
 }
 
 static void ADC_client_on_disconnected(struct ADC_client* client)
@@ -432,8 +439,8 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 {
 	char* split;
 	int ssl = 0;
-	struct hostent* dns;
-	struct in_addr* addr;
+	struct hostent* dns = 0;
+	struct in_addr* addr = 0;
 
 	if (!arg)
 		return 0;
@@ -445,12 +452,11 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 		return 0;
 
 	/* Check for ADC or ADCS */
-	if (!strncmp(arg, "adc://", 6))
-		ssl = 0;
-	else if (!strncmp(arg, "adcs://", 7))
-		ssl = 1;
-	else
-		return 0;
+	if (!strncmp(arg, "adc://", 6))       ssl = 0;
+	else if (!strncmp(arg, "adcs://", 7)) ssl = 1;
+	else return 0;
+
+	client->ssl = ssl;
 
 	/* Split hostname and port (if possible) */
 	split = strrchr(client->hub_address + 6 + ssl, ':');
@@ -467,9 +473,7 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 	/* Resolve IP address (FIXME: blocking call) */
 	dns = gethostbyname(client->hub_address + 6 + ssl);
 	if (dns)
-	{
 		addr = (struct in_addr*) dns->h_addr_list[0];
-	}
 
 	// Initialize the sockaddr struct.
 	memset(&client->addr, 0, sizeof(client->addr));

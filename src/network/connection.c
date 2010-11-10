@@ -138,6 +138,23 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode 
 #endif /* SSL_SUPPORT */
 
 
+int net_con_connect(struct net_connection* con, struct sockaddr* addr, size_t addr_len)
+{
+	int ret = net_connect(con->sd, (struct sockaddr*) addr, addr_len);
+	if (ret == 0 || (ret == -1 && net_error() == EISCONN))
+	{
+		return 1;
+	}
+	else if (ret == -1 && (net_error() == EALREADY || net_error() == EINPROGRESS || net_error() == EWOULDBLOCK || net_error() == EINTR))
+	{
+		return 0;
+	}
+	else
+	{
+		return -1;
+	}
+}
+
 ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 {
 	int ret;
@@ -307,15 +324,18 @@ void net_con_callback(struct net_connection* con, int events)
 
 			case tls_st_connected:
 				LOG_PROTO("tls_st_connected, events=%s%s, ssl_flags=%s%s", (events & NET_EVENT_READ ? "R" : ""), (events & NET_EVENT_WRITE ? "W" : ""), con->flags & NET_WANT_SSL_READ ? "R" : "", con->flags & NET_WANT_SSL_WRITE ? "W" : "");
-				if (events & NET_EVENT_WRITE && con->flags & NET_WANT_SSL_READ)
+
+				// continue a SSL_read() that wants to write.
+				if (events & NET_EVENT_WRITE && con->flags & NET_WANT_SSL_WRITE)
 				{
-					con->callback(con, events & NET_EVENT_READ, con->ptr);
+					con->callback(con, NET_EVENT_READ, con->ptr);
 					return;
 				}
 
+				// continue a SSL_write() that wants to read something.
 				if (events & NET_EVENT_READ && con->flags & NET_WANT_SSL_WRITE)
 				{
-					con->callback(con, events & NET_EVENT_READ, con->ptr);
+					con->callback(con, NET_EVENT_WRITE, con->ptr);
 					return;
 				}
 
