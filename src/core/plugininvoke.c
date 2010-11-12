@@ -74,14 +74,18 @@
 #define PLUGIN_INVOKE_3(HUB, FUNCNAME, ARG1, ARG2, ARG3) INVOKE(HUB, FUNCNAME, { plugin->funcs.FUNCNAME(plugin, ARG1, ARG2, ARG3); })
 
 
-static void convert_user_type(struct plugin_user* puser, struct hub_user* user)
+static struct plugin_user* convert_user_type(struct hub_user* user)
 {
+	struct plugin_user* puser = (struct plugin_user*) user;
+	return puser;
+#if 0
 	puser->sid  = user->id.sid;
 	puser->nick = user->id.nick;
 	puser->cid  = user->id.cid;
 	puser->user_agent = user->user_agent;
 	puser->addr = user->id.addr;
 	puser->credentials = user->credentials;
+#endif
 }
 
 plugin_st plugin_check_ip_early(struct hub_info* hub, struct ip_addr_encap* addr)
@@ -106,85 +110,71 @@ void plugin_log_connection_denied(struct hub_info* hub, struct ip_addr_encap* ip
 
 void plugin_log_user_login_success(struct hub_info* hub, struct hub_user* who)
 {
-	struct plugin_user user;
-	convert_user_type(&user, who);
-	PLUGIN_INVOKE_1(hub, on_user_login, &user);
+	struct plugin_user* user = convert_user_type(who);
+	PLUGIN_INVOKE_1(hub, on_user_login, user);
 }
 
 void plugin_log_user_login_error(struct hub_info* hub, struct hub_user* who, const char* reason)
 {
-	struct plugin_user user;
-	convert_user_type(&user, who);
-	PLUGIN_INVOKE_2(hub, on_user_login_error, &user, reason);
+	struct plugin_user* user = convert_user_type(who);
+	PLUGIN_INVOKE_2(hub, on_user_login_error, user, reason);
 }
 
 void plugin_log_user_logout(struct hub_info* hub, struct hub_user* who, const char* reason)
 {
-	struct plugin_user user;
-	convert_user_type(&user, who);
-	PLUGIN_INVOKE_2(hub, on_user_logout, &user, reason);
+	struct plugin_user* user = convert_user_type(who);
+	PLUGIN_INVOKE_2(hub, on_user_logout, user, reason);
 }
 
 void plugin_log_user_nick_change(struct hub_info* hub, struct hub_user* who, const char* new_nick)
 {
-	struct plugin_user user;
-	convert_user_type(&user, who);
-	PLUGIN_INVOKE_2(hub, on_user_nick_change, &user, new_nick);
+	struct plugin_user* user = convert_user_type(who);
+	PLUGIN_INVOKE_2(hub, on_user_nick_change, user, new_nick);
 }
 
 void plugin_log_user_update_error(struct hub_info* hub, struct hub_user* who, const char* reason)
 {
-	struct plugin_user user;
-	convert_user_type(&user, who);
-	PLUGIN_INVOKE_2(hub, on_user_update_error, &user, reason);
+	struct plugin_user* user = convert_user_type(who);
+	PLUGIN_INVOKE_2(hub, on_user_update_error, user, reason);
 }
 
 void plugin_log_chat_message(struct hub_info* hub, struct hub_user* who, const char* message, int flags)
 {
-	struct plugin_user user;
-	convert_user_type(&user, who);
-	PLUGIN_INVOKE_3(hub, on_user_chat_message, &user, message, flags);
+	struct plugin_user* user = convert_user_type(who);
+	PLUGIN_INVOKE_3(hub, on_user_chat_message, user, message, flags);
 }
 
 plugin_st plugin_handle_chat_message(struct hub_info* hub, struct hub_user* from, const char* message, int flags)
 {
-	struct plugin_user user;
-	convert_user_type(&user, from);
-	PLUGIN_INVOKE_STATUS_2(hub, on_chat_msg, &user, message);
+	struct plugin_user* user = convert_user_type(from);
+	PLUGIN_INVOKE_STATUS_2(hub, on_chat_msg, user, message);
 }
 
 plugin_st plugin_handle_private_message(struct hub_info* hub, struct hub_user* from, struct hub_user* to, const char* message, int flags)
 {
-	struct plugin_user user1;
-	struct plugin_user user2;
-	convert_user_type(&user1, from);
-	convert_user_type(&user2, to);
-	PLUGIN_INVOKE_STATUS_3(hub, on_private_msg, &user1, &user2, message);
+	struct plugin_user* user1 = convert_user_type(from);
+	struct plugin_user* user2 = convert_user_type(to);
+	PLUGIN_INVOKE_STATUS_3(hub, on_private_msg, user1, user2, message);
 }
 
 plugin_st plugin_handle_search(struct hub_info* hub, struct hub_user* from, const char* data)
 {
-	struct plugin_user user;
-	convert_user_type(&user, from);
-	PLUGIN_INVOKE_STATUS_2(hub, on_search, &user, data);
+	struct plugin_user* user = convert_user_type(from);
+	PLUGIN_INVOKE_STATUS_2(hub, on_search, user, data);
 }
 
 plugin_st plugin_handle_connect(struct hub_info* hub, struct hub_user* from, struct hub_user* to)
 {
-	struct plugin_user user1;
-	struct plugin_user user2;
-	convert_user_type(&user1, from);
-	convert_user_type(&user2, to);
-	PLUGIN_INVOKE_STATUS_2(hub, on_p2p_connect, &user1, &user2);
+	struct plugin_user* user1 = convert_user_type(from);
+	struct plugin_user* user2 = convert_user_type(to);
+	PLUGIN_INVOKE_STATUS_2(hub, on_p2p_connect, user1, user2);
 }
 
 plugin_st plugin_handle_revconnect(struct hub_info* hub, struct hub_user* from, struct hub_user* to)
 {
-	struct plugin_user user1;
-	struct plugin_user user2;
-	convert_user_type(&user1, from);
-	convert_user_type(&user2, to);
-	PLUGIN_INVOKE_STATUS_2(hub, on_p2p_revconnect, &user1, &user2);
+	struct plugin_user* user1 = convert_user_type(from);
+	struct plugin_user* user2 = convert_user_type(to);
+	PLUGIN_INVOKE_STATUS_2(hub, on_p2p_revconnect, user1, user2);
 }
 
 plugin_st plugin_auth_get_user(struct hub_info* hub, const char* nickname, struct auth_info* info)
