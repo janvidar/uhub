@@ -426,11 +426,12 @@ static int command_broadcast(struct hub_info* hub, struct hub_user* user, struct
 	char from_sid[5];
 	char buffer[128];
 	size_t recipients = 0;
+	struct hub_user* target;
 
 	memcpy(from_sid, sid_to_string(user->id.sid), sizeof(from_sid));
 	memcpy(pm_flag + 2, from_sid, sizeof(from_sid));
 
-	struct hub_user* target = (struct hub_user*) list_get_first(hub->users->list);
+	target = (struct hub_user*) list_get_first(hub->users->list);
 	while (target)
 	{
 		if (target != user)

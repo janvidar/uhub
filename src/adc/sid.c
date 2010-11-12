@@ -119,6 +119,7 @@ void sid_pool_destroy(struct sid_pool* pool)
 
 sid_t sid_alloc(struct sid_pool* pool, struct hub_user* user)
 {
+	sid_t n;
 	if (pool->count >= (pool->max - pool->min))
 	{
 #ifdef DEBUG_SID
@@ -127,7 +128,7 @@ sid_t sid_alloc(struct sid_pool* pool, struct hub_user* user)
 		return 0;
 	}
 
-	sid_t n = (++pool->count);
+	n = (++pool->count);
 	for (; (pool->map[n % pool->max]); n++) ;
 
 #ifdef DEBUG_SID
