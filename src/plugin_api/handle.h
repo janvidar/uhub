@@ -20,69 +20,14 @@
 #ifndef HAVE_UHUB_PLUGIN_HANDLE_H
 #define HAVE_UHUB_PLUGIN_HANDLE_H
 
+/**
+ * This file describes the interface a uhub uses to interact with plugins.
+ */
+
 #include "system.h"
 #include "util/credentials.h"
 #include "util/ipcalc.h"
-
-#define PLUGIN_API_VERSION 1
-
-#ifndef MAX_NICK_LEN
-#define MAX_NICK_LEN 64
-#endif
-
-#ifndef MAX_PASS_LEN
-#define MAX_PASS_LEN 64
-#endif
-
-#ifndef MAX_CID_LEN
-#define MAX_CID_LEN 39
-#endif
-
-
-struct plugin_handle;
-
-struct plugin_user
-{
-	unsigned int sid;
-	const char* nick;
-	const char* cid;
-	const char* user_agent;
-	struct ip_addr_encap addr;
-	enum auth_credentials credentials;
-};
-
-enum plugin_status
-{
-	st_default = 0,    /* Use default */
-	st_allow = 1,      /* Allow action */
-	st_deny = -1,      /* Deny action */
-};
-
-typedef enum plugin_status plugin_st;
-
-struct auth_info
-{
-	char nickname[MAX_NICK_LEN+1];
-	char password[MAX_PASS_LEN+1];
-	enum auth_credentials credentials;
-};
-
-enum ban_flags
-{
-	ban_nickname = 0x01, /* Nickname is banned */
-	ban_cid      = 0x02, /* CID is banned */
-	ban_ip       = 0x04, /* IP address (range) is banned */
-};
-
-struct ban_info
-{
-	unsigned int flags;                 /* See enum ban_flags. */
-	char nickname[MAX_NICK_LEN+1];      /* Nickname - only defined if (ban_nickname & flags). */
-	char cid[MAX_CID_LEN+1];            /* CID - only defined if (ban_cid & flags). */
-	struct ip_addr_encap ip_addr_lo;    /* Low IP address of an IP range */
-	struct ip_addr_encap ip_addr_hi;    /* High IP address of an IP range */
-	time_t expiry;                      /* Time when the ban record expires */
-};
+#include "plugin_api/types.h"
 
 typedef plugin_st (*on_chat_msg_t)(struct plugin_handle*, struct plugin_user* from, const char* message);
 typedef plugin_st (*on_private_msg_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to, const char* message);
@@ -142,7 +87,6 @@ struct plugin_funcs
 	// Login check functions
 	on_check_ip_early_t     login_check_ip_early;
 	on_check_ip_late_t      login_check_ip_late;
-
 };
 
 struct plugin_handle
@@ -157,6 +101,7 @@ struct plugin_handle
 	size_t plugin_funcs_size;       /* Size of the plugin funcs */
 	struct plugin_funcs funcs;
 };
+
 
 #define PLUGIN_INITIALIZE(PTR, NAME, VERSION, DESCRIPTION) \
 	do { \
