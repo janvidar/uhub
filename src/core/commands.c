@@ -133,22 +133,55 @@ const char* command_get_syntax(struct commands_handler* handler)
 {
 	static char args[128];
 	size_t n = 0;
+	int opt = 0;
 	args[0] = 0;
 	if (handler->args)
 	{
 		for (n = 0; n < strlen(handler->args); n++)
 		{
-			if (n > 0) strcat(args, " ");
+			if (n > 0 && !opt) strcat(args, " ");
 			switch (handler->args[n])
 			{
+				case '?': strcat(args, "["); opt = 1; continue;
 				case 'n': strcat(args, "<nick>"); break;
-				case 'c': strcat(args, "<cid>");  break;
+				case 'i': strcat(args, "<cid>");  break;
 				case 'a': strcat(args, "<addr>"); break;
 				case 'm': strcat(args, "<message>"); break;
+				case 'p': strcat(args, "<password>"); break;
+				case 'C': strcat(args, "<credentials>"); break;
+				case 'c': strcat(args, "<command>"); break;
+				case 'N': strcat(args, "<number>"); break;
+			}
+			if (opt)
+			{
+				strcat(args, "]");
+				opt = 0;
 			}
 		}
 	}
 	return args;
+}
+
+static size_t command_count_required_args(struct commands_handler* handler)
+{
+	size_t n = 0;
+	for (n = 0; n < strlen(handler->args); n++)
+	{
+		if (handler->args[n] == '?')
+			break;
+	}
+	return n;
+}
+
+int command_check_args(struct hub_command* cmd, struct commands_handler* handler)
+{
+	if (!handler->args)
+		return 1;
+
+	if (list_size(cmd->args) >= command_count_required_args(handler))
+		return 1;
+
+	return 0;
 }
 
 static int command_arg_mismatch(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd, struct commands_handler* handler)
@@ -187,17 +220,53 @@ static int command_help(struct hub_info* hub, struct hub_user* user, struct hub_
 	size_t n;
 	char msg[MAX_HELP_MSG];
 	msg[0] = 0;
-	strcat(msg, "Available commands:\n");
+	char* command = list_get_first(cmd->args);
 
-	for (n = 0; command_handlers[n].prefix; n++)
+	if (!command)
 	{
-		if (command_handlers[n].cred <= user->credentials)
+		strcat(msg, "Available commands:\n");
+
+		for (n = 0; command_handlers[n].prefix; n++)
 		{
-			strcat(msg, "!");
-			strcat(msg, command_handlers[n].prefix);
-			strcat(msg, " - ");
-			strcat(msg, command_handlers[n].description);
-			strcat(msg, "\n");
+			if (command_handlers[n].cred <= user->credentials)
+			{
+				strcat(msg, "!");
+				strcat(msg, command_handlers[n].prefix);
+				strcat(msg, " - ");
+				strcat(msg, command_handlers[n].description);
+				strcat(msg, "\n");
+			}
+		}
+	}
+	else
+	{
+		int found = 0;
+		for (n = 0; command_handlers[n].prefix; n++)
+		{
+			if (strcmp(command, command_handlers[n].prefix) == 0)
+			{
+				found = 1;
+				if (command_handlers[n].cred <= user->credentials)
+				{
+					strcat(msg, "Usage: !");
+					strcat(msg, command_handlers[n].prefix);
+					strcat(msg, " ");
+					strcat(msg, command_get_syntax(&command_handlers[n]));
+					strcat(msg, "\n");
+
+					strcat(msg, command_handlers[n].description);
+					strcat(msg, "\n");
+				}
+				else
+				{
+					strcat(msg, "This command is not available to you.\n");
+				}
+			}
+		}
+
+		if (!found)
+		{
+			sprintf(msg, "Command \"%s\" not found.\n", command);
 		}
 	}
 	return command_status(hub, user, cmd, msg);
@@ -465,13 +534,31 @@ static int command_history(struct hub_info* hub, struct hub_user* user, struct h
 	int ret = (int) list_size(messages);
 	size_t bufsize;
 	char tmp[128];
+	char* maxlines_str = list_get_first(cmd->args);
+	int maxlines = 0;
+	int lines = 0;
 
 	if (!ret)
 	{
 		return command_status(hub, user, cmd, "No messages.");
 	}
 
-	snprintf(tmp, 128, "*** %s: Found %d message%s:", cmd->prefix, ret, ((ret != 1) ? "s" : ""));
+	if (maxlines_str)
+		maxlines = uhub_atoi(maxlines_str);
+
+	if (maxlines <= 0 || maxlines > ret)
+		maxlines = ret;
+
+	if (maxlines != ret)
+	{
+		lines = ret - maxlines;
+		snprintf(tmp, 128, "*** %s: Displaying %d of %d message%s:", cmd->prefix, maxlines, ret, ((ret != 1) ? "s" : ""));
+	}
+	else
+	{
+		snprintf(tmp, 128, "*** %s: Found %d message%s:", cmd->prefix, ret, ((ret != 1) ? "s" : ""));
+	}
+
 	bufsize = strlen(tmp);
 	message = (char*) list_get_first(messages);
 	while (message)
@@ -493,7 +580,8 @@ static int command_history(struct hub_info* hub, struct hub_user* user, struct h
 	message = (char*) list_get_first(messages);
 	while (message)
 	{
-		strcat(buffer, message);
+		if (--lines < 0)
+			strcat(buffer, message);
 		message = (char*) list_get_next(messages);
 	}
 	strcat(buffer, "\n");
@@ -569,6 +657,117 @@ static int command_log(struct hub_info* hub, struct hub_user* user, struct hub_c
 	return 0;
 }
 
+static int command_register(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
+{
+	struct auth_info data;
+	char tmp[1024];
+	char* password = list_get_first(cmd->args);
+
+	strncpy(data.nickname, user->id.nick, MAX_NICK_LEN);
+	strncpy(data.password, password, MAX_PASS_LEN);
+	data.nickname[MAX_NICK_LEN] = '\0';
+	data.password[MAX_PASS_LEN] = '\0';
+	data.credentials = auth_cred_user;
+
+	if (acl_register_user(hub, &data))
+	{
+		sprintf(tmp, "User \"%s\" registered.", user->id.nick);
+		return command_status(hub, user, cmd, tmp);
+	}
+	else
+	{
+		sprintf(tmp, "Unable to register user \"%s\".", user->id.nick);
+		return command_status(hub, user, cmd, tmp);
+	}
+}
+
+static int command_password(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
+{
+	struct auth_info data;
+	char tmp[1024];
+	char* password = list_get_first(cmd->args);
+
+	strncpy(data.nickname, user->id.nick, MAX_NICK_LEN);
+	strncpy(data.password, password, MAX_PASS_LEN);
+	data.nickname[MAX_NICK_LEN] = '\0';
+	data.password[MAX_PASS_LEN] = '\0';
+	data.credentials = user->credentials;
+
+	if (acl_update_user(hub, &data))
+	{
+		return command_status(hub, user, cmd, "Password changed.");
+	}
+	else
+	{
+		sprintf(tmp, "Unable to change password for user \"%s\".", user->id.nick);
+		return command_status(hub, user, cmd, tmp);
+	}
+}
+
+static int command_useradd(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
+{
+	struct auth_info data;
+	char tmp[1024];
+	char* nick = list_get_first(cmd->args);
+	char* pass = list_get_next(cmd->args);
+	char* cred = list_get_next(cmd->args);
+	enum auth_credentials credentials;
+
+	if (!(cred && auth_string_to_cred(cred, &credentials)))
+	{
+		credentials = auth_cred_user;
+	}
+
+	strncpy(data.nickname, nick, MAX_NICK_LEN);
+	strncpy(data.password, pass, MAX_PASS_LEN);
+	data.nickname[MAX_NICK_LEN] = '\0';
+	data.password[MAX_PASS_LEN] = '\0';
+	data.credentials = credentials;
+
+	if (acl_register_user(hub, &data))
+	{
+		sprintf(tmp, "User \"%s\" registered.", nick);
+		return command_status(hub, user, cmd, tmp);
+	}
+	else
+	{
+		sprintf(tmp, "Unable to register user \"%s\".", nick);
+		return command_status(hub, user, cmd, tmp);
+	}
+}
+
+static int command_userdel(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
+{
+	char tmp[1024];
+	char* nick = list_get_first(cmd->args);
+
+	if (acl_delete_user(hub, nick))
+	{
+		sprintf(tmp, "User \"%s\" is deleted.", nick);
+		return command_status(hub, user, cmd, tmp);
+	}
+	else
+	{
+		sprintf(tmp, "Unable to delete user \"%s\".", nick);
+		return command_status(hub, user, cmd, tmp);
+	}
+}
+
+static int command_usermod(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
+{
+	return command_status(hub, user, cmd, "Not implemented!");
+}
+
+static int command_userinfo(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
+{
+	return command_status(hub, user, cmd, "Not implemented!");
+}
+
+static int command_userpass(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
+{
+	return command_status(hub, user, cmd, "Not implemented!");
+}
+
 static int command_rules(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
 {
 	if (!hub_send_rules(hub, user))
@@ -611,7 +810,7 @@ int command_dipatcher(struct hub_info* hub, struct hub_user* user, const char* m
 		{
 			if (handler->cred <= user->credentials)
 			{
-				if (!handler->args || (handler->args && list_size(cmd->args) >= strlen(handler->args)))
+				if (command_check_args(cmd, handler))
 				{
 					rc = handler->handler(hub, user, cmd);
 				}
@@ -643,20 +842,27 @@ static struct commands_handler command_handlers[] = {
 	{ "crash",      5, 0,   auth_cred_admin,     command_crash,    "Crash the hub (DEBUG)."       },
 #endif
 	{ "getip",      5, "n", auth_cred_operator,  command_getip,    "Show IP address for a user"   },
-	{ "help",       4, 0,   auth_cred_guest,     command_help,     "Show this help message."      },
-	{ "history",    7, 0,   auth_cred_guest,     command_history,  "Show the last chat messages." },
+	{ "help",       4, "?c",auth_cred_guest,     command_help,     "Show this help message."      },
+	{ "history",    7, "?N",auth_cred_guest,     command_history,  "Show the last chat messages." },
 	{ "kick",       4, "n", auth_cred_operator,  command_kick,     "Kick a user"                  },
 	{ "log",        3, 0,   auth_cred_operator,  command_log,      "Display log"                  },
 	{ "motd",       4, 0,   auth_cred_guest,     command_motd,     "Show the message of the day"  },
 	{ "mute",       4, "n", auth_cred_operator,  command_mute,     "Mute user"                    },
 	{ "myip",       4, 0,   auth_cred_guest,     command_myip,     "Show your own IP."            },
+	{ "register",   8, "p", auth_cred_guest,     command_register, "Register your username."      },
 	{ "reload",     6, 0,   auth_cred_admin,     command_reload,   "Reload configuration files."  },
 	{ "rules",      5, 0,   auth_cred_guest,     command_rules,    "Show the hub rules"           },
+	{ "password",   8, "p", auth_cred_user,      command_password, "Change your own password."    },
 	{ "shutdown",   8, 0,   auth_cred_admin,     command_shutdown, "Shutdown hub."                },
 	{ "stats",      5, 0,   auth_cred_super,     command_stats,    "Show hub statistics."         },
 	{ "unban",      5, "n", auth_cred_operator,  command_unban,    "Lift ban on a user"           },
 	{ "unmute",     6, "n", auth_cred_operator,  command_mute,     "Unmute user"                  },
 	{ "uptime",     6, 0,   auth_cred_guest,     command_uptime,   "Display hub uptime info."     },
+	{ "useradd",    7, "np",auth_cred_operator,  command_useradd,  "Register a new user."         },
+	{ "userdel",    7, "n", auth_cred_operator,  command_userdel,  "Delete a registered user."    },
+	{ "userinfo",   8, "n", auth_cred_operator,  command_userinfo, "Show registered user info."   },
+	{ "usermod",    7, "nC",auth_cred_admin,     command_usermod,  "Modify user credentials."     },
+	{ "userpass",   8, "np",auth_cred_operator,  command_userpass, "Change password for a user."  },
 	{ "version",    7, 0,   auth_cred_guest,     command_version,  "Show hub version info."       },
 	{ "whoip",      5, "a", auth_cred_operator,  command_whoip,    "Show users matching IP range" },
 	{ 0,            0, 0,   auth_cred_none,      command_help,     ""                             }

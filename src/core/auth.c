@@ -275,18 +275,63 @@ int acl_shutdown(struct acl_handle* handle)
 		list_clear(handle->networks, &acl_free_ip_info);
 		list_destroy(handle->networks);
 	}
-	
+
 	if (handle->nat_override)
 	{
 		list_clear(handle->nat_override, &acl_free_ip_info);
 		list_destroy(handle->nat_override);
 	}
-	
-	
+
 	memset(handle, 0, sizeof(struct acl_handle));
 	return 0;
 }
 
+extern int acl_register_user(struct hub_info* hub, struct auth_info* info)
+{
+#ifdef PLUGIN_SUPPORT
+	if (plugin_auth_register_user(hub, info) != st_allow)
+	{
+		return 0;
+	}
+	return 1;
+#else
+	// NOT SUPPORTED!
+	return 0;
+#endif
+}
+
+extern int acl_update_user(struct hub_info* hub, struct auth_info* info)
+{
+#ifdef PLUGIN_SUPPORT
+	if (plugin_auth_update_user(hub, info) != st_allow)
+	{
+		return 0;
+	}
+	return 1;
+#else
+	// NOT SUPPORTED!
+	return 0;
+#endif
+}
+
+extern int acl_delete_user(struct hub_info* hub, const char* name)
+{
+#ifdef PLUGIN_SUPPORT
+	struct auth_info data;
+	strncpy(data.nickname, name, MAX_NICK_LEN);
+	data.nickname[MAX_NICK_LEN] = '\0';
+	data.password[0] = '\0';
+	data.credentials = auth_cred_none;
+	if (plugin_auth_delete_user(hub, &data) != st_allow)
+	{
+		return 0;
+	}
+	return 1;
+#else
+	// NOT SUPPORTED!
+	return 0;
+#endif
+}
 
 struct auth_info* acl_get_access_info(struct hub_info* hub, const char* name)
 {

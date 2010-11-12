@@ -40,6 +40,10 @@ extern int acl_initialize(struct hub_config* config, struct acl_handle* handle);
 extern int acl_shutdown(struct acl_handle* handle);
 
 extern struct auth_info* acl_get_access_info(struct hub_info* hub, const char* name);
+extern int acl_register_user(struct hub_info* hub, struct auth_info* info);
+extern int acl_update_user(struct hub_info* hub, struct auth_info* info);
+extern int acl_delete_user(struct hub_info* hub, const char* name);
+
 
 extern int acl_is_cid_banned(struct acl_handle* handle, const char* cid);
 extern int acl_is_ip_banned(struct acl_handle* handle, const char* ip_address);
