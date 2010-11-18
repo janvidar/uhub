@@ -172,7 +172,7 @@ struct cfg_settings* cfg_settings_split(const char* line)
 		|| ((pos = (char*) strchr(line, '=')) == NULL)
 		|| ((s = hub_malloc_zero(sizeof(struct cfg_settings))) == NULL)
 		|| ((tok = cfg_tokenize(line)) == NULL)
-		|| (cfg_token_count(tok) < 2)
+		|| (cfg_token_count(tok) < 1)
 		|| (cfg_token_count(tok) > 3)
 		|| (cfg_token_count(tok) == 3 && strcmp(cfg_token_get(tok, 1), "="))
 		)
@@ -182,10 +182,17 @@ struct cfg_settings* cfg_settings_split(const char* line)
 		return NULL;
 	}
 
-	if (cfg_token_count(tok) == 2)
+	if (cfg_token_count(tok) == 1)
 	{
 		char* key = cfg_token_get_first(tok);
 		pos = strchr(key, '=');
+		if (!pos)
+		{
+			cfg_tokens_free(tok);
+			cfg_settings_free(s);
+			return NULL;
+		}
+
 		pos[0] = 0;
 		key = strip_white_space(key);
 
@@ -197,7 +204,38 @@ struct cfg_settings* cfg_settings_split(const char* line)
 		}
 
 		s->key = strdup(key);
-		s->value = strdup(strip_white_space(cfg_token_get_next(tok)));
+		s->value = strdup(strip_white_space(pos+1));
+	}
+	else if (cfg_token_count(tok) == 2)
+	{
+		char* key = cfg_token_get_first(tok);
+		char* val = cfg_token_get_next(tok);
+
+                if ((pos = strchr(key, '=')))
+		{
+			pos[0] = 0;
+			key = strip_white_space(key);
+		}
+		else if ((pos = strchr(val, '=')))
+		{
+			val = strip_white_space(pos+1);
+		}
+		else
+		{
+			cfg_tokens_free(tok);
+			cfg_settings_free(s);
+			return NULL;
+		}
+
+		if (!*key)
+		{
+			cfg_tokens_free(tok);
+			cfg_settings_free(s);
+			return NULL;
+		}
+
+		s->key = strdup(key);
+		s->value = strdup(val);
 	}
 	else
 	{
