@@ -1021,4 +1021,4 @@ int command_dipatcher(struct hub_info* hub, struct hub_user* user, const char* m
 	command_destroy(cmd);
 	return 0;
 }
-#endif // 0
+#endif
