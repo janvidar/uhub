@@ -9,6 +9,11 @@ Before you try to compile µHub, please make sure the following prerequisites ar
   * GNU make
   * gcc > 3.0 (or MinGW on Windows)
   * Perl 5
+  * openssl > 0.9.8 (or use  "make USE_SSL=NO")
+  * sqlite > 3.x
+
+or read  http://www.uhub.org/compile.php for more info.
+
 
 Linux, Mac OSX, FreeBSD, NetBSD and OpenBSD
 -------------------------------------------
