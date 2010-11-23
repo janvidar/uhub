@@ -302,6 +302,8 @@ install: $(uhub_BINARY)
 	@if [ ! -d $(UHUB_CONF_DIR) ]; then echo Creating $(UHUB_CONF_DIR); mkdir -p $(UHUB_CONF_DIR); fi
 	@if [ ! -f $(UHUB_CONF_DIR)/uhub.conf ]; then cp doc/uhub.conf $(UHUB_CONF_DIR); fi
 	@if [ ! -f $(UHUB_CONF_DIR)/users.conf ]; then cp doc/users.conf  $(UHUB_CONF_DIR); fi
+	@if [ ! -f $(UHUB_CONF_DIR)/rules.txt ]; then cp doc/rules.txt  $(UHUB_CONF_DIR); fi
+	@if [ ! -f $(UHUB_CONF_DIR)/plugins.conf ]; then cp doc/plugins.conf  $(UHUB_CONF_DIR); fi
 	@if [ ! -d $(UHUB_MOD_DIR) ]; then echo Creating $(UHUB_MOD_DIR); mkdir -p $(UHUB_MOD_DIR); fi
 	@cp -f mod_*.so $(UHUB_MOD_DIR)
 	@touch $(UHUB_CONF_DIR)/motd.txt
