@@ -1,6 +1,10 @@
 #!/usr/bin/perl
 
+# use script 
+# sqlite3 users.db < `tools/convert_to_sqlite.pl /etc/uhub/users.conf`
+
 my $input = $ARGV[0];
+
 
 open (FILE, "$input") || die "# Unable to open input file $input: $!";
 my @lines = <FILE>;
