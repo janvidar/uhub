@@ -65,6 +65,14 @@ void* plugin_lookup_symbol(struct uhub_plugin* plugin, const char* symbol)
 #endif
 }
 
+static void plugin_register_hub_functions(struct plugin_handle* handle)
+{
+	handle->hub.send_message = NULL;
+	handle->hub.user_disconnect = NULL;
+	handle->hub.command_add = NULL;
+	handle->hub.command_del = NULL;
+}
+
 struct plugin_handle* plugin_load(const char* filename, const char* config)
 {
 	plugin_register_f register_f;
@@ -85,6 +93,8 @@ struct plugin_handle* plugin_load(const char* filename, const char* config)
 	handle->handle = plugin;
 	register_f = plugin_lookup_symbol(plugin, "plugin_register");
 	unregister_f = plugin_lookup_symbol(plugin, "plugin_unregister");
+
+	plugin_register_hub_functions(handle);
 
 	if (register_f && unregister_f)
 	{

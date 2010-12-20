@@ -57,6 +57,9 @@ typedef plugin_st (*auth_register_user_t)(struct plugin_handle*, struct auth_inf
 typedef plugin_st (*auth_update_user_t)(struct plugin_handle*, struct auth_info* user);
 typedef plugin_st (*auth_delete_user_t)(struct plugin_handle*, struct auth_info* user);
 
+/**
+ * These are callbacks used for the hub to invoke functions in plugins.
+ */
 struct plugin_funcs
 {
 	// Log events for connections
@@ -89,6 +92,26 @@ struct plugin_funcs
 	on_check_ip_late_t      login_check_ip_late;
 };
 
+struct plugin_command_handle;
+
+typedef int (*hfunc_send_message)(struct plugin_handle*, struct plugin_user* user, const char* message);
+typedef int (*hfunc_user_disconnect)(struct plugin_user* user);
+typedef int (*hfunc_command_add)(struct plugin_handle*, struct plugin_command_handle*);
+typedef int (*hfunc_command_del)(struct plugin_handle*, struct plugin_command_handle*);
+
+/**
+ * These are functions created and initialized by the hub and which can be used
+ * by plugins to access functionality internal to the hub.
+ */
+struct plugin_hub_funcs
+{
+	hfunc_send_message send_message;
+	hfunc_user_disconnect user_disconnect;
+	hfunc_command_add command_add;
+	hfunc_command_del command_del;
+};
+
+
 struct plugin_handle
 {
 	struct uhub_plugin* handle;     /* Must NOT be modified by the plugin */
@@ -99,7 +122,8 @@ struct plugin_handle
 	const char* error_msg;          /* Error message for registration error. */
 	size_t plugin_api_version;      /* Plugin API version */
 	size_t plugin_funcs_size;       /* Size of the plugin funcs */
-	struct plugin_funcs funcs;
+	struct plugin_funcs funcs;      /* Table of functions that can be implemented by a plugin */
+	struct plugin_hub_funcs hub;    /* Table of core hub functions that can be used by a plugin */
 };
 
 
