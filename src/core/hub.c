@@ -1212,12 +1212,16 @@ uint64_t hub_get_shared_files(struct hub_info* hub)
 
 uint64_t hub_get_min_share(struct hub_info* hub)
 {
-	return 1024 * 1024 * hub->config->limit_min_share;
+	uint64_t size = hub->config->limit_min_share;
+	size *= (1024 * 1024);
+	return size;
 }
 
 uint64_t hub_get_max_share(struct hub_info* hub)
 {
-	return 1024 * 1024 * hub->config->limit_max_share;
+        uint64_t size = hub->config->limit_max_share;
+        size *= (1024 * 1024);
+        return size;
 }
 
 size_t hub_get_min_slots(struct hub_info* hub)
