@@ -309,7 +309,10 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 		else if (private_msg)
 		{
 			struct hub_user* target = uman_get_user_by_sid(hub, cmd->target);
-			status = plugin_handle_private_message(hub, u, target, message, 0);
+			if (target)
+				status = plugin_handle_private_message(hub, u, target, message, 0);
+			else
+				relay = 0;
 		}
 
 		if (status == st_deny)
