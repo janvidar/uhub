@@ -1084,6 +1084,8 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 
 	if (level >= status_level_fatal)
 	{
+		adc_msg_add_argument(qui, sid_to_string(user->id.sid));
+
 		snprintf(buf, 230, "MS%s", escaped_text);
 		adc_msg_add_argument(qui, buf);
 
