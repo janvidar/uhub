@@ -600,7 +600,7 @@ int adc_msg_has_named_argument(struct adc_message* cmd, const char prefix_[2])
 	while (start)
 	{
 		count++;
-		if ((&start[0] - &cmd->cache[0]) < 1+cmd->length)
+		if ((size_t) (&start[0] - &cmd->cache[0]) < 1+cmd->length)
 			start = memmem(&start[1], (&cmd->cache[cmd->length] - &start[0]), prefix, 3);
 		else
 			start = NULL;
@@ -881,8 +881,8 @@ char* adc_msg_unescape(const char* string)
 char* adc_msg_escape(const char* string)
 {
 	char* str = hub_malloc(adc_msg_escape_length(string)+1);
-	int n = 0;
-	int i = 0;
+	size_t n = 0;
+	size_t i = 0;
 	for (i = 0; i < strlen(string); i++)
 	{
 		switch (string[i]) {

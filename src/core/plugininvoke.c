@@ -37,31 +37,37 @@
 	}
 
 #define PLUGIN_INVOKE_STATUS_1(HUB, FUNCNAME, ARG1) \
-	plugin_st status = st_default; \
-	INVOKE(HUB, FUNCNAME, { \
-		status = plugin->funcs.FUNCNAME(plugin, ARG1); \
-		if (status != st_default) \
-			break; \
-	}); \
-	return status
+	do { \
+		plugin_st status = st_default; \
+		INVOKE(HUB, FUNCNAME, { \
+			status = plugin->funcs.FUNCNAME(plugin, ARG1); \
+			if (status != st_default) \
+				break; \
+		}); \
+		return status; \
+	} while(0)
 
 #define PLUGIN_INVOKE_STATUS_2(HUB, FUNCNAME, ARG1, ARG2) \
-	plugin_st status = st_default; \
-	INVOKE(HUB, FUNCNAME, { \
-		status = plugin->funcs.FUNCNAME(plugin, ARG1, ARG2); \
-		if (status != st_default) \
-			break; \
-	}); \
-	return status
+	do { \
+		plugin_st status = st_default; \
+		INVOKE(HUB, FUNCNAME, { \
+			status = plugin->funcs.FUNCNAME(plugin, ARG1, ARG2); \
+			if (status != st_default) \
+				break; \
+		}); \
+		return status; \
+	} while(0)
 
 #define PLUGIN_INVOKE_STATUS_3(HUB, FUNCNAME, ARG1, ARG2, ARG3) \
-	plugin_st status = st_default; \
-	INVOKE(HUB, FUNCNAME, { \
-		status = plugin->funcs.FUNCNAME(plugin, ARG1, ARG2, ARG3); \
-		if (status != st_default) \
-			break; \
-	}); \
-	return status
+	do { \
+		plugin_st status = st_default; \
+		INVOKE(HUB, FUNCNAME, { \
+			status = plugin->funcs.FUNCNAME(plugin, ARG1, ARG2, ARG3); \
+			if (status != st_default) \
+				break; \
+		}); \
+		return status; \
+	} while(0)
 
 #define PLUGIN_INVOKE_1(HUB, FUNCNAME, ARG1) INVOKE(HUB, FUNCNAME, { plugin->funcs.FUNCNAME(plugin, ARG1); })
 #define PLUGIN_INVOKE_2(HUB, FUNCNAME, ARG1, ARG2) INVOKE(HUB, FUNCNAME, { plugin->funcs.FUNCNAME(plugin, ARG1, ARG2); })

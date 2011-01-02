@@ -88,7 +88,7 @@ int handle_net_read(struct hub_user* user)
 
 		if (lastPos || remaining)
 		{
-			if (remaining < g_hub->config->max_recv_buffer)
+			if (remaining < (size_t) g_hub->config->max_recv_buffer)
 			{
 				hub_recvq_set(q, lastPos ? lastPos : buf, remaining);
 			}

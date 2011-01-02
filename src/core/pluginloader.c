@@ -123,6 +123,7 @@ void plugin_unload(struct plugin_handle* plugin)
 static int plugin_parse_line(char* line, int line_count, void* ptr_data)
 {
 	struct uhub_plugins* handle = (struct uhub_plugins*) ptr_data;
+	struct plugin_handle* plugin;
 	struct cfg_tokens* tokens = cfg_tokenize(line);
 	char *directive, *soname, *params;
 
@@ -148,7 +149,7 @@ static int plugin_parse_line(char* line, int line_count, void* ptr_data)
 			params = "";
 
 		LOG_TRACE("Load plugin: \"%s\", params=\"%s\"", soname, params);
-		struct plugin_handle* plugin = plugin_load(soname, params);
+		plugin = plugin_load(soname, params);
 		if (plugin)
 		{
 			list_append(handle->loaded, plugin);

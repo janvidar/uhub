@@ -34,12 +34,14 @@ static struct net_statistics stats_total;
 
 int net_initialize()
 {
+#ifdef WINSOCK
+	struct WSAData wsa;
+#endif
 	if (!net_initialized)
 	{
 		LOG_TRACE("Initializing network monitor.");
 
 #ifdef WINSOCK
-		struct WSAData wsa;
 		if (WSAStartup(MAKEWORD(2, 2), &wsa) != NO_ERROR)
 		{
 			LOG_ERROR("Unable to initialize winsock.");
@@ -528,7 +530,7 @@ const char* net_address_to_string(int af, const void* src, char* dst, socklen_t 
 			return NULL;
 	}
 	
-	if (WSAAddressToString(addr, size, NULL, dst, &len) == 0)
+	if (WSAAddressToStringA(addr, size, NULL, dst, &len) == 0)
 	{
 		return dst;
 	}

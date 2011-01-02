@@ -38,7 +38,7 @@ typedef void (*net_con_backend_init)(struct net_backend*, struct net_connection*
 typedef void (*net_con_backend_add)(struct net_backend*, struct net_connection*, int mask);
 typedef void (*net_con_backend_mod)(struct net_backend*, struct net_connection*, int mask);
 typedef void (*net_con_backend_del)(struct net_backend*,struct net_connection*);
-typedef const char* (*net_con_backend_name)(void);
+typedef const char* (*net_con_backend_name)();
 
 struct net_backend_handler
 {

@@ -429,7 +429,7 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 	arg = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_SHARED_FILES);
 	if (arg)
 	{
-		ssize_t shared_files = atoll(arg);
+		int shared_files = atoi(arg);
 		if (shared_files < 0)
 			shared_files = 0;
 
@@ -446,7 +446,7 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 	arg = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_COUNT_HUB_NORMAL);
 	if (arg)
 	{
-		ssize_t num = atoll(arg);
+		int num = atoi(arg);
 		if (num < 0) num = 0;
 		user->limits.hub_count_user = num;
 		hub_free(arg);
@@ -456,7 +456,7 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 	arg = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_COUNT_HUB_REGISTER);
 	if (arg)
 	{
-		ssize_t num = atoll(arg);
+		int num = atoi(arg);
 		if (num < 0) num = 0;
 		user->limits.hub_count_registered = num;
 		hub_free(arg);
@@ -466,7 +466,7 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 	arg = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_COUNT_HUB_OPERATOR);
 	if (arg)
 	{
-		ssize_t num = atoll(arg);
+		int num = atoi(arg);
 		if (num < 0) num = 0;
 		user->limits.hub_count_operator = num;
 		hub_free(arg);
@@ -476,7 +476,7 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 	arg = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_UPLOAD_SLOTS);
 	if (arg)
 	{
-		ssize_t num = atoll(arg);
+		int num = atoi(arg);
 		if (num < 0) num = 0;
 		user->limits.upload_slots = num;
 		hub_free(arg);
@@ -591,7 +591,7 @@ static int check_is_hub_full(struct hub_info* hub, struct hub_user* user)
 	 * If hub is full, don't let users in, but we still want to allow
 	 * operators and admins to enter the hub.
 	 */
-	if (hub->config->max_users && hub->users->count >= hub->config->max_users && !user_is_protected(user))
+	if (hub->config->max_users && hub->users->count >= (size_t) hub->config->max_users && !user_is_protected(user))
 	{
 		return 1;
 	}

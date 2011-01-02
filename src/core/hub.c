@@ -396,6 +396,7 @@ void hub_send_hubinfo(struct hub_info* hub, struct hub_user* u)
 {
 	struct adc_message* info = adc_msg_copy(hub->command_info);
 	int value = 0;
+	uint64_t size = 0;
 
 	if (user_flag_get(u, feature_ping))
 	{
@@ -409,13 +410,13 @@ void hub_send_hubinfo(struct hub_info* hub, struct hub_user* u)
 		adc_msg_add_named_argument(info, "UC", uhub_itoa(hub_get_user_count(hub)));
 		adc_msg_add_named_argument(info, "MC", uhub_itoa(hub_get_max_user_count(hub)));
 		adc_msg_add_named_argument(info, "SS", uhub_ulltoa(hub_get_shared_size(hub)));
-		adc_msg_add_named_argument(info, "SF", uhub_itoa(hub_get_shared_files(hub)));
+		adc_msg_add_named_argument(info, "SF", uhub_ulltoa(hub_get_shared_files(hub)));
 
 		/* Maximum/minimum share size */
-		value = hub_get_max_share(hub);
-		if (value) adc_msg_add_named_argument(info, "XS", uhub_itoa(value));
-		value = hub_get_min_share(hub);
-		if (value) adc_msg_add_named_argument(info, "MS", uhub_itoa(value));
+		size = hub_get_max_share(hub);
+		if (size) adc_msg_add_named_argument(info, "XS", uhub_ulltoa(size));
+		size = hub_get_min_share(hub);
+		if (size) adc_msg_add_named_argument(info, "MS", uhub_ulltoa(size));
 
 		/* Maximum/minimum upload slots allowed per user */
 		value = hub_get_max_slots(hub);
@@ -972,7 +973,7 @@ void hub_free_variables(struct hub_info* hub)
 /**
  * @return 1 if nickname is in use, or 0 if not used.
  */
-static inline int is_nick_in_use(struct hub_info* hub, const char* nick)
+static int is_nick_in_use(struct hub_info* hub, const char* nick)
 {
 	struct hub_user* lookup = uman_get_user_by_nick(hub, nick);
 	if (lookup)
@@ -986,7 +987,7 @@ static inline int is_nick_in_use(struct hub_info* hub, const char* nick)
 /**
  * @return 1 if CID is in use, or 0 if not used.
  */
-static inline int is_cid_in_use(struct hub_info* hub, const char* cid)
+static int is_cid_in_use(struct hub_info* hub, const char* cid)
 {
 	struct hub_user* lookup = uman_get_user_by_cid(hub, cid);
 	if (lookup)

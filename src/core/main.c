@@ -231,6 +231,7 @@ void print_usage(char* program)
 
 void parse_command_line(int argc, char** argv)
 {
+#ifdef HAVE_GETOPT
 	int opt;
 	while ((opt = getopt(argc, argv, "vqfc:l:hu:g:VCsSLp:")) != -1)
 	{
@@ -301,6 +302,7 @@ void parse_command_line(int argc, char** argv)
 				break;
 		}
 	}
+#endif /* HAVE_GETOPT */
 
 	if (arg_config == NULL)
 	{

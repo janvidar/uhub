@@ -53,11 +53,6 @@ extern const char* uhub_ulltoa(uint64_t val);
 
 extern int uhub_atoi(const char* value);
 
-#ifdef NEED_ATOLL
-extern int atoll(const char* value);
-#endif
-
-
 #ifndef HAVE_STRNDUP
 extern char* strndup(const char* string, size_t n);
 #endif

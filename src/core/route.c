@@ -57,7 +57,7 @@ int route_message(struct hub_info* hub, struct hub_user* u, struct adc_message* 
 	return 0;
 }
 
-static inline size_t get_max_send_queue(struct hub_info* hub)
+static size_t get_max_send_queue(struct hub_info* hub)
 {
 	/* TODO: More dynamic send queue limit, for instance:
 	 * return MAX(hub->config->max_send_buffer, (hub->config->max_recv_buffer * hub_get_user_count(hub)));
@@ -65,7 +65,7 @@ static inline size_t get_max_send_queue(struct hub_info* hub)
 	return hub->config->max_send_buffer;
 }
 
-static inline size_t get_max_send_queue_soft(struct hub_info* hub)
+static size_t get_max_send_queue_soft(struct hub_info* hub)
 {
 	return hub->config->max_send_buffer_soft;
 }
@@ -75,7 +75,7 @@ static inline size_t get_max_send_queue_soft(struct hub_info* hub)
  *         -1 if send queue is overflowed
  *         0 if soft send queue is overflowed (not implemented at the moment)
  */
-static inline int check_send_queue(struct hub_info* hub, struct hub_user* user, struct adc_message* msg)
+static int check_send_queue(struct hub_info* hub, struct hub_user* user, struct adc_message* msg)
 {
 	if (user_flag_get(user, flag_user_list))
 		return 1;

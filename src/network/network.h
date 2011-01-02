@@ -255,7 +255,7 @@ extern int net_stats_timeout();
 extern void net_stats_get(struct net_statistics** intermediate, struct net_statistics** total);
 
 
-#if defined(WINSOCK) && !defined(__CYGWIN__)
+#if defined(WINSOCK) && !defined(__CYGWIN__) && !defined(_MSC_VER)
 
 #define EWOULDBLOCK     WSAEWOULDBLOCK
 #define EINPROGRESS     WSAEINPROGRESS

@@ -45,7 +45,69 @@ struct commands_handler
 	const char* description;
 };
 
-static struct commands_handler command_handlers[];
+#define FORWARD_DECL_CMD(X) static int X(struct hub_info* hub, struct hub_user* user, struct hub_command* cmd)
+
+FORWARD_DECL_CMD(command_ban);
+FORWARD_DECL_CMD(command_broadcast);
+FORWARD_DECL_CMD(command_crash);
+FORWARD_DECL_CMD(command_getip);
+FORWARD_DECL_CMD(command_help);
+FORWARD_DECL_CMD(command_history);
+FORWARD_DECL_CMD(command_kick);
+FORWARD_DECL_CMD(command_log);
+FORWARD_DECL_CMD(command_motd);
+FORWARD_DECL_CMD(command_mute);
+FORWARD_DECL_CMD(command_myip);
+FORWARD_DECL_CMD(command_register);
+FORWARD_DECL_CMD(command_reload);
+FORWARD_DECL_CMD(command_rules);
+FORWARD_DECL_CMD(command_password);
+FORWARD_DECL_CMD(command_shutdown);
+FORWARD_DECL_CMD(command_stats);
+FORWARD_DECL_CMD(command_unban);
+FORWARD_DECL_CMD(command_uptime);
+FORWARD_DECL_CMD(command_useradd);
+FORWARD_DECL_CMD(command_userdel);
+FORWARD_DECL_CMD(command_userinfo);
+FORWARD_DECL_CMD(command_usermod);
+FORWARD_DECL_CMD(command_userpass);
+FORWARD_DECL_CMD(command_version);
+FORWARD_DECL_CMD(command_whoip);
+
+#undef FORWARD_DECL_CMD
+
+static struct commands_handler command_handlers[] = {
+	{ "ban",        3, "n", auth_cred_operator,  command_ban,      "Ban a user"                   },
+	{ "broadcast",  9, "m", auth_cred_operator,  command_broadcast,"Send a message to all users"  },
+#ifdef CRASH_DEBUG
+	{ "crash",      5, 0,   auth_cred_admin,     command_crash,    "Crash the hub (DEBUG)."       },
+#endif
+	{ "getip",      5, "n", auth_cred_operator,  command_getip,    "Show IP address for a user"   },
+	{ "help",       4, "?c",auth_cred_guest,     command_help,     "Show this help message."      },
+	{ "history",    7, "?N",auth_cred_guest,     command_history,  "Show the last chat messages." },
+	{ "kick",       4, "n", auth_cred_operator,  command_kick,     "Kick a user"                  },
+	{ "log",        3, 0,   auth_cred_operator,  command_log,      "Display log"                  },
+	{ "motd",       4, 0,   auth_cred_guest,     command_motd,     "Show the message of the day"  },
+	{ "mute",       4, "n", auth_cred_operator,  command_mute,     "Mute user"                    },
+	{ "myip",       4, 0,   auth_cred_guest,     command_myip,     "Show your own IP."            },
+	{ "register",   8, "p", auth_cred_guest,     command_register, "Register your username."      },
+	{ "reload",     6, 0,   auth_cred_admin,     command_reload,   "Reload configuration files."  },
+	{ "rules",      5, 0,   auth_cred_guest,     command_rules,    "Show the hub rules"           },
+	{ "password",   8, "p", auth_cred_user,      command_password, "Change your own password."    },
+	{ "shutdown",   8, 0,   auth_cred_admin,     command_shutdown, "Shutdown hub."                },
+	{ "stats",      5, 0,   auth_cred_super,     command_stats,    "Show hub statistics."         },
+	{ "unban",      5, "n", auth_cred_operator,  command_unban,    "Lift ban on a user"           },
+	{ "unmute",     6, "n", auth_cred_operator,  command_mute,     "Unmute user"                  },
+	{ "uptime",     6, 0,   auth_cred_guest,     command_uptime,   "Display hub uptime info."     },
+	{ "useradd",    7, "np",auth_cred_operator,  command_useradd,  "Register a new user."         },
+	{ "userdel",    7, "n", auth_cred_operator,  command_userdel,  "Delete a registered user."    },
+	{ "userinfo",   8, "n", auth_cred_operator,  command_userinfo, "Show registered user info."   },
+	{ "usermod",    7, "nC",auth_cred_admin,     command_usermod,  "Modify user credentials."     },
+	{ "userpass",   8, "np",auth_cred_operator,  command_userpass, "Change password for a user."  },
+	{ "version",    7, 0,   auth_cred_guest,     command_version,  "Show hub version info."       },
+	{ "whoip",      5, "a", auth_cred_operator,  command_whoip,    "Show users matching IP range" },
+	{ 0,            0, 0,   auth_cred_none,      command_help,     ""                             }
+};
 
 static void command_destroy(struct hub_command* cmd)
 {
@@ -219,8 +281,8 @@ static int command_help(struct hub_info* hub, struct hub_user* user, struct hub_
 {
 	size_t n;
 	char msg[MAX_HELP_MSG];
-	msg[0] = 0;
 	char* command = list_get_first(cmd->args);
+	msg[0] = 0;
 
 	if (!command)
 	{
@@ -495,11 +557,12 @@ static int command_broadcast(struct hub_info* hub, struct hub_user* user, struct
 	char from_sid[5];
 	char buffer[128];
 	size_t recipients = 0;
+	struct hub_user* target;
 
 	memcpy(from_sid, sid_to_string(user->id.sid), sizeof(from_sid));
 	memcpy(pm_flag + 2, from_sid, sizeof(from_sid));
 
-	struct hub_user* target = (struct hub_user*) list_get_first(hub->users->list);
+	target = (struct hub_user*) list_get_first(hub->users->list);
 	while (target)
 	{
 		if (target != user)
@@ -834,37 +897,4 @@ int command_dipatcher(struct hub_info* hub, struct hub_user* user, const char* m
 	command_destroy(cmd);
 	return 0;
 }
-
-static struct commands_handler command_handlers[] = {
-	{ "ban",        3, "n", auth_cred_operator,  command_ban,      "Ban a user"                   },
-	{ "broadcast",  9, "m", auth_cred_operator,  command_broadcast,"Send a message to all users"  },
-#ifdef CRASH_DEBUG
-	{ "crash",      5, 0,   auth_cred_admin,     command_crash,    "Crash the hub (DEBUG)."       },
-#endif
-	{ "getip",      5, "n", auth_cred_operator,  command_getip,    "Show IP address for a user"   },
-	{ "help",       4, "?c",auth_cred_guest,     command_help,     "Show this help message."      },
-	{ "history",    7, "?N",auth_cred_guest,     command_history,  "Show the last chat messages." },
-	{ "kick",       4, "n", auth_cred_operator,  command_kick,     "Kick a user"                  },
-	{ "log",        3, 0,   auth_cred_operator,  command_log,      "Display log"                  },
-	{ "motd",       4, 0,   auth_cred_guest,     command_motd,     "Show the message of the day"  },
-	{ "mute",       4, "n", auth_cred_operator,  command_mute,     "Mute user"                    },
-	{ "myip",       4, 0,   auth_cred_guest,     command_myip,     "Show your own IP."            },
-	{ "register",   8, "p", auth_cred_guest,     command_register, "Register your username."      },
-	{ "reload",     6, 0,   auth_cred_admin,     command_reload,   "Reload configuration files."  },
-	{ "rules",      5, 0,   auth_cred_guest,     command_rules,    "Show the hub rules"           },
-	{ "password",   8, "p", auth_cred_user,      command_password, "Change your own password."    },
-	{ "shutdown",   8, 0,   auth_cred_admin,     command_shutdown, "Shutdown hub."                },
-	{ "stats",      5, 0,   auth_cred_super,     command_stats,    "Show hub statistics."         },
-	{ "unban",      5, "n", auth_cred_operator,  command_unban,    "Lift ban on a user"           },
-	{ "unmute",     6, "n", auth_cred_operator,  command_mute,     "Unmute user"                  },
-	{ "uptime",     6, 0,   auth_cred_guest,     command_uptime,   "Display hub uptime info."     },
-	{ "useradd",    7, "np",auth_cred_operator,  command_useradd,  "Register a new user."         },
-	{ "userdel",    7, "n", auth_cred_operator,  command_userdel,  "Delete a registered user."    },
-	{ "userinfo",   8, "n", auth_cred_operator,  command_userinfo, "Show registered user info."   },
-	{ "usermod",    7, "nC",auth_cred_admin,     command_usermod,  "Modify user credentials."     },
-	{ "userpass",   8, "np",auth_cred_operator,  command_userpass, "Change password for a user."  },
-	{ "version",    7, 0,   auth_cred_guest,     command_version,  "Show hub version info."       },
-	{ "whoip",      5, "a", auth_cred_operator,  command_whoip,    "Show users matching IP range" },
-	{ 0,            0, 0,   auth_cred_none,      command_help,     ""                             }
-};
 

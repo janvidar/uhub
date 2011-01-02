@@ -54,7 +54,7 @@ void timeout_queue_shutdown(struct timeout_queue* t)
 
 size_t timeout_queue_process(struct timeout_queue* t, time_t now)
 {
-	size_t pos = t->last;
+	size_t pos = (size_t) t->last;
 	size_t events = 0;
 	struct timeout_evt* evt = 0;
 	t->last = now;

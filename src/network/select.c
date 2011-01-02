@@ -48,7 +48,8 @@ const char* net_backend_name_select()
 
 int net_backend_poll_select(struct net_backend* data, int ms)
 {
-	int found, res, n;
+	int res;
+	size_t n, found;
 	struct timeval tval;
 	struct net_backend_select* backend = (struct net_backend_select*) data;
 

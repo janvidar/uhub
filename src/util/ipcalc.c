@@ -21,7 +21,7 @@
 
 int ip_is_valid_ipv4(const char* address)
 {
-	int i = 0; /* address index */
+	size_t i = 0; /* address index */
 	int o = 0; /* octet number */
 	int n = 0; /* numbers after each dot */
 	int d = 0; /* dots */

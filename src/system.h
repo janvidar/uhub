@@ -22,24 +22,6 @@
 
 #define _FILE_OFFSET_BITS 64
 
-#if USE_REGPARM && __GNUC__ >= 3
-#define REGPRM1 __attribute__((regparm(1)))
-#define REGPRM2 __attribute__((regparm(2)))
-#define REGPRM3 __attribute__((regparm(3)))
-#else
-#define REGPRM1
-#define REGPRM2
-#define REGPRM3
-#endif
-
-#ifndef FORCEINLINE
-#if __GNUC__ < 3
-#define FORCEINLINE inline
-#else
-#define FORCEINLINE inline __attribute__((always_inline))
-#endif
-#endif
-
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -48,7 +30,7 @@
 #define BSD_LIKE
 #endif
 
-#if defined(__CYGWIN__) || defined(__MINGW32__)
+#if defined(__CYGWIN__) || defined(__MINGW32__) || defined(_MSC_VER)
 #ifndef WINSOCK
 #define WINSOCK
 #endif
@@ -72,7 +54,6 @@
 #include <fcntl.h>
 
 #ifndef __sun__
-#include <getopt.h>
 #include <stdint.h>
 #endif
 
@@ -82,14 +63,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
 
 #if !defined(WIN32)
+#include <unistd.h>
 #include <grp.h>
 #include <pwd.h>
 #include <sys/resource.h>
 #define HAVE_STRNDUP
 #define HAVE_DLOPEN
+#define HAVE_GETOPT
+#define HAVE_SSIZE_T
 #include <dlfcn.h>
 #ifndef __HAIKU__
 #define HAVE_MEMMEM
@@ -134,6 +117,9 @@
 #undef HAVE_MEMMEM
 #endif
 
+#ifdef HAVE_GETOPT
+#include <getopt.h>
+#endif
 
 /*
  * Detect operating system info.
@@ -241,6 +227,25 @@
 
 #ifndef MAX
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
+
+#ifndef HAVE_SSIZE_T
+typedef int ssize_t;
+#define HAVE_SSIZE_T
+#endif
+
+#ifdef _MSC_VER
+typedef unsigned __int32 uint32_t;
+typedef unsigned __int64 uint64_t;
+#endif
+
+
+#ifdef _MSC_VER
+#define strdup _strdup
+#define snprintf _snprintf
+#define strcasecmp _stricmp
+#define strncasecmp _strnicmp
+#define atoll _atoi64
 #endif
 
 #endif /* HAVE_UHUB_SYSTEM_H */

@@ -29,15 +29,15 @@ struct cfg_tokens
 
 struct cfg_tokens* cfg_tokenize(const char* line)
 {
-	struct cfg_tokens* tokens = hub_malloc_zero(sizeof(struct cfg_tokens));
-	tokens->list = list_create();
-	char* buffer = hub_malloc_zero(strlen(line));
+	struct cfg_tokens* tokens = (struct cfg_tokens*) hub_malloc_zero(sizeof(struct cfg_tokens));
+	char* buffer = (char*) hub_malloc_zero(strlen(line));
 	char* out = buffer;
 	const char* p = line;
 	int backslash = 0;
 	char quote = 0;
 	size_t token_count = 0;
 	size_t token_size = 0;
+	tokens->list = list_create();
 
 	for (; *p; p++)
 	{
