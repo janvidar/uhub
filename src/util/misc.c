@@ -341,7 +341,7 @@ void* memmem(const void *haystack, size_t haystacklen, const void *needle, size_
 	char* c_pat = (char*) needle;
 	char* ptr = memchr(c_buf, c_pat[0], haystacklen);
 	
-	while (ptr && (&ptr[0] - &c_buf[0] < haystacklen))
+	while (ptr && ((size_t) (&ptr[0] - &c_buf[0]) < haystacklen))
 	{
 		if (!memcmp(ptr, c_pat, needlelen))
 			return ptr;

@@ -246,6 +246,10 @@ typedef unsigned __int64 uint64_t;
 #define strcasecmp _stricmp
 #define strncasecmp _strnicmp
 #define atoll _atoi64
+#include <io.h>
+#define open _open
+#define close _close
+#define read _read
 #endif
 
 #endif /* HAVE_UHUB_SYSTEM_H */
