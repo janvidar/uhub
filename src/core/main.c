@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2011, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,7 +18,6 @@
  */
 
 #include "uhub.h"
-
 
 static int arg_verbose = 5;
 static int arg_fork    = 0;
@@ -145,6 +144,8 @@ int main_loop()
 
 		hub_set_variables(hub, &acl);
 
+		break;
+
 		hub_event_loop(hub);
 
 		hub_free_variables(hub);
@@ -231,7 +232,6 @@ void print_usage(char* program)
 
 void parse_command_line(int argc, char** argv)
 {
-#ifdef HAVE_GETOPT
 	int opt;
 	while ((opt = getopt(argc, argv, "vqfc:l:hu:g:VCsSLp:")) != -1)
 	{
@@ -302,7 +302,6 @@ void parse_command_line(int argc, char** argv)
 				break;
 		}
 	}
-#endif /* HAVE_GETOPT */
 
 	if (arg_config == NULL)
 	{

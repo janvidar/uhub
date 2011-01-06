@@ -63,6 +63,7 @@ extern "C" {
 #include "util/config_token.h"
 #include "util/credentials.h"
 #include "util/floodctl.h"
+#include "util/getopt.h"
 #include "util/ipcalc.h"
 #include "util/list.h"
 #include "util/log.h"

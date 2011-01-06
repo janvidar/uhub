@@ -22,17 +22,13 @@
 
 #include "plugin_api/handle.h"
 
-#ifdef PLUGIN_SUPPORT
-
 struct hub_config;
 struct linked_list;
 struct plugin_handle;
 
 struct uhub_plugin
 {
-#ifdef HAVE_DLOPEN
 	void* handle;
-#endif
 	plugin_unregister_f unregister;
 };
 
@@ -53,10 +49,6 @@ extern void plugin_shutdown(struct uhub_plugins* handle);
 extern struct uhub_plugin* plugin_open(const char* filename);
 extern void plugin_close(struct uhub_plugin*);
 extern void* plugin_lookup_symbol(struct uhub_plugin*, const char* symbol);
-
-
-
-#endif /* PLUGIN_SUPPORT */
 
 #endif /* HAVE_UHUB_PLUGIN_LOADER_H */
 

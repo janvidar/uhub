@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2010, Jan Vidar Krey
+ * Copyright (C) 2011, Jan Vidar Krey
  */
 
 #include "plugin_api/handle.h"
@@ -101,6 +101,9 @@ static int parse_line(char* line, int line_count, void* ptr_data)
 	struct linked_list* users = (struct linked_list*) ptr_data;
 	struct cfg_tokens* tokens = cfg_tokenize(line);
 	enum auth_credentials cred;
+	char* credential;
+	char* username;
+	char* password;
 
 	if (cfg_token_count(tokens) == 0)
 	{
@@ -114,9 +117,9 @@ static int parse_line(char* line, int line_count, void* ptr_data)
 		return -1;
 	}
 
-	char* credential = cfg_token_get_first(tokens);
-	char* username   = cfg_token_get_next(tokens);
-	char* password   = cfg_token_get_next(tokens);
+	credential = cfg_token_get_first(tokens);
+	username   = cfg_token_get_next(tokens);
+	password   = cfg_token_get_next(tokens);
 
 	if (!auth_string_to_cred(credential, &cred))
 	{
