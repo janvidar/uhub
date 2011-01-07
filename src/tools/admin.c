@@ -26,6 +26,7 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 
 		case ADC_CLIENT_PASSWORD_REQ:
 			puts("*** Requesting password.");
+			break;
 
 		case ADC_CLIENT_LOGGED_IN:
 			puts("*** Logged in.");
@@ -80,10 +81,7 @@ int main(int argc, char** argv)
 	ADC_client_set_callback(&client, handle);
 	ADC_client_connect(&client, argv[1]);
 
-	while (running)
-	{
-		net_backend_process();
-	}
+	while (running && net_backend_process()) { }
 
 	ADC_client_destroy(&client);
 	net_destroy();
