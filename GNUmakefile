@@ -140,6 +140,7 @@ libuhub_SOURCES := \
 		src/core/route.c \
 		src/core/user.c \
 		src/core/usermanager.c \
+		src/core/plugincallback.c \
 		src/core/plugininvoke.c \
 		src/core/pluginloader.c \
 		src/network/backend.c \

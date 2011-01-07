@@ -95,7 +95,7 @@ struct plugin_funcs
 struct plugin_command_handle;
 
 typedef int (*hfunc_send_message)(struct plugin_handle*, struct plugin_user* user, const char* message);
-typedef int (*hfunc_user_disconnect)(struct plugin_user* user);
+typedef int (*hfunc_user_disconnect)(struct plugin_handle*, struct plugin_user* user);
 typedef int (*hfunc_command_add)(struct plugin_handle*, struct plugin_command_handle*);
 typedef int (*hfunc_command_del)(struct plugin_handle*, struct plugin_command_handle*);
 

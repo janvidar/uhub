@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2011, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,14 +78,6 @@ static struct plugin_user* convert_user_type(struct hub_user* user)
 {
 	struct plugin_user* puser = (struct plugin_user*) user;
 	return puser;
-#if 0
-	puser->sid  = user->id.sid;
-	puser->nick = user->id.nick;
-	puser->cid  = user->id.cid;
-	puser->user_agent = user->user_agent;
-	puser->addr = user->id.addr;
-	puser->credentials = user->credentials;
-#endif
 }
 
 plugin_st plugin_check_ip_early(struct hub_info* hub, struct ip_addr_encap* addr)

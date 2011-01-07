@@ -854,7 +854,7 @@ void hub_plugins_load(struct hub_info* hub)
 	if (!hub->plugins)
 		return;
 
-	if (plugin_initialize(hub->config, hub->plugins) < 0)
+	if (plugin_initialize(hub->config, hub) < 0)
 	{
 		hub_free(hub->plugins);
 		hub->plugins = 0;

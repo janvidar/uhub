@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2011, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,6 +22,19 @@
 #ifdef PLUGIN_SUPPORT
 #include "plugin_api/handle.h"
 
+struct plugin_hub_internals
+{
+	struct hub_info* hub;
+	plugin_unregister_f unregister;
+};
+
+static struct plugin_hub_internals* get_internals(struct plugin_handle* handle)
+{
+	assert(handle && handle->handle && handle->handle->internals);
+	struct plugin_hub_internals* internals = (struct plugin_hub_internals*) handle->handle->internals;
+	return internals;
+}
+
 struct uhub_plugin* plugin_open(const char* filename)
 {
 	LOG_TRACE("plugin_open: \"%s\"", filename);
@@ -41,6 +54,8 @@ struct uhub_plugin* plugin_open(const char* filename)
 		return 0;
 	}
 
+	plugin->internals = hub_malloc_zero(sizeof(struct plugin_hub_internals));
+
 	return plugin;
 #else
 	return 0;
@@ -49,6 +64,7 @@ struct uhub_plugin* plugin_open(const char* filename)
 
 void plugin_close(struct uhub_plugin* plugin)
 {
+	hub_free(plugin->internals);
 #ifdef HAVE_DLOPEN
 	dlclose(plugin->handle);
 	hub_free(plugin);
@@ -65,21 +81,16 @@ void* plugin_lookup_symbol(struct uhub_plugin* plugin, const char* symbol)
 #endif
 }
 
-static void plugin_register_hub_functions(struct plugin_handle* handle)
-{
-	handle->hub.send_message = NULL;
-	handle->hub.user_disconnect = NULL;
-	handle->hub.command_add = NULL;
-	handle->hub.command_del = NULL;
-}
 
-struct plugin_handle* plugin_load(const char* filename, const char* config)
+
+struct plugin_handle* plugin_load(const char* filename, const char* config, struct hub_info* hub)
 {
 	plugin_register_f register_f;
 	plugin_unregister_f unregister_f;
 	int ret;
 	struct plugin_handle* handle = hub_malloc_zero(sizeof(struct plugin_handle));
 	struct uhub_plugin* plugin = plugin_open(filename);
+	struct plugin_hub_internals* internals;
 
 	if (!plugin)
 		return NULL;
@@ -94,7 +105,9 @@ struct plugin_handle* plugin_load(const char* filename, const char* config)
 	register_f = plugin_lookup_symbol(plugin, "plugin_register");
 	unregister_f = plugin_lookup_symbol(plugin, "plugin_unregister");
 
-	plugin_register_hub_functions(handle);
+	plugin_register_callback_functions(handle);
+
+	internals = (struct plugin_hub_internals*) plugin->internals;
 
 	if (register_f && unregister_f)
 	{
@@ -105,7 +118,11 @@ struct plugin_handle* plugin_load(const char* filename, const char* config)
 			{
 				LOG_INFO("Loaded plugin: %s: %s, version %s.", filename, handle->name, handle->version);
 				LOG_TRACE("Plugin API version: %d (func table size: " PRINTF_SIZE_T ")", handle->plugin_api_version, handle->plugin_funcs_size);
-				plugin->unregister = unregister_f;
+
+				// Set hub internals
+				internals->unregister = unregister_f;
+				internals->hub = hub;
+
 				return handle;
 			}
 			else
@@ -126,15 +143,18 @@ struct plugin_handle* plugin_load(const char* filename, const char* config)
 
 void plugin_unload(struct plugin_handle* plugin)
 {
-	plugin->handle->unregister(plugin);
+	struct plugin_hub_internals* internals = get_internals(plugin);
+	plugin_unregister_callback_functions(plugin);
+	internals->unregister(plugin);
 	plugin_close(plugin->handle);
 }
 
 static int plugin_parse_line(char* line, int line_count, void* ptr_data)
 {
-	struct uhub_plugins* handle = (struct uhub_plugins*) ptr_data;
-	struct plugin_handle* plugin;
+	struct hub_info* hub = (struct hub_info*) ptr_data;
+	struct uhub_plugins* handle = hub->plugins;
 	struct cfg_tokens* tokens = cfg_tokenize(line);
+	struct plugin_handle* plugin;
 	char *directive, *soname, *params;
 
 	if (cfg_token_count(tokens) == 0)
@@ -159,7 +179,7 @@ static int plugin_parse_line(char* line, int line_count, void* ptr_data)
 			params = "";
 
 		LOG_TRACE("Load plugin: \"%s\", params=\"%s\"", soname, params);
-		plugin = plugin_load(soname, params);
+		plugin = plugin_load(soname, params, hub);
 		if (plugin)
 		{
 			list_append(handle->loaded, plugin);
@@ -172,12 +192,12 @@ static int plugin_parse_line(char* line, int line_count, void* ptr_data)
 	return -1;
 }
 
-int plugin_initialize(struct hub_config* config, struct uhub_plugins* handle)
+int plugin_initialize(struct hub_config* config, struct hub_info* hub)
 {
 	int ret;
 
-	handle->loaded = list_create();
-	if (!handle->loaded)
+	hub->plugins->loaded = list_create();
+	if (!hub->plugins->loaded)
 		return -1;
 
 	if (config)
@@ -185,7 +205,7 @@ int plugin_initialize(struct hub_config* config, struct uhub_plugins* handle)
 		if (!*config->file_plugins)
 			return 0;
 
-		ret = file_read_lines(config->file_plugins, handle, &plugin_parse_line);
+		ret = file_read_lines(config->file_plugins, hub, &plugin_parse_line);
 		if (ret == -1)
 			return -1;
 	}
@@ -203,6 +223,13 @@ void plugin_shutdown(struct uhub_plugins* handle)
 	}
 
 	list_destroy(handle->loaded);
+}
+
+// Used internally only
+struct hub_info* plugin_get_hub(struct plugin_handle* plugin)
+{
+	struct plugin_hub_internals* data = get_internals(plugin);
+	return data->hub;
 }
 
 #endif /* PLUGIN_SUPPORT */
