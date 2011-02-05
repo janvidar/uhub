@@ -37,6 +37,9 @@
 #endif
 
 #ifdef WINSOCK
+#ifndef FD_SETSIZE
+#define FD_SETSIZE 4096
+#endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #else

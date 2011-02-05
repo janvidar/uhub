@@ -144,8 +144,6 @@ int main_loop()
 
 		hub_set_variables(hub, &acl);
 
-		break;
-
 		hub_event_loop(hub);
 
 		hub_free_variables(hub);

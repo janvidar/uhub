@@ -35,6 +35,7 @@ struct net_backend_select
 	struct net_connection_select** conns;
 	fd_set rfds;
 	fd_set wfds;
+	fd_set xfds;
 	int maxfd;
 	struct net_backend_common* common;
 };
@@ -58,6 +59,7 @@ int net_backend_poll_select(struct net_backend* data, int ms)
 
 	FD_ZERO(&backend->rfds);
 	FD_ZERO(&backend->wfds);
+	FD_ZERO(&backend->xfds);
 
 	backend->maxfd = -1;
 	for (n = 0, found = 0; found < backend->common->num && n < backend->common->max; n++)
@@ -73,10 +75,14 @@ int net_backend_poll_select(struct net_backend* data, int ms)
 	}
 	backend->maxfd++;
 
-	res = select(backend->maxfd, &backend->rfds, &backend->wfds, 0, &tval);
-
-	if (res == -1 && errno == EINTR)
+	res = select(backend->maxfd, &backend->rfds, &backend->wfds, &backend->xfds, &tval);
+	if (res == -1)
+	{
+		printf("Error: %d\n", net_error());
+	}
+	if (res == -1 && net_error() == EINTR)
 		return 0;
+
 	return res;
 }
 
@@ -122,11 +128,13 @@ void net_con_backend_add_select(struct net_backend* data, struct net_connection*
 {
 	struct net_backend_select* backend = (struct net_backend_select*) data;
 	backend->conns[con->sd] = (struct net_connection_select*) con;
+	con->flags |= (events & (NET_EVENT_READ | NET_EVENT_WRITE));
 }
+
 
 void net_con_backend_mod_select(struct net_backend* data, struct net_connection* con, int events)
 {
-	con->flags |= (events & (NET_EVENT_READ | NET_EVENT_WRITE));;
+	con->flags |= (events & (NET_EVENT_READ | NET_EVENT_WRITE));
 }
 
 void net_con_backend_del_select(struct net_backend* data, struct net_connection* con)

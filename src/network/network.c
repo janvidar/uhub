@@ -83,8 +83,7 @@ size_t net_get_max_sockets()
 	return 1024;
 #else
 #ifdef WIN32
-	LOG_WARN("Windows system, limited to 4096 connections.");
-	return 4096;
+	return FD_SETSIZE;
 #else
 	LOG_WARN("System does not have getrlimit(): constrained to 1024 sockets");
 	return 1024;
@@ -650,12 +649,16 @@ const char* net_get_local_address(int fd)
 
 	if (getsockname(fd, (struct sockaddr*) name, &namelen) != -1)
 	{
+#ifndef WINSOCK
 		int af = storage.ss_family;
 		if (af == AF_INET6)
 		{
 			net_address_to_string(af, (void*) &name6->sin6_addr, address, INET6_ADDRSTRLEN);
 		}
 		else
+#else
+		int af = AF_INET;
+#endif
 		{
 			net_address_to_string(af, (void*) &name4->sin_addr, address, INET6_ADDRSTRLEN);
 		}
