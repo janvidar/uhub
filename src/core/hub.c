@@ -289,7 +289,7 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 		}
 		else
 		{
-			relay = command_dipatcher(hub, u, message);
+			relay = command_invoke(hub->commands, u, message);
 		}
 	}
 
@@ -810,6 +810,10 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	hub->status = hub_status_running;
 
 	g_hub = hub;
+
+	// Start the hub command sub-system
+	hub->commands = command_initialize(hub);
+
 	return hub;
 }
 
@@ -834,6 +838,7 @@ void hub_shutdown_service(struct hub_info* hub)
 	list_destroy(hub->chat_history);
 	list_clear(hub->logout_info, &hub_free);
 	list_destroy(hub->logout_info);
+	command_shutdown(hub->commands);
 	hub_free(hub);
 	hub = 0;
 	g_hub = 0;
