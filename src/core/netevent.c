@@ -185,7 +185,11 @@ void net_on_accept(struct net_connection* con, int event, void *arg)
 		int fd = net_accept(server_fd, &ipaddr);
 		if (fd == -1)
 		{
+#ifdef WINSOCK
+			if (net_error() == WSAEWOULDBLOCK)
+#else
 			if (net_error() == EWOULDBLOCK)
+#endif
 			{
 				break;
 			}
