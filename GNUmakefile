@@ -237,7 +237,7 @@ endif
 %.o: %.c version.h revision.h
 	$(MSG_CC) $(CC) -fPIC -c $(CFLAGS) -o $@ $<
 
-all: $(uhub_BINARY)
+all: $(uhub_BINARY) plugins
 
 plugins: $(uhub_BINARY) $(all_plugins)
 
