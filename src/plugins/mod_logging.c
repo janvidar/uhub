@@ -1,7 +1,7 @@
 /**
- * This is a minimal example plugin for uhub.
+ * A logging plugin for uhub.
+ * Logs to either file or syslog.
  */
-
 #include "system.h"
 #include "adc/adcconst.h"
 #include "adc/sid.h"
@@ -9,40 +9,138 @@
 #include "util/ipcalc.h"
 #include "plugin_api/handle.h"
 
+#include "util/misc.h"
+#include "util/config_token.h"
+#include <syslog.h>
+
 struct ip_addr_encap;
 
 struct log_data
 {
+	enum {
+		mode_file,
+		mode_syslog
+	} logmode;
 	char* logfile;
 	int fd;
 };
 
+static void reset(struct log_data* data)
+{
+	/* set defaults */
+	data->logmode = mode_file;
+	data->logfile = NULL;
+	data->fd = -1;
+}
 
 static void set_error_message(struct plugin_handle* plugin, const char* msg)
 {
 	plugin->error_msg = msg;
 }
 
+static int log_open_file(struct plugin_handle* plugin, struct log_data* data)
+{
+	data->fd = open(data->logfile, O_CREAT | O_APPEND | O_NOATIME | O_LARGEFILE | O_WRONLY, 0664);
+	return (data->fd != -1);
+}
 
-static struct log_data* log_open(struct plugin_handle* plugin, const char* config)
+static int log_open_syslog(struct plugin_handle* plugin)
+{
+	openlog("uhub", 0, LOG_USER);
+	return 1;
+}
+
+static struct log_data* parse_config(const char* line, struct plugin_handle* plugin)
 {
 	struct log_data* data = (struct log_data*) hub_malloc(sizeof(struct log_data));
-	data->logfile = strdup(config);
-	data->fd = open(data->logfile, O_CREAT | O_APPEND | O_NOATIME | O_LARGEFILE | O_WRONLY, 0664);
-	if (data->fd == -1)
+	struct cfg_tokens* tokens = cfg_tokenize(line);
+	char* token = cfg_token_get_first(tokens);
+
+	if (!data)
+		return 0;
+
+	reset(data);
+
+	while (token)
 	{
-		set_error_message(plugin, "Unable to open log file!");
-		hub_free(data->logfile);
-		hub_free(data);
-		return NULL;
+		struct cfg_settings* setting = cfg_settings_split(token);
+
+		if (!setting)
+		{
+			set_error_message(plugin, "Unable to parse startup parameters");
+			cfg_tokens_free(tokens);
+			hub_free(data);
+			return 0;
+		}
+
+		if (strcmp(cfg_settings_get_key(setting), "file") == 0)
+		{
+			data->logfile = strdup(cfg_settings_get_value(setting));
+			data->logmode = mode_file;
+		}
+		else if (strcmp(cfg_settings_get_key(setting), "syslog") == 0)
+		{
+			int use_syslog = 0;
+			if (!string_to_boolean(cfg_settings_get_value(setting), &use_syslog))
+			{
+				data->logmode = (use_syslog) ? mode_syslog : mode_file;
+			}
+		}
+		else
+		{
+			set_error_message(plugin, "Unknown startup parameters given");
+			cfg_tokens_free(tokens);
+			cfg_settings_free(setting);
+			hub_free(data);
+			return 0;
+		}
+
+		cfg_settings_free(setting);
+		token = cfg_token_get_next(tokens);
 	}
+
+	if (data->logmode == mode_file)
+	{
+		if ((data->logmode == mode_file && !data->logfile))
+		{
+			set_error_message(plugin, "No log file is given, use file=<path>");
+			hub_free(data);
+			return 0;
+		}
+
+		if (!log_open_file(plugin, data))
+		{
+			hub_free(data->logfile);
+			hub_free(data);
+			set_error_message(plugin, "Unable to open log file");
+			return 0;
+		}
+	}
+	else
+	{
+		if (!log_open_syslog(plugin))
+		{
+			hub_free(data->logfile);
+			hub_free(data);
+			set_error_message(plugin, "Unable to open syslog");
+			return 0;
+		}
+	}
+
 	return data;
 }
 
 static void log_close(struct log_data* data)
 {
-	hub_free(data->logfile);
-	close(data->fd);
+	if (data->logmode == mode_file)
+	{
+		hub_free(data->logfile);
+		close(data->fd);
+	}
+	else
+	{
+		closelog();
+	}
 	hub_free(data);
 }
 
@@ -54,16 +152,25 @@ static void log_message(struct log_data* data, const char *format, ...)
 	va_list args;
 	ssize_t size = 0;
 
-	t = time(NULL);
-	tmp = localtime(&t);
-	strftime(logmsg, 32, "%Y-%m-%d %H:%M:%S ", tmp);
+	if (data->logmode == mode_file)
+	{
+		t = time(NULL);
+		tmp = localtime(&t);
+		strftime(logmsg, 32, "%Y-%m-%d %H:%M:%S ", tmp);
 
-	va_start(args, format);
-	size = vsnprintf(logmsg + 20, 1004, format, args);
-	va_end(args);
+		va_start(args, format);
+		size = vsnprintf(logmsg + 20, 1004, format, args);
+		va_end(args);
 
-	write(data->fd, logmsg, size + 20);
-	fdatasync(data->fd);
+		write(data->fd, logmsg, size + 20);
+		fdatasync(data->fd);
+	}
+	else
+	{
+		va_start(args, format);
+		vsyslog(LOG_INFO, format, args);
+		va_end(args);
+	}
 }
 
 static void log_user_login(struct plugin_handle* plugin, struct plugin_user* user)
@@ -101,7 +208,7 @@ int plugin_register(struct plugin_handle* plugin, const char* config)
 	plugin->funcs.on_user_logout = log_user_logout;
 	plugin->funcs.on_user_nick_change = log_change_nick;
 
-	plugin->ptr = log_open(plugin, config);
+	plugin->ptr = parse_config(config, plugin);
 	if (!plugin->ptr)
 		return -1;
 	return 0;
