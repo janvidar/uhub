@@ -840,21 +840,22 @@ void hub_shutdown_service(struct hub_info* hub)
 }
 
 #ifdef PLUGIN_SUPPORT
-void hub_plugins_load(struct hub_info* hub)
+int hub_plugins_load(struct hub_info* hub)
 {
 	if (!hub->config->file_plugins || !*hub->config->file_plugins)
-		return;
+		return 0;
 
 	hub->plugins = hub_malloc_zero(sizeof(struct uhub_plugins));
 	if (!hub->plugins)
-		return;
+		return -1;
 
 	if (plugin_initialize(hub->config, hub->plugins) < 0)
 	{
 		hub_free(hub->plugins);
 		hub->plugins = 0;
-		return;
+		return -1;
 	}
+	return 0;
 }
 
 void hub_plugins_unload(struct hub_info* hub)
@@ -943,7 +944,11 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 	}
 
 #ifdef PLUGIN_SUPPORT
-	hub_plugins_load(hub);
+	if (hub_plugins_load(hub) < 0)
+	{
+		hub->status = hub_status_shutdown;
+	}
+	else
 #endif
 
 	hub->status = (hub->config->hub_enabled ? hub_status_running : hub_status_disabled);
