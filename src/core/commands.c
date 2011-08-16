@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2011, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -732,15 +732,22 @@ static int command_register(struct hub_info* hub, struct hub_user* user, struct 
 	data.password[MAX_PASS_LEN] = '\0';
 	data.credentials = auth_cred_user;
 
-	if (acl_register_user(hub, &data))
+	if (hub->config->register_self)
 	{
-		sprintf(tmp, "User \"%s\" registered.", user->id.nick);
-		return command_status(hub, user, cmd, tmp);
+		if (acl_register_user(hub, &data))
+		{
+			sprintf(tmp, "User \"%s\" registered.", user->id.nick);
+			return command_status(hub, user, cmd, tmp);
+		}
+		else
+		{
+			sprintf(tmp, "Unable to register user \"%s\".", user->id.nick);
+			return command_status(hub, user, cmd, tmp);
+		}
 	}
 	else
 	{
-		sprintf(tmp, "Unable to register user \"%s\".", user->id.nick);
-		return command_status(hub, user, cmd, tmp);
+		return command_status(hub, user, cmd, "You are not allowed to register.");
 	}
 }
 

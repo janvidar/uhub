@@ -108,6 +108,15 @@
 		<since>0.1.1</since>
 	</option>
 
+   <option name="register_self" type="boolean" default="0">
+	   <short>Allow users to register themselves on the hub.</short>
+		<description><![CDATA[
+			If this is enabled guests can register their nickname on the hub.
+			Otherwise only operators can register users.
+		]]></description>
+		<since>0.4.0</since>
+   </option>
+
 	<option name="obsolete_clients" type="boolean" default="0">
 		<short>Support obsolete clients using a ADC protocol prior to 1.0</short>
 		<description><![CDATA[
