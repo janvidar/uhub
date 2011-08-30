@@ -90,6 +90,7 @@ extern "C" {
 #include "core/pluginloader.h"
 #include "core/hub.h"
 #include "core/commands.h"
+#include "core/commands_builtin.h"
 #include "core/inf.h"
 #include "core/hubevent.h"
 #include "core/plugincallback.h"

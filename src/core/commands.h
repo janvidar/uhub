@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2011, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -57,7 +57,7 @@ struct command_handle
 {
 	const char* prefix;				/**<<< "Command prefix, for instance 'help' would be the prefix for the !help command." */
 	size_t length;					/**<<< "Length of the prefix" */
-	const char* args;				/**<<< "Argument codes (see below)" */
+	const char* args;				/**<<< "Argument codes (see above)" */
 	enum auth_credentials cred;		/**<<< "Minimum access level for the command" */
 	command_handler handler;		/**<<< "Function pointer for the command" */
 	const char* description;		/**<<< "Description for the command" */
@@ -81,6 +81,11 @@ extern int command_add(struct command_base*, struct command_handle*);
  * Returns 1 on success, or 0 on error.
  */
 extern int command_del(struct command_base*, struct command_handle*);
+
+/**
+ * Returns 1 if a command is available to a user (user has access to run it.)
+ */
+extern int command_is_available(struct command_handle*, struct hub_user* user);
 
 /**
  * Dispatch a message and forward it as a command.
