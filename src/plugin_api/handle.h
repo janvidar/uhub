@@ -53,6 +53,7 @@ struct plugin_user
 
 struct plugin_hub_info
 {
+	const char* description;
 };
 
 enum plugin_status
