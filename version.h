@@ -21,5 +21,5 @@
 #endif
 
 #ifndef COPYRIGHT
-#define COPYRIGHT "Copyright (c) 2007-2010, Jan Vidar Krey <janvidar@extatic.org>"
+#define COPYRIGHT "Copyright (c) 2007-2011, Jan Vidar Krey <janvidar@extatic.org>"
 #endif
