@@ -161,7 +161,7 @@ ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 		LOG_PROTO("SSL_write(con=%p, buf=%p, len=" PRINTF_SIZE_T ") => %d", con, buf, len, ret);
 		if (ret <= 0)
 		{
-			return -handle_openssl_error(con, ret);
+			return handle_openssl_error(con, ret);
 		}
 	}
 #endif
@@ -201,7 +201,7 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 		}
 		else
 		{
-			return -handle_openssl_error(con, ret);
+			return handle_openssl_error(con, ret);
 		}
 	}
 #endif
@@ -251,6 +251,9 @@ void* net_con_get_ptr(struct net_connection* con)
 
 void net_con_destroy(struct net_connection* con)
 {
+#ifdef SSL_SUPPORT
+	SSL_free(con->ssl);
+#endif
 	hub_free(con);
 }
 

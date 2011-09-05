@@ -11,6 +11,7 @@ void config_defaults(struct hub_config* config)
 	config->show_banner_sys_info = 1;
 	config->max_users = 500;
 	config->registered_users_only = 0;
+	config->register_self = 0;
 	config->obsolete_clients = 0;
 	config->chat_only = 0;
 	config->chat_is_privileged = 0;
@@ -42,6 +43,7 @@ void config_defaults(struct hub_config* config)
 	config->flood_ctl_extras = 0;
 	config->tls_enable = 0;
 	config->tls_require = 0;
+	config->tls_require_redirect_addr = hub_strdup("");
 	config->tls_certificate = hub_strdup("");
 	config->tls_private_key = hub_strdup("");
 	config->file_motd = hub_strdup("");
@@ -176,6 +178,16 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 	if (!strcmp(key, "registered_users_only"))
 	{
 		if (!apply_boolean(key, data, &config->registered_users_only))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "register_self"))
+	{
+		if (!apply_boolean(key, data, &config->register_self))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -489,6 +501,16 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 	if (!strcmp(key, "tls_require"))
 	{
 		if (!apply_boolean(key, data, &config->tls_require))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "tls_require_redirect_addr"))
+	{
+		if (!apply_string(key, data, &config->tls_require_redirect_addr, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -933,6 +955,8 @@ void free_config(struct hub_config* config)
 
 	hub_free(config->redirect_addr);
 
+	hub_free(config->tls_require_redirect_addr);
+
 	hub_free(config->tls_certificate);
 
 	hub_free(config->tls_private_key);
@@ -1048,6 +1072,9 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 	if (!ignore_defaults || config->registered_users_only != 0)
 		fprintf(stdout, "registered_users_only = %s\n", config->registered_users_only ? "yes" : "no");
 
+	if (!ignore_defaults || config->register_self != 0)
+		fprintf(stdout, "register_self = %s\n", config->register_self ? "yes" : "no");
+
 	if (!ignore_defaults || config->obsolete_clients != 0)
 		fprintf(stdout, "obsolete_clients = %s\n", config->obsolete_clients ? "yes" : "no");
 
@@ -1140,6 +1167,9 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 
 	if (!ignore_defaults || config->tls_require != 0)
 		fprintf(stdout, "tls_require = %s\n", config->tls_require ? "yes" : "no");
+
+	if (!ignore_defaults || strcmp(config->tls_require_redirect_addr, "") != 0)
+		fprintf(stdout, "tls_require_redirect_addr = \"%s\"\n", config->tls_require_redirect_addr);
 
 	if (!ignore_defaults || strcmp(config->tls_certificate, "") != 0)
 		fprintf(stdout, "tls_certificate = \"%s\"\n", config->tls_certificate);

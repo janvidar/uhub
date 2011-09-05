@@ -51,6 +51,10 @@ struct plugin_user
 	enum auth_credentials credentials;
 };
 
+struct plugin_hub_info
+{
+};
+
 enum plugin_status
 {
 	st_default = 0,    /* Use default */
@@ -100,6 +104,11 @@ typedef void (*on_user_nick_change_t)(struct plugin_handle*, struct plugin_user*
 typedef void (*on_user_update_error_t)(struct plugin_handle*, struct plugin_user*, const char* reason);
 typedef void (*on_user_chat_msg_t)(struct plugin_handle*, struct plugin_user*, const char* message, int flags);
 
+typedef void (*on_hub_started_t)(struct plugin_handle*, struct plugin_hub_info*);
+typedef void (*on_hub_reloaded_t)(struct plugin_handle*, struct plugin_hub_info*);
+typedef void (*on_hub_shutdown_t)(struct plugin_handle*, struct plugin_hub_info*);
+typedef void (*on_hub_error_t)(struct plugin_handle*, struct plugin_hub_info*, const char* message);
+
 typedef plugin_st (*on_change_nick_t)(struct plugin_handle*, struct plugin_user*, const char* new_nick);
 
 typedef plugin_st (*on_check_ip_early_t)(struct plugin_handle*, struct ip_addr_encap*);
@@ -125,6 +134,12 @@ struct plugin_funcs
 	on_user_nick_change_t   on_user_nick_change; /* A user has changed nickname */
 	on_user_update_error_t  on_user_update_error;/* A user has failed to update - nickname, etc. */
 	on_user_chat_msg_t      on_user_chat_message;/* A user has sent a public chat message */
+
+	// Log hub events
+	on_hub_started_t        on_hub_started;      /* Triggered just after plugins are loaded and the hub is started. */
+	on_hub_reloaded_t       on_hub_reloaded;     /* Triggered immediately after hub configuration is reloaded. */
+	on_hub_shutdown_t       on_hub_shutdown;     /* Triggered just before the hub is being shut down and before plugins are unloaded. */
+	on_hub_error_t          on_hub_error;        /* Triggered for log-worthy error messages */
 
 	// Activity events (can be intercepted and refused/accepted by a plugin)
 	on_chat_msg_t           on_chat_msg;         /* A public chat message is about to be sent (can be intercepted) */

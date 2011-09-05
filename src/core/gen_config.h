@@ -11,6 +11,7 @@ struct hub_config
 	int   show_banner_sys_info;            /*<<< Show banner on connect (default: 1) */
 	int   max_users;                       /*<<< Maximum number of users allowed on the hub (default: 500) */
 	int   registered_users_only;           /*<<< Allow registered users only (default: 0) */
+	int   register_self;                   /*<<< Allow users to register themselves on the hub. (default: 0) */
 	int   obsolete_clients;                /*<<< Support obsolete clients using a ADC protocol prior to 1.0 (default: 0) */
 	int   chat_only;                       /*<<< Allow chat only operation on hub (default: 0) */
 	int   chat_is_privileged;              /*<<< Allow chat for operators and above only (default: 0) */
@@ -42,6 +43,7 @@ struct hub_config
 	int   flood_ctl_extras;                /*<<< Max extra messages allowed in time interval (default: 0) */
 	int   tls_enable;                      /*<<< Enable SSL/TLS support (default: 0) */
 	int   tls_require;                     /*<<< If SSL/TLS enabled, should it be required (default: 0) (default: 0) */
+	char* tls_require_redirect_addr;       /*<<< A redirect address in case a client connects using "adc://" when "adcs://" is required. (default: ) */
 	char* tls_certificate;                 /*<<< Certificate file (default: ) */
 	char* tls_private_key;                 /*<<< Private key file (default: ) */
 	char* file_motd;                       /*<<< File containing the 'message of the day (default: ) */

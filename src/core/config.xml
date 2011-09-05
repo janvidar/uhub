@@ -108,6 +108,15 @@
 		<since>0.1.1</since>
 	</option>
 
+   <option name="register_self" type="boolean" default="0">
+	   <short>Allow users to register themselves on the hub.</short>
+		<description><![CDATA[
+			If this is enabled guests can register their nickname on the hub.
+			Otherwise only operators can register users.
+		]]></description>
+		<since>0.4.0</since>
+   </option>
+
 	<option name="obsolete_clients" type="boolean" default="0">
 		<short>Support obsolete clients using a ADC protocol prior to 1.0</short>
 		<description><![CDATA[
@@ -416,6 +425,17 @@
 		]]></description>
 		<since>0.3.0</since>
 	</option>
+
+	<option name="tls_require_redirect_addr" type="string" default="">
+		<check regexp="(adc|adcs|dchub)://.*" />
+		<short>A redirect address in case a client connects using "adc://" when "adcs://" is required.</short>
+		<description><![CDATA[
+		This is the redirect address used when the hub wants to redirect a client for not using ADCS.
+		For instance a hub at adc://adc.example.com might redirect to adcs://adc.example.com
+		]]></description>
+		<since>0.3.3</since>
+	</option>
+
 
 	<option name="tls_certificate" type="file" default="">
 		<short>Certificate file</short>

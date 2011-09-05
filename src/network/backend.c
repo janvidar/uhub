@@ -179,6 +179,14 @@ void net_con_close(struct net_connection* con)
 
 	g_backend->handler.con_del(g_backend->data, con);
 
+#ifdef SSL_SUPPORT
+	if (con->ssl)
+	{
+		SSL_shutdown(con->ssl);
+		SSL_clear(con->ssl);
+	}
+#endif
+
 	net_close(con->sd);
 	con->sd = -1;
 
@@ -196,6 +204,7 @@ struct net_cleanup_handler* net_cleanup_initialize(size_t max)
 
 void net_cleanup_shutdown(struct net_cleanup_handler* handler)
 {
+	net_cleanup_process(handler);
 	hub_free(handler->queue);
 	hub_free(handler);
 }

@@ -25,7 +25,6 @@
 struct sid_pool;
 struct hub_user;
 
-extern const char* BASE32_ALPHABET;
 extern char* sid_to_string(sid_t sid_);
 extern sid_t string_to_sid(const char* sid);
 
