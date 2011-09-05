@@ -72,7 +72,7 @@ static net_backend_init_t net_backend_init_funcs[] = {
 int net_backend_init()
 {
 	size_t n;
-	g_backend = hub_malloc_zero(sizeof(struct net_backend));
+	g_backend = (struct net_backend*) hub_malloc_zero(sizeof(struct net_backend));
 	g_backend->common.num = 0;
 	g_backend->common.max = net_get_max_sockets();
 	g_backend->now = time(0);
