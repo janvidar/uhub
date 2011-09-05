@@ -1,0 +1,7 @@
+*.vcproj.user
+*.vcproj.filters
+*.ncb
+*.aps
+*.suo
+Debug
+Release
