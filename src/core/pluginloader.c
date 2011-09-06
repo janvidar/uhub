@@ -24,35 +24,43 @@
 
 struct uhub_plugin* plugin_open(const char* filename)
 {
+	struct uhub_plugin* plugin;
 	LOG_TRACE("plugin_open: \"%s\"", filename);
-#ifdef HAVE_DLOPEN
-	struct uhub_plugin* plugin = (struct uhub_plugin*) hub_malloc_zero(sizeof(struct uhub_plugin));
+
+	plugin = (struct uhub_plugin*) hub_malloc_zero(sizeof(struct uhub_plugin));
 	if (!plugin)
 	{
 		return 0;
 	}
 
+#ifdef HAVE_DLOPEN
 	plugin->handle = dlopen(filename, RTLD_LAZY);
+#else
+	plugin->handle = LoadLibraryExA(filename, NULL, 0);
+#endif
 
 	if (!plugin->handle)
 	{
+#ifdef HAVE_DLOPEN
 		LOG_ERROR("Unable to open plugin %s: %s", filename, dlerror());
+#else
+		LOG_ERROR("Unable to open plugin %s: %s", filename, GetLastError());
+#endif
 		hub_free(plugin);
 		return 0;
 	}
 
 	return plugin;
-#else
-	return 0;
-#endif
 }
 
 void plugin_close(struct uhub_plugin* plugin)
 {
 #ifdef HAVE_DLOPEN
 	dlclose(plugin->handle);
-	hub_free(plugin);
+#else
+	FreeLibrary((HMODULE) plugin->handle);
 #endif
+	hub_free(plugin);
 }
 
 void* plugin_lookup_symbol(struct uhub_plugin* plugin, const char* symbol)
@@ -61,7 +69,8 @@ void* plugin_lookup_symbol(struct uhub_plugin* plugin, const char* symbol)
 	void* addr = dlsym(plugin->handle, symbol);
 	return addr;
 #else
-	return 0;
+	FARPROC addr = GetProcAddress((HMODULE) plugin->handle, symbol);
+	return (void*) addr;
 #endif
 }
 
