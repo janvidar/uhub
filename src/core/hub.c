@@ -974,37 +974,6 @@ void hub_free_variables(struct hub_info* hub)
 	adc_msg_free(hub->command_support);
 }
 
-
-/**
- * @return 1 if nickname is in use, or 0 if not used.
- */
-static int is_nick_in_use(struct hub_info* hub, const char* nick)
-{
-	struct hub_user* lookup = uman_get_user_by_nick(hub, nick);
-	if (lookup)
-	{
-		return 1;
-	}
-	return 0;
-}
-
-
-/**
- * @return 1 if CID is in use, or 0 if not used.
- */
-static int is_cid_in_use(struct hub_info* hub, const char* cid)
-{
-	struct hub_user* lookup = uman_get_user_by_cid(hub, cid);
-	if (lookup)
-	{
-		return 1;
-	}
-	return 0;
-}
-
-
-
-
 static void set_status_code(enum msg_status_level level, int code, char buffer[4])
 {
 	buffer[0] = ('0' + (int) level);
