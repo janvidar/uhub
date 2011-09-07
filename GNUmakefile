@@ -116,7 +116,7 @@ endif
 
 ifeq ($(USE_SSL),YES)
 CFLAGS        += -DSSL_SUPPORT
-LDLIBS        += -lssl
+LDLIBS        += -lssl -lcrypto
 endif
 
 LDLIBS        += -ldl
