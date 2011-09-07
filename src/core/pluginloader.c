@@ -44,7 +44,7 @@ struct uhub_plugin* plugin_open(const char* filename)
 #ifdef HAVE_DLOPEN
 		LOG_ERROR("Unable to open plugin %s: %s", filename, dlerror());
 #else
-		LOG_ERROR("Unable to open plugin %s: %s", filename, GetLastError());
+		LOG_ERROR("Unable to open plugin %s: %d", filename, GetLastError());
 #endif
 		hub_free(plugin);
 		return 0;

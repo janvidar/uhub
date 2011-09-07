@@ -256,4 +256,9 @@ typedef unsigned __int64 uint64_t;
 #define NEED_GETOPT
 #endif
 
+#if defined(__CYGWIN__) || defined(__MINGW32__) || defined(_MSC_VER)
+#define PLUGIN_API __declspec(dllexport)
+#else
+#define PLUGIN_API
+#endif
 #endif /* HAVE_UHUB_SYSTEM_H */

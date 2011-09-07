@@ -203,7 +203,7 @@ static plugin_st delete_user(struct plugin_handle* plugin, struct auth_info* use
 	return st_default;
 }
 
-int plugin_register(struct plugin_handle* plugin, const char* config)
+PLUGIN_API int plugin_register(struct plugin_handle* plugin, const char* config)
 {
 	PLUGIN_INITIALIZE(plugin, "File authentication plugin", "0.1", "Authenticate users based on a read-only text file.");
 
@@ -219,7 +219,7 @@ int plugin_register(struct plugin_handle* plugin, const char* config)
 	return -1;
 }
 
-int plugin_unregister(struct plugin_handle* plugin)
+PLUGIN_API int plugin_unregister(struct plugin_handle* plugin)
 {
 	set_error_message(plugin, 0);
 	unload_acl(plugin->ptr);

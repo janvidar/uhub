@@ -193,12 +193,12 @@ struct plugin_handle
  * @param config A configuration string
  * @return 0 on success, -1 on error.
  */
-extern int plugin_register(struct plugin_handle* handle, const char* config);
+PLUGIN_API int plugin_register(struct plugin_handle* handle, const char* config);
 
 /**
  * @return 0 on success, -1 on error.
  */
-extern int plugin_unregister(struct plugin_handle*);
+PLUGIN_API int plugin_unregister(struct plugin_handle*);
 
 typedef int (*plugin_register_f)(struct plugin_handle* handle, const char* config);
 typedef int (*plugin_unregister_f)(struct plugin_handle*);
