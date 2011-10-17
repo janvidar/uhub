@@ -120,9 +120,12 @@ struct cfg_tokens* cfg_tokenize(const char* line)
 
 void cfg_tokens_free(struct cfg_tokens* tokens)
 {
-	list_clear(tokens->list, hub_free);
-	list_destroy(tokens->list);
-	hub_free(tokens);
+	if (tokens)
+	{
+		list_clear(tokens->list, hub_free);
+		list_destroy(tokens->list);
+		hub_free(tokens);
+	}
 }
 
 int cfg_token_add(struct cfg_tokens* tokens, char* new_token)
