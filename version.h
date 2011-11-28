@@ -1,4 +1,6 @@
+#if !defined(_MSC_VER)
 #include "revision.h"
+#endif
 
 #ifndef PRODUCT
 #define PRODUCT "uhub"

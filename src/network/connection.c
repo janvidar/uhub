@@ -70,7 +70,6 @@ static int handle_openssl_error(struct net_connection* con, int ret)
 			con->ssl_state = tls_st_error;
 			return -1;
 	}
-
 	return -1;
 }
 

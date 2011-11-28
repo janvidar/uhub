@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2011, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -115,6 +115,11 @@ struct ADC_client
 	char* hub_address;
 	char* nick;
 	char* desc;
+	int ssl_enabled;
+#ifdef SSL_SUPPORT
+	SSL_METHOD* ssl_method;
+	SSL_CTX* ssl_ctx;
+#endif /*  SSL_SUPPORT */
 };
 
 int ADC_client_create(struct ADC_client* client, const char* nickname, const char* description);

@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2011, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -75,33 +75,32 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 {
 	struct ADC_client* client = (struct ADC_client*) net_con_get_ptr(con);
 
-	if (events == NET_EVENT_TIMEOUT)
+	switch (client->state)
 	{
-		if (client->state == ps_conn)
-		{
-			client->callback(client, ADC_CLIENT_DISCONNECTED, 0);
-		}
-		return;
-	}
+		case ps_conn:
+			if (events == NET_EVENT_TIMEOUT)
+			{
+				client->callback(client, ADC_CLIENT_DISCONNECTED, 0);
+				return;
+			}
 
-	if (events & NET_EVENT_READ)
-	{
-		if (ADC_client_recv(client) == -1)
-		{
-			ADC_client_on_disconnected(client);
-		}
-	}
+			if (events & NET_EVENT_WRITE)
+				ADC_client_connect(client, 0);
+			break;
 
-	if (events & NET_EVENT_WRITE)
-	{
-		if (client->state == ps_conn)
-		{
-			ADC_client_connect(client, 0);
-		}
-		else
-		{
-			/* FIXME: Call send again */
-		}
+		default:
+			if (events & NET_EVENT_READ)
+			{
+				if (ADC_client_recv(client) == -1)
+				{
+					ADC_client_on_disconnected(client);
+				}
+			}
+
+			if (events & NET_EVENT_WRITE)
+			{
+				/* FIXME: Call send again */
+			}
 	}
 }
 
@@ -380,6 +379,14 @@ int ADC_client_connect(struct ADC_client* client, const char* address)
 	int ret = net_connect(net_con_get_sd(client->con), (struct sockaddr*) &client->addr, sizeof(struct sockaddr_in));
 	if (ret == 0 || (ret == -1 && net_error() == EISCONN))
 	{
+#ifdef SSL_SUPPORT
+		if (ssl_enabled)
+		{
+			
+		}
+		else
+#endif
+		
 		ADC_client_on_connected(client);
 	}
 	else if (ret == -1 && (net_error() == EALREADY || net_error() == EINPROGRESS || net_error() == EWOULDBLOCK || net_error() == EINTR))
@@ -446,9 +453,9 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 
 	/* Check for ADC or ADCS */
 	if (!strncmp(arg, "adc://", 6))
-		ssl = 0;
+		client->ssl_enabled = 0;
 	else if (!strncmp(arg, "adcs://", 7))
-		ssl = 1;
+		client->ssl_enabled = 1;
 	else
 		return 0;
 

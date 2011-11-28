@@ -119,7 +119,7 @@ struct hub_info
 #endif
 
 #ifdef SSL_SUPPORT
-	SSL_METHOD* ssl_method;
+	const SSL_METHOD* ssl_method;
 	SSL_CTX* ssl_ctx;
 #endif /*  SSL_SUPPORT */
 };

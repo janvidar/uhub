@@ -26,12 +26,10 @@
 static int check_cmd_bool(const char* cmd, struct linked_list* list, char* line, int line_count)
 {
 	char* data;
-	char* data_extra;
 	
 	if (!strncmp(line, cmd, strlen(cmd)))
 	{
 		data = &line[strlen(cmd)];
-		data_extra = 0;
 		data[0] = '\0';
 		data++;
 		

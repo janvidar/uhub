@@ -328,9 +328,8 @@ void runloop(size_t clients)
 		ADC_client_connect(c, cfg_uri);
 	}
 
-	while (running)
+	while (net_backend_process())
 	{
-		net_backend_process();
 	}
 
 	for (n = 0; n < clients; n++)
