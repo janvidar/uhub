@@ -23,7 +23,6 @@ static int cfg_level       = 1; /* activity level (0..3) */
 static int cfg_chat        = 0; /* chat mode, allow sending chat messages */
 static int cfg_quiet       = 0; /* quiet mode (no output) */
 static int cfg_clients     = ADC_CLIENTS_DEFAULT; /* number of clients */
-static int running         = 1;
 
 #define MAX_CHAT_MSGS 35
 const char* chat_messages[MAX_CHAT_MSGS] = {

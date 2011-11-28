@@ -380,7 +380,7 @@ int ADC_client_connect(struct ADC_client* client, const char* address)
 	if (ret == 0 || (ret == -1 && net_error() == EISCONN))
 	{
 #ifdef SSL_SUPPORT
-		if (ssl_enabled)
+		if (client->ssl_enabled)
 		{
 			
 		}
