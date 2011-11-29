@@ -92,20 +92,14 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 				{
 					LOG_TRACE("Probed TLS %d.%d connection. TLS disabled in hub.", (int) probe_recvbuf[1], (int) probe_recvbuf[2]);
 				}
-				probe_destroy(probe);
-				return;
 			}
 			else
 			{
-				LOG_TRACE("Probed TLS %d.%d connection", (int) probe_recvbuf[1], (int) probe_recvbuf[2]);
-
-				net_con_ssl_handshake(con, net_con_ssl_mode_server, probe->hub->ssl_ctx);
-				return;
+				LOG_TRACE("Probed unsupported protocol: %x%x%x%x.", (int) probe_recvbuf[0], (int) probe_recvbuf[1], (int) probe_recvbuf[2], (int) probe_recvbuf[3]);
 			}
-#else
+#endif
 			probe_destroy(probe);
 			return;
-#endif
 		}
 	}
 }
