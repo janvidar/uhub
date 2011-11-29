@@ -20,6 +20,10 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 			puts("*** Disconnected.");
 			break;
 
+		case ADC_CLIENT_SSL_HANDSHAKE:
+			puts("*** SSL handshake.");
+			break;
+
 		case ADC_CLIENT_LOGGING_IN:
 			puts("*** Logging in...");
 			break;

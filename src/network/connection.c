@@ -122,6 +122,11 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode 
 	if (ssl_mode == net_con_ssl_mode_server)
 	{
 		ssl = SSL_new(ssl_ctx);
+		if (!ssl)
+		{
+			LOG_ERROR("Unable to create new SSL stream\n");
+			return -1;
+		}
 		SSL_set_fd(ssl, con->sd);
 		net_con_set_ssl(con, ssl);
 		return net_con_ssl_accept(con);

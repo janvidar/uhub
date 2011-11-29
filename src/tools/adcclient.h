@@ -26,12 +26,13 @@
 
 enum ADC_client_state
 {
-	ps_none     = 0x00, /* Not connected */
-	ps_conn     = 0x01, /* Connecting... */
-	ps_protocol = 0x02, /* Have sent HSUP */
-	ps_identify = 0x04, /* Have sent BINF */
-	ps_verify   = 0x08, /* Have sent HPAS */
-	ps_normal   = 0x10, /* Are fully logged in */
+	ps_none, /* Not connected */
+	ps_conn, /* Connecting... */
+	ps_conn_ssl, /* SSL handshake */
+	ps_protocol, /* Have sent HSUP */
+	ps_identify, /* Have sent BINF */
+	ps_verify, /* Have sent HPAS */
+	ps_normal, /* Are fully logged in */
 };
 
 struct ADC_client;
@@ -41,6 +42,8 @@ enum ADC_client_callback_type
 	ADC_CLIENT_CONNECTING       = 1001,
 	ADC_CLIENT_CONNECTED        = 1002,
 	ADC_CLIENT_DISCONNECTED     = 1003,
+	ADC_CLIENT_SSL_HANDSHAKE    = 1101,
+	ADC_CLIENT_SSL_OK           = 1102,
 
 	ADC_CLIENT_LOGGING_IN       = 2001,
 	ADC_CLIENT_PASSWORD_REQ     = 2002,
@@ -117,7 +120,7 @@ struct ADC_client
 	char* desc;
 	int ssl_enabled;
 #ifdef SSL_SUPPORT
-	SSL_METHOD* ssl_method;
+	const SSL_METHOD* ssl_method;
 	SSL_CTX* ssl_ctx;
 #endif /*  SSL_SUPPORT */
 };

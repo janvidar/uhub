@@ -23,10 +23,14 @@
 #define ADC_CID_SIZE 39
 #define BIG_BUFSIZE 32768
 #define TIGERSIZE 24
+// #define ADCC_DEBUG
 
 static ssize_t ADC_client_recv(struct ADC_client* client);
 static void ADC_client_send_info(struct ADC_client* client);
 static void ADC_client_on_connected(struct ADC_client* client);
+#ifdef SSL_SUPPORT
+static void ADC_client_on_connected_ssl(struct ADC_client* client);
+#endif
 static void ADC_client_on_disconnected(struct ADC_client* client);
 static void ADC_client_on_login(struct ADC_client* client);
 static int ADC_client_parse_address(struct ADC_client* client, const char* arg);
@@ -42,14 +46,42 @@ static void ADC_client_debug(struct ADC_client* client, const char* format, ...)
 	fprintf(stdout, "* [%p] %s\n", client, logmsg);
 }
 
+#ifdef ADCC_DEBUG
+#define ADC_TRACE fprintf(stderr, "TRACE: %s\n", __PRETTY_FUNCTION__)
+#else
+#define ADC_TRACE do { } while(0)
+#endif
+
+#ifdef ADCC_DEBUG
+static const char* ADC_client_state_string[] =
+{
+	"ps_none",
+	"ps_conn",
+	"ps_conn_ssl",
+	"ps_protocol",
+	"ps_identify",
+	"ps_verify",
+	"ps_normal",
+	0
+};
+#endif
+
 static void ADC_client_set_state(struct ADC_client* client, enum ADC_client_state state)
 {
-	client->state = state;
+	ADC_TRACE;
+	if (client->state != state)
+	{
+#ifdef ADCC_DEBUG
+		ADC_client_debug(client, "Set state %s (was %s)", ADC_client_state_string[(int) state], ADC_client_state_string[(int) client->state]);
+#endif
+		client->state = state;
+	}
 }
 
 
 static void adc_cid_pid(struct ADC_client* client)
 {
+	ADC_TRACE;
 	char seed[64];
 	char pid[64];
 	char cid[64];
@@ -73,6 +105,7 @@ static void adc_cid_pid(struct ADC_client* client)
 
 static void event_callback(struct net_connection* con, int events, void *arg)
 {
+	ADC_TRACE;
 	struct ADC_client* client = (struct ADC_client*) net_con_get_ptr(con);
 
 	switch (client->state)
@@ -87,6 +120,18 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 			if (events & NET_EVENT_WRITE)
 				ADC_client_connect(client, 0);
 			break;
+
+#ifdef SSL_SUPPORT
+		case ps_conn_ssl:
+			if (events == NET_EVENT_TIMEOUT)
+			{
+				client->callback(client, ADC_CLIENT_DISCONNECTED, 0);
+				return;
+			}
+
+			ADC_client_on_connected_ssl(client);
+			break;
+#endif
 
 		default:
 			if (events & NET_EVENT_READ)
@@ -126,6 +171,7 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 
 static void ADC_client_on_recv_line(struct ADC_client* client, const char* line, size_t length)
 {
+	ADC_TRACE;
 #ifdef ADC_CLIENT_DEBUG_PROTO
 	ADC_client_debug(client, "- LINE: '%s'", start);
 #endif
@@ -249,6 +295,7 @@ static void ADC_client_on_recv_line(struct ADC_client* client, const char* line,
 
 static ssize_t ADC_client_recv(struct ADC_client* client)
 {
+	ADC_TRACE;
 	ssize_t size = net_con_recv(client->con, &client->recvbuf[client->r_offset], ADC_BUFSIZE - client->r_offset);
 	if (size <= 0)
 		return size;
@@ -284,6 +331,7 @@ static ssize_t ADC_client_recv(struct ADC_client* client)
 
 void ADC_client_send(struct ADC_client* client, char* msg)
 {
+	ADC_TRACE;
 	int ret = net_con_send(client->con, msg, strlen(msg));
 
 #ifdef ADC_CLIENT_DEBUG_PROTO
@@ -310,6 +358,7 @@ void ADC_client_send(struct ADC_client* client, char* msg)
 
 void ADC_client_send_info(struct ADC_client* client)
 {
+	ADC_TRACE;
 	char binf[11];
 	snprintf(binf, 11, "BINF %s\n", sid_to_string(client->sid));
 	client->info = adc_msg_create(binf);
@@ -329,6 +378,7 @@ void ADC_client_send_info(struct ADC_client* client)
 
 int ADC_client_create(struct ADC_client* client, const char* nickname, const char* description)
 {
+	ADC_TRACE;
 	memset(client, 0, sizeof(struct ADC_client));
 
 	int sd = net_socket_create(PF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -354,6 +404,7 @@ int ADC_client_create(struct ADC_client* client, const char* nickname, const cha
 
 void ADC_client_destroy(struct ADC_client* client)
 {
+	ADC_TRACE;
 	ADC_client_disconnect(client);
 #if 0
 	/* FIXME */
@@ -368,6 +419,7 @@ void ADC_client_destroy(struct ADC_client* client)
 
 int ADC_client_connect(struct ADC_client* client, const char* address)
 {
+	ADC_TRACE;
 	if (!client->hub_address)
 	{
 		if (!ADC_client_parse_address(client, address))
@@ -379,23 +431,12 @@ int ADC_client_connect(struct ADC_client* client, const char* address)
 	int ret = net_connect(net_con_get_sd(client->con), (struct sockaddr*) &client->addr, sizeof(struct sockaddr_in));
 	if (ret == 0 || (ret == -1 && net_error() == EISCONN))
 	{
-#ifdef SSL_SUPPORT
-		if (client->ssl_enabled)
-		{
-			
-		}
-		else
-#endif
-		
 		ADC_client_on_connected(client);
 	}
 	else if (ret == -1 && (net_error() == EALREADY || net_error() == EINPROGRESS || net_error() == EWOULDBLOCK || net_error() == EINTR))
 	{
-		if (client->state != ps_conn)
-		{
-			net_con_update(client->con, NET_EVENT_READ | NET_EVENT_WRITE);
-			ADC_client_set_state(client, ps_conn);
-		}
+		net_con_update(client->con, NET_EVENT_READ | NET_EVENT_WRITE);
+		ADC_client_set_state(client, ps_conn);
 	}
 	else
 	{
@@ -407,14 +448,38 @@ int ADC_client_connect(struct ADC_client* client, const char* address)
 
 static void ADC_client_on_connected(struct ADC_client* client)
 {
+	ADC_TRACE;
+#ifdef SSL_SUPPORT
+	if (client->ssl_enabled)
+	{
+		net_con_update(client->con, NET_EVENT_READ | NET_EVENT_WRITE);
+		client->callback(client, ADC_CLIENT_SSL_HANDSHAKE, 0);
+		ADC_client_set_state(client, ps_conn_ssl);
+	}
+	else
+#endif
+	{
+		net_con_update(client->con, NET_EVENT_READ);
+		client->callback(client, ADC_CLIENT_CONNECTED, 0);
+		ADC_client_send(client, ADC_HANDSHAKE);
+		ADC_client_set_state(client, ps_protocol);
+	}
+}
+
+#ifdef SSL_SUPPORT
+static void ADC_client_on_connected_ssl(struct ADC_client* client)
+{
+	ADC_TRACE;
 	net_con_update(client->con, NET_EVENT_READ);
 	client->callback(client, ADC_CLIENT_CONNECTED, 0);
 	ADC_client_send(client, ADC_HANDSHAKE);
 	ADC_client_set_state(client, ps_protocol);
 }
+#endif
 
 static void ADC_client_on_disconnected(struct ADC_client* client)
 {
+	ADC_TRACE;
 	net_con_close(client->con);
 	client->con = 0;
 	ADC_client_set_state(client, ps_none);
@@ -422,12 +487,14 @@ static void ADC_client_on_disconnected(struct ADC_client* client)
 
 static void ADC_client_on_login(struct ADC_client* client)
 {
+	ADC_TRACE;
 	ADC_client_set_state(client, ps_normal);
 	client->callback(client, ADC_CLIENT_LOGGED_IN, 0);
 }
 
 void ADC_client_disconnect(struct ADC_client* client)
 {
+	ADC_TRACE;
 	if (client->con && net_con_get_sd(client->con) != -1)
 	{
 		net_con_close(client->con);
@@ -437,6 +504,7 @@ void ADC_client_disconnect(struct ADC_client* client)
 
 static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 {
+	ADC_TRACE;
 	char* split;
 	int ssl = 0;
 	struct hostent* dns;
@@ -455,7 +523,10 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 	if (!strncmp(arg, "adc://", 6))
 		client->ssl_enabled = 0;
 	else if (!strncmp(arg, "adcs://", 7))
+	{
 		client->ssl_enabled = 1;
+		ssl = 1;
+	}
 	else
 		return 0;
 
@@ -488,5 +559,6 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 
 void ADC_client_set_callback(struct ADC_client* client, adc_client_cb cb)
 {
+	ADC_TRACE;
 	client->callback = cb;
 }
