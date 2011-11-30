@@ -141,6 +141,10 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode 
 }
 #endif /* SSL_SUPPORT */
 
+#ifdef SSL_SUPPORT
+void net_stats_add_tx(size_t bytes);
+void net_stats_add_rx(size_t bytes);
+#endif
 
 ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 {
@@ -166,6 +170,10 @@ ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 		if (ret <= 0)
 		{
 			return handle_openssl_error(con, ret);
+		}
+		else
+		{
+			 net_stats_add_tx(ret);
 		}
 	}
 #endif
@@ -202,6 +210,7 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 		if (ret > 0)
 		{
 			net_con_update(con, NET_EVENT_READ);
+			net_stats_add_rx(ret);
 		}
 		else
 		{
