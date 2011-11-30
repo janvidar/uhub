@@ -258,6 +258,7 @@ static void ADC_client_on_recv_line(struct ADC_client* client, const char* line,
 				if (adc_msg_has_named_argument(msg, "ID"))
 				{
 					struct ADC_user user;
+					user.sid = msg->source;
 					EXTRACT_NAMED_ARG(msg, "NI", user.name);
 					EXTRACT_NAMED_ARG(msg, "DE", user.description);
 					EXTRACT_NAMED_ARG(msg, "VE", user.version);

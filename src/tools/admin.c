@@ -44,7 +44,7 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 			break;
 
 		case ADC_CLIENT_USER_JOIN:
-			printf("    JOIN: %s\n", data->user->name);
+			printf("    JOIN: %s %s\n", sid_to_string(data->user->sid), data->user->name);
 			break;
 
 		case ADC_CLIENT_USER_QUIT:
