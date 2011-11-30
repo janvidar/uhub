@@ -181,6 +181,10 @@ static int convert_support_fourcc(int fourcc)
 		case FOURCC('A','D','C','S'):
 			return feature_adcs;
 
+		// ignore these extensions, they are not useful for the hub.
+		case FOURCC('D','H','T','0'):
+			return 0;
+
 		default:
 			LOG_DEBUG("Unknown extension: %x", fourcc);
 			return 0;
