@@ -337,8 +337,10 @@ void hub_chat_history_add(struct hub_info* hub, struct hub_user* user, struct ad
 {
 	char* msg_esc   = adc_msg_get_argument(cmd, 0);
 	char* message = adc_msg_unescape(msg_esc);
-	char* log = hub_malloc(strlen(message) + strlen(user->id.nick) + 14);
-	sprintf(log, "%s <%s> %s\n", get_timestamp(time(NULL)), user->id.nick, message);
+	size_t loglen = strlen(message) + strlen(user->id.nick) + 13;
+	char* log = hub_malloc(loglen + 1);
+	snprintf(log, loglen, "%s <%s> %s\n", get_timestamp(time(NULL)), user->id.nick, message);
+	log[loglen] = '\0';
 	list_append(hub->chat_history, log);
 	while (list_size(hub->chat_history) > (size_t) hub->config->max_chat_history)
 	{
@@ -1331,8 +1333,8 @@ void hub_logout_log(struct hub_info* hub, struct hub_user* user)
 	struct hub_logout_info* loginfo = hub_malloc_zero(sizeof(struct hub_logout_info));
 	if (!loginfo) return;
 	loginfo->time = time(NULL);
-	strcpy(loginfo->cid, user->id.cid);
-	strcpy(loginfo->nick, user->id.nick);
+	memcpy(loginfo->cid, user->id.cid, sizeof(loginfo->cid));
+	memcpy(loginfo->nick, user->id.nick, sizeof(loginfo->nick));
 	memcpy(&loginfo->addr, &user->id.addr, sizeof(struct ip_addr_encap));
 	loginfo->reason = user->quit_reason;
 

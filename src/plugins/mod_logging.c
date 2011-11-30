@@ -40,7 +40,8 @@ static void set_error_message(struct plugin_handle* plugin, const char* msg)
 
 static int log_open_file(struct plugin_handle* plugin, struct log_data* data)
 {
-	data->fd = open(data->logfile, O_CREAT | O_APPEND | O_NOATIME | O_LARGEFILE | O_WRONLY, 0664);
+	int flags = O_CREAT | O_APPEND | O_WRONLY;
+	data->fd = open(data->logfile, flags, 0664);
 	return (data->fd != -1);
 }
 
@@ -163,7 +164,12 @@ static void log_message(struct log_data* data, const char *format, ...)
 		va_end(args);
 
 		write(data->fd, logmsg, size + 20);
+
+#ifdef _POSIX_SYNCHRONIZED_IO
 		fdatasync(data->fd);
+#else
+		fsync(data->fd);
+#endif
 	}
 	else
 	{

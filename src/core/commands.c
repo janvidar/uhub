@@ -328,7 +328,7 @@ static int command_help(struct hub_info* hub, struct hub_user* user, struct hub_
 
 		if (!found)
 		{
-			sprintf(msg, "Command \"%s\" not found.\n", command);
+			snprintf(msg, sizeof(msg), "Command \"%s\" not found.\n", command);
 		}
 	}
 	return command_status(hub, user, cmd, msg);
@@ -676,11 +676,11 @@ static int command_log(struct hub_info* hub, struct hub_user* user, struct hub_c
 
 	if (search_len)
 	{
-		sprintf(tmp, "Logged entries: " PRINTF_SIZE_T ", searching for \"%s\"", list_size(messages), search);
+		snprintf(tmp, sizeof(tmp), "Logged entries: " PRINTF_SIZE_T ", searching for \"%s\"", list_size(messages), search);
 	}
 	else
 	{
-		sprintf(tmp, "Logged entries: " PRINTF_SIZE_T, list_size(messages));
+		snprintf(tmp, sizeof(tmp), "Logged entries: " PRINTF_SIZE_T, list_size(messages));
 	}
 	command_status(hub, user, cmd, tmp);
 
@@ -705,7 +705,7 @@ static int command_log(struct hub_info* hub, struct hub_user* user, struct hub_c
 
 		if (show)
 		{
-			sprintf(tmp, "* %s %s, %s [%s] - %s", get_timestamp(log->time), log->cid, log->nick, ip_convert_to_string(&log->addr), user_get_quit_reason_string(log->reason));
+			snprintf(tmp, sizeof(tmp), "* %s %s, %s [%s] - %s", get_timestamp(log->time), log->cid, log->nick, ip_convert_to_string(&log->addr), user_get_quit_reason_string(log->reason));
 			send_message(hub, user, tmp);
 		}
 		log = (struct hub_logout_info*) list_get_next(messages);
@@ -713,7 +713,7 @@ static int command_log(struct hub_info* hub, struct hub_user* user, struct hub_c
 
 	if (search_len)
 	{
-		sprintf(tmp, PRINTF_SIZE_T " entries shown.", search_hits);
+		snprintf(tmp, sizeof(tmp), PRINTF_SIZE_T " entries shown.", search_hits);
 		command_status(hub, user, cmd, tmp);
 	}
 
@@ -736,12 +736,12 @@ static int command_register(struct hub_info* hub, struct hub_user* user, struct 
 	{
 		if (acl_register_user(hub, &data))
 		{
-			sprintf(tmp, "User \"%s\" registered.", user->id.nick);
+			snprintf(tmp, sizeof(tmp), "User \"%s\" registered.", user->id.nick);
 			return command_status(hub, user, cmd, tmp);
 		}
 		else
 		{
-			sprintf(tmp, "Unable to register user \"%s\".", user->id.nick);
+			snprintf(tmp, sizeof(tmp), "Unable to register user \"%s\".", user->id.nick);
 			return command_status(hub, user, cmd, tmp);
 		}
 	}
@@ -769,7 +769,7 @@ static int command_password(struct hub_info* hub, struct hub_user* user, struct 
 	}
 	else
 	{
-		sprintf(tmp, "Unable to change password for user \"%s\".", user->id.nick);
+		snprintf(tmp, sizeof(tmp), "Unable to change password for user \"%s\".", user->id.nick);
 		return command_status(hub, user, cmd, tmp);
 	}
 }
@@ -796,12 +796,12 @@ static int command_useradd(struct hub_info* hub, struct hub_user* user, struct h
 
 	if (acl_register_user(hub, &data))
 	{
-		sprintf(tmp, "User \"%s\" registered.", nick);
+		snprintf(tmp, sizeof(tmp), "User \"%s\" registered.", nick);
 		return command_status(hub, user, cmd, tmp);
 	}
 	else
 	{
-		sprintf(tmp, "Unable to register user \"%s\".", nick);
+		snprintf(tmp, sizeof(tmp), "Unable to register user \"%s\".", nick);
 		return command_status(hub, user, cmd, tmp);
 	}
 }
@@ -813,12 +813,12 @@ static int command_userdel(struct hub_info* hub, struct hub_user* user, struct h
 
 	if (acl_delete_user(hub, nick))
 	{
-		sprintf(tmp, "User \"%s\" is deleted.", nick);
+		snprintf(tmp, sizeof(tmp), "User \"%s\" is deleted.", nick);
 		return command_status(hub, user, cmd, tmp);
 	}
 	else
 	{
-		sprintf(tmp, "Unable to delete user \"%s\".", nick);
+		snprintf(tmp, sizeof(tmp), "Unable to delete user \"%s\".", nick);
 		return command_status(hub, user, cmd, tmp);
 	}
 }

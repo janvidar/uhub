@@ -26,4 +26,5 @@ extern int optind;
 
 extern int getopt(int argc, char* const argv[], const char *optstring);
 
-#endif
+#endif /* NEED_GETOPT */
+

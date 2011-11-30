@@ -399,7 +399,7 @@ const char* get_timestamp(time_t now)
 {
 	static char ts[32] = {0, };
 	struct tm* t  = localtime(&now);
-	sprintf(ts, "[%02d:%02d]", t->tm_hour, t->tm_min);
+	snprintf(ts, sizeof(ts), "[%02d:%02d]", t->tm_hour, t->tm_min);
 	return ts;
 }
 

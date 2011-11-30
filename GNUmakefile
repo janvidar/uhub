@@ -11,6 +11,7 @@ MV            := mv
 RANLIB        := ranlib
 CFLAGS        += -pipe -Wall
 USE_SSL       ?= YES
+USE_PLUGINS   ?= YES
 USE_BIGENDIAN ?= AUTO
 BITS          ?= AUTO
 SILENT        ?= YES
@@ -119,8 +120,6 @@ CFLAGS        += -DSSL_SUPPORT
 LDLIBS        += -lssl -lcrypto
 endif
 
-LDLIBS        += -ldl
-
 GIT_VERSION=$(shell git describe --tags 2>/dev/null || echo "")
 GIT_REVISION=$(shell git show --abbrev-commit  2>/dev/null | head -n 1 | cut -f 2 -d " " || echo "")
 OLD_REVISION=$(shell grep GIT_REVISION revision.h 2>/dev/null | cut -f 3 -d " " | tr -d "\"")
@@ -221,7 +220,7 @@ adcrush_OBJECTS       := $(adcrush_SOURCES:.c=.o)
 admin_OBJECTS         := $(admin_SOURCES:.c=.o)
 
 all_OBJECTS     := $(libuhub_OBJECTS) $(uhub_OBJECTS) $(libutils_OBJECTS) $(adcrush_OBJECTS) $(autotest_OBJECTS) $(admin_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
-all_plugins     := $(plugin_example_TARGET) $(plugin_logging_TARGET) $(plugin_auth_TARGET) $(plugin_auth_sqlite_TARGET)
+all_plugins     :=
 
 uhub_BINARY=uhub$(BIN_EXT)
 adcrush_BINARY=adcrush$(BIN_EXT)
@@ -229,7 +228,8 @@ admin_BINARY=uhub-admin$(BIN_EXT)
 autotest_BINARY=autotest/test$(BIN_EXT)
 
 ifeq ($(USE_PLUGINS),YES)
-all_OBJECTS     += $(plugins)
+all_plugins     := $(plugin_example_TARGET) $(plugin_logging_TARGET) $(plugin_auth_TARGET) $(plugin_auth_sqlite_TARGET)
+all_OBJECTS     += $(all_plugins)
 endif
 
 .PHONY: revision.h.tmp all plugins
