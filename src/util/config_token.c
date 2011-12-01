@@ -30,7 +30,7 @@ struct cfg_tokens
 struct cfg_tokens* cfg_tokenize(const char* line)
 {
 	struct cfg_tokens* tokens = (struct cfg_tokens*) hub_malloc_zero(sizeof(struct cfg_tokens));
-	char* buffer = (char*) hub_malloc_zero(strlen(line));
+	char* buffer = (char*) hub_malloc_zero(strlen(line) + 1);
 	char* out = buffer;
 	const char* p = line;
 	int backslash = 0;
@@ -68,6 +68,7 @@ struct cfg_tokens* cfg_tokenize(const char* line)
 				else
 				{
 					RESET_TOKEN;
+					hub_free(buffer);
 					return tokens;
 				}
 				break;
@@ -115,6 +116,7 @@ struct cfg_tokens* cfg_tokenize(const char* line)
 	}
 
 	RESET_TOKEN;
+	hub_free(buffer);
 	return tokens;
 }
 

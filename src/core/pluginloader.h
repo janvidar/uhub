@@ -30,6 +30,7 @@ struct uhub_plugin
 {
 	void* handle;
 	plugin_unregister_f unregister;
+	char* filename;
 };
 
 struct uhub_plugins

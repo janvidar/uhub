@@ -50,16 +50,19 @@ struct uhub_plugin* plugin_open(const char* filename)
 		return 0;
 	}
 
+	plugin->filename = strdup(filename);
 	return plugin;
 }
 
 void plugin_close(struct uhub_plugin* plugin)
 {
+	LOG_TRACE("plugin_close: \"%s\"", plugin->filename);
 #ifdef HAVE_DLOPEN
 	dlclose(plugin->handle);
 #else
 	FreeLibrary((HMODULE) plugin->handle);
 #endif
+	hub_free(plugin->filename);
 	hub_free(plugin);
 }
 
@@ -127,6 +130,7 @@ void plugin_unload(struct plugin_handle* plugin)
 {
 	plugin->handle->unregister(plugin);
 	plugin_close(plugin->handle);
+	hub_free(plugin);
 }
 
 static int plugin_parse_line(char* line, int line_count, void* ptr_data)
@@ -186,7 +190,12 @@ int plugin_initialize(struct hub_config* config, struct uhub_plugins* handle)
 
 		ret = file_read_lines(config->file_plugins, handle, &plugin_parse_line);
 		if (ret == -1)
+		{
+			list_clear(handle->loaded, hub_free);
+			list_destroy(handle->loaded);
+			handle->loaded = 0;
 			return -1;
+		}
 	}
 	return 0;
 }

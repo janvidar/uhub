@@ -100,6 +100,8 @@ static struct log_data* parse_config(const char* line, struct plugin_handle* plu
 		token = cfg_token_get_next(tokens);
 	}
 
+	cfg_tokens_free(tokens);
+
 	if (data->logmode == mode_file)
 	{
 		if ((data->logmode == mode_file && !data->logfile))
