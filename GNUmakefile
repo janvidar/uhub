@@ -245,7 +245,7 @@ $(plugin_auth_TARGET): $(plugin_auth_SOURCES) $(libutils_OBJECTS)
 	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
 
 $(plugin_auth_sqlite_TARGET): $(plugin_auth_sqlite_SOURCES) $(libutils_OBJECTS) 
-	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS) $(plugin_auth_sqlite_LIBS)
+	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS) $(LDFLAGS) $(plugin_auth_sqlite_LIBS)
 
 $(plugin_example_TARGET): $(plugin_example_SOURCES)
 	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
