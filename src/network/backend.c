@@ -222,7 +222,7 @@ void net_cleanup_process(struct net_cleanup_handler* handler)
 	{
 		struct net_connection* con = handler->queue[n];
 		LOG_TRACE("net_cleanup_process: free: %p", con);
-		hub_free(con);
+		net_con_destroy(con);
 	}
 	handler->num = 0;
 }
