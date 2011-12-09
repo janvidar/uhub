@@ -106,8 +106,10 @@
 #endif
 
 #ifdef BSD_LIKE
+/*
 #define USE_KQUEUE
 #include <sys/event.h>
+*/
 #endif
 
 #define USE_SELECT
