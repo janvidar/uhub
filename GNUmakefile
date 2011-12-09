@@ -139,6 +139,7 @@ libuhub_SOURCES := \
 		src/core/route.c \
 		src/core/user.c \
 		src/core/usermanager.c \
+		src/core/plugincallback.c \
 		src/core/plugininvoke.c \
 		src/core/pluginloader.c \
 		src/network/backend.c \
@@ -208,6 +209,8 @@ plugin_auth_sqlite_SOURCES := src/plugins/mod_auth_sqlite.c
 plugin_auth_sqlite_TARGET  := mod_auth_sqlite.so
 plugin_auth_sqlite_LIBS    := -lsqlite3
 
+plugin_chat_history_SOURCE := src/plugins/mod_chat_history.c
+plugin_chat_history_TARGET := mod_chat_history.so
 
 # Source to objects
 libuhub_OBJECTS       := $(libuhub_SOURCES:.c=.o)
@@ -220,7 +223,7 @@ adcrush_OBJECTS       := $(adcrush_SOURCES:.c=.o)
 admin_OBJECTS         := $(admin_SOURCES:.c=.o)
 
 all_OBJECTS     := $(libuhub_OBJECTS) $(uhub_OBJECTS) $(libutils_OBJECTS) $(adcrush_OBJECTS) $(autotest_OBJECTS) $(admin_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
-all_plugins     :=
+all_plugins     := $(plugin_example_TARGET) $(plugin_logging_TARGET) $(plugin_auth_TARGET) $(plugin_auth_sqlite_TARGET) $(plugin_chat_history_TARGET)
 
 uhub_BINARY=uhub$(BIN_EXT)
 adcrush_BINARY=adcrush$(BIN_EXT)
@@ -247,10 +250,13 @@ $(plugin_auth_TARGET): $(plugin_auth_SOURCES) $(libutils_OBJECTS)
 $(plugin_auth_sqlite_TARGET): $(plugin_auth_sqlite_SOURCES) $(libutils_OBJECTS) 
 	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS) $(LDFLAGS) $(plugin_auth_sqlite_LIBS)
 
-$(plugin_example_TARGET): $(plugin_example_SOURCES)
+$(plugin_example_TARGET): $(plugin_example_SOURCES) $(libutils_OBJECTS)
 	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
 
 $(plugin_logging_TARGET): $(plugin_logging_SOURCES) $(libutils_OBJECTS) $(libadc_common_OBJECTS) src/network/network.o
+	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
+
+$(plugin_chat_history_TARGET): $(plugin_chat_history_SOURCE) $(libutils_OBJECTS)
 	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
 
 $(adcrush_BINARY): $(adcrush_OBJECTS) $(libuhub_OBJECTS) $(libutils_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)

@@ -1,11 +1,9 @@
-Authors of uHub
+Authors of uhub
 ===============
 
 Jan Vidar Krey, Design and implementation
 E_zombie, Centos/RedHat customization scripts and heavy load testing
-
-Thanks to:
-==========
-
-tehnick, Fixing Debian's lintian warnings.
+FleetCommand, Hub topic
+MiMic, Implemented user commands
+tehnick, Debian and Ubuntu packaging.
 

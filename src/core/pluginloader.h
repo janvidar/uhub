@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2011, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@
 #include "plugin_api/handle.h"
 
 struct hub_config;
+struct hub_info;
 struct linked_list;
 struct plugin_handle;
 
@@ -31,6 +32,7 @@ struct uhub_plugin
 	void* handle;
 	plugin_unregister_f unregister;
 	char* filename;
+	void* internals;      // Hub internal stuff
 };
 
 struct uhub_plugins
@@ -39,17 +41,20 @@ struct uhub_plugins
 };
 
 // High level plugin loader ode
-extern struct plugin_handle* plugin_load(const char* filename, const char* config);
+extern struct plugin_handle* plugin_load(const char* filename, const char* config, struct hub_info* hub);
 extern void plugin_unload(struct plugin_handle* plugin);
 
 // extern void plugin_unload(struct plugin_handle*);
-extern int plugin_initialize(struct hub_config* config, struct uhub_plugins* handle);
+extern int plugin_initialize(struct hub_config* config, struct hub_info* hub);
 extern void plugin_shutdown(struct uhub_plugins* handle);
 
 // Low level plugin loader code (used internally)
 extern struct uhub_plugin* plugin_open(const char* filename);
 extern void plugin_close(struct uhub_plugin*);
 extern void* plugin_lookup_symbol(struct uhub_plugin*, const char* symbol);
+
+// Used internally only
+extern struct hub_info* plugin_get_hub(struct plugin_handle*);
 
 #endif /* HAVE_UHUB_PLUGIN_LOADER_H */
 

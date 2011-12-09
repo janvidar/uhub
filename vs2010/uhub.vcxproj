@@ -93,6 +93,7 @@
     <ClCompile Include="..\src\core\inf.c" />
     <ClCompile Include="..\src\core\main.c" />
     <ClCompile Include="..\src\core\netevent.c" />
+    <ClCompile Include="..\src\core\plugincallback.c" />
     <ClCompile Include="..\src\core\plugininvoke.c" />
     <ClCompile Include="..\src\core\pluginloader.c" />
     <ClCompile Include="..\src\core\probe.c" />
@@ -115,6 +116,7 @@
     <ClInclude Include="..\src\adc\sid.h" />
     <ClInclude Include="..\src\core\auth.h" />
     <ClInclude Include="..\src\core\commands.h" />
+    <ClInclude Include="..\src\core\commands_builtin.h" />
     <ClInclude Include="..\src\core\config.h" />
     <ClInclude Include="..\src\core\eventid.h" />
     <ClInclude Include="..\src\core\eventqueue.h" />
@@ -124,6 +126,7 @@
     <ClInclude Include="..\src\core\hubio.h" />
     <ClInclude Include="..\src\core\inf.h" />
     <ClInclude Include="..\src\core\netevent.h" />
+    <ClInclude Include="..\src\core\plugincallback.h" />
     <ClInclude Include="..\src\core\plugininvoke.h" />
     <ClInclude Include="..\src\core\pluginloader.h" />
     <ClInclude Include="..\src\core\probe.h" />
@@ -135,6 +138,7 @@
     <ClInclude Include="..\src\network\connection.h" />
     <ClInclude Include="..\src\network\network.h" />
     <ClInclude Include="..\src\network\timeout.h" />
+    <ClInclude Include="..\src\plugin_api\command_api.h" />
     <ClInclude Include="..\src\plugin_api\handle.h" />
     <ClInclude Include="..\src\system.h" />
     <ClInclude Include="..\src\uhub.h" />

@@ -378,7 +378,7 @@ static int check_user_agent(struct hub_info* hub, struct hub_user* user, struct 
 		ua = adc_msg_unescape(ua_encoded);
 		if (ua)
 		{
-			memcpy(user->user_agent, ua, MIN(strlen(ua), MAX_UA_LEN));
+			memcpy(user->id.user_agent, ua, MIN(strlen(ua), MAX_UA_LEN));
 			hub_free(ua);
 		}
 	}

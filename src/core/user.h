@@ -82,8 +82,9 @@ extern const char* user_get_quit_reason_string(enum user_quit_reason);
 struct hub_user_info
 {
 	sid_t sid;                    /** session ID */
-	char cid[MAX_CID_LEN+1];      /** global client ID */
 	char nick[MAX_NICK_LEN+1];    /** User's nick name */
+	char cid[MAX_CID_LEN+1];      /** global client ID */
+	char user_agent[MAX_UA_LEN+1];/** User agent string */
 	struct ip_addr_encap addr;    /** User's IP address */
 };
 
@@ -105,11 +106,10 @@ struct hub_user_limits
 
 struct hub_user
 {
-	enum user_state         state;              /** see enum user_state */
-	enum auth_credentials   credentials;        /** see enum user_credentials */
 	struct hub_user_info    id;                 /** Contains nick name and CID */
+	enum auth_credentials   credentials;        /** see enum user_credentials */
+	enum user_state         state;              /** see enum user_state */
 	uint32_t                flags;              /** see enum user_features */
-	char                    user_agent[MAX_UA_LEN+1];/** User agent string */
 	struct linked_list*     feature_cast;       /** Features supported by feature cast */
 	struct adc_message*     info;               /** ADC 'INF' message (broadcasted to everyone joining the hub) */
 	struct hub_info*        hub;                /** The hub instance this user belong to */

@@ -114,6 +114,8 @@ struct hub_info
 	struct linked_list* chat_history;    /* Chat history */
 	struct linked_list* logout_info;     /* Log of people logging out. */
 
+	struct command_base* commands;       /* Hub command handler */
+
 #ifdef PLUGIN_SUPPORT
 	struct uhub_plugins* plugins;
 #endif

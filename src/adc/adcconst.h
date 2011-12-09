@@ -20,7 +20,11 @@
 #ifndef HAVE_UHUB_ADC_CONSTANTS_H
 #define HAVE_UHUB_ADC_CONSTANTS_H
 
+#ifndef SID_T_DEFINED
 typedef uint32_t sid_t;
+#define SID_T_DEFINED
+#endif
+
 typedef uint32_t fourcc_t;
 
 /* Internal uhub limit */
