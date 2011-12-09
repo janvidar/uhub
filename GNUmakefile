@@ -17,6 +17,7 @@ BITS          ?= AUTO
 SILENT        ?= YES
 TERSE         ?= NO
 STACK_PROTECT ?= NO
+NEED_LIBDL    ?= NO
 
 ifeq ($(OS), Windows_NT)
 WINDOWS       ?= YES
@@ -31,6 +32,10 @@ endif
 
 ifeq ($(OPSYS),Haiku)
 LDLIBS        += -lnetwork
+endif
+
+ifeq ($(OPSYS),Linux)
+NEED_LIBDL = YES
 endif
 
 CFLAGS        += -I./src/
@@ -118,6 +123,10 @@ endif
 ifeq ($(USE_SSL),YES)
 CFLAGS        += -DSSL_SUPPORT
 LDLIBS        += -lssl -lcrypto
+endif
+
+ifeq ($(NEED_LIBDL),YES)
+LDLIBS        += -ldl
 endif
 
 GIT_VERSION=$(shell git describe --tags 2>/dev/null || echo "")
