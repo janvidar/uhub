@@ -692,7 +692,7 @@ static int load_ssl_certificates(struct hub_info* hub, struct hub_config* config
 {
 	if (config->tls_enable)
 	{
-		hub->ssl_method = SSLv23_method(); /* TLSv1_method() */
+		hub->ssl_method = (SSL_METHOD*) SSLv23_method(); /* TLSv1_method() */
 		hub->ssl_ctx = SSL_CTX_new(hub->ssl_method);
 
 		/* Disable SSLv2 */
