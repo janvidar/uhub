@@ -26,7 +26,7 @@
 #define _GNU_SOURCE
 #endif
 
-#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__) || defined(__DragonFly__) || (defined(__APPLE__) && defined(__MACH__))
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__) || defined(__DragonFly__) || (defined(__APPLE__) && defined(__MACH__)) || defined(__FreeBSD_kernel__)
 #define BSD_LIKE
 #endif
 
@@ -140,7 +140,7 @@
 #define OPSYS "MacOSX"
 #endif
 
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
 #define OPSYS "FreeBSD"
 #endif
 
