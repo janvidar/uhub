@@ -70,6 +70,7 @@ void command_shutdown(struct command_base* cbase)
 {
 	commands_builtin_remove(cbase);
 	assert(list_size(cbase->handlers) == 0);
+	list_destroy(cbase->handlers);
 	hub_free(cbase);
 }
 
@@ -980,12 +981,12 @@ static int command_stats(struct command_base* cbase, struct hub_user* user, stru
 static struct command_handle* add_builtin(struct command_base* cbase, const char* prefix, const char* args, enum auth_credentials cred, command_handler handler, const char* description)
 {
 	struct command_handle* handle = (struct command_handle*) hub_malloc_zero(sizeof(struct command_handle));
-	handle->prefix = strdup(prefix);
+	handle->prefix = prefix;
 	handle->length = strlen(prefix);
-	handle->args = args ? strdup(args) : NULL;
+	handle->args = args;
 	handle->cred = cred;
 	handle->handler = handler;
-	handle->description = strdup(description);
+	handle->description = description;
 	handle->origin = "built-in";
 	handle->ptr = cbase;
 	return handle;
@@ -1033,5 +1034,6 @@ void commands_builtin_remove(struct command_base* cbase)
 	while ((command = list_get_first(cbase->handlers)))
 	{
 		command_del(cbase, command);
+		hub_free(command);
 	}
 }
