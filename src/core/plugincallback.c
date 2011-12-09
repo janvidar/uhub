@@ -41,7 +41,7 @@ static int plugin_command_dispatch(struct command_base* cbase, struct hub_user* 
 	struct plugin_user* puser = (struct plugin_user*) user; // FIXME: Use a proper conversion function instead.
 	struct plugin_command* pcommand = (struct plugin_command*) cmd; // FIXME: Use a proper conversion function instead.
 
-	LOG_INFO("plugin_command_dispatch: cmd=%s", cmd->prefix);
+	LOG_PLUGIN("plugin_command_dispatch: cmd=%s", cmd->prefix);
 
 	cmdh = (struct plugin_command_handle*) list_get_first(data->commands);
 	while (cmdh)
@@ -59,6 +59,7 @@ static int plugin_command_dispatch(struct command_base* cbase, struct hub_user* 
 
 struct plugin_callback_data* plugin_callback_data_create()
 {
+	LOG_PLUGIN("plugin_callback_data_create()");
 	struct plugin_callback_data* data = (struct plugin_callback_data*) hub_malloc_zero(sizeof(struct plugin_callback_data));
 	data->commands = list_create();
 	return data;
@@ -66,6 +67,7 @@ struct plugin_callback_data* plugin_callback_data_create()
 
 void plugin_callback_data_destroy(struct plugin_callback_data* data)
 {
+	LOG_PLUGIN("plugin_callback_data_destroy()");
 	if (data->commands)
 	{
 		uhub_assert(list_size(data->commands) == 0);

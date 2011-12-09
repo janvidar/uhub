@@ -31,6 +31,7 @@ enum log_verbosity {
 	log_dump     = 7,
 	log_memory   = 8,
 	log_protocol = 9,
+	log_plugin   = 10,
 };
 
 #define LOG_FATAL(format, ...)  hub_log(log_fatal,    format, ## __VA_ARGS__)
@@ -42,9 +43,11 @@ enum log_verbosity {
 #ifdef DEBUG
 # define LOG_DEBUG(format, ...)  hub_log(log_debug,    format, ## __VA_ARGS__)
 # define LOG_TRACE(format, ...)  hub_log(log_trace,    format, ## __VA_ARGS__)
+# define LOG_PLUGIN(format, ...) hub_log(log_plugin,   format, ## __VA_ARGS__)
 #else
 # define LOG_DEBUG(format, ...)  do { } while(0)
 # define LOG_TRACE(format, ...)  do { } while(0)
+# define LOG_PLUGIN(format, ...) do { } while(0)
 #endif
 
 #ifdef LOWLEVEL_DEBUG

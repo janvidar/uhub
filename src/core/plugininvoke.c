@@ -20,7 +20,7 @@
 #include "uhub.h"
 #include "plugin_api/handle.h"
 
-#define PLUGIN_DEBUG(hub, name) printf("Invoke %s on %d plugins\n",name, (int) (hub->plugins ? list_size(hub->plugins->loaded) : -1));
+#define PLUGIN_DEBUG(hub, name) LOG_PLUGIN("Invoke %s on %d plugins", name, (int) (hub->plugins ? list_size(hub->plugins->loaded) : -1));
 
 
 #define INVOKE(HUB, FUNCNAME, CODE) \

@@ -51,6 +51,7 @@ static const char* prefixes[] =
 	"DUMP",
 	"MEM",
 	"PROTO",
+	"PLUGIN",
 	0
 };
 
@@ -185,12 +186,12 @@ void hub_log(int log_verbosity, const char *format, ...)
 		
 		if (logfile)
 		{
-			fprintf(logfile, "%s %5s: %s\n", timestamp, prefixes[log_verbosity], logmsg);
+			fprintf(logfile, "%s %6s: %s\n", timestamp, prefixes[log_verbosity], logmsg);
 			fflush(logfile);
 		}
 		else
 		{
-			fprintf(stderr, "%s %5s: %s\n", timestamp, prefixes[log_verbosity], logmsg);	
+			fprintf(stderr, "%s %6s: %s\n", timestamp, prefixes[log_verbosity], logmsg);
 		}
 	}
 

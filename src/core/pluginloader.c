@@ -42,7 +42,7 @@ static struct plugin_hub_internals* get_internals(struct plugin_handle* handle)
 struct uhub_plugin* plugin_open(const char* filename)
 {
 	struct uhub_plugin* plugin;
-	LOG_TRACE("plugin_open: \"%s\"", filename);
+	LOG_PLUGIN("plugin_open: \"%s\"", filename);
 
 	plugin = (struct uhub_plugin*) hub_malloc_zero(sizeof(struct uhub_plugin));
 	if (!plugin)
@@ -74,8 +74,9 @@ struct uhub_plugin* plugin_open(const char* filename)
 
 void plugin_close(struct uhub_plugin* plugin)
 {
-	LOG_TRACE("plugin_close: \"%s\"", plugin->filename);
+	LOG_PLUGIN("plugin_close: \"%s\"", plugin->filename);
 	hub_free(plugin->internals);
+
 #ifdef HAVE_DLOPEN
 	dlclose(plugin->handle);
 #else
@@ -136,7 +137,7 @@ struct plugin_handle* plugin_load(const char* filename, const char* config, stru
 			if (handle->plugin_api_version == PLUGIN_API_VERSION && handle->plugin_funcs_size == sizeof(struct plugin_funcs))
 			{
 				LOG_INFO("Loaded plugin: %s: %s, version %s.", filename, handle->name, handle->version);
-				LOG_TRACE("Plugin API version: %d (func table size: " PRINTF_SIZE_T ")", handle->plugin_api_version, handle->plugin_funcs_size);
+				LOG_PLUGIN("Plugin API version: %d (func table size: " PRINTF_SIZE_T ")", handle->plugin_api_version, handle->plugin_funcs_size);
 				return handle;
 			}
 			else
@@ -193,7 +194,7 @@ static int plugin_parse_line(char* line, int line_count, void* ptr_data)
 		if (!params)
 			params = "";
 
-		LOG_TRACE("Load plugin: \"%s\", params=\"%s\"", soname, params);
+		LOG_PLUGIN("Load plugin: \"%s\", params=\"%s\"", soname, params);
 		plugin = plugin_load(soname, params, hub);
 		if (plugin)
 		{
