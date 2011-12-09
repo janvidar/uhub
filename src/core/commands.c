@@ -231,6 +231,7 @@ static int command_parse(struct command_base* cbase, struct hub_user* user, cons
 {
 	char* prefix;
 	int n;
+	int ret;
 	struct hub_command* cmd = hub_malloc_zero(sizeof(struct hub_command));
 	struct command_handle* handler = NULL;
 	struct linked_list* tokens = NULL;
@@ -244,9 +245,8 @@ static int command_parse(struct command_base* cbase, struct hub_user* user, cons
 	n = split_string(message, "\\s", tokens, 0);
 	if (n <= 0)
 	{
-		command_destroy(cmd);
-		// FIXME
-		return 0;
+		ret = 0; // FIXME
+		goto command_parse_cleanup;
 	}
 
 	// Find a matching command handler
@@ -258,14 +258,14 @@ static int command_parse(struct command_base* cbase, struct hub_user* user, cons
 		handler = command_handler_lookup(cbase, cmd->prefix);
 		if (!handler)
 		{
-			return command_not_found(cbase, user, prefix);
+			ret = command_not_found(cbase, user, prefix);
+			goto command_parse_cleanup;
 		}
 	}
 	else
 	{
-		command_destroy(cmd);
-		command_syntax_error(cbase, user);
-		return 0;
+		ret = command_syntax_error(cbase, user);
+		goto command_parse_cleanup;
 	}
 
 	// Remove the first token.
@@ -274,27 +274,30 @@ static int command_parse(struct command_base* cbase, struct hub_user* user, cons
 
 	// Parse arguments
 	cmd->args = command_extract_arguments(cbase, handler, tokens);
-	list_clear(tokens, &hub_free);
-	list_destroy(tokens);
 
 	if (!cmd->args)
 	{
-		command_destroy(cmd);
-		// FIXME
-		return 0;
+		ret = 0;
+		goto command_parse_cleanup;
 	}
 
 	if (command_is_available(handler, user))
 	{
 		handler->handler(cbase, user, handler, cmd);
-		command_destroy(cmd);
-		return 0;
+		ret = 0;
+		goto command_parse_cleanup;
 	}
 	else
 	{
-		command_destroy(cmd);
-		return command_access_denied(cbase, user, prefix);
+		ret = command_access_denied(cbase, user, prefix);
+		goto command_parse_cleanup;
 	}
+
+command_parse_cleanup:
+	command_destroy(cmd);
+	list_clear(tokens, &hub_free);
+	list_destroy(tokens);
+	return ret;
 }
 
 const char* command_get_syntax(struct command_handle* handler)
