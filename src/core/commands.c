@@ -29,6 +29,19 @@ static int command_access_denied(struct command_base* cbase, struct hub_user* us
 static int command_not_found(struct command_base* cbase, struct hub_user* user, const char* prefix);
 static int command_syntax_error(struct command_base* cbase, struct hub_user* user);
 
+static size_t str_append(char* dst, const char* buf, size_t size)
+{
+	size_t dst_len = strlen(dst);
+	size_t buf_len = strlen(buf);
+
+	if (dst_len + buf_len >= size)
+		return dst_len + buf_len;
+
+	memcpy(dst + dst_len, buf, buf_len);
+	dst[dst_len + buf_len] = '\0';
+	return dst_len + buf_len;
+}
+
 struct command_base
 {
 	struct hub_info* hub;
@@ -293,22 +306,22 @@ const char* command_get_syntax(struct command_handle* handler)
 	{
 		for (n = 0; n < strlen(handler->args); n++)
 		{
-			if (n > 0 && !opt) strcat(args, " ");
+			if (n > 0 && !opt) str_append(args, " ", sizeof(args));
 			switch (handler->args[n])
 			{
-				case '?': strcat(args, "["); opt = 1; continue;
-				case 'n': strcat(args, "<nick>"); break;
-				case 'i': strcat(args, "<cid>");  break;
-				case 'a': strcat(args, "<addr>"); break;
-				case 'm': strcat(args, "<message>"); break;
-				case 'p': strcat(args, "<password>"); break;
-				case 'C': strcat(args, "<credentials>"); break;
-				case 'c': strcat(args, "<command>"); break;
-				case 'N': strcat(args, "<number>"); break;
+				case '?': str_append(args, "[", sizeof(args)); opt = 1; continue;
+				case 'n': str_append(args, "<nick>", sizeof(args)); break;
+				case 'i': str_append(args, "<cid>", sizeof(args));  break;
+				case 'a': str_append(args, "<addr>", sizeof(args)); break;
+				case 'm': str_append(args, "<message>", sizeof(args)); break;
+				case 'p': str_append(args, "<password>", sizeof(args)); break;
+				case 'C': str_append(args, "<credentials>", sizeof(args)); break;
+				case 'c': str_append(args, "<command>", sizeof(args)); break;
+				case 'N': str_append(args, "<number>", sizeof(args)); break;
 			}
 			if (opt)
 			{
-				strcat(args, "]");
+				str_append(args, "]", sizeof(args));
 				opt = 0;
 			}
 		}
@@ -412,21 +425,13 @@ static int command_help(struct command_base* cbase, struct hub_user* user, struc
 
 	if (!command)
 	{
-		strcat(msg, "Available commands:\n");
+		n += snprintf(msg, sizeof(msg), "Available commands:\n");
 
 		for (command = (struct command_handle*) list_get_first(cbase->handlers); command; command = (struct command_handle*) list_get_next(cbase->handlers))
 		{
 			if (command_is_available(command, user))
 			{
-				strcat(msg, "!");
-				strcat(msg, command->prefix);
-				for (n = command->length; n < cbase->prefix_length_max; n++)
-				{
-					strcat(msg, " ");
-				}
-				strcat(msg, "- ");
-				strcat(msg, command->description);
-				strcat(msg, "\n");
+				n += snprintf(msg + n, sizeof(msg) - n, "!%s%20s- %s\n", command->prefix, " ", command->description);
 			}
 		}
 	}
@@ -434,17 +439,11 @@ static int command_help(struct command_base* cbase, struct hub_user* user, struc
 	{
 		if (command_is_available(command, user))
 		{
-			strcat(msg, "Usage: !");
-			strcat(msg, command->prefix);
-			strcat(msg, " ");
-			strcat(msg, command_get_syntax(command));
-			strcat(msg, "\n");
-			strcat(msg, command->description);
-			strcat(msg, "\n");
+			snprintf(msg, sizeof(msg), "Usage: !%s %s\n%s\n", command->prefix, command_get_syntax(command), command->description);
 		}
 		else
 		{
-			strcat(msg, "This command is not available to you.\n");
+			snprintf(msg, sizeof(msg), "This command is not available to you.\n");
 		}
 	}
 	return command_status(cbase, user, cmd, msg);
@@ -457,6 +456,7 @@ static int command_uptime(struct command_base* cbase, struct hub_user* user, str
 	size_t h;
 	size_t m;
 	size_t D = (size_t) difftime(time(0), cbase->hub->tm_started);
+	size_t offset = 0;
 
 	d = D / (24 * 3600);
 	D = D % (24 * 3600);
@@ -466,19 +466,8 @@ static int command_uptime(struct command_base* cbase, struct hub_user* user, str
 
 	tmp[0] = 0;
 	if (d)
-	{
-		strcat(tmp, uhub_itoa((int) d));
-		strcat(tmp, " day");
-		if (d != 1) strcat(tmp, "s");
-		strcat(tmp, ", ");
-	}
-
-	if (h < 10) strcat(tmp, "0");
-	strcat(tmp, uhub_itoa((int) h));
-	strcat(tmp, ":");
-	if (m < 10) strcat(tmp, "0");
-	strcat(tmp, uhub_itoa((int) m));
-
+		offset += snprintf(tmp, sizeof(tmp), "%d day%s, ", (int) d, d != 1 ? "s" : "");
+	snprintf(tmp + offset, sizeof(tmp) - offset, "%02d:%02d", (int) h, (int) m);
 	return command_status(cbase, user, cmd, tmp);
 }
 
@@ -607,6 +596,7 @@ static int command_whoip(struct command_base* cbase, struct hub_user* user, stru
 	int ret = 0;
 	char tmp[128];
 	char* buffer;
+	size_t length;
 
 	if (!address)
 		return -1; // FIXME: bad syntax.
@@ -629,7 +619,8 @@ static int command_whoip(struct command_base* cbase, struct hub_user* user, stru
 
 	snprintf(tmp, 128, "*** %s: Found %d match%s:", cmd->prefix, ret, ((ret != 1) ? "es" : ""));
 
-	buffer = hub_malloc(((MAX_NICK_LEN + INET6_ADDRSTRLEN + 5) * ret) + strlen(tmp) + 3);
+	length = ((MAX_NICK_LEN + INET6_ADDRSTRLEN + 5) * ret) + strlen(tmp) + 3;
+	buffer = hub_malloc(length);
 	if (!buffer)
 	{
 		list_destroy(users);
@@ -637,19 +628,19 @@ static int command_whoip(struct command_base* cbase, struct hub_user* user, stru
 	}
 
 	buffer[0] = 0;
-	strcat(buffer, tmp);
-	strcat(buffer, "\n");
+	str_append(buffer, tmp, length);
+	str_append(buffer, "\n", length);
 
 	u = (struct hub_user*) list_get_first(users);
 	while (u)
 	{
-		strcat(buffer, u->id.nick);
-		strcat(buffer, " (");
-		strcat(buffer, user_get_address(u));
-		strcat(buffer, ")\n");
+		str_append(buffer, u->id.nick, length);
+		str_append(buffer, " (", length);
+		str_append(buffer, user_get_address(u), length);
+		str_append(buffer, ")\n", length);
 		u = (struct hub_user*) list_get_next(users);
 	}
-	strcat(buffer, "\n");
+	str_append(buffer, "\n", length);
 
 	send_message(cbase, user, buffer);
 	hub_free(buffer);
@@ -746,24 +737,25 @@ static int command_history(struct command_base* cbase, struct hub_user* user, st
 		message = (char*) list_get_next(messages);
 	}
 
-	buffer = hub_malloc(bufsize+4);
+	bufsize += 4;
+	buffer = hub_malloc(bufsize);
 	if (!buffer)
 	{
 		return command_status(cbase, user, cmd, "Not enough memory.");
 	}
 
 	buffer[0] = 0;
-	strcat(buffer, tmp);
-	strcat(buffer, "\n");
+	str_append(buffer, tmp, bufsize);
+	str_append(buffer, "\n", bufsize);
 
 	message = (char*) list_get_first(messages);
 	while (message)
 	{
 		if (--lines < 0)
-			strcat(buffer, message);
+			str_append(buffer, message, bufsize);
 		message = (char*) list_get_next(messages);
 	}
-	strcat(buffer, "\n");
+	str_append(buffer, "\n", bufsize);
 
 	send_message(cbase, user, buffer);
 	hub_free(buffer);
@@ -985,7 +977,7 @@ static int command_stats(struct command_base* cbase, struct hub_user* user, stru
 	return command_status(cbase, user, cmd, temp);
 }
 
-static struct command_handle* add_builtin(const char* prefix, const char* args, enum auth_credentials cred, command_handler handler, const char* description)
+static struct command_handle* add_builtin(struct command_base* cbase, const char* prefix, const char* args, enum auth_credentials cred, command_handler handler, const char* description)
 {
 	struct command_handle* handle = (struct command_handle*) hub_malloc_zero(sizeof(struct command_handle));
 	handle->prefix = strdup(prefix);
@@ -995,11 +987,12 @@ static struct command_handle* add_builtin(const char* prefix, const char* args, 
 	handle->handler = handler;
 	handle->description = strdup(description);
 	handle->origin = "built-in";
+	handle->ptr = cbase;
 	return handle;
 }
 
 #define ADD_COMMAND(PREFIX, LENGTH, ARGS, CREDENTIALS, FUNCTION, DESCRIPTION) \
-	command_add(cbase, add_builtin(PREFIX, ARGS, CREDENTIALS, FUNCTION, DESCRIPTION), NULL)
+	command_add(cbase, add_builtin(cbase, PREFIX, ARGS, CREDENTIALS, FUNCTION, DESCRIPTION), NULL)
 
 void commands_builtin_add(struct command_base* cbase)
 {

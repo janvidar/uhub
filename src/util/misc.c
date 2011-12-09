@@ -293,7 +293,8 @@ const char* uhub_itoa(int val)
 	memset(buf, 0, sizeof(buf));
 	if (!val)
 	{
-		strcat(buf, "0");
+		buf[0] = '0';
+		buf[1] = '\0';
 		return buf;
 	}
 	i = sizeof(buf) - 1;
@@ -314,7 +315,8 @@ const char* uhub_ulltoa(uint64_t val)
 	
 	if (!val)
 	{
-		strcat(buf, "0");
+		buf[0] = '0';
+		buf[1] = '\0';
 		return buf;
 	}
 	i = sizeof(buf) - 1;
