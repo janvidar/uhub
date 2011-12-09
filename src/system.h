@@ -164,6 +164,10 @@
 #define OPSYS "Haiku"
 #endif
 
+#if defined(__GNU__)
+#define OPSYS "Hurd"
+#endif
+
 /* Detect CPUs */
 #if defined(__alpha__) || defined(__alpha)
 #define CPUINFO "Alpha"
@@ -207,6 +211,10 @@
 
 #if defined(__sh__)
 #define CPUINFO "SuperH"
+#endif
+
+#if defined(__s390__) || defined(__s390x__)
+#define CPUINFO "s390"
 #endif
 
 /* Misc */
