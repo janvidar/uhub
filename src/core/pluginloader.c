@@ -74,8 +74,11 @@ struct uhub_plugin* plugin_open(const char* filename)
 
 void plugin_close(struct uhub_plugin* plugin)
 {
+	struct plugin_hub_internals* internals = (struct plugin_hub_internals*) plugin->internals;
+
 	LOG_PLUGIN("plugin_close: \"%s\"", plugin->filename);
-	hub_free(plugin->internals);
+	plugin_callback_data_destroy(internals->callback_data);
+	hub_free(internals);
 
 #ifdef HAVE_DLOPEN
 	dlclose(plugin->handle);
