@@ -528,8 +528,25 @@ void hub_send_flood_warning(struct hub_info* hub, struct hub_user* u, const char
 	}
 }
 
+static enum status_message check_duplicate_logins_ok(struct hub_info* hub, struct hub_user* user)
+{
+	struct hub_user* lookup1;
+	struct hub_user* lookup2;
+
+	lookup1 = uman_get_user_by_nick(hub, user->id.nick);
+	if (lookup1)
+		return status_msg_inf_error_nick_taken;
+
+	lookup2 = uman_get_user_by_cid(hub,  user->id.cid);
+	if (lookup2)
+		return status_msg_inf_error_cid_taken;
+
+	return status_ok;
+}
+
 static void hub_event_dispatcher(void* callback_data, struct event_data* message)
 {
+	enum status_message status;
 	struct hub_info* hub = (struct hub_info*) callback_data;
 	struct hub_user* user = (struct hub_user*) message->ptr;
 	assert(hub != NULL);
@@ -547,7 +564,17 @@ static void hub_event_dispatcher(void* callback_data, struct event_data* message
 			}
 			else
 			{
-				on_login_success(hub, user);
+				/* Race condition, we could have two messages for two logins queued up.
+				   So make sure we don't let the second client in. */
+				status = check_duplicate_logins_ok(hub, user);
+				if (status == status_ok)
+				{
+					on_login_success(hub, user);
+				}
+				else
+				{
+					on_login_failure(hub, user, status);
+				}
 			}
 			break;
 		}
