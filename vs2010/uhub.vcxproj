@@ -108,7 +108,6 @@
     <ClCompile Include="..\src\network\select.c" />
     <ClCompile Include="..\src\network\timeout.c" />
     <ClCompile Include="..\src\network\timer.c" />
-    <ClCompile Include="..\src\network\winsock.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\adc\adcconst.h" />

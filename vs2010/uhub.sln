@@ -14,6 +14,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mod_auth_simple", "plugins\
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mod_example", "plugins\mod_example\mod_example.vcxproj", "{9BBAEFDA-8E0E-4E7F-B8B6-0050432FC45B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{0A3C1519-D877-47D9-A82E-40AC1BC79D75} = {0A3C1519-D877-47D9-A82E-40AC1BC79D75}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

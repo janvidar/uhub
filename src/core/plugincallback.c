@@ -59,8 +59,8 @@ static int plugin_command_dispatch(struct command_base* cbase, struct hub_user* 
 
 struct plugin_callback_data* plugin_callback_data_create()
 {
-	LOG_PLUGIN("plugin_callback_data_create()");
 	struct plugin_callback_data* data = (struct plugin_callback_data*) hub_malloc_zero(sizeof(struct plugin_callback_data));
+	LOG_PLUGIN("plugin_callback_data_create()");
 	data->commands = list_create();
 	return data;
 }
