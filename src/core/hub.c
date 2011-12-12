@@ -528,7 +528,7 @@ void hub_send_flood_warning(struct hub_info* hub, struct hub_user* u, const char
 	}
 }
 
-static enum status_message check_duplicate_logins_ok(struct hub_info* hub, struct hub_user* user)
+static int check_duplicate_logins_ok(struct hub_info* hub, struct hub_user* user)
 {
 	struct hub_user* lookup1;
 	struct hub_user* lookup2;
@@ -541,12 +541,12 @@ static enum status_message check_duplicate_logins_ok(struct hub_info* hub, struc
 	if (lookup2)
 		return status_msg_inf_error_cid_taken;
 
-	return status_ok;
+	return 0;
 }
 
 static void hub_event_dispatcher(void* callback_data, struct event_data* message)
 {
-	enum status_message status;
+	int status;
 	struct hub_info* hub = (struct hub_info*) callback_data;
 	struct hub_user* user = (struct hub_user*) message->ptr;
 	assert(hub != NULL);
@@ -567,13 +567,13 @@ static void hub_event_dispatcher(void* callback_data, struct event_data* message
 				/* Race condition, we could have two messages for two logins queued up.
 				   So make sure we don't let the second client in. */
 				status = check_duplicate_logins_ok(hub, user);
-				if (status == status_ok)
+				if (!status)
 				{
 					on_login_success(hub, user);
 				}
 				else
 				{
-					on_login_failure(hub, user, status);
+					on_login_failure(hub, user, (enum status_message) status);
 				}
 			}
 			break;

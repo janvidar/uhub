@@ -22,7 +22,6 @@
 
 enum status_message
 {
-	status_ok                            = 0,
 	status_msg_hub_full                  = -1,  /* hub is full */
 	status_msg_hub_disabled              = -2,  /* hub is disabled */
 	status_msg_hub_registered_users_only = -3,  /* hub is for registered users only */
