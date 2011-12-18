@@ -304,7 +304,7 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 
 	if (relay)
 	{
-		plugin_st status;
+		plugin_st status = st_default;
 		if (broadcast)
 		{
 			status = plugin_handle_chat_message(hub, u, message, 0);
