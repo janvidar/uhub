@@ -31,8 +31,7 @@
 struct plugin_command
 {
 	const char* message;
-	char* prefix;
-	size_t prefix_len;
+	const char* prefix;
 	struct linked_list* args;
 };
 

@@ -33,9 +33,9 @@ static struct plugin_callback_data* get_callback_data(struct plugin_handle* plug
 	return data;
 }
 
-static int plugin_command_dispatch(struct command_base* cbase, struct hub_user* user, struct command_handle* handle, struct hub_command* cmd)
+static int plugin_command_dispatch(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
-	struct plugin_handle* plugin = (struct plugin_handle*) handle->ptr;
+	struct plugin_handle* plugin = (struct plugin_handle*) cmd->ptr;
 	struct plugin_callback_data* data = get_callback_data(plugin);
 	struct plugin_command_handle* cmdh;
 	struct plugin_user* puser = (struct plugin_user*) user; // FIXME: Use a proper conversion function instead.
@@ -46,9 +46,6 @@ static int plugin_command_dispatch(struct command_base* cbase, struct hub_user* 
 	cmdh = (struct plugin_command_handle*) list_get_first(data->commands);
 	while (cmdh)
 	{
-		if (cmdh->length != cmd->prefix_len)
-			continue;
-
 		if (strcmp(cmdh->prefix, cmd->prefix) == 0)
 			return cmdh->handler(plugin, puser, pcommand);
 

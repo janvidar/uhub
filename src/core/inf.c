@@ -546,7 +546,8 @@ static int set_credentials(struct hub_info* hub, struct hub_user* user, struct a
 	{
 		user->credentials = auth_cred_guest;
 	}
-	
+	hub_free(info);
+
 	switch (user->credentials)
 	{
 		case auth_cred_none:

@@ -35,8 +35,10 @@ extern char* debug_mem_strndup(const char* s, size_t n);
 
 #define hub_malloc     malloc
 #define hub_free       free
+#define hub_realloc    realloc
 #define hub_strdup     strdup
 #define hub_strndup    strndup
+
 
 #endif
 

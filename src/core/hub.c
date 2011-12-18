@@ -254,6 +254,7 @@ int hub_handle_password(struct hub_info* hub, struct hub_user* u, struct adc_mes
 int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc_message* cmd)
 {
 	char* message = adc_msg_get_argument(cmd, 0);
+	char* message_decoded = NULL;
 	int ret = 0;
 	int relay = 1;
 	int broadcast;
@@ -289,7 +290,9 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 		}
 		else
 		{
-			relay = command_invoke(hub->commands, u, message);
+			message_decoded = adc_msg_unescape(message);
+			relay = command_invoke(hub->commands, u, message_decoded);
+			hub_free(message_decoded);
 		}
 	}
 

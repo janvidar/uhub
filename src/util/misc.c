@@ -281,6 +281,27 @@ int uhub_atoi(const char* value) {
 	return value[0] == '-' ? -val : val;
 }
 
+int is_number(const char* value, int* num)
+{
+	int len = strlen(value);
+	int offset = (value[0] == '-') ? 1 : 0;
+	int val = 0;
+	int i = offset;
+
+	if (!*(value + offset))
+		return 0;
+
+	for (; i < len; i++)
+		if (value[i] > '9' || value[i] < '0')
+			return 0;
+
+	for (i = offset; i< len; i++)
+		val = val*10 + (value[i] - '0');
+	*num = value[0] == '-' ? -val : val;
+
+	return 1;
+}
+
 
 /*
  * FIXME: -INTMIN is wrong!

@@ -36,6 +36,12 @@ extern char* strip_white_space(char* string);
 extern void strip_off_ini_line_comments(char* line, int line_count);
 extern char* strip_off_quotes(char* line);
 
+/**
+ * Convert number in str to integer and store it in num.
+ * @return 1 on success, or 0 on error.
+ */
+extern int is_number(const char* str, int* num);
+
 extern int file_read_lines(const char* file, void* data, file_line_handler_t handler);
 
 /**

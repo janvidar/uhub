@@ -187,6 +187,7 @@ adcrush_SOURCES := src/tools/adcrush.c
 admin_SOURCES := src/tools/admin.c
 
 autotest_SOURCES := \
+		autotest/test_commands.tcc \
 		autotest/test_credentials.tcc \
 		autotest/test_eventqueue.tcc \
 		autotest/test_hub.tcc \
