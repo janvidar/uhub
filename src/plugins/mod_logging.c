@@ -165,13 +165,18 @@ static void log_message(struct log_data* data, const char *format, ...)
 		size = vsnprintf(logmsg + 20, 1004, format, args);
 		va_end(args);
 
-		write(data->fd, logmsg, size + 20);
-
+		if (write(data->fd, logmsg, size + 20) < (size+20))
+		{
+			fprintf(stderr, "Unable to write full log. Error=%d: %s\n", errno, strerror(errno));
+		}
+		else
+		{
 #ifdef _POSIX_SYNCHRONIZED_IO
-		fdatasync(data->fd);
+			fdatasync(data->fd);
 #else
-		fsync(data->fd);
+			fsync(data->fd);
 #endif
+		}
 	}
 	else
 	{
