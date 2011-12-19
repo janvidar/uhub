@@ -141,4 +141,8 @@ extern struct hub_command* command_parse(struct command_base* cbase, const struc
  */
 extern void command_free(struct hub_command* command);
 
+
+extern void commands_builtin_add(struct command_base*);
+extern void commands_builtin_remove(struct command_base*);
+
 #endif /* HAVE_UHUB_COMMANDS_H */
