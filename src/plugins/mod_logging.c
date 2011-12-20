@@ -186,7 +186,7 @@ static void log_message(struct log_data* data, const char *format, ...)
 		}
 		else
 		{
-#ifdef _POSIX_SYNCHRONIZED_IO
+#if defined _POSIX_SYNCHRONIZED_IO && _POSIX_SYNCHRONIZED_IO > 0
 			fdatasync(data->fd);
 #else
 			fsync(data->fd);
