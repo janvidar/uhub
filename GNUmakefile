@@ -182,6 +182,9 @@ libadc_client_SOURCES := \
 
 uhub_SOURCES := src/core/main.c
 
+uhub-passwd_SOURCES := src/tools/uhub-passwd.c
+uhub-passwd_LIBS    := -lsqlite3
+
 adcrush_SOURCES := src/tools/adcrush.c
 
 admin_SOURCES := src/tools/admin.c
@@ -229,6 +232,7 @@ libadc_client_OBJECTS := $(libadc_client_SOURCES:.c=.o)
 libadc_common_OBJECTS := $(libadc_common_SOURCES:.c=.o)
 
 uhub_OBJECTS          := $(uhub_SOURCES:.c=.o)
+uhub-passwd_OBJECTS   := $(uhub-passwd_SOURCES:.c=.o)
 adcrush_OBJECTS       := $(adcrush_SOURCES:.c=.o)
 admin_OBJECTS         := $(admin_SOURCES:.c=.o)
 
@@ -236,6 +240,7 @@ all_OBJECTS     := $(libuhub_OBJECTS) $(uhub_OBJECTS) $(libutils_OBJECTS) $(adcr
 all_plugins     := $(plugin_example_TARGET) $(plugin_logging_TARGET) $(plugin_auth_TARGET) $(plugin_auth_sqlite_TARGET) $(plugin_chat_history_TARGET)
 
 uhub_BINARY=uhub$(BIN_EXT)
+uhub-passwd_BINARY=uhub-passwd$(BIN_EXT)
 adcrush_BINARY=adcrush$(BIN_EXT)
 admin_BINARY=uhub-admin$(BIN_EXT)
 autotest_BINARY=autotest/test$(BIN_EXT)
@@ -250,7 +255,7 @@ endif
 %.o: %.c version.h revision.h
 	$(MSG_CC) $(CC) -fPIC -c $(CFLAGS) -o $@ $<
 
-all: $(uhub_BINARY) plugins
+all: $(uhub_BINARY) $(uhub-passwd_BINARY) plugins
 
 plugins: $(uhub_BINARY) $(all_plugins)
 
@@ -277,6 +282,10 @@ $(admin_BINARY): $(admin_OBJECTS) $(libuhub_OBJECTS) $(libutils_OBJECTS) $(libad
 
 $(uhub_BINARY): $(uhub_OBJECTS) $(libuhub_OBJECTS) $(libutils_OBJECTS) $(libadc_common_OBJECTS)
 	$(MSG_LD) $(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+
+$(uhub-passwd_BINARY): $(uhub-passwd_OBJECTS)
+	$(MSG_LD) $(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS) $(uhub-passwd_LIBS)
+
 
 autotest.c: $(autotest_SOURCES)
 	$(shell exotic --standalone $(autotest_SOURCES) > $@)
