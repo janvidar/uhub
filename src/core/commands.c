@@ -31,88 +31,7 @@ static int send_command_not_found(struct command_base* cbase, struct hub_user* u
 static int send_command_syntax_error(struct command_base* cbase, struct hub_user* user);
 static int send_command_missing_arguments(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd);
 
-#define CBUF_FLAG_CONST_BUFFER 0x01
-
 static void null_free(void* ptr) { }
-
-struct command_buffer
-{
-	size_t capacity;
-	size_t size;
-	size_t flags;
-	char* buf;
-};
-
-static struct command_buffer* cbuf_create(size_t capacity)
-{
-	struct command_buffer* buf = hub_malloc(sizeof(struct command_buffer));
-	buf->capacity = capacity;
-	buf->size = 0;
-	buf->flags = 0;
-	buf->buf = hub_malloc(capacity + 1);
-	return buf;
-}
-
-static struct command_buffer* cbuf_create_const(const char* buffer)
-{
-	struct command_buffer* buf = hub_malloc(sizeof(struct command_buffer));
-	buf->capacity = 0;
-	buf->size = strlen(buffer);
-	buf->flags = CBUF_FLAG_CONST_BUFFER;
-	buf->buf = (char*) buffer;
-	return buf;
-}
-
-static void cbuf_destroy(struct command_buffer* buf)
-{
-	if (!(buf->flags & CBUF_FLAG_CONST_BUFFER))
-	{
-		hub_free(buf->buf);
-	}
-	hub_free(buf);
-}
-
-static void cbuf_resize(struct command_buffer* buf, size_t capacity)
-{
-	uhub_assert(buf->flags == 0);
-	buf->capacity = capacity;
-	buf->buf = hub_realloc(buf->buf, capacity + 1);
-}
-
-static void cbuf_append_bytes(struct command_buffer* buf, const char* msg, size_t len)
-{
-	uhub_assert(buf->flags == 0);
-	if (buf->size + len >= buf->capacity)
-		cbuf_resize(buf, buf->size + len);
-
-	memcpy(buf->buf + buf->size, msg, len);
-	buf->size += len;
-	buf->buf[buf->size] = '\0';
-}
-
-static void cbuf_append(struct command_buffer* buf, const char* msg)
-{
-	size_t len = strlen(msg);
-	uhub_assert(buf->flags == 0);
-	cbuf_append_bytes(buf, msg, len);
-}
-
-static void cbuf_append_format(struct command_buffer* buf, const char* format, ...)
-{
-	static char tmp[1024];
-	va_list args;
-	int bytes;
-	uhub_assert(buf->flags == 0);
-	va_start(args, format);
-	bytes = vsnprintf(tmp, 1024, format, args);
-	va_end(args);
-	cbuf_append_bytes(buf, tmp, bytes);
-}
-
-static const char* cbuf_get(struct command_buffer* buf)
-{
-	return buf->buf;
-}
 
 struct command_base
 {
@@ -394,7 +313,7 @@ command_parse_cleanup:
 	return cmd;
 }
 
-void command_get_syntax(struct command_handle* handler, struct command_buffer* buf)
+void command_get_syntax(struct command_handle* handler, struct cbuffer* buf)
 {
 	size_t n = 0;
 	int opt = 0;
@@ -425,7 +344,7 @@ void command_get_syntax(struct command_handle* handler, struct command_buffer* b
 }
 
 
-void send_message(struct command_base* cbase, struct hub_user* user, struct command_buffer* buf)
+void send_message(struct command_base* cbase, struct hub_user* user, struct cbuffer* buf)
 {
 	char* buffer = adc_msg_escape(cbuf_get(buf));
 	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
@@ -438,7 +357,7 @@ void send_message(struct command_base* cbase, struct hub_user* user, struct comm
 
 static int send_command_access_denied(struct command_base* cbase, struct hub_user* user, const char* prefix)
 {
-	struct command_buffer* buf = cbuf_create(128);
+	struct cbuffer* buf = cbuf_create(128);
 	cbuf_append_format(buf, "*** %s: Access denied.", prefix);
 	send_message(cbase, user, buf);
 	return 0;
@@ -446,7 +365,7 @@ static int send_command_access_denied(struct command_base* cbase, struct hub_use
 
 static int send_command_not_found(struct command_base* cbase, struct hub_user* user, const char* prefix)
 {
-	struct command_buffer* buf = cbuf_create(128);
+	struct cbuffer* buf = cbuf_create(128);
 	cbuf_append_format(buf, "*** %s: Command not found.", prefix);
 	send_message(cbase, user, buf);
 	return 0;
@@ -454,7 +373,7 @@ static int send_command_not_found(struct command_base* cbase, struct hub_user* u
 
 static int send_command_syntax_error(struct command_base* cbase, struct hub_user* user)
 {
-	struct command_buffer* buf = cbuf_create(128);
+	struct cbuffer* buf = cbuf_create(128);
 	cbuf_append(buf, "*** Syntax error.");
 	send_message(cbase, user, buf);
 	return 0;
@@ -462,7 +381,7 @@ static int send_command_syntax_error(struct command_base* cbase, struct hub_user
 
 static int send_command_missing_arguments(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
-	struct command_buffer* buf = cbuf_create(512);
+	struct cbuffer* buf = cbuf_create(512);
 	cbuf_append_format(buf, "*** Missing argument: See !help !%s\n", cmd->prefix);
 	send_message(cbase, user, buf);
 	return 0;
@@ -532,9 +451,9 @@ int command_invoke(struct command_base* cbase, struct hub_user* user, const char
 	return ret;
 }
 
-static int command_status(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd, struct command_buffer* msg)
+static int command_status(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd, struct cbuffer* msg)
 {
-	struct command_buffer* buf = cbuf_create(msg->size + strlen(cmd->prefix) + 8);
+	struct cbuffer* buf = cbuf_create(cbuf_size(msg) + strlen(cmd->prefix) + 8);
 	cbuf_append_format(buf, "*** %s: %s", cmd->prefix, cbuf_get(msg));
 	send_message(cbase, user, buf);
 	cbuf_destroy(msg);
@@ -543,7 +462,7 @@ static int command_status(struct command_base* cbase, struct hub_user* user, str
 
 static int command_help(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
-	struct command_buffer* buf = cbuf_create(MAX_HELP_LINE);
+	struct cbuffer* buf = cbuf_create(MAX_HELP_LINE);
 	struct command_handle* command = list_get_first(cmd->args);
 
 	if (!command)
@@ -576,7 +495,7 @@ static int command_help(struct command_base* cbase, struct hub_user* user, struc
 
 static int command_uptime(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
-	struct command_buffer* buf = cbuf_create(128);
+	struct cbuffer* buf = cbuf_create(128);
 	size_t d;
 	size_t h;
 	size_t m;
@@ -596,7 +515,7 @@ static int command_uptime(struct command_base* cbase, struct hub_user* user, str
 
 static int command_kick(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
-	struct command_buffer* buf;
+	struct cbuffer* buf;
 	struct hub_user* target = list_get_first(cmd->args);
 
 	buf = cbuf_create(128);
@@ -614,7 +533,7 @@ static int command_kick(struct command_base* cbase, struct hub_user* user, struc
 
 static int command_ban(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
-	struct command_buffer* buf = cbuf_create(128);
+	struct cbuffer* buf = cbuf_create(128);
 	struct hub_user* target = list_get_first(cmd->args);
 
 	if (target == user)
@@ -640,7 +559,7 @@ static int command_unban(struct command_base* cbase, struct hub_user* user, stru
 static int command_mute(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
 	struct hub_user* target = list_get_first(cmd->args);
-	struct command_buffer* buf = cbuf_create(128);
+	struct cbuffer* buf = cbuf_create(128);
 
 	if (strlen(cmd->prefix) == 4)
 	{
@@ -669,7 +588,7 @@ static int command_shutdown_hub(struct command_base* cbase, struct hub_user* use
 
 static int command_version(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
-	struct command_buffer* buf;
+	struct cbuffer* buf;
 	if (cbase->hub->config->show_banner_sys_info)
 		buf = cbuf_create_const("Powered by " PRODUCT_STRING " on " OPSYS "/" CPUINFO);
 	else
@@ -679,14 +598,14 @@ static int command_version(struct command_base* cbase, struct hub_user* user, st
 
 static int command_myip(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
-	struct command_buffer* buf = cbuf_create(128);
+	struct cbuffer* buf = cbuf_create(128);
 	cbuf_append_format(buf, "Your address is \"%s\"", user_get_address(user));
 	return command_status(cbase, user, cmd, buf);
 }
 
 static int command_getip(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
-	struct command_buffer* buf = cbuf_create(128);
+	struct cbuffer* buf = cbuf_create(128);
 	struct hub_user* target = list_get_first(cmd->args);
 	cbuf_append_format(buf, "\"%s\" has address \"%s\"", target->id.nick, user_get_address(target));
 	return command_status(cbase, user, cmd, buf);
@@ -694,7 +613,7 @@ static int command_getip(struct command_base* cbase, struct hub_user* user, stru
 
 static int command_whoip(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
-	struct command_buffer* buf;
+	struct cbuffer* buf;
 	struct ip_range* range = list_get_first(cmd->args);
 	struct linked_list* users = (struct linked_list*) list_create();
 	struct hub_user* u;
@@ -735,7 +654,7 @@ static int command_broadcast(struct command_base* cbase, struct hub_user* user, 
 	char from_sid[5];
 	size_t recipients = 0;
 	struct hub_user* target;
-	struct command_buffer* buf = cbuf_create(128);
+	struct cbuffer* buf = cbuf_create(128);
 
 	memcpy(from_sid, sid_to_string(user->id.sid), sizeof(from_sid));
 	memcpy(pm_flag + 2, from_sid, sizeof(from_sid));
@@ -768,7 +687,7 @@ static int command_broadcast(struct command_base* cbase, struct hub_user* user, 
 
 static int command_history(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
-	struct command_buffer* buf;
+	struct cbuffer* buf;
 	struct linked_list* messages = cbase->hub->chat_history;
 	char* message;
 	char* maxlines_str = list_get_first(cmd->args);
@@ -811,7 +730,7 @@ static int command_history(struct command_base* cbase, struct hub_user* user, st
 
 static int command_log(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
-	struct command_buffer* buf;
+	struct cbuffer* buf;
 	struct linked_list* messages = cbase->hub->logout_info;
 	struct hub_logout_info* log;
 	char* search = 0;
@@ -883,7 +802,7 @@ static int command_log(struct command_base* cbase, struct hub_user* user, struct
 
 static int command_register(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
-	struct command_buffer* buf = cbuf_create(128);
+	struct cbuffer* buf = cbuf_create(128);
 	struct auth_info data;
 	char* password = list_get_first(cmd->args);
 
@@ -906,7 +825,7 @@ static int command_register(struct command_base* cbase, struct hub_user* user, s
 
 static int command_password(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
-	struct command_buffer* buf = cbuf_create(128);
+	struct cbuffer* buf = cbuf_create(128);
 	struct auth_info data;
 	char* password = list_get_first(cmd->args);
 
@@ -929,7 +848,7 @@ static int command_password(struct command_base* cbase, struct hub_user* user, s
 
 static int command_useradd(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
-	struct command_buffer* buf = cbuf_create(128);
+	struct cbuffer* buf = cbuf_create(128);
 	struct auth_info data;
 	char* nick = list_get_first(cmd->args);
 	char* pass = list_get_next(cmd->args);
@@ -954,7 +873,7 @@ static int command_useradd(struct command_base* cbase, struct hub_user* user, st
 
 static int command_userdel(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
-	struct command_buffer* buf = cbuf_create(128);
+	struct cbuffer* buf = cbuf_create(128);
 	char* nick = list_get_first(cmd->args);
 
 	if (acl_delete_user(cbase->hub, nick))
@@ -1004,7 +923,7 @@ static int command_crash(struct command_base* cbase, struct hub_user* user, stru
 
 static int command_stats(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
-	struct command_buffer* buf = cbuf_create(128);
+	struct cbuffer* buf = cbuf_create(128);
 	struct hub_info* hub = cbase->hub;
 
 	cbuf_append_format(buf, PRINTF_SIZE_T " users, peak: " PRINTF_SIZE_T ". Network (up/down): %d/%d KB/s, peak: %d/%d KB/s",

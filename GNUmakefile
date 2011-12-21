@@ -166,6 +166,7 @@ libadc_common_SOURCES := \
 		src/adc/sid.c
 
 libutils_SOURCES := \
+		src/util/cbuffer.c \
 		src/util/config_token.c \
 		src/util/credentials.c \
 		src/util/floodctl.c \

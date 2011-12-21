@@ -58,6 +58,7 @@ extern "C" {
 
 #include "adc/adcconst.h"
 
+#include "util/cbuffer.h"
 #include "util/config_token.h"
 #include "util/credentials.h"
 #include "util/floodctl.h"
