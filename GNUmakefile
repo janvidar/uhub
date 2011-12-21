@@ -155,7 +155,6 @@ libuhub_SOURCES := \
 		src/network/connection.c \
 		src/network/epoll.c \
 		src/network/kqueue.c \
-		src/network/network.c \
 		src/network/select.c \
 		src/network/timeout.c \
 		src/network/timer.c
@@ -175,6 +174,7 @@ libutils_SOURCES := \
 		src/util/log.c \
 		src/util/memory.c \
 		src/util/misc.c \
+		src/network/network.c \
 		src/util/rbtree.c \
 		src/util/tiger.c
 
@@ -213,6 +213,9 @@ autotest_OBJECTS = autotest.o
 plugin_example_SOURCES := src/plugins/mod_example.c
 plugin_example_TARGET  := mod_example.so
 
+plugin_welcome_SOURCES := src/plugins/mod_welcome.c
+plugin_welcome_TARGET  := mod_welcome.so
+
 plugin_logging_SOURCES := src/plugins/mod_logging.c
 plugin_logging_TARGET  := mod_logging.so
 
@@ -237,8 +240,9 @@ uhub-passwd_OBJECTS   := $(uhub-passwd_SOURCES:.c=.o)
 adcrush_OBJECTS       := $(adcrush_SOURCES:.c=.o)
 admin_OBJECTS         := $(admin_SOURCES:.c=.o)
 
+all_plugins     := $(plugin_example_TARGET) $(plugin_logging_TARGET) $(plugin_auth_TARGET) $(plugin_auth_sqlite_TARGET) $(plugin_chat_history_TARGET) $(plugin_welcome_TARGET)
 all_OBJECTS     := $(libuhub_OBJECTS) $(uhub_OBJECTS) $(libutils_OBJECTS) $(adcrush_OBJECTS) $(autotest_OBJECTS) $(admin_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
-all_plugins     := $(plugin_example_TARGET) $(plugin_logging_TARGET) $(plugin_auth_TARGET) $(plugin_auth_sqlite_TARGET) $(plugin_chat_history_TARGET)
+all_OBJECTS     += $(all_plugins)
 
 uhub_BINARY=uhub$(BIN_EXT)
 uhub-passwd_BINARY=uhub-passwd$(BIN_EXT)
@@ -246,15 +250,16 @@ adcrush_BINARY=adcrush$(BIN_EXT)
 admin_BINARY=uhub-admin$(BIN_EXT)
 autotest_BINARY=autotest/test$(BIN_EXT)
 
-ifeq ($(USE_PLUGINS),YES)
-all_plugins     := $(plugin_example_TARGET) $(plugin_logging_TARGET) $(plugin_auth_TARGET) $(plugin_auth_sqlite_TARGET)
-all_OBJECTS     += $(all_plugins)
-endif
 
 .PHONY: revision.h.tmp all plugins
 
 %.o: %.c version.h revision.h
 	$(MSG_CC) $(CC) -fPIC -c $(CFLAGS) -o $@ $<
+
+
+#%.so: %.c
+#	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
+
 
 all: $(uhub_BINARY) $(uhub-passwd_BINARY) plugins
 
@@ -273,6 +278,9 @@ $(plugin_logging_TARGET): $(plugin_logging_SOURCES) $(libutils_OBJECTS) $(libadc
 	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
 
 $(plugin_chat_history_TARGET): $(plugin_chat_history_SOURCE) $(libutils_OBJECTS)
+	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
+
+$(plugin_welcome_TARGET): $(plugin_welcome_SOURCES) $(libutils_OBJECTS)
 	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
 
 $(adcrush_BINARY): $(adcrush_OBJECTS) $(libuhub_OBJECTS) $(libutils_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
