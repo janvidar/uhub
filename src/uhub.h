@@ -25,8 +25,6 @@
 /* #define MEMORY_DEBUG */
 /* #define DEBUG_SENDQ 1 */
 
-#define PLUGIN_SUPPORT
-
 #include "system.h"
 
 #ifndef WIN32

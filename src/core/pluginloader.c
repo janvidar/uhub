@@ -19,7 +19,6 @@
 
 #include "uhub.h"
 
-#ifdef PLUGIN_SUPPORT
 #include "plugin_api/handle.h"
 
 struct plugin_callback_data;
@@ -256,4 +255,3 @@ struct hub_info* plugin_get_hub(struct plugin_handle* plugin)
 	return data->hub;
 }
 
-#endif /* PLUGIN_SUPPORT */

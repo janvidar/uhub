@@ -286,35 +286,24 @@ int acl_shutdown(struct acl_handle* handle)
 
 extern int acl_register_user(struct hub_info* hub, struct auth_info* info)
 {
-#ifdef PLUGIN_SUPPORT
 	if (plugin_auth_register_user(hub, info) != st_allow)
 	{
 		return 0;
 	}
 	return 1;
-#else
-	// NOT SUPPORTED!
-	return 0;
-#endif
 }
 
 extern int acl_update_user(struct hub_info* hub, struct auth_info* info)
 {
-#ifdef PLUGIN_SUPPORT
 	if (plugin_auth_update_user(hub, info) != st_allow)
 	{
 		return 0;
 	}
 	return 1;
-#else
-	// NOT SUPPORTED!
-	return 0;
-#endif
 }
 
 extern int acl_delete_user(struct hub_info* hub, const char* name)
 {
-#ifdef PLUGIN_SUPPORT
 	struct auth_info data;
 	strncpy(data.nickname, name, MAX_NICK_LEN);
 	data.nickname[MAX_NICK_LEN] = '\0';
@@ -325,16 +314,11 @@ extern int acl_delete_user(struct hub_info* hub, const char* name)
 		return 0;
 	}
 	return 1;
-#else
-	// NOT SUPPORTED!
-	return 0;
-#endif
 }
 
 struct auth_info* acl_get_access_info(struct hub_info* hub, const char* name)
 {
 	struct auth_info* info = 0;
-#ifdef PLUGIN_SUPPORT
 	info = (struct auth_info*) hub_malloc(sizeof(struct auth_info));
 	if (plugin_auth_get_user(hub, name, info) != st_allow)
 	{
@@ -342,18 +326,6 @@ struct auth_info* acl_get_access_info(struct hub_info* hub, const char* name)
 		return NULL;
 	}
 	return info;
-#else
-	info = (struct auth_info*) list_get_first(hub->acl->users);
-	while (info)
-	{
-		if (strcasecmp((char*)info->nickname, name) == 0)
-		{
-			return info;
-		}
-		info = (struct auth_info*) list_get_next(hub->acl->users);
-	}
-	return NULL;
-#endif
 }
 
 #define STR_LIST_CONTAINS(LIST, STR) \
@@ -511,9 +483,7 @@ int acl_password_verify(struct hub_info* hub, struct hub_user* user, const char*
 	base32_encode((unsigned char*) tiger_res, TIGERSIZE, password_calc);
 	password_calc[MAX_CID_LEN] = 0;
 
-#ifdef PLUGIN_SUPPORT
 	hub_free(access);
-#endif
 
 	if (strcasecmp(password, password_calc) == 0)
 	{

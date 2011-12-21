@@ -176,9 +176,7 @@ void net_on_accept(struct net_connection* con, int event, void *arg)
 	struct hub_probe* probe = 0;
 	struct ip_addr_encap ipaddr;
 	int server_fd = net_con_get_sd(con);
-#ifdef PLUGIN_SUPPORT
 	plugin_st status;
-#endif
 
 	for (;;)
 	{
@@ -200,7 +198,6 @@ void net_on_accept(struct net_connection* con, int event, void *arg)
 			}
 		}
 
-#ifdef PLUGIN_SUPPORT
 		status = plugin_check_ip_early(hub, &ipaddr);
 		if (status == st_deny)
 		{
@@ -210,7 +207,6 @@ void net_on_accept(struct net_connection* con, int event, void *arg)
 		}
 
 		plugin_log_connection_accepted(hub, &ipaddr);
-#endif
 
 		probe = probe_create(hub, fd, &ipaddr);
 		if (!probe)

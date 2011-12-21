@@ -23,8 +23,6 @@
 #include "uhub.h"
 #include "plugin_api/handle.h"
 
-#ifdef PLUGIN_SUPPORT
-
 struct hub_info;
 struct ip_addr_encap;
 
@@ -62,8 +60,6 @@ plugin_st plugin_auth_get_user(struct hub_info* hub, const char* nickname, struc
 plugin_st plugin_auth_register_user(struct hub_info* hub, struct auth_info* user);
 plugin_st plugin_auth_update_user(struct hub_info* hub, struct auth_info* user);
 plugin_st plugin_auth_delete_user(struct hub_info* hub, struct auth_info* user);
-
-#endif
 
 #endif // HAVE_UHUB_PLUGIN_INVOKE_H
 

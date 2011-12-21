@@ -875,7 +875,6 @@ void hub_shutdown_service(struct hub_info* hub)
 	g_hub = 0;
 }
 
-#ifdef PLUGIN_SUPPORT
 int hub_plugins_load(struct hub_info* hub)
 {
 	if (!hub->config->file_plugins || !*hub->config->file_plugins)
@@ -903,7 +902,6 @@ void hub_plugins_unload(struct hub_info* hub)
 		hub->plugins = 0;
 	}
 }
-#endif
 
 void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 {
@@ -979,13 +977,11 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 		hub_free(tmp);
 	}
 
-#ifdef PLUGIN_SUPPORT
 	if (hub_plugins_load(hub) < 0)
 	{
 		hub->status = hub_status_shutdown;
 	}
 	else
-#endif
 
 	hub->status = (hub->config->hub_enabled ? hub_status_running : hub_status_disabled);
 	hub_free(server);
@@ -994,9 +990,7 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 
 void hub_free_variables(struct hub_info* hub)
 {
-#ifdef PLUGIN_SUPPORT
 	hub_plugins_unload(hub);
-#endif
 
 	adc_msg_free(hub->command_info);
 	adc_msg_free(hub->command_banner);

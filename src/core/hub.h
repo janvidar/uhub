@@ -115,10 +115,7 @@ struct hub_info
 	struct linked_list* logout_info;     /* Log of people logging out. */
 
 	struct command_base* commands;       /* Hub command handler */
-
-#ifdef PLUGIN_SUPPORT
-	struct uhub_plugins* plugins;
-#endif
+	struct uhub_plugins* plugins;        /* Plug-ins loaded for this hub instance. */
 
 #ifdef SSL_SUPPORT
 	SSL_METHOD* ssl_method;
