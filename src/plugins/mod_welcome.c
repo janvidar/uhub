@@ -127,7 +127,7 @@ static struct welcome_data* parse_config(const char* line, struct plugin_handle*
 			}
 
 			data->cmd_motd = hub_malloc_zero(sizeof(struct plugin_command_handle));
-			PLUGIN_COMMAND_INITIALIZE(data->cmd_motd, (void*) data, "msg", "", auth_cred_guest, command_handler_motd, "Show the message of the day.");
+			PLUGIN_COMMAND_INITIALIZE(data->cmd_motd, (void*) data, "motd", "", auth_cred_guest, command_handler_motd, "Show the message of the day.");
 		}
 		else if (strcmp(cfg_settings_get_key(setting), "rules") == 0)
 		{
@@ -142,7 +142,7 @@ static struct welcome_data* parse_config(const char* line, struct plugin_handle*
 			}
 
 			data->cmd_rules = hub_malloc_zero(sizeof(struct plugin_command_handle));
-			PLUGIN_COMMAND_INITIALIZE(data->cmd_rules, (void*) data, "rule", "", auth_cred_guest, command_handler_rules, "Show the hub rules.");
+			PLUGIN_COMMAND_INITIALIZE(data->cmd_rules, (void*) data, "rules", "", auth_cred_guest, command_handler_rules, "Show the hub rules.");
 		}
 		else
 		{
@@ -255,13 +255,13 @@ static void on_user_login(struct plugin_handle* plugin, struct plugin_user* user
 static int command_handler_motd(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_command* cmd)
 {
 	send_motd(plugin, user);
-	return 1;
+	return 0;
 }
 
 static int command_handler_rules(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_command* cmd)
 {
 	send_rules(plugin, user);
-	return 1;
+	return 0;
 }
 
 int plugin_register(struct plugin_handle* plugin, const char* config)
