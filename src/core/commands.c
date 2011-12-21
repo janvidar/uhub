@@ -898,20 +898,6 @@ static int command_userpass(struct command_base* cbase, struct hub_user* user, s
 	return command_status(cbase, user, cmd, cbuf_create_const("Not implemented!"));
 }
 
-static int command_rules(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
-{
-	if (!hub_send_rules(cbase->hub, user))
-		return command_status(cbase, user, cmd, cbuf_create_const("no rules defined."));
-	return 0;
-}
-
-static int command_motd(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
-{
-	if (!hub_send_motd(cbase->hub, user))
-		return command_status(cbase, user, cmd, cbuf_create_const("no motd defined."));
-	return 0;
-}
-
 #ifdef CRASH_DEBUG
 static int command_crash(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
@@ -965,12 +951,10 @@ void commands_builtin_add(struct command_base* cbase)
 	ADD_COMMAND("history",    7, "?N",auth_cred_guest,     command_history,  "Show the last chat messages." );
 	ADD_COMMAND("kick",       4, "n", auth_cred_operator,  command_kick,     "Kick a user"                  );
 	ADD_COMMAND("log",        3, "",  auth_cred_operator,  command_log,      "Display log"                  );
-	ADD_COMMAND("motd",       4, "",  auth_cred_guest,     command_motd,     "Show the message of the day"  );
 	ADD_COMMAND("mute",       4, "n", auth_cred_operator,  command_mute,     "Mute user"                    );
 	ADD_COMMAND("myip",       4, "",  auth_cred_guest,     command_myip,     "Show your own IP."            );
 	ADD_COMMAND("register",   8, "p", auth_cred_guest,     command_register, "Register your username."      );
 	ADD_COMMAND("reload",     6, "",  auth_cred_admin,     command_reload,   "Reload configuration files."  );
-	ADD_COMMAND("rules",      5, "",  auth_cred_guest,     command_rules,    "Show the hub rules"           );
 	ADD_COMMAND("password",   8, "p", auth_cred_user,      command_password, "Change your own password."    );
 	ADD_COMMAND("shutdown",   8, "",  auth_cred_admin,     command_shutdown_hub, "Shutdown hub."                );
 	ADD_COMMAND("stats",      5, "",  auth_cred_super,     command_stats,    "Show hub statistics."         );

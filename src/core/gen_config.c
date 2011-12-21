@@ -46,9 +46,7 @@ void config_defaults(struct hub_config* config)
 	config->tls_require_redirect_addr = hub_strdup("");
 	config->tls_certificate = hub_strdup("");
 	config->tls_private_key = hub_strdup("");
-	config->file_motd = hub_strdup("");
 	config->file_acl = hub_strdup("");
-	config->file_rules = hub_strdup("");
 	config->file_plugins = hub_strdup("");
 	config->msg_hub_full = hub_strdup("Hub is full");
 	config->msg_hub_disabled = hub_strdup("Hub is disabled");
@@ -538,29 +536,9 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		return 0;
 	}
 
-	if (!strcmp(key, "file_motd"))
-	{
-		if (!apply_string(key, data, &config->file_motd, (char*) ""))
-		{
-			LOG_ERROR("Configuration parse error on line %d", line_count);
-			return -1;
-		}
-		return 0;
-	}
-
 	if (!strcmp(key, "file_acl"))
 	{
 		if (!apply_string(key, data, &config->file_acl, (char*) ""))
-		{
-			LOG_ERROR("Configuration parse error on line %d", line_count);
-			return -1;
-		}
-		return 0;
-	}
-
-	if (!strcmp(key, "file_rules"))
-	{
-		if (!apply_string(key, data, &config->file_rules, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -961,11 +939,7 @@ void free_config(struct hub_config* config)
 
 	hub_free(config->tls_private_key);
 
-	hub_free(config->file_motd);
-
 	hub_free(config->file_acl);
-
-	hub_free(config->file_rules);
 
 	hub_free(config->file_plugins);
 
@@ -1177,14 +1151,8 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 	if (!ignore_defaults || strcmp(config->tls_private_key, "") != 0)
 		fprintf(stdout, "tls_private_key = \"%s\"\n", config->tls_private_key);
 
-	if (!ignore_defaults || strcmp(config->file_motd, "") != 0)
-		fprintf(stdout, "file_motd = \"%s\"\n", config->file_motd);
-
 	if (!ignore_defaults || strcmp(config->file_acl, "") != 0)
 		fprintf(stdout, "file_acl = \"%s\"\n", config->file_acl);
-
-	if (!ignore_defaults || strcmp(config->file_rules, "") != 0)
-		fprintf(stdout, "file_rules = \"%s\"\n", config->file_rules);
 
 	if (!ignore_defaults || strcmp(config->file_plugins, "") != 0)
 		fprintf(stdout, "file_plugins = \"%s\"\n", config->file_plugins);

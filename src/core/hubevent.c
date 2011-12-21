@@ -20,7 +20,7 @@
 #include "uhub.h"
 #include "plugin_api/handle.h"
 
-/* Send MOTD, do logging etc */
+/* Notify plugins, etc */
 void on_login_success(struct hub_info* hub, struct hub_user* u)
 {
 	/* Send user list of all existing users */
@@ -31,19 +31,11 @@ void on_login_success(struct hub_info* hub, struct hub_user* u)
 	user_set_state(u, state_normal);
 	uman_add(hub, u);
 
-	plugin_log_user_login_success(hub, u);
-
 	/* Announce new user to all connected users */
 	if (user_is_logged_in(u))
 		route_info_message(hub, u);
-	
-	/* Send message of the day (if any) */
-	if (user_is_logged_in(u)) /* Previous send() can fail! */
-		hub_send_motd(hub, u);
 
-	/* Send message of the day (if any) */
-	if (user_is_logged_in(u)) /* Previous send() can fail! */
-		hub_send_rules(hub, u);
+	plugin_log_user_login_success(hub, u);
 
 	/* reset timeout */
 	net_con_clear_timeout(u->connection);

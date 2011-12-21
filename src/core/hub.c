@@ -478,27 +478,6 @@ void hub_send_handshake(struct hub_info* hub, struct hub_user* u)
 	}
 }
 
-int hub_send_motd(struct hub_info* hub, struct hub_user* u)
-{
-	if (hub->command_motd)
-	{
-		route_to_user(hub, u, hub->command_motd);
-		return 1;
-	}
-	return 0;
-}
-
-int hub_send_rules(struct hub_info* hub, struct hub_user* u)
-{
-	if (hub->command_rules)
-	{
-		route_to_user(hub, u, hub->command_rules);
-		return 1;
-	}
-	return 0;
-}
-
-
 void hub_send_password_challenge(struct hub_info* hub, struct hub_user* u)
 {
 	struct adc_message* igpa;
@@ -905,8 +884,6 @@ void hub_plugins_unload(struct hub_info* hub)
 
 void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 {
-	int fd, ret;
-	char buf[MAX_RECV_BUF];
 	char* tmp;
 	char* server = adc_msg_escape(PRODUCT_STRING); /* FIXME: OOM */
 
@@ -924,39 +901,6 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 		tmp = adc_msg_escape(hub->config->hub_description);
 		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_DESCRIPTION, tmp);
 		hub_free(tmp);
-	}
-
-	/* (Re-)read the message of the day */
-	hub->command_motd = 0;
-	fd = (hub->config->file_motd && *hub->config->file_motd) ? open(hub->config->file_motd, 0) : -1;
-	if (fd != -1)
-	{
-		ret = read(fd, buf, MAX_RECV_BUF);
-		if (ret > 0)
-		{
-			buf[ret] = 0;
-			tmp = adc_msg_escape(buf);
-			hub->command_motd = adc_msg_construct(ADC_CMD_IMSG, 6 + strlen(tmp));
-			adc_msg_add_argument(hub->command_motd, tmp);
-			hub_free(tmp);
-		}
-		close(fd);
-	}
-
-	hub->command_rules = 0;
-	fd = (hub->config->file_rules && *hub->config->file_rules) ? open(hub->config->file_rules, 0) : -1;
-	if (fd != -1)
-	{
-		ret = read(fd, buf, MAX_RECV_BUF);
-		if (ret > 0)
-		{
-			buf[ret] = 0;
-			tmp = adc_msg_escape(buf);
-			hub->command_rules = adc_msg_construct(ADC_CMD_IMSG, 6 + strlen(tmp));
-			adc_msg_add_argument(hub->command_rules, tmp);
-			hub_free(tmp);
-		}
-		close(fd);
 	}
 
 	hub->command_support = adc_msg_construct(ADC_CMD_ISUP, 6 + strlen(ADC_PROTO_SUPPORT));
@@ -994,13 +938,6 @@ void hub_free_variables(struct hub_info* hub)
 
 	adc_msg_free(hub->command_info);
 	adc_msg_free(hub->command_banner);
-
-	if (hub->command_motd)
-		adc_msg_free(hub->command_motd);
-
-	if (hub->command_rules)
-		adc_msg_free(hub->command_rules);
-
 	adc_msg_free(hub->command_support);
 }
 

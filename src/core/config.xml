@@ -453,24 +453,6 @@
 		<since>0.3.0</since>
 	</option>
 
-	<option name="file_motd" type="file" default="">
-		<short>File containing the 'message of the day</short>
-		<description><![CDATA[
-			This can be specified as a message of the day file. If a valid file is given here it's content will be sent to all users after they have logged in to the hub. If the file is missing or empty this configuration entry will be ignored.
-		]]></description>
-		<since>0.1.3</since>
-		<example><![CDATA[
-			<p>
-			Unix users: <br />
-				file_acl = "/etc/uhub/motd.txt"
-			</p>
-			<p>
-			Windows users: <br />
-				file_acl = "c:\uhub\motd.txt"
-			</p>
-		]]></example>
-	</option>
-
 	<option name="file_acl" type="file" default="">
 		<short>File containing access control lists</short>
 		<description><![CDATA[
@@ -487,25 +469,6 @@
 			<p>
 			Windows users: <br />
 				file_acl = "c:\uhub\users.conf"
-			</p>
-		]]></example>
-	</option>
-
-	<option name="file_rules" type="file" default="">
-		<short>File containing hub rules</short>
-		<description><![CDATA[
-			This is a text file that is displayed on login as an extended message of the day.
-			In addition the contents of the file is displayed when a user uses the "!rules" command.
-		]]></description>
-		<since>0.3.0</since>
-		<example><![CDATA[
-			<p>
-			Unix users: <br />
-				file_acl = "/etc/uhub/rules.txt"
-			</p>
-			<p>
-			Windows users: <br />
-				file_acl = "c:\uhub\rules.txt"
 			</p>
 		]]></example>
 	</option>

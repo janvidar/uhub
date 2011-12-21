@@ -46,9 +46,7 @@ struct hub_config
 	char* tls_require_redirect_addr;       /*<<< A redirect address in case a client connects using "adc://" when "adcs://" is required. (default: ) */
 	char* tls_certificate;                 /*<<< Certificate file (default: ) */
 	char* tls_private_key;                 /*<<< Private key file (default: ) */
-	char* file_motd;                       /*<<< File containing the 'message of the day (default: ) */
 	char* file_acl;                        /*<<< File containing access control lists (default: ) */
-	char* file_rules;                      /*<<< File containing hub rules (default: ) */
 	char* file_plugins;                    /*<<< Plugin configuration file (default: ) */
 	char* msg_hub_full;                    /*<<< "Hub is full" */
 	char* msg_hub_disabled;                /*<<< "Hub is disabled" */

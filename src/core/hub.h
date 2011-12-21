@@ -103,8 +103,6 @@ struct hub_info
 	struct acl_handle* acl;
 	struct adc_message* command_info;    /* The hub's INF command */
 	struct adc_message* command_support; /* The hub's SUP command */
-	struct adc_message* command_motd;    /* The message of the day */
-	struct adc_message* command_rules;   /* The hub rules */
 	struct adc_message* command_banner;  /* The default welcome message */
 	time_t tm_started;
 	int status;
@@ -204,19 +202,6 @@ extern void hub_send_hubinfo(struct hub_info* hub, struct hub_user* u);
  * hub_send_support() and hub_send_sid()
  */
 extern void hub_send_handshake(struct hub_info* hub, struct hub_user* u);
-
-/**
- * Send a welcome message containing the message of the day to 
- * one particular user. This can be sent in any point in time.
- * @return 1 if the motd were sent.
- */
-extern int hub_send_motd(struct hub_info* hub, struct hub_user* u);
-
-/**
- * Send the rules if configured.
- * @return 1 if the rules were sent.
- */
-extern int hub_send_rules(struct hub_info* hub, struct hub_user* u);
 
 /**
  * Send a password challenge to a user.
