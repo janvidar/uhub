@@ -218,8 +218,9 @@ int plugin_register(struct plugin_handle* plugin, const char* config)
 
 int plugin_unregister(struct plugin_handle* plugin)
 {
+	struct sql_data* sql;
 	set_error_message(plugin, 0);
-	struct sql_data* sql = (struct sql_data*) plugin->ptr;
+	sql = (struct sql_data*) plugin->ptr;
 	sqlite3_close(sql->db);
 	hub_free(sql);
 	return 0;

@@ -92,17 +92,17 @@ static void cbuf_append_bytes(struct command_buffer* buf, const char* msg, size_
 
 static void cbuf_append(struct command_buffer* buf, const char* msg)
 {
-	uhub_assert(buf->flags == 0);
 	size_t len = strlen(msg);
+	uhub_assert(buf->flags == 0);
 	cbuf_append_bytes(buf, msg, len);
 }
 
 static void cbuf_append_format(struct command_buffer* buf, const char* format, ...)
 {
-	uhub_assert(buf->flags == 0);
 	static char tmp[1024];
 	va_list args;
 	int bytes;
+	uhub_assert(buf->flags == 0);
 	va_start(args, format);
 	bytes = vsnprintf(tmp, 1024, format, args);
 	va_end(args);
@@ -330,8 +330,8 @@ parse_arguments_error:
 
 static struct command_handle* command_get_handler(struct command_base* cbase, const char* prefix, const struct hub_user* user, struct hub_command* cmd)
 {
-	uhub_assert(cmd != NULL);
 	struct command_handle* handler = NULL;
+	uhub_assert(cmd != NULL);
 
 	if (prefix && prefix[0] && prefix[1])
 	{
