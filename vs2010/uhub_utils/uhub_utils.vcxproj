@@ -65,6 +65,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\util\cbuffer.c" />
     <ClCompile Include="..\..\src\util\config_token.c" />
     <ClCompile Include="..\..\src\util\credentials.c" />
     <ClCompile Include="..\..\src\util\floodctl.c" />
@@ -78,6 +79,7 @@
     <ClCompile Include="..\..\src\util\tiger.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\src\util\cbuffer.h" />
     <ClInclude Include="..\..\src\util\config_token.h" />
     <ClInclude Include="..\..\src\util\credentials.h" />
     <ClInclude Include="..\..\src\util\floodctl.h" />

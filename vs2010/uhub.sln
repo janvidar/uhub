@@ -18,6 +18,20 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mod_example", "plugins\mod_
 		{0A3C1519-D877-47D9-A82E-40AC1BC79D75} = {0A3C1519-D877-47D9-A82E-40AC1BC79D75}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mod_auth_sqlite", "plugins\mod_auth_sqlite\mod_auth_sqlite.vcxproj", "{0EF03E84-2720-4616-A5BE-4D5737F68445}"
+	ProjectSection(ProjectDependencies) = postProject
+		{0A3C1519-D877-47D9-A82E-40AC1BC79D75} = {0A3C1519-D877-47D9-A82E-40AC1BC79D75}
+		{A4FC9D62-D544-4D2A-88D7-A58529C3460B} = {A4FC9D62-D544-4D2A-88D7-A58529C3460B}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sqlite", "thirdparty\sqlite\sqlite.vcxproj", "{A4FC9D62-D544-4D2A-88D7-A58529C3460B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "uhub-passwd", "uhub-passwd\uhub-passwd.vcxproj", "{E92EB860-AE9E-4532-A75F-0929A7BCF6D0}"
+	ProjectSection(ProjectDependencies) = postProject
+		{0A3C1519-D877-47D9-A82E-40AC1BC79D75} = {0A3C1519-D877-47D9-A82E-40AC1BC79D75}
+		{A4FC9D62-D544-4D2A-88D7-A58529C3460B} = {A4FC9D62-D544-4D2A-88D7-A58529C3460B}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -40,6 +54,18 @@ Global
 		{9BBAEFDA-8E0E-4E7F-B8B6-0050432FC45B}.Debug|Win32.Build.0 = Debug|Win32
 		{9BBAEFDA-8E0E-4E7F-B8B6-0050432FC45B}.Release|Win32.ActiveCfg = Release|Win32
 		{9BBAEFDA-8E0E-4E7F-B8B6-0050432FC45B}.Release|Win32.Build.0 = Release|Win32
+		{0EF03E84-2720-4616-A5BE-4D5737F68445}.Debug|Win32.ActiveCfg = Debug|Win32
+		{0EF03E84-2720-4616-A5BE-4D5737F68445}.Debug|Win32.Build.0 = Debug|Win32
+		{0EF03E84-2720-4616-A5BE-4D5737F68445}.Release|Win32.ActiveCfg = Release|Win32
+		{0EF03E84-2720-4616-A5BE-4D5737F68445}.Release|Win32.Build.0 = Release|Win32
+		{A4FC9D62-D544-4D2A-88D7-A58529C3460B}.Debug|Win32.ActiveCfg = Debug|Win32
+		{A4FC9D62-D544-4D2A-88D7-A58529C3460B}.Debug|Win32.Build.0 = Debug|Win32
+		{A4FC9D62-D544-4D2A-88D7-A58529C3460B}.Release|Win32.ActiveCfg = Release|Win32
+		{A4FC9D62-D544-4D2A-88D7-A58529C3460B}.Release|Win32.Build.0 = Release|Win32
+		{E92EB860-AE9E-4532-A75F-0929A7BCF6D0}.Debug|Win32.ActiveCfg = Debug|Win32
+		{E92EB860-AE9E-4532-A75F-0929A7BCF6D0}.Debug|Win32.Build.0 = Debug|Win32
+		{E92EB860-AE9E-4532-A75F-0929A7BCF6D0}.Release|Win32.ActiveCfg = Release|Win32
+		{E92EB860-AE9E-4532-A75F-0929A7BCF6D0}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
