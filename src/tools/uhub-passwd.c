@@ -66,12 +66,13 @@ static void print_usage(const char* str)
 static char* sql_escape_string(const char* str)
 {
 	size_t i, n, size;
+	char* buf;
 
 	for (n = 0, size = strlen(str); n < strlen(str); n++)
 		if (str[n] == '\'')
 			size++;
 
-	char* buf = malloc(size+1);
+	buf = malloc(size+1);
 	for (n = 0, i = 0; n < strlen(str); n++)
 	{
 		if (str[n] == '\'')
@@ -315,10 +316,10 @@ void main_usage(const char* binary)
 
 int main(int argc, char** argv)
 {
+	size_t n = 0;
 	binary = argv[0];
 	filename = argv[1];
 	command = argv[2];
-	size_t n = 0;
 
 	if (argc < 3)
 	{
