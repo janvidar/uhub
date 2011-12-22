@@ -184,6 +184,9 @@ static struct cbuffer* parse_message(struct plugin_user* user, const char* msg)
 			case 'a':
 				cbuf_append(buf, ip_convert_to_string(&user->addr));
 				break;
+			case 'c':
+				cbuf_append(buf, auth_cred_to_string(user->credentials));
+				break;
 
 			case '%':
 				cbuf_append(buf, "%");

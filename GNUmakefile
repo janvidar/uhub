@@ -327,9 +327,9 @@ else
 install: $(uhub_BINARY)
 	@echo Copying $(uhub_BINARY) to $(UHUB_PREFIX)/bin/
 	@cp $(uhub_BINARY) $(UHUB_PREFIX)/bin/
+	@cp $(uhub-passwd_BINARY) $(UHUB_PREFIX)/bin/
 	@if [ ! -d $(UHUB_CONF_DIR) ]; then echo Creating $(UHUB_CONF_DIR); mkdir -p $(UHUB_CONF_DIR); fi
 	@if [ ! -f $(UHUB_CONF_DIR)/uhub.conf ]; then cp doc/uhub.conf $(UHUB_CONF_DIR); fi
-	@if [ ! -f $(UHUB_CONF_DIR)/users.conf ]; then cp doc/users.conf  $(UHUB_CONF_DIR); fi
 	@if [ ! -f $(UHUB_CONF_DIR)/rules.txt ]; then cp doc/rules.txt  $(UHUB_CONF_DIR); fi
 	@if [ ! -f $(UHUB_CONF_DIR)/plugins.conf ]; then cp doc/plugins.conf  $(UHUB_CONF_DIR); fi
 	@if [ ! -d $(UHUB_MOD_DIR) ]; then echo Creating $(UHUB_MOD_DIR); mkdir -p $(UHUB_MOD_DIR); fi
