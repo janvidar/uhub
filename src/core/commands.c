@@ -295,13 +295,13 @@ struct hub_command* command_parse(struct command_base* cbase, const struct hub_u
 		goto command_parse_cleanup;
 	}
 
+	// Setup hub command.
+	cmd->prefix = strdup(((char*) list_get_first(tokens)) + 1);
+
 	// Find a matching command handler
 	handle = command_get_handler(cbase, list_get_first(tokens), user, cmd);
 	if (cmd->status != cmd_status_ok)
 		goto command_parse_cleanup;
-
-	// Setup hub command.
-	cmd->prefix = strdup(((char*) list_get_first(tokens)) + 1);
 
 	// Parse arguments
 	cmd->status = command_extract_arguments(cbase, user, handle, tokens, &cmd->args);
@@ -382,7 +382,7 @@ static int send_command_syntax_error(struct command_base* cbase, struct hub_user
 static int send_command_missing_arguments(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
 	struct cbuffer* buf = cbuf_create(512);
-	cbuf_append_format(buf, "*** Missing argument: See !help !%s\n", cmd->prefix);
+	cbuf_append_format(buf, "*** Missing argument: See !help %s\n", cmd->prefix);
 	send_message(cbase, user, buf);
 	return 0;
 }
