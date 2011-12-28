@@ -29,7 +29,7 @@ struct example_plugin_data
 static int example_command_handler(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_command* cmd)
 {
 	plugin->hub.send_message(plugin, user, "Hello from mod_example.");
-	return 1;
+	return 0;
 }
 
 static void command_register(struct plugin_handle* plugin)
