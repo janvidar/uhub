@@ -462,6 +462,7 @@ static int command_status(struct command_base* cbase, struct hub_user* user, str
 
 static int command_help(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
+	size_t n;
 	struct cbuffer* buf = cbuf_create(MAX_HELP_LINE);
 	struct command_handle* command = list_get_first(cmd->args);
 
@@ -473,7 +474,10 @@ static int command_help(struct command_base* cbase, struct hub_user* user, struc
 		{
 			if (command_is_available(command, user))
 			{
-				cbuf_append_format(buf, "!%s%12s- %s\n", command->prefix, " ", command->description);
+				cbuf_append_format(buf, "!%s", command->prefix);
+				for (n = strlen(command->prefix); n < cbase->prefix_length_max; n++)
+					cbuf_append(buf, " ");
+				cbuf_append_format(buf, " - %s\n", command->description);
 			}
 		}
 	}
