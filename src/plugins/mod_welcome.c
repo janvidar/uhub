@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2011, Jan Vidar Krey
+ * Copyright (C) 2007-2012, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,6 +78,9 @@ int read_rules(struct welcome_data* data)
 
 static void free_welcome_data(struct welcome_data* data)
 {
+	if (!data)
+		return;
+
 	hub_free(data->cmd_motd);
 	hub_free(data->motd_file);
 	hub_free(data->motd);
@@ -109,9 +112,7 @@ static struct welcome_data* parse_config(const char* line, struct plugin_handle*
 		if (!setting)
 		{
 			set_error_message(plugin, "Unable to parse startup parameters");
-			cfg_tokens_free(tokens);
-			free_welcome_data(data);
-			return 0;
+			goto cleanup_parse_error;
 		}
 
 		if (strcmp(cfg_settings_get_key(setting), "motd") == 0)
@@ -120,10 +121,8 @@ static struct welcome_data* parse_config(const char* line, struct plugin_handle*
 			if (!read_motd(data))
 			{
 				set_error_message(plugin, "Unable to read motd file.");
-				cfg_tokens_free(tokens);
 				cfg_settings_free(setting);
-				free_welcome_data(data);
-				return 0;
+				goto cleanup_parse_error;
 			}
 
 			data->cmd_motd = hub_malloc_zero(sizeof(struct plugin_command_handle));
@@ -135,10 +134,8 @@ static struct welcome_data* parse_config(const char* line, struct plugin_handle*
 			if (!read_rules(data))
 			{
 				set_error_message(plugin, "Unable to read rules file.");
-				cfg_tokens_free(tokens);
 				cfg_settings_free(setting);
-				free_welcome_data(data);
-				return 0;
+				goto cleanup_parse_error;
 			}
 
 			data->cmd_rules = hub_malloc_zero(sizeof(struct plugin_command_handle));
@@ -147,10 +144,8 @@ static struct welcome_data* parse_config(const char* line, struct plugin_handle*
 		else
 		{
 			set_error_message(plugin, "Unknown startup parameters given");
-			cfg_tokens_free(tokens);
 			cfg_settings_free(setting);
-			free_welcome_data(data);
-			return 0;
+			goto cleanup_parse_error;
 		}
 
 		cfg_settings_free(setting);
@@ -159,6 +154,11 @@ static struct welcome_data* parse_config(const char* line, struct plugin_handle*
 
 	cfg_tokens_free(tokens);
 	return data;
+
+cleanup_parse_error:
+	cfg_tokens_free(tokens);
+	free_welcome_data(data);
+	return 0;
 }
 
 
