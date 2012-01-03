@@ -265,6 +265,13 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 	if (!message)
 		return 0;
 
+	message_decoded = adc_msg_unescape(message);
+	if (!message_decoded)
+	{
+		hub_free(message);
+		return 0;
+	}
+
 	if (!user_is_logged_in(u))
 	{
 		hub_free(message);
@@ -290,9 +297,7 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 		}
 		else
 		{
-			message_decoded = adc_msg_unescape(message);
 			relay = command_invoke(hub->commands, u, message_decoded);
-			hub_free(message_decoded);
 		}
 	}
 
@@ -307,13 +312,13 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 		plugin_st status = st_default;
 		if (broadcast)
 		{
-			status = plugin_handle_chat_message(hub, u, message, 0);
+			status = plugin_handle_chat_message(hub, u, message_decoded, 0);
 		}
 		else if (private_msg)
 		{
 			struct hub_user* target = uman_get_user_by_sid(hub, cmd->target);
 			if (target)
-				status = plugin_handle_private_message(hub, u, target, message, 0);
+				status = plugin_handle_private_message(hub, u, target, message_decoded, 0);
 			else
 				relay = 0;
 		}
@@ -327,37 +332,13 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 		/* adc_msg_remove_named_argument(cmd, "PM"); */
 		if (broadcast)
 		{
-			hub_chat_history_add(hub, u, cmd);
-			plugin_log_chat_message(hub, u, message, 0);
+			plugin_log_chat_message(hub, u, message_decoded, 0);
 		}
 		ret = route_message(hub, u, cmd);
 	}
 	hub_free(message);
+	hub_free(message_decoded);
 	return ret;
-}
-
-void hub_chat_history_add(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
-{
-	char* msg_esc   = adc_msg_get_argument(cmd, 0);
-	char* message = adc_msg_unescape(msg_esc);
-	size_t loglen = strlen(message) + strlen(user->id.nick) + 13;
-	char* log = hub_malloc(loglen + 1);
-	snprintf(log, loglen, "%s <%s> %s\n", get_timestamp(time(NULL)), user->id.nick, message);
-	log[loglen] = '\0';
-	list_append(hub->chat_history, log);
-	while (list_size(hub->chat_history) > (size_t) hub->config->max_chat_history)
-	{
-		char* msg = list_get_first(hub->chat_history);
-		list_remove(hub->chat_history, msg);
-		hub_free(msg);
-	}
-	hub_free(message);
-	hub_free(msg_esc);
-}
-
-void hub_chat_history_clear(struct hub_info* hub)
-{
-	list_clear(hub->chat_history, &hub_free);
 }
 
 void hub_send_support(struct hub_info* hub, struct hub_user* u)
@@ -803,20 +784,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		return 0;
 	}
 
-	hub->chat_history = (struct linked_list*) list_create();
 	hub->logout_info  = (struct linked_list*) list_create();
-	if (!hub->chat_history)
-	{
-		net_con_close(hub->server);
-		list_destroy(hub->chat_history);
-		list_destroy(hub->logout_info);
-		hub_free(hub->recvbuf);
-		hub_free(hub->sendbuf);
-		uman_shutdown(hub);
-		hub_free(hub);
-		return 0;
-	}
-
 	server_alt_port_start(hub, config);
 
 	hub->status = hub_status_running;
@@ -844,8 +812,6 @@ void hub_shutdown_service(struct hub_info* hub)
 	hub->status = hub_status_stopped;
 	hub_free(hub->sendbuf);
 	hub_free(hub->recvbuf);
-	hub_chat_history_clear(hub);
-	list_destroy(hub->chat_history);
 	list_clear(hub->logout_info, &hub_free);
 	list_destroy(hub->logout_info);
 	command_shutdown(hub->commands);

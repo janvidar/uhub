@@ -109,7 +109,6 @@ struct hub_info
 	char* recvbuf; /* Global receive buffer */
 	char* sendbuf; /* Global send buffer */
 
-	struct linked_list* chat_history;    /* Chat history */
 	struct linked_list* logout_info;     /* Log of people logging out. */
 
 	struct command_base* commands;       /* Hub command handler */
@@ -150,16 +149,6 @@ extern int hub_handle_password(struct hub_info* hub, struct hub_user* u, struct 
  * @return 0 on success, -1 on error.
  */
 extern int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc_message* cmd);
-
-/**
- * Add a chat message to the chat history
- */
-extern void hub_chat_history_add(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd);
-
-/**
- * Clear the chat history.
- */
-extern void hub_chat_history_clear(struct hub_info* hub);
 
 /**
  * Used internally by hub_handle_info

@@ -689,49 +689,6 @@ static int command_broadcast(struct command_base* cbase, struct hub_user* user, 
 	return 0;
 }
 
-static int command_history(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
-{
-	struct cbuffer* buf;
-	struct linked_list* messages = cbase->hub->chat_history;
-	char* message;
-	char* maxlines_str = list_get_first(cmd->args);
-	int maxlines = 0;
-	int skiplines = 0;
-	int total = list_size(messages);
-
-	if (total == 0)
-		return command_status(cbase, user, cmd, cbuf_create_const("No messages."));
-
-	buf = cbuf_create(MAX_HELP_MSG);
-	if (maxlines_str)
-		maxlines = uhub_atoi(maxlines_str);
-
-	if (maxlines <= 0 || maxlines > total)
-		maxlines = total;
-
-	if (maxlines != total)
-	{
-		skiplines = total - maxlines;
-		cbuf_append_format(buf, "*** %s: Displaying %d of %d message%s:", cmd->prefix, maxlines, total, ((total != 1) ? "s" : ""));
-	}
-	else
-	{
-		cbuf_append_format(buf, "*** %s: Displaying %d message%s:", cmd->prefix, total, ((total != 1) ? "s" : ""));
-	}
-	cbuf_append(buf, "\n");
-
-	message = (char*) list_get_first(messages);
-	while (message)
-	{
-		if (--skiplines < 0)
-			cbuf_append(buf, message);
-		message = (char*) list_get_next(messages);
-	}
-	cbuf_append(buf, "\n");
-	send_message(cbase, user, buf);
-	return 0;
-}
-
 static int command_log(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
 	struct cbuffer* buf;
@@ -952,7 +909,6 @@ void commands_builtin_add(struct command_base* cbase)
 #endif
 	ADD_COMMAND("getip",      5, "n", auth_cred_operator,  command_getip,    "Show IP address for a user"   );
 	ADD_COMMAND("help",       4, "?c",auth_cred_guest,     command_help,     "Show this help message."      );
-	ADD_COMMAND("history",    7, "?N",auth_cred_guest,     command_history,  "Show the last chat messages." );
 	ADD_COMMAND("kick",       4, "n", auth_cred_operator,  command_kick,     "Kick a user"                  );
 	ADD_COMMAND("log",        3, "",  auth_cred_operator,  command_log,      "Display log"                  );
 	ADD_COMMAND("mute",       4, "n", auth_cred_operator,  command_mute,     "Mute user"                    );
