@@ -14,14 +14,10 @@
 #define REVISION ""
 #define PRODUCT_STRING PRODUCT "/" VERSION
 #else
-#define REVISION "(git: " GIT_REVISION ")"
-#ifdef GIT_VERSION
-#define PRODUCT_STRING PRODUCT "/" GIT_VERSION
-#else
-#define PRODUCT_STRING PRODUCT "/" VERSION " " REVISION
-#endif
+#define REVISION "git-" GIT_REVISION
+#define PRODUCT_STRING PRODUCT "/" VERSION "-" REVISION
 #endif
 
 #ifndef COPYRIGHT
-#define COPYRIGHT "Copyright (c) 2007-2011, Jan Vidar Krey <janvidar@extatic.org>"
+#define COPYRIGHT "Copyright (c) 2007-2012, Jan Vidar Krey <janvidar@extatic.org>"
 #endif
