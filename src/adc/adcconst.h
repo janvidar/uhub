@@ -64,6 +64,11 @@ typedef uint32_t fourcc_t;
 #define ADC_CMD_FSCH FOURCC('F','S','C','H')
 #define ADC_CMD_DRES FOURCC('D','R','E','S')
 
+/* invalid search results (spam) */
+#define ADC_CMD_BRES FOURCC('B','R','E','S')
+#define ADC_CMD_ERES FOURCC('E','R','E','S')
+#define ADC_CMD_FRES FOURCC('F','R','E','S')
+
 /* connection setup */
 #define ADC_CMD_DCTM FOURCC('D','C','T','M')
 #define ADC_CMD_DRCM FOURCC('D','R','C','M')

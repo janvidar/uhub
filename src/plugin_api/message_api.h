@@ -26,4 +26,9 @@
  */
 extern int plugin_send_message(struct plugin_handle*, struct plugin_user* to, const char* message);
 
+/**
+ * Send a status message to a user.
+ */
+extern int plugin_send_status(struct plugin_handle* struct plugin_user* to, int code, const char* message);
+
 #endif /* HAVE_UHUB_PLUGIN_API_H */

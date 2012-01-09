@@ -50,6 +50,7 @@ plugin_st plugin_handle_private_message(struct hub_info* hub, struct hub_user* f
 
 /* Handle searches */
 plugin_st plugin_handle_search(struct hub_info* hub, struct hub_user* user, const char* data);
+plugin_st plugin_handle_search_result(struct hub_info* hub, struct hub_user* from, struct hub_user* to, const char* data);
 
 /* Handle p2p connections */
 plugin_st plugin_handle_connect(struct hub_info* hub, struct hub_user* from, struct hub_user* to);

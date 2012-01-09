@@ -155,6 +155,13 @@ plugin_st plugin_handle_search(struct hub_info* hub, struct hub_user* from, cons
 	PLUGIN_INVOKE_STATUS_2(hub, on_search, user, data);
 }
 
+plugin_st plugin_handle_search_result(struct hub_info* hub, struct hub_user* from, struct hub_user* to, const char* data)
+{
+	struct plugin_user* user1 = convert_user_type(from);
+	struct plugin_user* user2 = convert_user_type(to);
+	PLUGIN_INVOKE_STATUS_3(hub, on_search_result, user1, user2, data);
+}
+
 plugin_st plugin_handle_connect(struct hub_info* hub, struct hub_user* from, struct hub_user* to)
 {
 	struct plugin_user* user1 = convert_user_type(from);

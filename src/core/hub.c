@@ -21,10 +21,6 @@
 
 struct hub_info* g_hub = 0;
 
-#define CHECK_CHAT_ONLY \
-	if (hub->config->chat_only && u->credentials < auth_cred_operator) \
-		break
-
 /* FIXME: Flood control should be done in a plugin! */
 #define CHECK_FLOOD(TYPE, WARN) \
 	if (flood_control_check(&u->flood_ ## TYPE , hub->config->flood_ctl_  ## TYPE, hub->config->flood_ctl_interval, net_get_time())) \
@@ -81,6 +77,7 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 			case ADC_CMD_EINF:
 			case ADC_CMD_FINF:
 				/* these must never be allowed for security reasons, so we ignore them. */
+				CHECK_FLOOD(extras, 1);
 				break;
 
 			case ADC_CMD_EMSG:
@@ -96,20 +93,35 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 			case ADC_CMD_ESCH:
 			case ADC_CMD_FSCH:
 				cmd->priority = -1;
-				CHECK_CHAT_ONLY;
+				if (plugin_handle_search(hub, u, cmd->cache) == st_deny)
+					break;
 				CHECK_FLOOD(search, 1);
 				ROUTE_MSG;
 
+			case ADC_CMD_FRES: // spam
+			case ADC_CMD_BRES: // spam
+			case ADC_CMD_ERES: // pointless.
+				CHECK_FLOOD(extras, 1);
+				break;
+
 			case ADC_CMD_DRES:
 				cmd->priority = -1;
-				CHECK_CHAT_ONLY;
+				if (plugin_handle_search_result(hub, u, uman_get_user_by_sid(hub, cmd->target), cmd->cache) == st_deny)
+					break;
 				/* CHECK_FLOOD(search, 0); */
 				ROUTE_MSG;
 
 			case ADC_CMD_DRCM:
+				cmd->priority = -1;
+				if (plugin_handle_revconnect(hub, u, uman_get_user_by_sid(hub, cmd->target)) == st_deny)
+					break;
+				CHECK_FLOOD(connect, 1);
+				ROUTE_MSG;
+
 			case ADC_CMD_DCTM:
 				cmd->priority = -1;
-				CHECK_CHAT_ONLY;
+				if (plugin_handle_connect(hub, u, uman_get_user_by_sid(hub, cmd->target)) == st_deny)
+					break;
 				CHECK_FLOOD(connect, 1);
 				ROUTE_MSG;
 

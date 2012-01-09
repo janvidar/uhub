@@ -92,6 +92,20 @@ static int cbfunc_send_message(struct plugin_handle* plugin, struct plugin_user*
 	return 1;
 }
 
+static int cbfunc_send_status(struct plugin_handle* plugin, struct plugin_user* user, int code, const char* message)
+{
+//	struct plugin_callback_data* data = get_callback_data(plugin);
+	char code_str[4];
+	char* buffer = adc_msg_escape(message);
+	struct adc_message* command = adc_msg_construct(ADC_CMD_ISTA, strlen(buffer) + 10);
+	snprintf(code_str, sizeof(code_str), "%03d", code);
+	adc_msg_add_argument(command, code_str);
+	adc_msg_add_argument(command, buffer);
+	route_to_user(plugin_get_hub(plugin), convert_user_type(user), command);
+	adc_msg_free(command);
+	hub_free(buffer);
+	return 1;
+}
 
 static int cbfunc_user_disconnect(struct plugin_handle* plugin, struct plugin_user* user)
 {
@@ -136,6 +150,7 @@ static int cbfunc_command_del(struct plugin_handle* plugin, struct plugin_comman
 void plugin_register_callback_functions(struct plugin_handle* handle)
 {
 	handle->hub.send_message = cbfunc_send_message;
+	handle->hub.send_status_message = cbfunc_send_status;
 	handle->hub.user_disconnect = cbfunc_user_disconnect;
 	handle->hub.command_add = cbfunc_command_add;
 	handle->hub.command_del = cbfunc_command_del;

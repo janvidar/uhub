@@ -32,6 +32,7 @@
 typedef plugin_st (*on_chat_msg_t)(struct plugin_handle*, struct plugin_user* from, const char* message);
 typedef plugin_st (*on_private_msg_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to, const char* message);
 typedef plugin_st (*on_search_t)(struct plugin_handle*, struct plugin_user* from, const char* data);
+typedef plugin_st (*on_search_result_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to, const char* data);
 typedef plugin_st (*on_p2p_connect_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to);
 typedef plugin_st (*on_p2p_revconnect_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to);
 
@@ -89,6 +90,7 @@ struct plugin_funcs
 	on_chat_msg_t           on_chat_msg;         /* A public chat message is about to be sent (can be intercepted) */
 	on_private_msg_t        on_private_msg;      /* A public chat message is about to be sent (can be intercepted) */
 	on_search_t             on_search;           /* A search is about to be sent (can be intercepted) */
+	on_search_result_t      on_search_result;    /* A search result is about to be sent (can be intercepted) */
 	on_p2p_connect_t        on_p2p_connect;      /* A user is about to connect to another user (can be intercepted) */
 	on_p2p_revconnect_t     on_p2p_revconnect;   /* A user is about to connect to another user (can be intercepted) */
 
@@ -106,6 +108,7 @@ struct plugin_funcs
 struct plugin_command_handle;
 
 typedef int (*hfunc_send_message)(struct plugin_handle*, struct plugin_user* user, const char* message);
+typedef int (*hfunc_send_status)(struct plugin_handle*, struct plugin_user* to, int code, const char* message);
 typedef int (*hfunc_user_disconnect)(struct plugin_handle*, struct plugin_user* user);
 typedef int (*hfunc_command_add)(struct plugin_handle*, struct plugin_command_handle*);
 typedef int (*hfunc_command_del)(struct plugin_handle*, struct plugin_command_handle*);
@@ -117,6 +120,7 @@ typedef int (*hfunc_command_del)(struct plugin_handle*, struct plugin_command_ha
 struct plugin_hub_funcs
 {
 	hfunc_send_message send_message;
+	hfunc_send_status send_status_message;
 	hfunc_user_disconnect user_disconnect;
 	hfunc_command_add command_add;
 	hfunc_command_del command_del;

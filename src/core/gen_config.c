@@ -13,7 +13,6 @@ void config_defaults(struct hub_config* config)
 	config->registered_users_only = 0;
 	config->register_self = 0;
 	config->obsolete_clients = 0;
-	config->chat_only = 0;
 	config->chat_is_privileged = 0;
 	config->hub_name = hub_strdup("uhub");
 	config->hub_description = hub_strdup("no description");
@@ -196,16 +195,6 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 	if (!strcmp(key, "obsolete_clients"))
 	{
 		if (!apply_boolean(key, data, &config->obsolete_clients))
-		{
-			LOG_ERROR("Configuration parse error on line %d", line_count);
-			return -1;
-		}
-		return 0;
-	}
-
-	if (!strcmp(key, "chat_only"))
-	{
-		if (!apply_boolean(key, data, &config->chat_only))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -1051,9 +1040,6 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 
 	if (!ignore_defaults || config->obsolete_clients != 0)
 		fprintf(stdout, "obsolete_clients = %s\n", config->obsolete_clients ? "yes" : "no");
-
-	if (!ignore_defaults || config->chat_only != 0)
-		fprintf(stdout, "chat_only = %s\n", config->chat_only ? "yes" : "no");
 
 	if (!ignore_defaults || config->chat_is_privileged != 0)
 		fprintf(stdout, "chat_is_privileged = %s\n", config->chat_is_privileged ? "yes" : "no");

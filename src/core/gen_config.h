@@ -13,7 +13,6 @@ struct hub_config
 	int   registered_users_only;           /*<<< Allow registered users only (default: 0) */
 	int   register_self;                   /*<<< Allow users to register themselves on the hub. (default: 0) */
 	int   obsolete_clients;                /*<<< Support obsolete clients using a ADC protocol prior to 1.0 (default: 0) */
-	int   chat_only;                       /*<<< Allow chat only operation on hub (default: 0) */
 	int   chat_is_privileged;              /*<<< Allow chat for operators and above only (default: 0) */
 	char* hub_name;                        /*<<< Name of hub (default: uhub) */
 	char* hub_description;                 /*<<< Short hub description, topic or subject. (default: no description) */

@@ -126,14 +126,6 @@
 		<since>0.3.1</since>
 	</option>
 
-	<option name="chat_only" type="boolean" default="0">
-		<short>Allow chat only operation on hub</short>
-		<description><![CDATA[
-			If this is enabled the hub will refuse to relay messages for search and connection setup. This effectively makes the hub viable for chat only.
-		]]></description>
-		<since>0.1.1</since>
-	</option>
-
 	<option name="chat_is_privileged" type="boolean" default="0">
 		<short>Allow chat for operators and above only</short>
 		<description><![CDATA[
