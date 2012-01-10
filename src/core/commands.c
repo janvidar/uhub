@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2011, Jan Vidar Krey
+ * Copyright (C) 2007-2012, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -651,14 +651,15 @@ static int command_whoip(struct command_base* cbase, struct hub_user* user, stru
 
 static int command_broadcast(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
-	size_t offset = 12;
+	size_t offset = 11;
 	size_t message_len = strlen(cmd->message + offset);
-	struct adc_message* command = 0;
+	char* message = adc_msg_escape(cmd->message + offset);
 	char pm_flag[7] = "PM";
 	char from_sid[5];
 	size_t recipients = 0;
 	struct hub_user* target;
 	struct cbuffer* buf = cbuf_create(128);
+	struct adc_message* command = NULL;
 
 	memcpy(from_sid, sid_to_string(user->id.sid), sizeof(from_sid));
 	memcpy(pm_flag + 2, from_sid, sizeof(from_sid));
@@ -675,7 +676,7 @@ static int command_broadcast(struct command_base* cbase, struct hub_user* user, 
 
 			adc_msg_add_argument(command, from_sid);
 			adc_msg_add_argument(command, sid_to_string(target->id.sid));
-			adc_msg_add_argument(command, (cmd->message + offset));
+			adc_msg_add_argument(command, message);
 			adc_msg_add_argument(command, pm_flag);
 
 			route_to_user(cbase->hub, target, command);
@@ -686,6 +687,7 @@ static int command_broadcast(struct command_base* cbase, struct hub_user* user, 
 
 	cbuf_append_format(buf, "*** %s: Delivered to " PRINTF_SIZE_T " user%s", cmd->prefix, recipients, (recipients != 1 ? "s" : ""));
 	send_message(cbase, user, buf);
+	hub_free(message);
 	return 0;
 }
 
