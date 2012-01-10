@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2011, Jan Vidar Krey
+ * Copyright (C) 2007-2012, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,8 +26,7 @@
 #include "util/log.h"
 #include "util/config_token.h"
 
-#define DEBUG_SQL
-
+// #define DEBUG_SQL
 
 static void set_error_message(struct plugin_handle* plugin, const char* msg)
 {
