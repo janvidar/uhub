@@ -203,8 +203,7 @@ int ip_mask_create_left(int af, int bits, struct ip_addr_encap* result)
 		fill = (128-bits) / 8;
 		remain_bits = (128-bits) % 8;
 		mask = (0xff << (8 - remain_bits));
-		n = 0;
-		
+
 		for (n = 0; n < fill; n++)
 			((uint8_t*) &result->internal_ip_data.in6)[n] = (uint8_t) 0xff;
 		
@@ -252,7 +251,6 @@ int ip_mask_create_right(int af, int bits, struct ip_addr_encap* result)
 		fill = (128-bits) / 8;
 		remain_bits = (128-bits) % 8;
 		mask8 = (0xff >> (8 - remain_bits));
-		n = 0;
 		start = 16-fill;
 		
 		for (n = 0; n < start; n++)
