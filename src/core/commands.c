@@ -20,7 +20,8 @@
 #include "uhub.h"
 
 #ifdef DEBUG
-#define CRASH_DEBUG
+// #define CRASH_DEBUG
+// #define DEBUG_UNLOAD_PLUGINS
 #endif
 
 #define MAX_HELP_MSG 16384
@@ -584,6 +585,23 @@ static int command_reload(struct command_base* cbase, struct hub_user* user, str
 	return command_status(cbase, user, cmd, cbuf_create_const("Reloading configuration..."));
 }
 
+#ifdef DEBUG_UNLOAD_PLUGINS
+int hub_plugins_load(struct hub_info* hub);
+int hub_plugins_unload(struct hub_info* hub);
+
+static int command_load(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
+{
+	hub_plugins_load(cbase->hub);
+	return command_status(cbase, user, cmd, cbuf_create_const("Loading plugins..."));
+}
+
+static int command_unload(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
+{
+	hub_plugins_unload(cbase->hub);
+	return command_status(cbase, user, cmd, cbuf_create_const("Unloading plugins..."));
+}
+#endif /* DEBUG_UNLOAD_PLUGINS */
+
 static int command_shutdown_hub(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
 	cbase->hub->status = hub_status_shutdown;
@@ -918,7 +936,7 @@ void commands_builtin_add(struct command_base* cbase)
 	ADD_COMMAND("register",   8, "p", auth_cred_guest,     command_register, "Register your username."      );
 	ADD_COMMAND("reload",     6, "",  auth_cred_admin,     command_reload,   "Reload configuration files."  );
 	ADD_COMMAND("password",   8, "p", auth_cred_user,      command_password, "Change your own password."    );
-	ADD_COMMAND("shutdown",   8, "",  auth_cred_admin,     command_shutdown_hub, "Shutdown hub."                );
+	ADD_COMMAND("shutdown",   8, "",  auth_cred_admin,     command_shutdown_hub, "Shutdown hub."            );
 	ADD_COMMAND("stats",      5, "",  auth_cred_super,     command_stats,    "Show hub statistics."         );
 	ADD_COMMAND("unban",      5, "n", auth_cred_operator,  command_unban,    "Lift ban on a user"           );
 	ADD_COMMAND("unmute",     6, "n", auth_cred_operator,  command_mute,     "Unmute user"                  );
@@ -930,6 +948,11 @@ void commands_builtin_add(struct command_base* cbase)
 	ADD_COMMAND("userpass",   8, "np",auth_cred_operator,  command_userpass, "Change password for a user."  );
 	ADD_COMMAND("version",    7, "",  auth_cred_guest,     command_version,  "Show hub version info."       );
 	ADD_COMMAND("whoip",      5, "a", auth_cred_operator,  command_whoip,    "Show users matching IP range" );
+
+#ifdef DEBUG_UNLOAD_PLUGINS
+	ADD_COMMAND("load",       4, "",  auth_cred_admin,     command_load,     "Load plugins."                );
+	ADD_COMMAND("unload",     6, "",  auth_cred_admin,     command_unload,   "Unload plugins."              );
+#endif /* DEBUG_UNLOAD_PLUGINS */
 }
 
 void commands_builtin_remove(struct command_base* cbase)

@@ -78,6 +78,7 @@ void plugin_close(struct uhub_plugin* plugin)
 	LOG_PLUGIN("plugin_close: \"%s\"", plugin->filename);
 	plugin_callback_data_destroy(internals->callback_data);
 	hub_free(internals);
+	plugin->internals = NULL;
 
 #ifdef HAVE_DLOPEN
 	dlclose(plugin->handle);
