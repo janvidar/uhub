@@ -156,7 +156,13 @@ ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 		ret = net_send(con->sd, buf, len, UHUB_SEND_SIGNAL);
 		if (ret == -1)
 		{
-			if (net_error() == EWOULDBLOCK || net_error() == EINTR)
+			if (
+#ifdef WINSOCK
+				net_error() == WSAEWOULDBLOCK
+#else
+				net_error() == EWOULDBLOCK 
+#endif
+				|| net_error() == EINTR)
 				return 0;
 			return -1;
 		}
@@ -190,7 +196,13 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 		ret = net_recv(con->sd, buf, len, 0);
 		if (ret == -1)
 		{
-			if (net_error() == EWOULDBLOCK || net_error() == EINTR)
+			if (
+#ifdef WINSOCK
+				net_error() == WSAEWOULDBLOCK
+#else
+				net_error() == EWOULDBLOCK
+#endif
+				|| net_error() == EINTR)
 				return 0;
 			return -net_error();
 		}
@@ -226,7 +238,13 @@ ssize_t net_con_peek(struct net_connection* con, void* buf, size_t len)
 	int ret = net_recv(con->sd, buf, len, MSG_PEEK);
 	if (ret == -1)
 	{
-		if (net_error() == EWOULDBLOCK || net_error() == EINTR)
+		if (
+#ifdef WINSOCK
+				net_error() == WSAEWOULDBLOCK
+#else
+				net_error() == EWOULDBLOCK 
+#endif
+				|| net_error() == EINTR)
 			return 0;
 		return -net_error();
 	}

@@ -36,6 +36,11 @@
 #endif
 #endif
 
+#if defined(__CYGWIN__) || defined(__MINGW32__)
+#define HAVE_SSIZE_T
+#define NEED_GETOPT
+#endif
+
 #ifdef WINSOCK
 #ifndef FD_SETSIZE
 #define FD_SETSIZE 4096
