@@ -95,16 +95,36 @@ static int command_is_available(struct command_handle* handle, const struct hub_
 	return handle->cred <= user->credentials;
 }
 
+void hub_command_args_free(struct hub_command* cmd)
+{
+	struct hub_command_arg_data* data = NULL;
+
+	if (!cmd->args)
+		return;
+
+	for (data = (struct hub_command_arg_data*) list_get_first(cmd->args); data; data = (struct hub_command_arg_data*) list_get_next(cmd->args))
+	{
+		switch (data->type)
+		{
+			case type_string:
+				hub_free(data->data.string);
+				break;
+			default:
+				break;
+		}
+	}
+
+	list_clear(cmd->args, hub_free);
+	list_destroy(cmd->args);
+	cmd->args = NULL;
+}
+
 void command_free(struct hub_command* cmd)
 {
 	if (!cmd) return;
 
 	hub_free(cmd->prefix);
-	if (cmd->args)
-	{
-		list_clear(cmd->args, &null_free);
-		list_destroy(cmd->args);
-	}
+	hub_command_args_free(cmd);
 	hub_free(cmd);
 }
 
@@ -124,33 +144,27 @@ static struct command_handle* command_handler_lookup(struct command_base* cbase,
 	return NULL;
 }
 
-static enum command_parse_status command_extract_arguments(struct command_base* cbase, const struct hub_user* user, struct command_handle* command, struct linked_list* tokens, struct linked_list** args)
+
+static enum command_parse_status command_extract_arguments(struct command_base* cbase, const struct hub_user* user, struct command_handle* command, struct linked_list* tokens, struct linked_list* args)
 {
 	int arg = 0;
 	int opt = 0;
 	char arg_code;
 	char* token = NULL;
-	struct hub_user* target = NULL;
-	struct command_handle* target_command = NULL;
-	enum auth_credentials cred;
+	struct hub_command_arg_data* data = NULL;
 	enum command_parse_status status = cmd_status_ok;
-	int args_addr_range = 0;
-	int temp_num;
 
 	// Ignore the first token since it is the prefix.
 	token = list_get_first(tokens);
 	list_remove(tokens, token);
 	hub_free(token);
 
-	uhub_assert(args);
-	*args = list_create();
-
-	while ((arg_code = command->args[arg++]))
+	while (status == cmd_status_ok && (arg_code = command->args[arg++]))
 	{
 		token = list_get_first(tokens);
 		if (!token || !*token)
 		{
-			status = (arg_code == '?')  ? cmd_status_ok : cmd_status_missing_args;
+			status = (arg_code == '?' ? cmd_status_ok : cmd_status_missing_args);
 			break;
 		}
 
@@ -161,90 +175,113 @@ static enum command_parse_status command_extract_arguments(struct command_base* 
 				continue;
 
 			case 'n':
-				target = uman_get_user_by_nick(cbase->hub, token);
-				if (!target)
+				data = hub_malloc(sizeof(*data));
+				data->type = type_user;
+				data->data.user = uman_get_user_by_nick(cbase->hub, token);
+				if (!data->data.user)
 				{
+					hub_free(data);
+					data = NULL;
 					status = cmd_status_arg_nick;
-					goto parse_arguments_error;
 				}
-				list_append(*args, target);
 				break;
 
 			case 'i':
-				target = uman_get_user_by_cid(cbase->hub, token);
-				if (!target)
+				data = hub_malloc(sizeof(*data));
+				data->type = type_user;
+				data->data.user = uman_get_user_by_cid(cbase->hub, token);
+				if (!data->data.user)
 				{
+					hub_free(data);
+					data = NULL;
 					status = cmd_status_arg_cid;
-					goto parse_arguments_error;
 				}
-				list_append(*args, target);
 				break;
 
 			case 'a':
-				uhub_assert(args_addr_range == 0 || !"BUG: Can only be one address range argument per command!");
-				if (!ip_convert_address_to_range(token, &cbase->range))
+				data = hub_malloc(sizeof(*data));
+				data->type = type_address;
+				if (ip_convert_to_binary(token, data->data.address) == -1)
 				{
+					hub_free(data);
+					data = NULL;
 					status = cmd_status_arg_address;
-					goto parse_arguments_error;
 				}
-				list_append(*args, &cbase->range);
-				args_addr_range++;
+				break;
+
+			case 'r':
+				data = hub_malloc(sizeof(*data));
+				data->type = type_range;
+				if (!ip_convert_address_to_range(token, data->data.range))
+				{
+					hub_free(data);
+					data = NULL;
+					status = cmd_status_arg_address;
+				}
 				break;
 
 			case 'm':
 			case 'p':
-				list_append(*args, token);
+				data = hub_malloc(sizeof(*data));
+				data->type = type_string;
+				data->data.string = strdup(token);
 				break;
 
 			case 'c':
-				target_command = command_handler_lookup(cbase, token);
-				if (!target_command)
+				data = hub_malloc(sizeof(*data));
+				data->type = type_command;
+				data->data.command = command_handler_lookup(cbase, token);
+				if (!data->data.command)
 				{
+					hub_free(data);
+					data = NULL;
 					status = cmd_status_arg_command;
-					goto parse_arguments_error;
 				}
-				list_append(*args, target_command);
 				break;
 
 			case 'C':
-				if (!auth_string_to_cred(token, &cred))
+				data = hub_malloc(sizeof(*data));
+				data->type = type_credentials;
+				if (!auth_string_to_cred(token, &data->data.credentials))
 				{
+					hub_free(data);
+					data = NULL;
 					status = cmd_status_arg_cred;
-					goto parse_arguments_error;
 				}
-				list_append(*args, (void*) cred);
 				break;
 
 			case 'N':
-				if (!is_number(token, &temp_num))
+				data->type = type_integer;
+				if (!is_number(token, &data->data.integer))
 				{
-					status = cmd_status_arg_number;
-					goto parse_arguments_error;
+					hub_free(data);
+					data = NULL;
+					return cmd_status_arg_number;
 				}
-				list_append(*args, (void*) (int*) (intptr_t) temp_num);
 				break;
 
 			case '\0':
 				if (!opt)
 				{
 					status = cmd_status_missing_args;
-					goto parse_arguments_error;
 				}
 				else
 				{
 					status = cmd_status_ok;
-					break;
 				}
 		}
+
+		if  (data)
+		{
+			list_append(args, data);
+			data = NULL;
+		}
+
 		list_remove(tokens, token);
 		hub_free(token);
 	}
-	return status;
 
-parse_arguments_error:
-	list_clear(*args, &null_free);
-	list_destroy(*args);
-	*args = NULL;
+	hub_free(data);
 	return status;
 }
 
@@ -287,7 +324,7 @@ struct hub_command* command_parse(struct command_base* cbase, const struct hub_u
 	cmd->status = cmd_status_ok;
 	cmd->message = message;
 	cmd->prefix = NULL;
-	cmd->args = NULL;
+	cmd->args = list_create();
 	cmd->user = user;
 
 	if (split_string(message, " ", tokens, 0) <= 0)
@@ -305,7 +342,7 @@ struct hub_command* command_parse(struct command_base* cbase, const struct hub_u
 		goto command_parse_cleanup;
 
 	// Parse arguments
-	cmd->status = command_extract_arguments(cbase, user, handle, tokens, &cmd->args);
+	cmd->status = command_extract_arguments(cbase, user, handle, tokens, cmd->args);
 	goto command_parse_cleanup;
 
 command_parse_cleanup:
@@ -465,7 +502,8 @@ static int command_help(struct command_base* cbase, struct hub_user* user, struc
 {
 	size_t n;
 	struct cbuffer* buf = cbuf_create(MAX_HELP_LINE);
-	struct command_handle* command = list_get_first(cmd->args);
+	struct hub_command_arg_data* data = list_get_first(cmd->args);
+	struct command_handle* command = data->data.command;
 
 	if (!command)
 	{
@@ -724,6 +762,8 @@ static int command_log(struct command_base* cbase, struct hub_user* user, struct
 	}
 
 	buf = cbuf_create(128);
+	cbuf_append_format(buf, "Logged entries: " PRINTF_SIZE_T, list_size(messages));
+
 	search = list_get_first(cmd->args);
 	if (search)
 	{
@@ -732,11 +772,7 @@ static int command_log(struct command_base* cbase, struct hub_user* user, struct
 
 	if (search_len)
 	{
-		cbuf_append_format(buf, "Logged entries: " PRINTF_SIZE_T ", searching for \"%s\"", list_size(messages), search);
-	}
-	else
-	{
-		cbuf_append_format(buf, "Logged entries: " PRINTF_SIZE_T, list_size(messages));
+		cbuf_append_format(buf, ", searching for \"%s\"", list_size(messages), search);
 	}
 	command_status(cbase, user, cmd, buf);
 
@@ -785,7 +821,8 @@ static int command_register(struct command_base* cbase, struct hub_user* user, s
 {
 	struct cbuffer* buf = cbuf_create(128);
 	struct auth_info data;
-	char* password = list_get_first(cmd->args);
+	struct hub_command_arg_data* args = (struct hub_command_arg_data*) list_get_first(cmd->args);
+	char* password = args->data.string;
 
 	strncpy(data.nickname, user->id.nick, MAX_NICK_LEN);
 	strncpy(data.password, password, MAX_PASS_LEN);
@@ -808,7 +845,8 @@ static int command_password(struct command_base* cbase, struct hub_user* user, s
 {
 	struct cbuffer* buf = cbuf_create(128);
 	struct auth_info data;
-	char* password = list_get_first(cmd->args);
+	struct hub_command_arg_data* args = (struct hub_command_arg_data*) list_get_first(cmd->args);
+	char* password = args->data.string;
 
 	strncpy(data.nickname, user->id.nick, MAX_NICK_LEN);
 	strncpy(data.password, password, MAX_PASS_LEN);
@@ -930,24 +968,24 @@ void commands_builtin_add(struct command_base* cbase)
 	ADD_COMMAND("getip",      5, "n", auth_cred_operator,  command_getip,    "Show IP address for a user"   );
 	ADD_COMMAND("help",       4, "?c",auth_cred_guest,     command_help,     "Show this help message."      );
 	ADD_COMMAND("kick",       4, "n", auth_cred_operator,  command_kick,     "Kick a user"                  );
-	ADD_COMMAND("log",        3, "",  auth_cred_operator,  command_log,      "Display log"                  );
+	ADD_COMMAND("log",        3, "?m",  auth_cred_operator,  command_log,      "Display log"                  ); // fail
 	ADD_COMMAND("mute",       4, "n", auth_cred_operator,  command_mute,     "Mute user"                    );
 	ADD_COMMAND("myip",       4, "",  auth_cred_guest,     command_myip,     "Show your own IP."            );
-	ADD_COMMAND("register",   8, "p", auth_cred_guest,     command_register, "Register your username."      );
+	ADD_COMMAND("register",   8, "p", auth_cred_guest,     command_register, "Register your username."      ); // fail
 	ADD_COMMAND("reload",     6, "",  auth_cred_admin,     command_reload,   "Reload configuration files."  );
-	ADD_COMMAND("password",   8, "p", auth_cred_user,      command_password, "Change your own password."    );
+	ADD_COMMAND("password",   8, "p", auth_cred_user,      command_password, "Change your own password."    ); // fail
 	ADD_COMMAND("shutdown",   8, "",  auth_cred_admin,     command_shutdown_hub, "Shutdown hub."            );
 	ADD_COMMAND("stats",      5, "",  auth_cred_super,     command_stats,    "Show hub statistics."         );
-	ADD_COMMAND("unban",      5, "n", auth_cred_operator,  command_unban,    "Lift ban on a user"           );
+	ADD_COMMAND("unban",      5, "n", auth_cred_operator,  command_unban,    "Lift ban on a user"           ); // not implemented
 	ADD_COMMAND("unmute",     6, "n", auth_cred_operator,  command_mute,     "Unmute user"                  );
 	ADD_COMMAND("uptime",     6, "",  auth_cred_guest,     command_uptime,   "Display hub uptime info."     );
-	ADD_COMMAND("useradd",    7, "np",auth_cred_operator,  command_useradd,  "Register a new user."         );
-	ADD_COMMAND("userdel",    7, "n", auth_cred_operator,  command_userdel,  "Delete a registered user."    );
-	ADD_COMMAND("userinfo",   8, "n", auth_cred_operator,  command_userinfo, "Show registered user info."   );
-	ADD_COMMAND("usermod",    7, "nC",auth_cred_admin,     command_usermod,  "Modify user credentials."     );
-	ADD_COMMAND("userpass",   8, "np",auth_cred_operator,  command_userpass, "Change password for a user."  );
+	ADD_COMMAND("useradd",    7, "np",auth_cred_operator,  command_useradd,  "Register a new user."         ); // fail
+	ADD_COMMAND("userdel",    7, "n", auth_cred_operator,  command_userdel,  "Delete a registered user."    ); // fail
+	ADD_COMMAND("userinfo",   8, "n", auth_cred_operator,  command_userinfo, "Show registered user info."   ); // fail
+	ADD_COMMAND("usermod",    7, "nC",auth_cred_admin,     command_usermod,  "Modify user credentials."     ); // fail
+	ADD_COMMAND("userpass",   8, "np",auth_cred_operator,  command_userpass, "Change password for a user."  ); // fail
 	ADD_COMMAND("version",    7, "",  auth_cred_guest,     command_version,  "Show hub version info."       );
-	ADD_COMMAND("whoip",      5, "a", auth_cred_operator,  command_whoip,    "Show users matching IP range" );
+	ADD_COMMAND("whoip",      5, "a", auth_cred_operator,  command_whoip,    "Show users matching IP range" ); // ok
 
 #ifdef DEBUG_UNLOAD_PLUGINS
 	ADD_COMMAND("load",       4, "",  auth_cred_admin,     command_load,     "Load plugins."                );

@@ -41,6 +41,33 @@ enum command_parse_status
 	cmd_status_arg_command,    /** <<< "A command argument is not valid ('c')" */
 };
 
+struct hub_command_arg_data
+{
+	enum Type {
+		type_integer,
+		type_string,
+		type_user,
+		type_address,
+		type_range,
+		type_credentials,
+		type_command
+	} type;
+
+	union {
+		int integer;
+		char* string;
+		struct hub_user* user;
+		struct ip_addr_encap* address;
+		struct ip_range* range;
+		enum auth_credentials credentials;
+		struct command_handle* command;
+	} data;
+
+	struct hub_command_arg_data* next;
+};
+
+void hub_command_args_free(struct hub_command* command);
+
 /**
  * This struct contains all information needed to invoke
  * a command, which includes the whole message, the prefix,
@@ -70,6 +97,7 @@ struct hub_command
  * n = nick name (must exist in hub session)
  * i = CID (must exist in hub)
  * a = (IP) address (must be a valid IPv4 or IPv6 address)
+ * r = (IP) address range (either: IP-IP or IP/mask, both IPv4 or IPv6 work)
  * m = message (string)
  * p = password (string)
  * C = credentials (see auth_string_to_cred).
