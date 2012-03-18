@@ -1,7 +1,7 @@
 How to compile:
 ---------------
 
-See the official compiling howto: http://www.extatic.org/uhub/compile.html
+See the official compiling howto: http://www.uhub.org/compile.php
 
 Prerequisites
 
