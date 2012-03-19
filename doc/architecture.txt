@@ -1,13 +1,13 @@
 = Architecture of uHub =
 
-uHub is single threaded and handles network and timer events using the 
+uHub is single-threaded and handles network and timer events using the
 libevent library.
 For each state there is a read event (and sometimes a write event) and timeout
 event in case an expected read (or write) event does not occur.
 
 
 == Protocol overview ==
-uHub use "speak" the ADC protocol, which works in short as follows:
+uHub "speaks" the ADC protocol, which works in short as follows:
 (C = client, S = server aka uHub).
 
 C: HSUP ADBASE
