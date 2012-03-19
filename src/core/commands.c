@@ -827,6 +827,54 @@ static int command_password(struct command_base* cbase, struct hub_user* user, s
 	return command_status(cbase, user, cmd, buf);
 }
 
+static int command_topic(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
+{
+	struct hub_info* hub = cbase->hub;
+	char* hastopic = list_get_first(cmd->args);
+	size_t offset = 7; // strlen("!topic ")
+
+	// if no topic has been specified, reset to config
+	char* escaped_desc = adc_msg_escape(hastopic ? (cmd->message + offset) : hub->config->hub_description);
+
+	adc_msg_replace_named_argument(hub->command_info, ADC_INF_FLAG_DESCRIPTION, escaped_desc);
+
+	// broadcast new hub description
+	struct adc_message* command = adc_msg_construct(ADC_CMD_IINF, strlen(escaped_desc) + 8);
+	adc_msg_add_named_argument(command, ADC_INF_FLAG_DESCRIPTION, escaped_desc);
+	route_to_all(hub, command);
+
+	adc_msg_free(command);
+	hub_free(escaped_desc);
+
+	struct cbuffer* buf = cbuf_create_const("Topic updated");
+	return command_status(cbase, user, cmd, buf);
+}
+
+static int command_showtopic(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
+{
+	struct hub_info* hub = cbase->hub;
+	char* msg1 = adc_msg_escape("The current topic is: ");
+	char* msg2 = adc_msg_get_named_argument(hub->command_info, ADC_INF_FLAG_DESCRIPTION);
+	size_t msg_len = strlen(msg1) + strlen(msg2);
+	char* message = hub_malloc(msg_len + 1);
+	uhub_assert(message != NULL);
+	strcpy(message, msg1);
+	strcat(message, msg2);
+
+	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, (msg_len + 6));
+	adc_msg_add_argument(command, message);
+
+	// Send reply
+	route_to_user(hub, user, command);
+
+	hub_free(msg1);
+	hub_free(msg2);
+	hub_free(message);
+	adc_msg_free(command);
+
+	return 0;
+}
+
 static int command_useradd(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
 	struct cbuffer* buf = cbuf_create(128);
@@ -936,6 +984,8 @@ void commands_builtin_add(struct command_base* cbase)
 	ADD_COMMAND("register",   8, "p", auth_cred_guest,     command_register, "Register your username."      );
 	ADD_COMMAND("reload",     6, "",  auth_cred_admin,     command_reload,   "Reload configuration files."  );
 	ADD_COMMAND("password",   8, "p", auth_cred_user,      command_password, "Change your own password."    );
+	ADD_COMMAND("topic",      5, "?m",auth_cred_operator,  command_topic,    "Set or clear the hub topic."  );
+	ADD_COMMAND("showtopic",  9, "",  auth_cred_guest,     command_showtopic,"Show the current hub topic."  );
 	ADD_COMMAND("shutdown",   8, "",  auth_cred_admin,     command_shutdown_hub, "Shutdown hub."            );
 	ADD_COMMAND("stats",      5, "",  auth_cred_super,     command_stats,    "Show hub statistics."         );
 	ADD_COMMAND("unban",      5, "n", auth_cred_operator,  command_unban,    "Lift ban on a user"           );
