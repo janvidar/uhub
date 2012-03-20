@@ -54,26 +54,6 @@ static int plugin_command_dispatch(struct command_base* cbase, struct hub_user* 
 	return 0;
 }
 
-struct plugin_callback_data* plugin_callback_data_create()
-{
-	struct plugin_callback_data* data = (struct plugin_callback_data*) hub_malloc_zero(sizeof(struct plugin_callback_data));
-	LOG_PLUGIN("plugin_callback_data_create()");
-	data->commands = list_create();
-	return data;
-}
-
-void plugin_callback_data_destroy(struct plugin_callback_data* data)
-{
-	LOG_PLUGIN("plugin_callback_data_destroy()");
-	if (data->commands)
-	{
-		uhub_assert(list_size(data->commands) == 0);
-		list_destroy(data->commands);
-	}
-
-	hub_free(data);
-}
-
 static struct hub_user* convert_user_type(struct plugin_user* user)
 {
 	struct hub_user* huser = (struct hub_user*) user;
@@ -172,4 +152,31 @@ void plugin_register_callback_functions(struct plugin_handle* handle)
 
 void plugin_unregister_callback_functions(struct plugin_handle* handle)
 {
+}
+
+struct plugin_callback_data* plugin_callback_data_create()
+{
+	struct plugin_callback_data* data = (struct plugin_callback_data*) hub_malloc_zero(sizeof(struct plugin_callback_data));
+	LOG_PLUGIN("plugin_callback_data_create()");
+	data->commands = list_create();
+	return data;
+}
+
+void plugin_callback_data_destroy(struct plugin_handle* plugin, struct plugin_callback_data* data)
+{
+	LOG_PLUGIN("plugin_callback_data_destroy()");
+	if (data->commands)
+	{
+		// delete commands not deleted by the plugin itself:
+		struct plugin_command_handle* cmd = list_get_first(data->commands);
+		while (cmd)
+		{
+			cbfunc_command_del(plugin, cmd);
+			list_remove(data->commands, cmd);
+			cmd = list_get_next(data->commands);
+		}
+		list_destroy(data->commands);
+	}
+
+	hub_free(data);
 }

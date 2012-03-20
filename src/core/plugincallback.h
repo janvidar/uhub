@@ -24,7 +24,7 @@ struct plugin_handle;
 struct uhub_plugin;
 
 extern struct plugin_callback_data* plugin_callback_data_create();
-extern void plugin_callback_data_destroy(struct plugin_callback_data* data);
+extern void plugin_callback_data_destroy(struct plugin_handle* plugin, struct plugin_callback_data* data);
 
 extern void plugin_register_callback_functions(struct plugin_handle* plugin);
 extern void plugin_unregister_callback_functions(struct plugin_handle* plugin);
