@@ -31,7 +31,7 @@ The hub should send a packet containing the token back:
 'IECH {token} {host:port}', aswell as the same message via TCP.
 
 If the client receives the message via UDP, it should now be able to determine the type of NAT.
-If the client receives the message via TCP only it knows it has a firewall blocking icomming communication.
+If the client receives the message via TCP only it knows it has a firewall blocking incomming communication.
 If the client does not receive the message, it should assume a firewall is blocking all UDP communication,
 and resume in passive mode.
 
