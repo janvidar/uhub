@@ -348,7 +348,5 @@ dist-clean:
 	@rm -rf $(all_OBJECTS) *~ core
 
 clean:
-	@rm -rf $(libuhub_OBJECTS) *~ core $(uhub_BINARY) $(admin_BINARY) $(autotest_BINARY) $(adcrush_BINARY) $(all_OBJECTS) $(all_plugins) autotest.c revision.h revision.h.tmp && \
+	@rm -rf $(libuhub_OBJECTS) *~ core $(uhub_BINARY) $(uhub-passwd_BINARY) $(admin_BINARY) $(autotest_BINARY) $(adcrush_BINARY) $(all_OBJECTS) $(all_plugins) autotest.c revision.h revision.h.tmp && \
 	echo $(MSG_CLEAN)
-
-
