@@ -114,13 +114,6 @@ int net_destroy()
 	return -1;
 }
 
-#ifdef USE_LIBEVENT
-struct event_base* net_get_evbase()
-{
-	return net_evbase;
-}
-#endif
-
 static void net_error_out(int fd, const char* func)
 {
 	int err = net_error();

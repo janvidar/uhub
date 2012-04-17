@@ -51,8 +51,6 @@ extern int net_initialize();
  */
 extern int net_destroy();
 
-extern struct event_base* net_get_evbase();
-
 /**
  * @return the number of sockets currrently being monitored.
  */

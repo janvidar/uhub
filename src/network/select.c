@@ -55,7 +55,7 @@ int net_backend_poll_select(struct net_backend* data, int ms)
 	struct net_backend_select* backend = (struct net_backend_select*) data;
 
 	tval.tv_sec = ms / 1000;
-	tval.tv_usec = ((ms % 1000) * 1000); // FIXME: correct?
+	tval.tv_usec = (ms % 1000) * 1000;
 
 	FD_ZERO(&backend->rfds);
 	FD_ZERO(&backend->wfds);
