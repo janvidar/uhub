@@ -298,7 +298,7 @@ $(admin_BINARY): $(admin_OBJECTS) $(libuhub_OBJECTS) $(libutils_OBJECTS) $(libad
 $(uhub_BINARY): $(uhub_OBJECTS) $(libuhub_OBJECTS) $(libutils_OBJECTS) $(libadc_common_OBJECTS)
 	$(MSG_LD) $(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-$(uhub-passwd_BINARY): $(uhub-passwd_OBJECTS)
+$(uhub-passwd_BINARY): $(uhub-passwd_OBJECTS) src/util/misc.o src/util/list.o src/util/memory.o src/util/log.o
 	$(MSG_LD) $(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS) $(uhub-passwd_LIBS)
 
 

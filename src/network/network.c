@@ -531,6 +531,7 @@ const char* net_address_to_string(int af, const void* src, char* dst, socklen_t 
 			sin6.sin6_family = AF_INET6;
 			sin6.sin6_port   = 0;
 			sin6.sin6_addr   = *addr6;
+			sin6.sin6_scope_id = 0;
 			size             = sizeof(sin6);
 			addr             = (LPSOCKADDR) &sin6;
 			break;

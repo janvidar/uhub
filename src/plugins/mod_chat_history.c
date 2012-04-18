@@ -129,13 +129,14 @@ static int command_history(struct plugin_handle* plugin, struct plugin_user* use
 {
 	struct cbuffer* buf;
 	struct chat_history_data* data = (struct chat_history_data*) plugin->ptr;
-	int maxlines = 0;
+	struct plugin_command_arg_data* arg = plugin->hub.command_arg_next(plugin, cmd, plugin_cmd_arg_type_integer);
+	int maxlines;
 
 	if (!list_size(data->chat_history))
 		return command_status(plugin, user, cmd, cbuf_create_const("No messages."));
 
-	if (list_size(cmd->args) > 0)
-		maxlines = (int) (intptr_t) ((intptr_t*) (void*) list_get_first(cmd->args));
+	if (arg)
+		maxlines = arg->data.integer;
 	else
 		maxlines = data->history_default;
 	

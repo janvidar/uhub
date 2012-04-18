@@ -35,6 +35,19 @@ struct plugin_command
 	struct linked_list* args;
 };
 
+struct plugin_command_arg_data
+{
+	enum plugin_command_arg_type type;
+	union {
+		int integer;
+		char* string;
+		struct plugin_user* user;
+		struct ip_addr_encap* address;
+		struct ip_range* range;
+		enum auth_credentials credentials;
+	} data;
+};
+
 typedef int (*plugin_command_handler)(struct plugin_handle*, struct plugin_user* to, struct plugin_command*);
 
 struct plugin_command_handle
@@ -62,18 +75,5 @@ struct plugin_command_handle
 		PTR->description = DESC; \
 	} while (0)
 
-extern int plugin_command_add(struct plugin_handle*, struct plugin_command_handle*);
-extern int plugin_command_del(struct plugin_handle*, struct plugin_command_handle*);
-
-/**
- * Send a message to a user.
- * From the user's perspective the message will originate from the hub.
- */
-extern int plugin_command_send_message(struct plugin_handle*, struct plugin_user* to, const char* message);
-
-/**
- * Send a reply to a command.
- */
-extern int plugin_command_send_reply(struct plugin_handle*, struct plugin_user* user, struct plugin_command* command, const char* message);
 
 #endif /* HAVE_UHUB_PLUGIN_API_H */

@@ -41,6 +41,33 @@ enum command_parse_status
 	cmd_status_arg_command,    /** <<< "A command argument is not valid ('c')" */
 };
 
+enum hub_command_arg_type
+{
+		type_integer,
+		type_string,
+		type_user,
+		type_address,
+		type_range,
+		type_credentials,
+		type_command
+};
+
+struct hub_command_arg_data
+{
+	enum hub_command_arg_type type;
+	union {
+		int integer;
+		char* string;
+		struct hub_user* user;
+		struct ip_addr_encap* address;
+		struct ip_range* range;
+		enum auth_credentials credentials;
+		struct command_handle* command;
+	} data;
+};
+
+void hub_command_args_free(struct hub_command* command);
+
 /**
  * This struct contains all information needed to invoke
  * a command, which includes the whole message, the prefix,
@@ -64,12 +91,36 @@ struct hub_command
 };
 
 /**
+ * Reset the command argument iterator and return the number of arguments
+ * that can be extracted from a parsed command.
+ *
+ * @param cmd the command to start iterating arguments
+ * @return returns the number of arguments provided for the command
+ */
+extern size_t hub_command_arg_reset(struct hub_command* cmd);
+
+/**
+ * Obtain the current argument and place it in data and increments the iterator.
+ * If no argument exists, or the argument is of a different type than \param type, then 0 is returned.
+ *
+ * NOTE: when calling hub_command_arg_next the first time during a command callback it is safe to assume
+ * that the first argument will be extracted. Thus you don't need to call hub_command_arg_reset().
+ *
+ * @param cmd the command used for iterating arguments.
+ * @param type the expected type of this argument
+ * @return NULL if no argument is found or if the argument found does not match the expected type.
+ */
+extern struct hub_command_arg_data* hub_command_arg_next(struct hub_command* cmd, enum hub_command_arg_type type);
+
+/**
  * Argument codes are used to automatically parse arguments
  * for a a hub command.
  *
- * n = nick name (must exist in hub session)
+ * u = user (must exist in hub session, or will cause error)
+ * n = nick name (string)
  * i = CID (must exist in hub)
  * a = (IP) address (must be a valid IPv4 or IPv6 address)
+ * r = (IP) address range (either: IP-IP or IP/mask, both IPv4 or IPv6 work)
  * m = message (string)
  * p = password (string)
  * C = credentials (see auth_string_to_cred).

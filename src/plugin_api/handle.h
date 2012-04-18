@@ -106,12 +106,17 @@ struct plugin_funcs
 };
 
 struct plugin_command_handle;
+struct plugin_command;
+struct plugin_command_arg_data;
 
 typedef int (*hfunc_send_message)(struct plugin_handle*, struct plugin_user* user, const char* message);
 typedef int (*hfunc_send_status)(struct plugin_handle*, struct plugin_user* to, int code, const char* message);
 typedef int (*hfunc_user_disconnect)(struct plugin_handle*, struct plugin_user* user);
 typedef int (*hfunc_command_add)(struct plugin_handle*, struct plugin_command_handle*);
 typedef int (*hfunc_command_del)(struct plugin_handle*, struct plugin_command_handle*);
+
+typedef size_t (*hfunc_command_arg_reset)(struct plugin_handle*, struct plugin_command*);
+typedef struct plugin_command_arg_data* (*hfunc_command_arg_next)(struct plugin_handle*, struct plugin_command*, enum plugin_command_arg_type);
 
 /**
  * These are functions created and initialized by the hub and which can be used
@@ -124,8 +129,9 @@ struct plugin_hub_funcs
 	hfunc_user_disconnect user_disconnect;
 	hfunc_command_add command_add;
 	hfunc_command_del command_del;
+	hfunc_command_arg_reset command_arg_reset;
+	hfunc_command_arg_next command_arg_next;
 };
-
 
 struct plugin_handle
 {

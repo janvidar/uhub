@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2011, Jan Vidar Krey
+ * Copyright (C) 2007-2012, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
  */
 
 #include "uhub.h"
+#include "util/misc.h"
 #include <sqlite3.h>
 
 // #define DEBUG_SQL
@@ -104,6 +105,59 @@ static const char* validate_cred(const char* cred_str)
 	exit(1);
 }
 
+static const char* validate_username(const char* username)
+{
+	const char* tmp;
+
+	// verify length
+	if (strlen(username) > MAX_NICK_LEN)
+	{
+		fprintf(stderr, "User name is too long.\n");
+		exit(1);
+	}
+
+	/* Nick must not start with a space */
+	if (is_white_space(username[0]))
+	{
+		fprintf(stderr, "User name cannot start with white space.\n");
+		exit(1);
+	}
+
+	/* Check for ASCII values below 32 */
+	for (tmp = username; *tmp; tmp++)
+		if ((*tmp < 32) && (*tmp > 0))
+		{
+			fprintf(stderr, "User name contains illegal characters.\n");
+			exit(1);
+		}
+
+	if (!is_valid_utf8(username))
+	{
+		fprintf(stderr, "User name must be utf-8 encoded.\n");
+		exit(1);
+	}
+
+	return username;
+}
+
+
+static const char* validate_password(const char* password)
+{
+	// verify length
+	if (strlen(password) > MAX_PASS_LEN)
+	{
+		fprintf(stderr, "Password is too long.\n");
+		exit(1);
+	}
+
+	if (!is_valid_utf8(password))
+	{
+		fprintf(stderr, "Password must be utf-8 encoded.\n");
+		exit(1);
+	}
+
+	return password;
+}
 
 static void open_database()
 {
@@ -202,8 +256,8 @@ static int add(size_t argc, const char** argv)
 	if (argc < 2)
 		print_usage("username password [credentials = user]");
 
-	user = sql_escape_string(argv[0]);
-	pass = sql_escape_string(argv[1]);
+	user = sql_escape_string(validate_username(argv[0]));
+	pass = sql_escape_string(validate_password(argv[1]));
 	cred = validate_cred(argv[2] ? argv[2] : "user");
 
 	rc = sql_execute("INSERT INTO users (nickname, password, credentials) VALUES('%s', '%s', '%s');", user, pass, cred);
@@ -253,7 +307,7 @@ static int pass(size_t argc, const char** argv)
 		print_usage("username password");
 
 	user = sql_escape_string(argv[0]);
-	pass = sql_escape_string(argv[1]);
+	pass = sql_escape_string(validate_password(argv[1]));
 
 	rc = sql_execute("UPDATE users SET password = '%s' WHERE nickname = '%s';", pass, user);
 
@@ -275,7 +329,7 @@ static int del(size_t argc, const char** argv)
 	char* user = NULL;
 	int rc;
 
-	if (argc < 2)
+	if (argc < 1)
 		print_usage("username");
 
 	user = sql_escape_string(argv[0]);
@@ -307,11 +361,11 @@ void main_usage(const char* binary)
 			"\n"
 			"Parameters:\n"
 			"  'filename' is a database file\n"
-			"  'username' is a nickname (UTF-8, up to 64 bytes)\n"
-			"  'password' is a password (UTF-8, up to 64 bytes)\n"
+			"  'username' is a nickname (UTF-8, up to %i bytes)\n"
+			"  'password' is a password (UTF-8, up to %i bytes)\n"
 			"  'credentials' is one of 'admin', 'super', 'op', 'user'\n"
 			"\n"
-		, binary);
+		, binary, MAX_NICK_LEN, MAX_PASS_LEN);
 }
 
 int main(int argc, char** argv)
@@ -330,7 +384,7 @@ int main(int argc, char** argv)
 	for (; n < sizeof(COMMANDS) / sizeof(COMMANDS[0]); n++)
 	{
 		if (!strcmp(command, COMMANDS[n].command))
-			return COMMANDS[n].handle(argc - 2, (const char**) &argv[3]);
+			return COMMANDS[n].handle(argc - 3, (const char**) &argv[3]);
 	}
 
 	// Unknown command!

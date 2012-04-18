@@ -20,7 +20,6 @@
 #include "uhub.h"
 
 #ifdef DEBUG
-// #define CRASH_DEBUG
 // #define DEBUG_UNLOAD_PLUGINS
 #endif
 
@@ -95,16 +94,36 @@ static int command_is_available(struct command_handle* handle, const struct hub_
 	return handle->cred <= user->credentials;
 }
 
+void hub_command_args_free(struct hub_command* cmd)
+{
+	struct hub_command_arg_data* data = NULL;
+
+	if (!cmd->args)
+		return;
+
+	for (data = (struct hub_command_arg_data*) list_get_first(cmd->args); data; data = (struct hub_command_arg_data*) list_get_next(cmd->args))
+	{
+		switch (data->type)
+		{
+			case type_string:
+				hub_free(data->data.string);
+				break;
+			default:
+				break;
+		}
+	}
+
+	list_clear(cmd->args, hub_free);
+	list_destroy(cmd->args);
+	cmd->args = NULL;
+}
+
 void command_free(struct hub_command* cmd)
 {
 	if (!cmd) return;
 
 	hub_free(cmd->prefix);
-	if (cmd->args)
-	{
-		list_clear(cmd->args, &null_free);
-		list_destroy(cmd->args);
-	}
+	hub_command_args_free(cmd);
 	hub_free(cmd);
 }
 
@@ -124,33 +143,27 @@ static struct command_handle* command_handler_lookup(struct command_base* cbase,
 	return NULL;
 }
 
-static enum command_parse_status command_extract_arguments(struct command_base* cbase, const struct hub_user* user, struct command_handle* command, struct linked_list* tokens, struct linked_list** args)
+
+static enum command_parse_status command_extract_arguments(struct command_base* cbase, const struct hub_user* user, struct command_handle* command, struct linked_list* tokens, struct linked_list* args)
 {
 	int arg = 0;
 	int opt = 0;
 	char arg_code;
 	char* token = NULL;
-	struct hub_user* target = NULL;
-	struct command_handle* target_command = NULL;
-	enum auth_credentials cred;
+	struct hub_command_arg_data* data = NULL;
 	enum command_parse_status status = cmd_status_ok;
-	int args_addr_range = 0;
-	int temp_num;
 
 	// Ignore the first token since it is the prefix.
 	token = list_get_first(tokens);
 	list_remove(tokens, token);
 	hub_free(token);
 
-	uhub_assert(args);
-	*args = list_create();
-
-	while ((arg_code = command->args[arg++]))
+	while (status == cmd_status_ok && (arg_code = command->args[arg++]))
 	{
 		token = list_get_first(tokens);
 		if (!token || !*token)
 		{
-			status = (arg_code == '?')  ? cmd_status_ok : cmd_status_missing_args;
+			status = (arg_code == '?' ? cmd_status_ok : cmd_status_missing_args);
 			break;
 		}
 
@@ -160,91 +173,116 @@ static enum command_parse_status command_extract_arguments(struct command_base* 
 				opt = 1;
 				continue;
 
-			case 'n':
-				target = uman_get_user_by_nick(cbase->hub, token);
-				if (!target)
+			case 'u':
+				data = hub_malloc(sizeof(*data));
+				data->type = type_user;
+				data->data.user = uman_get_user_by_nick(cbase->hub, token);
+				if (!data->data.user)
 				{
+					hub_free(data);
+					data = NULL;
 					status = cmd_status_arg_nick;
-					goto parse_arguments_error;
 				}
-				list_append(*args, target);
 				break;
 
 			case 'i':
-				target = uman_get_user_by_cid(cbase->hub, token);
-				if (!target)
+				data = hub_malloc(sizeof(*data));
+				data->type = type_user;
+				data->data.user = uman_get_user_by_cid(cbase->hub, token);
+				if (!data->data.user)
 				{
+					hub_free(data);
+					data = NULL;
 					status = cmd_status_arg_cid;
-					goto parse_arguments_error;
 				}
-				list_append(*args, target);
 				break;
 
 			case 'a':
-				uhub_assert(args_addr_range == 0 || !"BUG: Can only be one address range argument per command!");
-				if (!ip_convert_address_to_range(token, &cbase->range))
+				data = hub_malloc(sizeof(*data));
+				data->type = type_address;
+				if (ip_convert_to_binary(token, data->data.address) == -1)
 				{
+					hub_free(data);
+					data = NULL;
 					status = cmd_status_arg_address;
-					goto parse_arguments_error;
 				}
-				list_append(*args, &cbase->range);
-				args_addr_range++;
 				break;
 
+			case 'r':
+				data = hub_malloc(sizeof(*data));
+				data->type = type_range;
+				if (!ip_convert_address_to_range(token, data->data.range))
+				{
+					hub_free(data);
+					data = NULL;
+					status = cmd_status_arg_address;
+				}
+				break;
+
+			case 'n':
 			case 'm':
 			case 'p':
-				list_append(*args, token);
+				data = hub_malloc(sizeof(*data));
+				data->type = type_string;
+				data->data.string = strdup(token);
 				break;
 
 			case 'c':
-				target_command = command_handler_lookup(cbase, token);
-				if (!target_command)
+				data = hub_malloc(sizeof(*data));
+				data->type = type_command;
+				data->data.command = command_handler_lookup(cbase, token);
+				if (!data->data.command)
 				{
+					hub_free(data);
+					data = NULL;
 					status = cmd_status_arg_command;
-					goto parse_arguments_error;
 				}
-				list_append(*args, target_command);
 				break;
 
 			case 'C':
-				if (!auth_string_to_cred(token, &cred))
+				data = hub_malloc(sizeof(*data));
+				data->type = type_credentials;
+				if (!auth_string_to_cred(token, &data->data.credentials))
 				{
+					hub_free(data);
+					data = NULL;
 					status = cmd_status_arg_cred;
-					goto parse_arguments_error;
 				}
-				list_append(*args, (void*) cred);
 				break;
 
 			case 'N':
-				if (!is_number(token, &temp_num))
+				data = hub_malloc(sizeof(*data));
+				data->type = type_integer;
+				if (!is_number(token, &data->data.integer))
 				{
-					status = cmd_status_arg_number;
-					goto parse_arguments_error;
+					hub_free(data);
+					data = NULL;
+					return cmd_status_arg_number;
 				}
-				list_append(*args, (void*) (int*) (intptr_t) temp_num);
 				break;
 
 			case '\0':
 				if (!opt)
 				{
 					status = cmd_status_missing_args;
-					goto parse_arguments_error;
 				}
 				else
 				{
 					status = cmd_status_ok;
-					break;
 				}
 		}
+
+		if  (data)
+		{
+			list_append(args, data);
+			data = NULL;
+		}
+
 		list_remove(tokens, token);
 		hub_free(token);
 	}
-	return status;
 
-parse_arguments_error:
-	list_clear(*args, &null_free);
-	list_destroy(*args);
-	*args = NULL;
+	hub_free(data);
 	return status;
 }
 
@@ -287,7 +325,7 @@ struct hub_command* command_parse(struct command_base* cbase, const struct hub_u
 	cmd->status = cmd_status_ok;
 	cmd->message = message;
 	cmd->prefix = NULL;
-	cmd->args = NULL;
+	cmd->args = list_create();
 	cmd->user = user;
 
 	if (split_string(message, " ", tokens, 0) <= 0)
@@ -305,7 +343,7 @@ struct hub_command* command_parse(struct command_base* cbase, const struct hub_u
 		goto command_parse_cleanup;
 
 	// Parse arguments
-	cmd->status = command_extract_arguments(cbase, user, handle, tokens, &cmd->args);
+	cmd->status = command_extract_arguments(cbase, user, handle, tokens, cmd->args);
 	goto command_parse_cleanup;
 
 command_parse_cleanup:
@@ -327,8 +365,10 @@ void command_get_syntax(struct command_handle* handler, struct cbuffer* buf)
 			{
 				case '?': cbuf_append(buf, "["); opt = 1; continue;
 				case 'n': cbuf_append(buf, "<nick>"); break;
+				case 'u': cbuf_append(buf, "<user>"); break;
 				case 'i': cbuf_append(buf, "<cid>");  break;
 				case 'a': cbuf_append(buf, "<addr>"); break;
+				case 'r': cbuf_append(buf, "<addr range>"); break;
 				case 'm': cbuf_append(buf, "<message>"); break;
 				case 'p': cbuf_append(buf, "<password>"); break;
 				case 'C': cbuf_append(buf, "<credentials>"); break;
@@ -452,6 +492,25 @@ int command_invoke(struct command_base* cbase, struct hub_user* user, const char
 	return ret;
 }
 
+size_t hub_command_arg_reset(struct hub_command* cmd)
+{
+	cmd->args->iterator = NULL;
+	return list_size(cmd->args);
+}
+
+struct hub_command_arg_data* hub_command_arg_next(struct hub_command* cmd, enum hub_command_arg_type type)
+{
+	struct hub_command_arg_data* ptr = (struct hub_command_arg_data*) list_get_next(cmd->args);
+	if (!ptr)
+		return NULL;
+
+	uhub_assert(ptr->type == type);
+	if (ptr->type != type)
+		return NULL;
+
+	return ptr;
+}
+
 static int command_status(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd, struct cbuffer* msg)
 {
 	struct cbuffer* buf = cbuf_create(cbuf_size(msg) + strlen(cmd->prefix) + 8);
@@ -465,9 +524,10 @@ static int command_help(struct command_base* cbase, struct hub_user* user, struc
 {
 	size_t n;
 	struct cbuffer* buf = cbuf_create(MAX_HELP_LINE);
-	struct command_handle* command = list_get_first(cmd->args);
+	struct hub_command_arg_data* data = hub_command_arg_next(cmd, type_command);
+	struct command_handle* command;
 
-	if (!command)
+	if (!data)
 	{
 		cbuf_append(buf, "Available commands:\n");
 
@@ -484,6 +544,7 @@ static int command_help(struct command_base* cbase, struct hub_user* user, struc
 	}
 	else
 	{
+		command = data->data.command;
 		if (command_is_available(command, user))
 		{
 			cbuf_append_format(buf, "Usage: !%s ", command->prefix);
@@ -521,7 +582,8 @@ static int command_uptime(struct command_base* cbase, struct hub_user* user, str
 static int command_kick(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
 	struct cbuffer* buf;
-	struct hub_user* target = list_get_first(cmd->args);
+	struct hub_command_arg_data* arg = hub_command_arg_next(cmd, type_user);
+	struct hub_user* target = arg->data.user;
 
 	buf = cbuf_create(128);
 	if (target == user)
@@ -532,49 +594,6 @@ static int command_kick(struct command_base* cbase, struct hub_user* user, struc
 	{
 		cbuf_append_format(buf, "Kicking user \"%s\".", target->id.nick);
 		hub_disconnect_user(cbase->hub, target, quit_kicked);
-	}
-	return command_status(cbase, user, cmd, buf);
-}
-
-static int command_ban(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
-{
-	struct cbuffer* buf = cbuf_create(128);
-	struct hub_user* target = list_get_first(cmd->args);
-
-	if (target == user)
-	{
-		cbuf_append(buf, "Cannot kick/ban yourself");
-	}
-	else
-	{
-		cbuf_append_format(buf, "Banning user \"%s\"", target->id.nick);
-
-		hub_disconnect_user(cbase->hub, target, quit_kicked);
-		acl_user_ban_nick(cbase->hub->acl, target->id.nick);
-		acl_user_ban_cid(cbase->hub->acl, target->id.cid);
-	}
-	return command_status(cbase, user, cmd, buf);
-}
-
-static int command_unban(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
-{
-	return command_status(cbase, user, cmd, cbuf_create_const("Not implemented"));
-}
-
-static int command_mute(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
-{
-	struct hub_user* target = list_get_first(cmd->args);
-	struct cbuffer* buf = cbuf_create(128);
-
-	if (strlen(cmd->prefix) == 4)
-	{
-		cbuf_append_format(buf, "Muted \"%s\"", target->id.nick);
-		user_flag_set(target, flag_muted);
-	}
-	else
-	{
-		cbuf_append_format(buf, "Unmuted \"%s\"", target->id.nick);
-		user_flag_unset(target, flag_muted);
 	}
 	return command_status(cbase, user, cmd, buf);
 }
@@ -628,20 +647,20 @@ static int command_myip(struct command_base* cbase, struct hub_user* user, struc
 static int command_getip(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
 	struct cbuffer* buf = cbuf_create(128);
-	struct hub_user* target = list_get_first(cmd->args);
-	cbuf_append_format(buf, "\"%s\" has address \"%s\"", target->id.nick, user_get_address(target));
+	struct hub_command_arg_data* arg = hub_command_arg_next(cmd, type_user);
+	cbuf_append_format(buf, "\"%s\" has address \"%s\"", arg->data.user->id.nick, user_get_address(arg->data.user));
 	return command_status(cbase, user, cmd, buf);
 }
 
 static int command_whoip(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
 	struct cbuffer* buf;
-	struct ip_range* range = list_get_first(cmd->args);
+	struct hub_command_arg_data* arg = hub_command_arg_next(cmd, type_range);
 	struct linked_list* users = (struct linked_list*) list_create();
 	struct hub_user* u;
 	int ret = 0;
 
-	ret = uman_get_user_by_addr(cbase->hub, users, range);
+	ret = uman_get_user_by_addr(cbase->hub, users, arg->data.range);
 	if (!ret)
 	{
 		list_clear(users, &null_free);
@@ -712,10 +731,11 @@ static int command_broadcast(struct command_base* cbase, struct hub_user* user, 
 static int command_log(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
 	struct cbuffer* buf;
+	struct hub_command_arg_data* arg = hub_command_arg_next(cmd, type_string);
 	struct linked_list* messages = cbase->hub->logout_info;
 	struct hub_logout_info* log;
-	char* search = 0;
-	size_t search_len = 0;
+	char* search = arg ? arg->data.string : "";
+	size_t search_len = strlen(search);
 	size_t search_hits = 0;
 
 	if (!list_size(messages))
@@ -724,19 +744,11 @@ static int command_log(struct command_base* cbase, struct hub_user* user, struct
 	}
 
 	buf = cbuf_create(128);
-	search = list_get_first(cmd->args);
-	if (search)
-	{
-		search_len = strlen(search);
-	}
+	cbuf_append_format(buf, "Logged entries: " PRINTF_SIZE_T, list_size(messages));
 
 	if (search_len)
 	{
-		cbuf_append_format(buf, "Logged entries: " PRINTF_SIZE_T ", searching for \"%s\"", list_size(messages), search);
-	}
-	else
-	{
-		cbuf_append_format(buf, "Logged entries: " PRINTF_SIZE_T, list_size(messages));
+		cbuf_append_format(buf, ", searching for \"%s\"", search);
 	}
 	command_status(cbase, user, cmd, buf);
 
@@ -781,113 +793,6 @@ static int command_log(struct command_base* cbase, struct hub_user* user, struct
 	return 0;
 }
 
-static int command_register(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
-{
-	struct cbuffer* buf = cbuf_create(128);
-	struct auth_info data;
-	char* password = list_get_first(cmd->args);
-
-	strncpy(data.nickname, user->id.nick, MAX_NICK_LEN);
-	strncpy(data.password, password, MAX_PASS_LEN);
-	data.nickname[MAX_NICK_LEN] = '\0';
-	data.password[MAX_PASS_LEN] = '\0';
-	data.credentials = auth_cred_user;
-
-	if (acl_register_user(cbase->hub, &data))
-	{
-		cbuf_append_format(buf, "User \"%s\" registered.", user->id.nick);
-	}
-	else
-	{
-		cbuf_append_format(buf, "Unable to register user \"%s\".", user->id.nick);
-	}
-	return command_status(cbase, user, cmd, buf);
-}
-
-static int command_password(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
-{
-	struct cbuffer* buf = cbuf_create(128);
-	struct auth_info data;
-	char* password = list_get_first(cmd->args);
-
-	strncpy(data.nickname, user->id.nick, MAX_NICK_LEN);
-	strncpy(data.password, password, MAX_PASS_LEN);
-	data.nickname[MAX_NICK_LEN] = '\0';
-	data.password[MAX_PASS_LEN] = '\0';
-	data.credentials = user->credentials;
-
-	if (acl_update_user(cbase->hub, &data))
-	{
-		cbuf_append(buf, "Password changed.");
-	}
-	else
-	{
-		cbuf_append_format(buf, "Unable to change password for user \"%s\".", user->id.nick);
-	}
-	return command_status(cbase, user, cmd, buf);
-}
-
-static int command_useradd(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
-{
-	struct cbuffer* buf = cbuf_create(128);
-	struct auth_info data;
-	char* nick = list_get_first(cmd->args);
-	char* pass = list_get_next(cmd->args);
-	char* cred = list_get_next(cmd->args);
-	enum auth_credentials credentials;
-
-	if (!(cred && auth_string_to_cred(cred, &credentials)))
-		credentials = auth_cred_user;
-
-	strncpy(data.nickname, nick, MAX_NICK_LEN);
-	strncpy(data.password, pass, MAX_PASS_LEN);
-	data.nickname[MAX_NICK_LEN] = '\0';
-	data.password[MAX_PASS_LEN] = '\0';
-	data.credentials = credentials;
-
-	if (acl_register_user(cbase->hub, &data))
-		cbuf_append_format(buf, "User \"%s\" registered.", nick);
-	else
-		cbuf_append_format(buf, "Unable to register user \"%s\".", nick);
-	return command_status(cbase, user, cmd, buf);
-}
-
-static int command_userdel(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
-{
-	struct cbuffer* buf = cbuf_create(128);
-	char* nick = list_get_first(cmd->args);
-
-	if (acl_delete_user(cbase->hub, nick))
-		cbuf_append_format(buf, "User \"%s\" is deleted.", nick);
-	else
-		cbuf_append_format(buf, "Unable to delete user \"%s\".", nick);
-	return command_status(cbase, user, cmd, buf);
-}
-
-static int command_usermod(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
-{
-	return command_status(cbase, user, cmd, cbuf_create_const("Not implemented!"));
-}
-
-static int command_userinfo(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
-{
-	return command_status(cbase, user, cmd, cbuf_create_const("Not implemented!"));
-}
-
-static int command_userpass(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
-{
-	return command_status(cbase, user, cmd, cbuf_create_const("Not implemented!"));
-}
-
-#ifdef CRASH_DEBUG
-static int command_crash(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
-{
-	void (*crash)(void) = NULL;
-	crash();
-	return 0;
-}
-#endif
-
 static int command_stats(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
 	struct cbuffer* buf = cbuf_create(128);
@@ -922,32 +827,18 @@ static struct command_handle* add_builtin(struct command_base* cbase, const char
 
 void commands_builtin_add(struct command_base* cbase)
 {
-	ADD_COMMAND("ban",        3, "n", auth_cred_operator,  command_ban,      "Ban a user"                   );
 	ADD_COMMAND("broadcast",  9, "m", auth_cred_operator,  command_broadcast,"Send a message to all users"  );
-#ifdef CRASH_DEBUG
-	ADD_COMMAND("crash",      5, "",  auth_cred_admin,     command_crash,    "Crash the hub (DEBUG)."       );
-#endif
-	ADD_COMMAND("getip",      5, "n", auth_cred_operator,  command_getip,    "Show IP address for a user"   );
+	ADD_COMMAND("getip",      5, "u", auth_cred_operator,  command_getip,    "Show IP address for a user"   );
 	ADD_COMMAND("help",       4, "?c",auth_cred_guest,     command_help,     "Show this help message."      );
-	ADD_COMMAND("kick",       4, "n", auth_cred_operator,  command_kick,     "Kick a user"                  );
-	ADD_COMMAND("log",        3, "",  auth_cred_operator,  command_log,      "Display log"                  );
-	ADD_COMMAND("mute",       4, "n", auth_cred_operator,  command_mute,     "Mute user"                    );
+	ADD_COMMAND("kick",       4, "u", auth_cred_operator,  command_kick,     "Kick a user"                  );
+	ADD_COMMAND("log",        3, "?m",  auth_cred_operator,  command_log,    "Display log"                  ); // fail
 	ADD_COMMAND("myip",       4, "",  auth_cred_guest,     command_myip,     "Show your own IP."            );
-	ADD_COMMAND("register",   8, "p", auth_cred_guest,     command_register, "Register your username."      );
 	ADD_COMMAND("reload",     6, "",  auth_cred_admin,     command_reload,   "Reload configuration files."  );
-	ADD_COMMAND("password",   8, "p", auth_cred_user,      command_password, "Change your own password."    );
 	ADD_COMMAND("shutdown",   8, "",  auth_cred_admin,     command_shutdown_hub, "Shutdown hub."            );
 	ADD_COMMAND("stats",      5, "",  auth_cred_super,     command_stats,    "Show hub statistics."         );
-	ADD_COMMAND("unban",      5, "n", auth_cred_operator,  command_unban,    "Lift ban on a user"           );
-	ADD_COMMAND("unmute",     6, "n", auth_cred_operator,  command_mute,     "Unmute user"                  );
 	ADD_COMMAND("uptime",     6, "",  auth_cred_guest,     command_uptime,   "Display hub uptime info."     );
-	ADD_COMMAND("useradd",    7, "np",auth_cred_operator,  command_useradd,  "Register a new user."         );
-	ADD_COMMAND("userdel",    7, "n", auth_cred_operator,  command_userdel,  "Delete a registered user."    );
-	ADD_COMMAND("userinfo",   8, "n", auth_cred_operator,  command_userinfo, "Show registered user info."   );
-	ADD_COMMAND("usermod",    7, "nC",auth_cred_admin,     command_usermod,  "Modify user credentials."     );
-	ADD_COMMAND("userpass",   8, "np",auth_cred_operator,  command_userpass, "Change password for a user."  );
 	ADD_COMMAND("version",    7, "",  auth_cred_guest,     command_version,  "Show hub version info."       );
-	ADD_COMMAND("whoip",      5, "a", auth_cred_operator,  command_whoip,    "Show users matching IP range" );
+	ADD_COMMAND("whoip",      5, "r", auth_cred_operator,  command_whoip,    "Show users matching IP range" );
 
 #ifdef DEBUG_UNLOAD_PLUGINS
 	ADD_COMMAND("load",       4, "",  auth_cred_admin,     command_load,     "Load plugins."                );

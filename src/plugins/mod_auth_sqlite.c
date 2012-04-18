@@ -39,6 +39,37 @@ struct sql_data
 	sqlite3* db;
 };
 
+static int null_callback(void* ptr, int argc, char **argv, char **colName) { return 0; }
+
+static int sql_execute(struct sql_data* sql, int (*callback)(void* ptr, int argc, char **argv, char **colName), void* ptr, const char* sql_fmt, ...)
+{
+	va_list args;
+	char query[1024];
+	char* errMsg;
+	int rc;
+
+	va_start(args, sql_fmt);
+	vsnprintf(query, sizeof(query), sql_fmt, args);
+
+#ifdef DEBUG_SQL
+	printf("SQL: %s\n", query);
+#endif
+
+	rc = sqlite3_exec(sql->db, query, callback, ptr, &errMsg);
+	if (rc != SQLITE_OK)
+	{
+#ifdef DEBUG_SQL
+		fprintf(stderr, "ERROR: %s\n", errMsg);
+#endif
+		sqlite3_free(errMsg);
+		return -rc;
+	}
+
+	rc = sqlite3_changes(sql->db);
+	return rc;
+}
+
+
 static struct sql_data* parse_config(const char* line, struct plugin_handle* plugin)
 {
 	struct sql_data* data = (struct sql_data*) hub_malloc_zero(sizeof(struct sql_data));
@@ -178,17 +209,42 @@ static plugin_st get_user(struct plugin_handle* plugin, const char* nickname, st
 static plugin_st register_user(struct plugin_handle* plugin, struct auth_info* user)
 {
 	struct sql_data* sql = (struct sql_data*) plugin->ptr;
-	if (sql->exclusive)
+	char* nick = strdup(sql_escape_string(user->nickname));
+	char* pass = strdup(sql_escape_string(user->password));
+	const char* cred = auth_cred_to_string(user->credentials);
+	int rc = sql_execute(sql, null_callback, NULL, "INSERT INTO users (nickname, password, credentials) VALUES('%s', '%s', '%s');", nick, pass, cred);
+
+	free(nick);
+	free(pass);
+
+	if (rc <= 0)
+	{
+		fprintf(stderr, "Unable to add user \"%s\"\n", user->nickname);
 		return st_deny;
-	return st_default;
+	}
+	return st_allow;
+	
 }
 
 static plugin_st update_user(struct plugin_handle* plugin, struct auth_info* user)
 {
 	struct sql_data* sql = (struct sql_data*) plugin->ptr;
-	if (sql->exclusive)
+
+	char* nick = strdup(sql_escape_string(user->nickname));
+	char* pass = strdup(sql_escape_string(user->password));
+	const char* cred = auth_cred_to_string(user->credentials);
+	int rc = sql_execute(sql, null_callback, NULL, "INSERT INTO users (nickname, password, credentials) VALUES('%s', '%s', '%s');", nick, pass, cred);
+
+	free(nick);
+	free(pass);
+
+	if (rc <= 0)
+	{
+		fprintf(stderr, "Unable to add user \"%s\"\n", user->nickname);
 		return st_deny;
-	return st_default;
+	}
+	return st_allow;
+	
 }
 
 static plugin_st delete_user(struct plugin_handle* plugin, struct auth_info* user)
@@ -201,7 +257,7 @@ static plugin_st delete_user(struct plugin_handle* plugin, struct auth_info* use
 
 int plugin_register(struct plugin_handle* plugin, const char* config)
 {
-	PLUGIN_INITIALIZE(plugin, "SQLite authentication plugin", "0.1", "Authenticate users based on a SQLite database.");
+	PLUGIN_INITIALIZE(plugin, "SQLite authentication plugin", "1.0", "Authenticate users based on a SQLite database.");
 
 	// Authentication actions.
 	plugin->funcs.auth_get_user = get_user;

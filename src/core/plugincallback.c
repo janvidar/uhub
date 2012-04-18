@@ -147,6 +147,17 @@ static int cbfunc_command_del(struct plugin_handle* plugin, struct plugin_comman
 	return 0;
 }
 
+size_t cbfunc_command_arg_reset(struct plugin_handle* plugin, struct plugin_command* cmd)
+{
+	// TODO: Use proper function for rewriting for plugin_command -> hub_command
+	return hub_command_arg_reset((struct hub_command*) cmd);
+}
+
+struct plugin_command_arg_data* cbfunc_command_arg_next(struct plugin_handle* plugin, struct plugin_command* cmd, enum plugin_command_arg_type t)
+{
+	// TODO: Use proper function for rewriting for plugin_command -> hub_command
+	return (struct plugin_command_arg_data*) hub_command_arg_next((struct hub_command*) cmd, (enum hub_command_arg_type) t);
+}
 
 void plugin_register_callback_functions(struct plugin_handle* handle)
 {
@@ -155,6 +166,8 @@ void plugin_register_callback_functions(struct plugin_handle* handle)
 	handle->hub.user_disconnect = cbfunc_user_disconnect;
 	handle->hub.command_add = cbfunc_command_add;
 	handle->hub.command_del = cbfunc_command_del;
+	handle->hub.command_arg_reset = cbfunc_command_arg_reset;
+	handle->hub.command_arg_next = cbfunc_command_arg_next;
 }
 
 void plugin_unregister_callback_functions(struct plugin_handle* handle)

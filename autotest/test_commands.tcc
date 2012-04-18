@@ -22,6 +22,7 @@ EXO_TEST(setup, {
 
 static int test_handler(struct command_base* cbase, struct hub_user* user, struct hub_command* hcmd)
 {
+	printf("test_handler\n");
 	result = 1;
 	return 0;
 }
@@ -35,7 +36,7 @@ static struct command_handle* create_handler(const char* prefix, const char* arg
 	c->cred = cred;
 	c->handler = test_handler;
 	c->description = "A handler added by autotest.";
-	c->description = "exotic";
+	c->origin = "exotic test";
 	c->ptr = &c->ptr;
 	return c;
 }
@@ -67,7 +68,7 @@ EXO_TEST(command_create, {
 	ADD_TEST(c_test1, "test1", "", auth_cred_guest);
 	ADD_TEST(c_test2, "test2", "", auth_cred_operator);
 	ADD_TEST(c_test3, "test3", "N?N?N", auth_cred_guest);
-	ADD_TEST(c_test4, "test4", "n", auth_cred_guest);
+	ADD_TEST(c_test4, "test4", "u", auth_cred_guest);
 	ADD_TEST(c_test5, "test5", "i", auth_cred_guest);
 	ADD_TEST(c_test6, "test6", "?c", auth_cred_guest);
 	ADD_TEST(c_test6, "test7", "C", auth_cred_guest);
@@ -83,6 +84,30 @@ static int verify(const char* str, enum command_parse_status expected)
 	command_free(cmd);
 	return status == expected;
 }
+
+static struct hub_command_arg_data* verify_argument(struct hub_command* cmd, enum hub_command_arg_type type)
+{
+	return  hub_command_arg_next(cmd, type);
+}
+
+static int verify_arg_integer(struct hub_command* cmd, int expected)
+{
+	struct hub_command_arg_data* data = verify_argument(cmd, type_integer);
+	return data->data.integer == expected;
+}
+
+static int verify_arg_user(struct hub_command* cmd, struct hub_user* expected)
+{
+	struct hub_command_arg_data* data = verify_argument(cmd, type_user);
+	return data->data.user == expected;
+}
+
+static int verify_arg_cred(struct hub_command* cmd, enum auth_credentials cred)
+{
+	struct hub_command_arg_data* data = verify_argument(cmd, type_credentials);
+	return data->data.credentials == cred;
+}
+
 
 EXO_TEST(command_access_1, { return verify("!test1", cmd_status_ok); });
 EXO_TEST(command_access_2, { return verify("!test2", cmd_status_access_error); });
@@ -134,7 +159,67 @@ EXO_TEST(command_parse_3, { return verify("!fail", cmd_status_not_found); });
 // built-in command
 EXO_TEST(command_parse_4, { return verify("!help", cmd_status_ok); });
 
+
+EXO_TEST(command_argument_integer_1, {
+	struct hub_command* cmd = command_parse(cbase, &user, "!test3");
+	return verify_argument(cmd, type_integer) == NULL;
+});
+
+EXO_TEST(command_argument_integer_2, {
+	struct hub_command* cmd = command_parse(cbase, &user, "!test3 10 42");
+	return verify_arg_integer(cmd, 10) && verify_arg_integer(cmd, 42) && verify_argument(cmd, type_integer) == NULL;
+});
+
+EXO_TEST(command_argument_integer_3, {
+	struct hub_command* cmd = command_parse(cbase, &user, "!test3 10 42 6784");
+	return verify_arg_integer(cmd, 10) && verify_arg_integer(cmd, 42) && verify_arg_integer(cmd, 6784);
+});
+
+EXO_TEST(command_argument_user_1, {
+	struct hub_command* cmd = command_parse(cbase, &user, "!test4 tester");
+	return verify_arg_user(cmd, &user) ;
+});
+
+EXO_TEST(command_argument_cid_1, {
+	struct hub_command* cmd = command_parse(cbase, &user, "!test5 3AGHMAASJA2RFNM22AA6753V7B7DYEPNTIWHBAY");
+	return verify_arg_user(cmd, &user) ;
+});
+
+EXO_TEST(command_argument_cred_1, {
+	struct hub_command* cmd = command_parse(cbase, &user, "!test7 admin");
+	return verify_arg_cred(cmd, auth_cred_admin);;
+});
+
+EXO_TEST(command_argument_cred_2, {
+	struct hub_command* cmd = command_parse(cbase, &user, "!test7 op");
+	return verify_arg_cred(cmd, auth_cred_operator);;
+});
+
+EXO_TEST(command_argument_cred_3, {
+	struct hub_command* cmd = command_parse(cbase, &user, "!test7 operator");
+	return verify_arg_cred(cmd, auth_cred_operator);
+});
+
+EXO_TEST(command_argument_cred_4, {
+	struct hub_command* cmd = command_parse(cbase, &user, "!test7 super");
+	return verify_arg_cred(cmd, auth_cred_super);
+});
+
+EXO_TEST(command_argument_cred_5, {
+	struct hub_command* cmd = command_parse(cbase, &user, "!test7 guest");
+	return verify_arg_cred(cmd, auth_cred_guest);
+});
+
+EXO_TEST(command_argument_cred_6, {
+	struct hub_command* cmd = command_parse(cbase, &user, "!test7 user");
+	return verify_arg_cred(cmd, auth_cred_user);
+});
+
+
+EXO_TEST(command_user_destroy, { return uman_remove(hub, &user) == 0; });
+
 EXO_TEST(command_destroy, {
+	
 	DEL_TEST(c_test1);
 	DEL_TEST(c_test2);
 	DEL_TEST(c_test3);
