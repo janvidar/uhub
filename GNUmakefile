@@ -232,6 +232,9 @@ plugin_chat_history_TARGET := mod_chat_history.so
 plugin_chat_only_SOURCE := src/plugins/mod_chat_only.c
 plugin_chat_only_TARGET := mod_chat_only.so
 
+plugin_topic_SOURCES := src/plugins/mod_topic.c
+plugin_topic_TARGET := mod_topic.so
+
 # Source to objects
 libuhub_OBJECTS       := $(libuhub_SOURCES:.c=.o)
 libutils_OBJECTS      := $(libutils_SOURCES:.c=.o)
@@ -243,7 +246,7 @@ uhub-passwd_OBJECTS   := $(uhub-passwd_SOURCES:.c=.o)
 adcrush_OBJECTS       := $(adcrush_SOURCES:.c=.o)
 admin_OBJECTS         := $(admin_SOURCES:.c=.o)
 
-all_plugins     := $(plugin_example_TARGET) $(plugin_logging_TARGET) $(plugin_auth_TARGET) $(plugin_auth_sqlite_TARGET) $(plugin_welcome_TARGET) $(plugin_chat_history_TARGET) $(plugin_chat_only_TARGET)
+all_plugins     := $(plugin_example_TARGET) $(plugin_logging_TARGET) $(plugin_auth_TARGET) $(plugin_auth_sqlite_TARGET) $(plugin_welcome_TARGET) $(plugin_chat_history_TARGET) $(plugin_chat_only_TARGET) $(plugin_topic_TARGET)
 all_OBJECTS     := $(libuhub_OBJECTS) $(uhub_OBJECTS) $(libutils_OBJECTS) $(adcrush_OBJECTS) $(autotest_OBJECTS) $(admin_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
 all_OBJECTS     += $(all_plugins)
 
@@ -288,6 +291,10 @@ $(plugin_chat_only_TARGET): $(plugin_chat_only_SOURCE) $(libutils_OBJECTS)
 
 $(plugin_welcome_TARGET): $(plugin_welcome_SOURCES) $(libutils_OBJECTS)
 	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
+
+$(plugin_topic_TARGET): $(plugin_topic_SOURCES) $(libutils_OBJECTS)
+	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
+
 
 $(adcrush_BINARY): $(adcrush_OBJECTS) $(libuhub_OBJECTS) $(libutils_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
 	$(MSG_LD) $(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)

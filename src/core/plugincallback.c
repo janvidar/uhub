@@ -159,6 +159,58 @@ struct plugin_command_arg_data* cbfunc_command_arg_next(struct plugin_handle* pl
 	return (struct plugin_command_arg_data*) hub_command_arg_next((struct hub_command*) cmd, (enum hub_command_arg_type) t);
 }
 
+static char* cbfunc_get_hub_name(struct plugin_handle* plugin)
+{
+	struct hub_info* hub = plugin_get_hub(plugin);
+	char* str_encoded = adc_msg_get_named_argument(hub->command_info, ADC_INF_FLAG_NICK);
+	char* str = adc_msg_unescape(str_encoded);
+	hub_free(str_encoded);
+	return str;
+}
+
+static char* cbfunc_get_hub_description(struct plugin_handle* plugin)
+{
+	struct hub_info* hub = plugin_get_hub(plugin);
+	char* str_encoded = adc_msg_get_named_argument(hub->command_info, ADC_INF_FLAG_DESCRIPTION);
+	char* str = adc_msg_unescape(str_encoded);
+	hub_free(str_encoded);
+	return str;
+}
+
+static void cbfunc_set_hub_name(struct plugin_handle* plugin, const char* str)
+{
+	struct hub_info* hub = plugin_get_hub(plugin);
+	struct adc_message* command;
+	char* new_str = adc_msg_escape(str ? str : hub->config->hub_name);
+
+	adc_msg_replace_named_argument(hub->command_info, ADC_INF_FLAG_NICK, new_str);
+		
+	// Broadcast hub name
+	command = adc_msg_construct(ADC_CMD_IINF, (strlen(new_str) + 8));
+	adc_msg_add_named_argument(command, ADC_INF_FLAG_NICK, new_str);
+	route_to_all(hub, command);
+
+	adc_msg_free(command);
+	hub_free(new_str);
+}
+
+static void cbfunc_set_hub_description(struct plugin_handle* plugin, const char* str)
+{
+	struct hub_info* hub = plugin_get_hub(plugin);
+	struct adc_message* command;
+	char* new_str = adc_msg_escape(str ? str : hub->config->hub_description);
+
+	adc_msg_replace_named_argument(hub->command_info, ADC_INF_FLAG_DESCRIPTION, new_str);
+		
+	// Broadcast hub description
+	command = adc_msg_construct(ADC_CMD_IINF, (strlen(new_str) + 8));
+	adc_msg_add_named_argument(command, ADC_INF_FLAG_DESCRIPTION, new_str);
+	route_to_all(hub, command);
+
+	adc_msg_free(command);
+	hub_free(new_str);
+}
+
 void plugin_register_callback_functions(struct plugin_handle* handle)
 {
 	handle->hub.send_message = cbfunc_send_message;
@@ -168,6 +220,10 @@ void plugin_register_callback_functions(struct plugin_handle* handle)
 	handle->hub.command_del = cbfunc_command_del;
 	handle->hub.command_arg_reset = cbfunc_command_arg_reset;
 	handle->hub.command_arg_next = cbfunc_command_arg_next;
+	handle->hub.get_name = cbfunc_get_hub_name;
+	handle->hub.set_name = cbfunc_set_hub_name;
+	handle->hub.get_description = cbfunc_get_hub_description;
+	handle->hub.set_description = cbfunc_set_hub_description;
 }
 
 void plugin_unregister_callback_functions(struct plugin_handle* handle)

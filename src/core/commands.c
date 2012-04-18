@@ -148,8 +148,11 @@ static enum command_parse_status command_extract_arguments(struct command_base* 
 {
 	int arg = 0;
 	int opt = 0;
+	int greedy = 0;
 	char arg_code;
 	char* token = NULL;
+	char* tmp = NULL;
+	size_t size = 0;
 	struct hub_command_arg_data* data = NULL;
 	enum command_parse_status status = cmd_status_ok;
 
@@ -160,7 +163,27 @@ static enum command_parse_status command_extract_arguments(struct command_base* 
 
 	while (status == cmd_status_ok && (arg_code = command->args[arg++]))
 	{
-		token = list_get_first(tokens);
+		if (greedy)
+		{
+			size = 1;
+			for (tmp = (char*) list_get_first(tokens); tmp; tmp = (char*) list_get_next(tokens))
+				size += (strlen(tmp) + 1);
+			token = hub_malloc_zero(size);
+
+			while ((tmp = list_get_first(tokens)))
+			{
+				if (*token)
+					strcat(token, " ");
+				strcat(token, tmp);
+				list_remove(tokens, tmp);
+				hub_free(tmp);
+			}
+		}
+		else
+		{
+			token = list_get_first(tokens);
+		}
+
 		if (!token || !*token)
 		{
 			status = (arg_code == '?' ? cmd_status_ok : cmd_status_missing_args);
@@ -171,6 +194,10 @@ static enum command_parse_status command_extract_arguments(struct command_base* 
 		{
 			case '?':
 				opt = 1;
+				continue;
+
+			case '+':
+				greedy = 1;
 				continue;
 
 			case 'u':

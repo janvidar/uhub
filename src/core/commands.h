@@ -128,12 +128,16 @@ extern struct hub_command_arg_data* hub_command_arg_next(struct hub_command* cmd
  * N = number (integer)
  *
  * Prefix an argument with ? to make it optional.
- * NOTE; if an argument is optional then all following arguments must also be optional.
+ * Prefix with + to make the argument greedy, which causes it to grab the rest of the line ignoring boundaries (only supported for string types).
+ *
+ * NOTE: if an argument is optional then all following arguments must also be optional.
+ * NOTE: You can combine optional and greedy, example: "?+m" would match "", "a", "a b c", etc.
  *
  * Example:
  * "nia" means "nick cid ip"
  * "n?p" means "nick [password]" where password is optional.
- *
+ * "?N?N" means two optional integers, this can also be expressed as "?NN".
+ * "?+m" means an optional string which may contain spaces that would otherwise be split into separate arguments.
  */
 struct command_handle
 {

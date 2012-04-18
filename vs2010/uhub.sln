@@ -32,6 +32,12 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "uhub-passwd", "uhub-passwd\
 		{A4FC9D62-D544-4D2A-88D7-A58529C3460B} = {A4FC9D62-D544-4D2A-88D7-A58529C3460B}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mod_topic", "plugins\mod_topic\mod_topic.vcxproj", "{9BBAEFDA-8E0E-4E7F-B8B6-00A3432FC45B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{0A3C1519-D877-47D9-A82E-40AC1BC79D75} = {0A3C1519-D877-47D9-A82E-40AC1BC79D75}
+		{98D8BFE9-DACD-40E1-B7BE-C9079ABF832E} = {98D8BFE9-DACD-40E1-B7BE-C9079ABF832E}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -66,6 +72,10 @@ Global
 		{E92EB860-AE9E-4532-A75F-0929A7BCF6D0}.Debug|Win32.Build.0 = Debug|Win32
 		{E92EB860-AE9E-4532-A75F-0929A7BCF6D0}.Release|Win32.ActiveCfg = Release|Win32
 		{E92EB860-AE9E-4532-A75F-0929A7BCF6D0}.Release|Win32.Build.0 = Release|Win32
+		{9BBAEFDA-8E0E-4E7F-B8B6-00A3432FC45B}.Debug|Win32.ActiveCfg = Debug|Win32
+		{9BBAEFDA-8E0E-4E7F-B8B6-00A3432FC45B}.Debug|Win32.Build.0 = Debug|Win32
+		{9BBAEFDA-8E0E-4E7F-B8B6-00A3432FC45B}.Release|Win32.ActiveCfg = Release|Win32
+		{9BBAEFDA-8E0E-4E7F-B8B6-00A3432FC45B}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
