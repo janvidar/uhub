@@ -93,6 +93,7 @@ int plugin_unregister(struct plugin_handle* plugin)
 	plugin->hub.command_del(plugin, data->cleartopic);
 	plugin->hub.command_del(plugin, data->showtopic);
 	hub_free(data->topic);
+	hub_free(data->cleartopic);
 	hub_free(data->showtopic);
 	hub_free(data);
 	plugin->ptr = NULL;
