@@ -52,15 +52,15 @@ typedef int (*plugin_command_handler)(struct plugin_handle*, struct plugin_user*
 
 struct plugin_command_handle
 {
-	void* internal_handle;			/**<<< "Internal used by the hub only" */
-	struct plugin_handle* handle;	/**<<< "The plugin handle this is associated with" */
-	const char* prefix;				/**<<< "Command prefix, for instance 'help' would be the prefix for the !help command." */
-	size_t length;					/**<<< "Length of the prefix" */
-	const char* args;				/**<<< "Argument codes" */
-	enum auth_credentials cred;		/**<<< "Minimum access level for the command" */
-	plugin_command_handler handler;	/**<<< "Function pointer for the command" */
-	const char* description;		/**<<< "Description for the command" */
-	const char* origin;				/**<<< "Name of plugin where the command originated." */
+	void* internal_handle;          /**<<< "Internal used by the hub only" */
+	struct plugin_handle* handle;   /**<<< "The plugin handle this is associated with" */
+	const char* prefix;             /**<<< "Command prefix, for instance 'help' would be the prefix for the !help command." */
+	size_t length;                  /**<<< "Length of the prefix" */
+	const char* args;               /**<<< "Argument codes" */
+	enum auth_credentials cred;     /**<<< "Minimum access level for the command" */
+	plugin_command_handler handler; /**<<< "Function pointer for the command" */
+	const char* description;        /**<<< "Description for the command" */
+	const char* origin;             /**<<< "Name of plugin where the command originated." */
 };
 
 #define PLUGIN_COMMAND_INITIALIZE(PTR, HANDLE, PREFIX, ARGS, CRED, CALLBACK, DESC) \

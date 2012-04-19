@@ -186,7 +186,10 @@ static enum command_parse_status command_extract_arguments(struct command_base* 
 
 		if (!token || !*token)
 		{
-			status = (arg_code == '?' ? cmd_status_ok : cmd_status_missing_args);
+			if (arg_code == '?' || opt == 1)
+				status = cmd_status_ok;
+			else
+				status = cmd_status_missing_args;
 			break;
 		}
 
@@ -284,7 +287,7 @@ static enum command_parse_status command_extract_arguments(struct command_base* 
 				{
 					hub_free(data);
 					data = NULL;
-					return cmd_status_arg_number;
+					status = cmd_status_arg_number;
 				}
 				break;
 
@@ -387,10 +390,13 @@ void command_get_syntax(struct command_handle* handler, struct cbuffer* buf)
 	{
 		for (n = 0; n < strlen(handler->args); n++)
 		{
-			if (n > 0 && !opt) cbuf_append(buf, " ");
+			if (n > 0)
+				cbuf_append(buf, " ");
+			if (opt)
+				cbuf_append(buf, "[");
 			switch (handler->args[n])
 			{
-				case '?': cbuf_append(buf, "["); opt = 1; continue;
+				case '?': opt = 1; continue;
 				case 'n': cbuf_append(buf, "<nick>"); break;
 				case 'u': cbuf_append(buf, "<user>"); break;
 				case 'i': cbuf_append(buf, "<cid>");  break;
@@ -403,11 +409,10 @@ void command_get_syntax(struct command_handle* handler, struct cbuffer* buf)
 				case 'N': cbuf_append(buf, "<number>"); break;
 			}
 			if (opt)
-			{
-				cbuf_append(buf, "]");
-				opt = 0;
-			}
+				opt++;
 		}
+		while (opt--)
+			cbuf_append(buf, "]");
 	}
 }
 
@@ -858,7 +863,7 @@ void commands_builtin_add(struct command_base* cbase)
 	ADD_COMMAND("getip",      5, "u", auth_cred_operator,  command_getip,    "Show IP address for a user"   );
 	ADD_COMMAND("help",       4, "?c",auth_cred_guest,     command_help,     "Show this help message."      );
 	ADD_COMMAND("kick",       4, "u", auth_cred_operator,  command_kick,     "Kick a user"                  );
-	ADD_COMMAND("log",        3, "?m",  auth_cred_operator,  command_log,    "Display log"                  ); // fail
+	ADD_COMMAND("log",        3, "?m",auth_cred_operator,  command_log,      "Display log"                  ); // fail
 	ADD_COMMAND("myip",       4, "",  auth_cred_guest,     command_myip,     "Show your own IP."            );
 	ADD_COMMAND("reload",     6, "",  auth_cred_admin,     command_reload,   "Reload configuration files."  );
 	ADD_COMMAND("shutdown",   8, "",  auth_cred_admin,     command_shutdown_hub, "Shutdown hub."            );

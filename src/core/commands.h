@@ -83,7 +83,7 @@ struct hub_command
 {
 	const char* message;                /**<<< "The complete message." */
 	char* prefix;                       /**<<< "The prefix extracted from the message." */
-	struct linked_list* args;           /**<<< "List of all parsed arguments from the message. Type depends on expectations." */
+	struct linked_list* args;           /**<<< "List of arguments of type struct hub_command_arg_data. Parsed from message." */
 	enum command_parse_status status;   /**<<< "Status of the hub_command." */
 	command_handler handler;            /**<<< "The function handler to call in order to invoke this command." */
 	const struct hub_user* user;        /**<<< "The user who invoked this command." */

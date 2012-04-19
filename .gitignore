@@ -7,3 +7,11 @@ uhub-admin
 adcrush
 uhub
 revision.h*
+build-stamp
+debian/files
+debian/uhub.debhelper.log
+debian/uhub.postinst.debhelper
+debian/uhub.postrm.debhelper
+debian/uhub.prerm.debhelper
+debian/uhub.substvars
+uhub-passwd

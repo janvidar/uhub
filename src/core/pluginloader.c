@@ -76,7 +76,7 @@ void plugin_close(struct uhub_plugin* plugin)
 	struct plugin_hub_internals* internals = (struct plugin_hub_internals*) plugin->internals;
 
 	LOG_PLUGIN("plugin_close: \"%s\"", plugin->filename);
-	plugin_callback_data_destroy(internals->callback_data);
+	plugin_callback_data_destroy(plugin->handle, internals->callback_data);
 	hub_free(internals);
 	plugin->internals = NULL;
 
@@ -162,8 +162,8 @@ struct plugin_handle* plugin_load(const char* filename, const char* config, stru
 void plugin_unload(struct plugin_handle* plugin)
 {
 	struct plugin_hub_internals* internals = get_internals(plugin);
-	plugin_unregister_callback_functions(plugin);
 	internals->unregister(plugin);
+	plugin_unregister_callback_functions(plugin);
 	plugin_close(plugin->handle);
 	hub_free(plugin);
 }
