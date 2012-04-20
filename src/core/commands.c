@@ -720,9 +720,9 @@ static int command_whoip(struct command_base* cbase, struct hub_user* user, stru
 
 static int command_broadcast(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
-	size_t offset = 11;
-	size_t message_len = strlen(cmd->message + offset);
-	char* message = adc_msg_escape(cmd->message + offset);
+	struct hub_command_arg_data* arg = hub_command_arg_next(cmd, type_string);
+	char* message = arg->data.string;
+	size_t message_len = strlen(message);
 	char pm_flag[7] = "PM";
 	char from_sid[5];
 	size_t recipients = 0;
@@ -859,7 +859,7 @@ static struct command_handle* add_builtin(struct command_base* cbase, const char
 
 void commands_builtin_add(struct command_base* cbase)
 {
-	ADD_COMMAND("broadcast",  9, "m", auth_cred_operator,  command_broadcast,"Send a message to all users"  );
+	ADD_COMMAND("broadcast",  9, "+m",auth_cred_operator,  command_broadcast,"Send a message to all users"  );
 	ADD_COMMAND("getip",      5, "u", auth_cred_operator,  command_getip,    "Show IP address for a user"   );
 	ADD_COMMAND("help",       4, "?c",auth_cred_guest,     command_help,     "Show this help message."      );
 	ADD_COMMAND("kick",       4, "u", auth_cred_operator,  command_kick,     "Kick a user"                  );
