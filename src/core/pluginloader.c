@@ -23,14 +23,7 @@
 
 struct plugin_callback_data;
 
-struct plugin_hub_internals
-{
-	struct hub_info* hub;
-	plugin_unregister_f unregister;             /* The unregister function. */
-	struct plugin_callback_data* callback_data; /* callback data that is unique for the plugin */
-};
-
-static struct plugin_hub_internals* get_internals(struct plugin_handle* handle)
+struct plugin_hub_internals* get_internals(struct plugin_handle* handle)
 {
 	struct plugin_hub_internals* internals;
 	assert(handle && handle->handle && handle->handle->internals);

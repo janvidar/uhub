@@ -32,7 +32,12 @@ struct linked_list* list_create()
 void list_destroy(struct linked_list* list)
 {
 	if (list)
+	{
+		uhub_assert(list->size == 0);
+		uhub_assert(list->first == NULL);
+		uhub_assert(list->last == NULL);
 		hub_free(list);
+	}
 }
 
 
@@ -102,10 +107,11 @@ void list_remove(struct linked_list* list, void* data_ptr)
 			hub_free(node);
 
 			list->size--;
-			break;
+			return;
 		}
 		node = node->next;
 	}
+	uhub_assert(false);
 }
 
 

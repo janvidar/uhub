@@ -27,10 +27,7 @@ struct plugin_callback_data
 
 static struct plugin_callback_data* get_callback_data(struct plugin_handle* plugin)
 {
-	struct plugin_callback_data* data;
-	uhub_assert(plugin && plugin->handle && plugin->handle->internals);
-	data = (struct plugin_callback_data*) plugin->handle->internals;
-	return data;
+	return get_internals(plugin)->callback_data;
 }
 
 static int plugin_command_dispatch(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
@@ -62,7 +59,6 @@ static struct hub_user* convert_user_type(struct plugin_user* user)
 
 static int cbfunc_send_message(struct plugin_handle* plugin, struct plugin_user* user, const char* message)
 {
-//	struct plugin_callback_data* data = get_callback_data(plugin);
 	char* buffer = adc_msg_escape(message);
 	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
 	adc_msg_add_argument(command, buffer);
@@ -74,7 +70,6 @@ static int cbfunc_send_message(struct plugin_handle* plugin, struct plugin_user*
 
 static int cbfunc_send_status(struct plugin_handle* plugin, struct plugin_user* user, int code, const char* message)
 {
-//	struct plugin_callback_data* data = get_callback_data(plugin);
 	char code_str[4];
 	char* buffer = adc_msg_escape(message);
 	struct adc_message* command = adc_msg_construct(ADC_CMD_ISTA, strlen(buffer) + 10);
@@ -89,7 +84,6 @@ static int cbfunc_send_status(struct plugin_handle* plugin, struct plugin_user* 
 
 static int cbfunc_user_disconnect(struct plugin_handle* plugin, struct plugin_user* user)
 {
-	// struct plugin_callback_data* data = get_callback_data(plugin);
 	hub_disconnect_user(plugin_get_hub(plugin), convert_user_type(user), quit_kicked);
 	return 0;
 }
@@ -224,13 +218,9 @@ void plugin_callback_data_destroy(struct plugin_handle* plugin, struct plugin_ca
 	if (data->commands)
 	{
 		// delete commands not deleted by the plugin itself:
-		struct plugin_command_handle* cmd = list_get_first(data->commands);
-		while (cmd)
-		{
+		struct plugin_command_handle* cmd;
+		while ( (cmd = list_get_first(data->commands)) )
 			cbfunc_command_del(plugin, cmd);
-			list_remove(data->commands, cmd);
-			cmd = list_get_next(data->commands);
-		}
 		list_destroy(data->commands);
 	}
 
