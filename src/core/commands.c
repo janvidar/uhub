@@ -384,32 +384,36 @@ command_parse_cleanup:
 
 void command_get_syntax(struct command_handle* handler, struct cbuffer* buf)
 {
-	size_t n = 0;
+	size_t n, arg_count;
 	int opt = 0;
+	char arg_code, last_arg = -1;
+
+	cbuf_append_format(buf, "!%s", handler->prefix);
 	if (handler->args)
 	{
-		for (n = 0; n < strlen(handler->args); n++)
+		arg_count = strlen(handler->args);
+		for (n = 0; n < arg_count; n++)
 		{
-			if (n > 0)
+			if (!strchr("?+", last_arg))
 				cbuf_append(buf, " ");
-			if (opt)
-				cbuf_append(buf, "[");
-			switch (handler->args[n])
+			arg_code = handler->args[n];
+			switch (arg_code)
 			{
-				case '?': opt = 1; continue;
-				case 'n': cbuf_append(buf, "<nick>"); break;
-				case 'u': cbuf_append(buf, "<user>"); break;
-				case 'i': cbuf_append(buf, "<cid>");  break;
-				case 'a': cbuf_append(buf, "<addr>"); break;
-				case 'r': cbuf_append(buf, "<addr range>"); break;
-				case 'm': cbuf_append(buf, "<message>"); break;
-				case 'p': cbuf_append(buf, "<password>"); break;
+				case '?': cbuf_append(buf, "["); opt++;      break;
+				case '+': /* ignore */                       break;
+				case 'n': cbuf_append(buf, "<nick>");        break;
+				case 'u': cbuf_append(buf, "<user>");        break;
+				case 'i': cbuf_append(buf, "<cid>");         break;
+				case 'a': cbuf_append(buf, "<addr>");        break;
+				case 'r': cbuf_append(buf, "<addr range>");  break;
+				case 'm': cbuf_append(buf, "<message>");     break;
+				case 'p': cbuf_append(buf, "<password>");    break;
 				case 'C': cbuf_append(buf, "<credentials>"); break;
-				case 'c': cbuf_append(buf, "<command>"); break;
-				case 'N': cbuf_append(buf, "<number>"); break;
+				case 'c': cbuf_append(buf, "<command>");     break;
+				case 'N': cbuf_append(buf, "<number>");      break;
+				default: LOG_ERROR("unknown argument code '%c'", arg_code);
 			}
-			if (opt)
-				opt++;
+			last_arg = arg_code;
 		}
 		while (opt--)
 			cbuf_append(buf, "]");
@@ -501,14 +505,11 @@ int command_invoke(struct command_base* cbase, struct hub_user* user, const char
 			ret = send_command_access_denied(cbase, user, cmd->prefix);
 			break;
 
-		case cmd_status_syntax_error:
-			ret = send_command_syntax_error(cbase, user);
-			break;
-
 		case cmd_status_missing_args:
 			ret = send_command_missing_arguments(cbase, user, cmd);
 			break;
 
+		case cmd_status_syntax_error:
 		case cmd_status_arg_nick:
 		case cmd_status_arg_cid:
 		case cmd_status_arg_address:
@@ -579,7 +580,7 @@ static int command_help(struct command_base* cbase, struct hub_user* user, struc
 		command = data->data.command;
 		if (command_is_available(command, user))
 		{
-			cbuf_append_format(buf, "Usage: !%s ", command->prefix);
+			cbuf_append_format(buf, "Usage: ");
 			command_get_syntax(command, buf);
 			cbuf_append_format(buf, "\n%s\n", command->description);
 		}

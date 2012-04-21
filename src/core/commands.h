@@ -136,7 +136,8 @@ extern struct hub_command_arg_data* hub_command_arg_next(struct hub_command* cmd
  * Example:
  * "nia" means "nick cid ip"
  * "n?p" means "nick [password]" where password is optional.
- * "?N?N" means two optional integers, this can also be expressed as "?NN".
+ * "?N?N" means zero, one, or two integers.
+ * "?NN" means zero or two integers.
  * "?+m" means an optional string which may contain spaces that would otherwise be split into separate arguments.
  */
 struct command_handle
