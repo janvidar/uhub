@@ -551,7 +551,7 @@ struct hub_command_arg_data* hub_command_arg_next(struct hub_command* cmd, enum 
 
 static int command_status(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd, struct cbuffer* msg)
 {
-	struct cbuffer* buf = cbuf_create(cbuf_size(msg) + strlen(cmd->prefix) + 8);
+	struct cbuffer* buf = cbuf_create(cbuf_size(msg) + strlen(cmd->prefix) + 7);
 	cbuf_append_format(buf, "*** %s: %s", cmd->prefix, cbuf_get(msg));
 	send_message(cbase, user, buf);
 	cbuf_destroy(msg);
