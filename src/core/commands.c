@@ -762,7 +762,6 @@ static int command_broadcast(struct command_base* cbase, struct hub_user* user, 
 
 	cbuf_append_format(buf, "*** %s: Delivered to " PRINTF_SIZE_T " user%s", cmd->prefix, recipients, (recipients != 1 ? "s" : ""));
 	send_message(cbase, user, buf);
-	hub_free(message);
 	return 0;
 }
 
