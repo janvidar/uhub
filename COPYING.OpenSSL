@@ -1,0 +1,25 @@
+OpenSSL License Exception
+-------------------------
+
+Copyright (c) 2007-2012, Jan Vidar Krey
+
+This program is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License 3 (GPL) as published by
+the Free Software Foundation.
+The full text the GPL can be found in the COPYING file.
+
+In addition this distribution of uhub may be linked against OpenSSL
+according to the terms described here:
+
+You have permission to copy, modify, propagate, and distribute a work
+formed by combining OpenSSL with uhub, or a work derivative of such a
+combination, even if such copying, modification, propagation, or
+distribution would otherwise violate the terms of the GPL. You must
+comply with the GPL in all respects for all of the code used other than
+OpenSSL.
+
+You may include this OpenSSL exception and its grant of permissions when
+you distribute uhub. Inclusion of this notice with such a distribution
+constitutes a grant of such permission.  If you do not wish to grant these
+permissions, delete this file.
+
