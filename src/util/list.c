@@ -111,7 +111,6 @@ void list_remove(struct linked_list* list, void* data_ptr)
 		}
 		node = node->next;
 	}
-	uhub_assert(0);
 }
 
 
