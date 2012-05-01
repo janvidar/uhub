@@ -136,6 +136,7 @@ OLD_REVISION=$(shell grep GIT_REVISION revision.h 2>/dev/null | cut -f 3 -d " " 
 # Sources
 libuhub_SOURCES := \
 		src/core/auth.c \
+		src/core/command_parser.c \
 		src/core/commands.c \
 		src/core/config.c \
 		src/core/eventqueue.c \

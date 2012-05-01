@@ -88,6 +88,7 @@ extern "C" {
 #include "core/route.h"
 #include "core/pluginloader.h"
 #include "core/hub.h"
+#include "core/command_parser.h"
 #include "core/commands.h"
 #include "core/inf.h"
 #include "core/hubevent.h"

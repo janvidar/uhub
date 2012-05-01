@@ -1,6 +1,7 @@
 #include <uhub.h>
 
 static struct hub_info* hub = NULL;
+static struct hub_command* cmd = NULL;
 static struct hub_user user;
 static struct command_base* cbase = NULL;
 static struct command_handle* c_test1 = NULL;
@@ -17,6 +18,7 @@ static int result = 0;
 EXO_TEST(setup, {
 	hub = hub_malloc_zero(sizeof(struct hub_info));
 	cbase = command_initialize(hub);
+	hub->commands = cbase;
 	return cbase && hub && uman_init(hub) == 0;
 });
 
@@ -79,7 +81,7 @@ extern void command_destroy(struct hub_command* cmd);
 
 static int verify(const char* str, enum command_parse_status expected)
 {
-	struct hub_command* cmd = command_parse(cbase, &user, str);
+	struct hub_command* cmd = command_parse(cbase, hub, &user, str);
 	enum command_parse_status status = cmd->status;
 	command_free(cmd);
 	return status == expected;
@@ -160,66 +162,76 @@ EXO_TEST(command_parse_3, { return verify("!fail", cmd_status_not_found); });
 EXO_TEST(command_parse_4, { return verify("!help", cmd_status_ok); });
 
 
+#define SETUP_COMMAND(string) \
+	do { \
+		if (cmd) command_free(cmd); \
+		cmd = command_parse(cbase, hub, &user, string); \
+	} while(0)
+
 EXO_TEST(command_argument_integer_1, {
-	struct hub_command* cmd = command_parse(cbase, &user, "!test3");
+	SETUP_COMMAND("!test3");
 	return verify_argument(cmd, type_integer) == NULL;
 });
 
 EXO_TEST(command_argument_integer_2, {
-	struct hub_command* cmd = command_parse(cbase, &user, "!test3 10 42");
+	SETUP_COMMAND("!test3 10 42");
 	return verify_arg_integer(cmd, 10) && verify_arg_integer(cmd, 42) && verify_argument(cmd, type_integer) == NULL;
 });
 
 EXO_TEST(command_argument_integer_3, {
-	struct hub_command* cmd = command_parse(cbase, &user, "!test3 10 42 6784");
+	SETUP_COMMAND("!test3 10 42 6784");
 	return verify_arg_integer(cmd, 10) && verify_arg_integer(cmd, 42) && verify_arg_integer(cmd, 6784);
 });
 
 EXO_TEST(command_argument_user_1, {
-	struct hub_command* cmd = command_parse(cbase, &user, "!test4 tester");
+	SETUP_COMMAND("!test4 tester");
 	return verify_arg_user(cmd, &user) ;
 });
 
 EXO_TEST(command_argument_cid_1, {
-	struct hub_command* cmd = command_parse(cbase, &user, "!test5 3AGHMAASJA2RFNM22AA6753V7B7DYEPNTIWHBAY");
+	SETUP_COMMAND("!test5 3AGHMAASJA2RFNM22AA6753V7B7DYEPNTIWHBAY");
 	return verify_arg_user(cmd, &user) ;
 });
 
 EXO_TEST(command_argument_cred_1, {
-	struct hub_command* cmd = command_parse(cbase, &user, "!test7 admin");
+	SETUP_COMMAND("!test7 admin");
 	return verify_arg_cred(cmd, auth_cred_admin);;
 });
 
 EXO_TEST(command_argument_cred_2, {
-	struct hub_command* cmd = command_parse(cbase, &user, "!test7 op");
+	SETUP_COMMAND("!test7 op");
 	return verify_arg_cred(cmd, auth_cred_operator);;
 });
 
 EXO_TEST(command_argument_cred_3, {
-	struct hub_command* cmd = command_parse(cbase, &user, "!test7 operator");
+	SETUP_COMMAND("!test7 operator");
 	return verify_arg_cred(cmd, auth_cred_operator);
 });
 
 EXO_TEST(command_argument_cred_4, {
-	struct hub_command* cmd = command_parse(cbase, &user, "!test7 super");
+	SETUP_COMMAND("!test7 super");
 	return verify_arg_cred(cmd, auth_cred_super);
 });
 
 EXO_TEST(command_argument_cred_5, {
-	struct hub_command* cmd = command_parse(cbase, &user, "!test7 guest");
+	SETUP_COMMAND("!test7 guest");
 	return verify_arg_cred(cmd, auth_cred_guest);
 });
 
 EXO_TEST(command_argument_cred_6, {
-	struct hub_command* cmd = command_parse(cbase, &user, "!test7 user");
+	SETUP_COMMAND("!test7 user");
 	return verify_arg_cred(cmd, auth_cred_user);
 });
 
+#undef SETUP_COMMAND
 
 EXO_TEST(command_user_destroy, { return uman_remove(hub, &user) == 0; });
 
 EXO_TEST(command_destroy, {
-	
+
+	command_free(cmd);
+	cmd = NULL;
+
 	DEL_TEST(c_test1);
 	DEL_TEST(c_test2);
 	DEL_TEST(c_test3);
