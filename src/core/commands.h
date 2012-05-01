@@ -24,9 +24,6 @@ struct command_base;
 struct command_handle;
 struct hub_command;
 
-typedef int (*command_handler)(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd);
-
-
 /**
  * Argument codes are used to automatically parse arguments
  * for a a hub command.
