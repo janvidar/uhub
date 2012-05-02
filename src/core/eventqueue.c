@@ -88,7 +88,7 @@ int event_queue_process(struct event_queue* queue)
 	}
 	
 	list_clear(queue->q1, event_queue_cleanup_callback);
-	assert(list_size(queue->q1) == 0);
+	uhub_assert(list_size(queue->q1) == 0);
 		
 	/* unlock queue */
 	queue->locked = 0;

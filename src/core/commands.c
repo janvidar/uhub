@@ -60,7 +60,7 @@ struct command_base* command_initialize(struct hub_info* hub)
 void command_shutdown(struct command_base* cbase)
 {
 	commands_builtin_remove(cbase);
-	assert(list_size(cbase->handlers) == 0);
+	uhub_assert(list_size(cbase->handlers) == 0);
 	list_destroy(cbase->handlers);
 	hub_free(cbase);
 }

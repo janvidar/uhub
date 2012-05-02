@@ -26,7 +26,7 @@ struct plugin_callback_data;
 struct plugin_hub_internals* get_internals(struct plugin_handle* handle)
 {
 	struct plugin_hub_internals* internals;
-	assert(handle && handle->handle && handle->handle->internals);
+	uhub_assert(handle && handle->handle && handle->handle->internals);
 	internals = (struct plugin_hub_internals*) handle->handle->internals;
 	return internals;
 }

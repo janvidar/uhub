@@ -162,7 +162,7 @@ int uman_remove(struct hub_info* hub, struct hub_user* user)
 	}
 	else
 	{
-		assert(!"negative count!");
+		uhub_assert(!"negative count!");
 	}
 
 	hub->users->shared_size  -= user->limits.shared_size;

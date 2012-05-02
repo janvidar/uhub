@@ -524,7 +524,7 @@ static void hub_event_dispatcher(void* callback_data, struct event_data* message
 	int status;
 	struct hub_info* hub = (struct hub_info*) callback_data;
 	struct hub_user* user = (struct hub_user*) message->ptr;
-	assert(hub != NULL);
+	uhub_assert(hub != NULL);
 
 	switch (message->id)
 	{

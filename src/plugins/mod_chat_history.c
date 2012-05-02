@@ -160,7 +160,7 @@ static struct chat_history_data* parse_config(const char* line, struct plugin_ha
 	struct cfg_tokens* tokens = cfg_tokenize(line);
 	char* token = cfg_token_get_first(tokens);
 
-	assert(data != NULL);
+	uhub_assert(data != NULL);
 
 	data->history_max = 200;
 	data->history_default = 25;

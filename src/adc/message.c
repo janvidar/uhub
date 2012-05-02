@@ -127,7 +127,7 @@ static int adc_msg_cache_append(struct adc_message* msg, const char* string, siz
 	memcpy(&msg->cache[msg->length], string, len);
 	adc_msg_set_length(msg, msg->length + len);
 
-	assert(msg->capacity > msg->length);
+	uhub_assert(msg->capacity > msg->length);
 	msg->cache[msg->length] = 0;
 	return 1;
 }
