@@ -226,9 +226,7 @@ static int check_network(struct hub_info* hub, struct hub_user* user, struct adc
 static void strip_network(struct hub_user* user, struct adc_message* cmd)
 {
 	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
-	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_UDP_PORT);
 	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
-	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_UDP_PORT);
 }
 
 static int nick_length_ok(const char* nick)
