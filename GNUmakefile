@@ -338,7 +338,7 @@ ifeq ($(WINDOWS),YES)
 install:
 	@echo "Cannot install automatically on windows."
 else
-install: $(uhub_BINARY)
+install: all
 	@echo Copying $(uhub_BINARY) to $(UHUB_PREFIX)/bin/
 	@cp $(uhub_BINARY) $(UHUB_PREFIX)/bin/
 	@cp $(uhub-passwd_BINARY) $(UHUB_PREFIX)/bin/
