@@ -78,10 +78,11 @@ int net_backend_poll_select(struct net_backend* data, int ms)
 	res = select(backend->maxfd, &backend->rfds, &backend->wfds, &backend->xfds, &tval);
 	if (res == -1)
 	{
+		if (net_error() == EINTR)
+			return 0;
+
 		printf("Error: %d\n", net_error());
 	}
-	if (res == -1 && net_error() == EINTR)
-		return 0;
 
 	return res;
 }
