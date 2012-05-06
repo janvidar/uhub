@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2012, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -85,6 +85,10 @@ typedef uint32_t fourcc_t;
 #define ADC_CMD_DINF FOURCC('D','I','N','F')
 #define ADC_CMD_EINF FOURCC('E','I','N','F')
 #define ADC_CMD_FINF FOURCC('F','I','N','F')
+#define ADC_CMD_BQUI FOURCC('B','Q','U','I')
+#define ADC_CMD_DQUI FOURCC('D','Q','U','I')
+#define ADC_CMD_EQUI FOURCC('E','Q','U','I')
+#define ADC_CMD_FQUI FOURCC('F','Q','U','I')
 
 /* Extension messages */
 #define ADC_CMD_HCHK FOURCC('H','C','H','K')
