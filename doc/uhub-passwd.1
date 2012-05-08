@@ -1,0 +1,42 @@
+.TH UHUB-PASSWD "1" "May 2012"
+.SH NAME
+uhub-passwd \- small utility for manipulating passwords which are
+used by uhub daemon
+.SH SYNOPSIS
+.B uhub-passwd
+\fIfilename command \fR[...]
+.SH DESCRIPTION
+uHub is a high performance peer-to-peer hub for the ADC network.
+Its low memory footprint allows it to handle several thousand users
+on high-end servers, or a small private hub on embedded hardware.
+.SH "OPTIONS"
+.TP
+.BI \^create
+.TP
+.BI \^add " username password [credentials = user]"
+.TP
+.BI \^del " username"
+.TP
+.BI \^mod " username credentials"
+.TP
+.BI \^pass " username password"
+.TP
+.BI \^list
+.SH "PARAMETERS"
+.TP
+.B 'filename'
+is a database file
+.TP
+.B 'username'
+is a nickname (UTF\-8, up to 64 bytes)
+.TP
+.B 'password'
+is a password (UTF\-8, up to 64 bytes)
+.TP
+.B 'credentials'
+is one of 'admin', 'super', 'op', 'user'
+.SH AUTHOR
+This program was written by Jan Vidar Krey <janvidar@extatic.org>
+.SH "BUG REPORTS"
+If you find a bug in uhub please report it to
+.B http://bugs.extatic.org/
