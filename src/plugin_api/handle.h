@@ -64,31 +64,32 @@ typedef plugin_st (*auth_delete_user_t)(struct plugin_handle*, struct auth_info*
 
 /**
  * These are callbacks used for the hub to invoke functions in plugins.
+ * The marked ones are not being called yet.
  */
 struct plugin_funcs
 {
 	// Log events for connections
 	on_connection_accepted_t on_connection_accepted; /* Someone successfully connected to the hub */
-	on_connection_refused_t on_connection_refused;   /* Someone was refused connection to the hub */
+	on_connection_refused_t  on_connection_refused;  /* Someone was refused connection to the hub */
 
 	// Log events for users
 	on_user_login_t         on_user_login;       /* A user has successfully logged in to the hub */
 	on_user_login_error_t   on_user_login_error; /* A user has failed to log in to the hub */
 	on_user_logout_t        on_user_logout;      /* A user has logged out of the hub (was previously logged in) */
-	on_user_nick_change_t   on_user_nick_change; /* A user has changed nickname */
+/* ! */	on_user_nick_change_t   on_user_nick_change; /* A user has changed nickname */
 	on_user_update_error_t  on_user_update_error;/* A user has failed to update - nickname, etc. */
 	on_user_chat_msg_t      on_user_chat_message;/* A user has sent a public chat message */
 
 	// Log hub events
-	on_hub_started_t        on_hub_started;      /* Triggered just after plugins are loaded and the hub is started. */
-	on_hub_reloaded_t       on_hub_reloaded;     /* Triggered immediately after hub configuration is reloaded. */
-	on_hub_shutdown_t       on_hub_shutdown;     /* Triggered just before the hub is being shut down and before plugins are unloaded. */
-	on_hub_error_t          on_hub_error;        /* Triggered for log-worthy error messages */
+/* ! */	on_hub_started_t        on_hub_started;      /* Triggered just after plugins are loaded and the hub is started. */
+/* ! */	on_hub_reloaded_t       on_hub_reloaded;     /* Triggered immediately after hub configuration is reloaded. */
+/* ! */	on_hub_shutdown_t       on_hub_shutdown;     /* Triggered just before the hub is being shut down and before plugins are unloaded. */
+/* ! */	on_hub_error_t          on_hub_error;        /* Triggered for log-worthy error messages */
 
 	// Activity events (can be intercepted and refused/accepted by a plugin)
 	on_check_ip_early_t     on_check_ip_early;   /* A user has just connected (can be intercepted) */
-	on_check_ip_late_t      on_check_ip_late;    /* A user has logged in (can be intercepted) */
-	on_change_nick_t        on_change_nick;      /* A user wants to change his nick (can be intercepted) */
+/* ! */	on_check_ip_late_t      on_check_ip_late;    /* A user has logged in (can be intercepted) */
+/* ! */	on_change_nick_t        on_change_nick;      /* A user wants to change his nick (can be intercepted) */
 	on_chat_msg_t           on_chat_msg;         /* A public chat message is about to be sent (can be intercepted) */
 	on_private_msg_t        on_private_msg;      /* A public chat message is about to be sent (can be intercepted) */
 	on_search_t             on_search;           /* A search is about to be sent (can be intercepted) */
