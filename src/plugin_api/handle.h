@@ -29,13 +29,6 @@
 #include "util/ipcalc.h"
 #include "plugin_api/types.h"
 
-typedef plugin_st (*on_chat_msg_t)(struct plugin_handle*, struct plugin_user* from, const char* message);
-typedef plugin_st (*on_private_msg_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to, const char* message);
-typedef plugin_st (*on_search_t)(struct plugin_handle*, struct plugin_user* from, const char* data);
-typedef plugin_st (*on_search_result_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to, const char* data);
-typedef plugin_st (*on_p2p_connect_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to);
-typedef plugin_st (*on_p2p_revconnect_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to);
-
 typedef void (*on_connection_accepted_t)(struct plugin_handle*, struct ip_addr_encap*);
 typedef void (*on_connection_refused_t)(struct plugin_handle*, struct ip_addr_encap*);
 
@@ -51,12 +44,18 @@ typedef void (*on_hub_reloaded_t)(struct plugin_handle*, struct plugin_hub_info*
 typedef void (*on_hub_shutdown_t)(struct plugin_handle*, struct plugin_hub_info*);
 typedef void (*on_hub_error_t)(struct plugin_handle*, struct plugin_hub_info*, const char* message);
 
-typedef plugin_st (*on_change_nick_t)(struct plugin_handle*, struct plugin_user*, const char* new_nick);
-
 typedef plugin_st (*on_check_ip_early_t)(struct plugin_handle*, struct ip_addr_encap*);
-typedef plugin_st (*on_check_ip_late_t)(struct plugin_handle*, struct ip_addr_encap*);
+typedef plugin_st (*on_check_ip_late_t)(struct plugin_handle*, struct plugin_user*, struct ip_addr_encap*);
 typedef plugin_st (*on_validate_nick_t)(struct plugin_handle*, const char* nick);
 typedef plugin_st (*on_validate_cid_t)(struct plugin_handle*, const char* cid);
+typedef plugin_st (*on_change_nick_t)(struct plugin_handle*, struct plugin_user*, const char* new_nick);
+
+typedef plugin_st (*on_chat_msg_t)(struct plugin_handle*, struct plugin_user* from, const char* message);
+typedef plugin_st (*on_private_msg_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to, const char* message);
+typedef plugin_st (*on_search_t)(struct plugin_handle*, struct plugin_user* from, const char* data);
+typedef plugin_st (*on_search_result_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to, const char* data);
+typedef plugin_st (*on_p2p_connect_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to);
+typedef plugin_st (*on_p2p_revconnect_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to);
 
 typedef plugin_st (*auth_get_user_t)(struct plugin_handle*, const char* nickname, struct auth_info* info);
 typedef plugin_st (*auth_register_user_t)(struct plugin_handle*, struct auth_info* user);
@@ -87,6 +86,9 @@ struct plugin_funcs
 	on_hub_error_t          on_hub_error;        /* Triggered for log-worthy error messages */
 
 	// Activity events (can be intercepted and refused/accepted by a plugin)
+	on_check_ip_early_t     on_check_ip_early;   /* A user has just connected (can be intercepted) */
+	on_check_ip_late_t      on_check_ip_late;    /* A user has logged in (can be intercepted) */
+	on_change_nick_t        on_change_nick;      /* A user wants to change his nick (can be intercepted) */
 	on_chat_msg_t           on_chat_msg;         /* A public chat message is about to be sent (can be intercepted) */
 	on_private_msg_t        on_private_msg;      /* A public chat message is about to be sent (can be intercepted) */
 	on_search_t             on_search;           /* A search is about to be sent (can be intercepted) */
@@ -100,9 +102,6 @@ struct plugin_funcs
 	auth_update_user_t      auth_update_user;    /* Update a registered user */
 	auth_delete_user_t      auth_delete_user;    /* Delete a registered user */
 
-	// Login check functions
-	on_check_ip_early_t     login_check_ip_early;
-	on_check_ip_late_t      login_check_ip_late;
 };
 
 struct plugin_command_handle;
