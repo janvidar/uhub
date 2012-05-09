@@ -109,7 +109,7 @@ struct hub_user
 	struct hub_user_info    id;                 /** Contains nick name and CID */
 	enum auth_credentials   credentials;        /** see enum user_credentials */
 	enum user_state         state;              /** see enum user_state */
-	uint32_t                flags;              /** see enum user_features */
+	uint32_t                flags;              /** see enum user_flags */
 	struct linked_list*     feature_cast;       /** Features supported by feature cast */
 	struct adc_message*     info;               /** ADC 'INF' message (broadcasted to everyone joining the hub) */
 	struct hub_info*        hub;                /** The hub instance this user belong to */

@@ -258,7 +258,7 @@ int file_read_lines(const char* file, void* data, file_line_handler_t handler)
 		return 0;
 	}
 
-	/* Parse configuaration */
+	/* Parse configuration */
 	split_data.handler = handler;
 	split_data.data = data;
 

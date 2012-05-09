@@ -119,9 +119,9 @@ typedef size_t (*hfunc_command_arg_reset)(struct plugin_handle*, struct plugin_c
 typedef struct plugin_command_arg_data* (*hfunc_command_arg_next)(struct plugin_handle*, struct plugin_command*, enum plugin_command_arg_type);
 
 typedef char* (*hfunc_get_hub_name)(struct plugin_handle*);
+typedef void  (*hfunc_set_hub_name)(struct plugin_handle*, const char*);
 typedef char* (*hfunc_get_hub_description)(struct plugin_handle*);
-typedef void (*hfunc_set_hub_name)(struct plugin_handle*, const char*);
-typedef void (*hfunc_set_hub_description)(struct plugin_handle*, const char*);
+typedef void  (*hfunc_set_hub_description)(struct plugin_handle*, const char*);
 
 /**
  * These are functions created and initialized by the hub and which can be used
@@ -137,8 +137,8 @@ struct plugin_hub_funcs
 	hfunc_command_arg_reset command_arg_reset;
 	hfunc_command_arg_next command_arg_next;
 	hfunc_get_hub_name get_name;
-	hfunc_get_hub_description get_description;
 	hfunc_set_hub_name set_name;
+	hfunc_get_hub_description get_description;
 	hfunc_set_hub_description set_description;
 };
 

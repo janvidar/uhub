@@ -73,10 +73,10 @@ struct cfg_tokens* cfg_tokenize(const char* line)
 				}
 				break;
 
-			case '\"':
+			case '"':
 				if (backslash)
 				{
-					ADD_CHAR('\"');
+					ADD_CHAR('"');
 					backslash = 0;
 				}
 				else if (quote)
