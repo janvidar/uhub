@@ -73,6 +73,7 @@
 #include <time.h>
 
 #if !defined(WIN32)
+#include <inttypes.h>
 #include <unistd.h>
 #include <grp.h>
 #include <pwd.h>

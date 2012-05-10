@@ -53,7 +53,11 @@ extern int file_read_lines(const char* file, void* data, file_line_handler_t han
  */
 extern int string_to_boolean(const char* str, int* boolean);
 
-
+/**
+ * Convert number to string.
+ * Note: these functions are neither thread-safe nor reentrant.
+ * @return pointer to the resulting string, NULL on error
+ */
 extern const char* uhub_itoa(int val);
 extern const char* uhub_ulltoa(uint64_t val);
 
