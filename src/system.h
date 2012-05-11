@@ -89,12 +89,13 @@
 #define HAVE_GETRLIMIT
 #endif
 
-/* printf and size_t support */
+/* printf support for size_t and uint64_t */
 #if defined(WIN32)
-/* Windows uses %Iu for size_t */
 #define PRINTF_SIZE_T "%Iu"
+#define PRINTF_UINT64_T "%I64u"
 #else
 #define PRINTF_SIZE_T "%zu"
+#define PRINTF_UINT64_T ("%" PRIu64)
 #endif
 
 #ifdef SSL_SUPPORT

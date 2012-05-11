@@ -315,7 +315,7 @@ const char* uhub_ulltoa(uint64_t val)
 {
 	static char buf[22];
 
-	return snprintf(buf, sizeof(buf), "%"PRIu64, val) < 0 ? NULL : buf;
+	return snprintf(buf, sizeof(buf), PRINTF_UINT64_T, val) < 0 ? NULL : buf;
 }
 
 
