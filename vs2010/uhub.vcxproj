@@ -85,6 +85,7 @@
     <ClCompile Include="..\src\adc\sid.c" />
     <ClCompile Include="..\src\core\auth.c" />
     <ClCompile Include="..\src\core\commands.c" />
+    <ClCompile Include="..\src\core\command_parser.c" />
     <ClCompile Include="..\src\core\config.c" />
     <ClCompile Include="..\src\core\eventqueue.c" />
     <ClCompile Include="..\src\core\hub.c" />
@@ -116,6 +117,7 @@
     <ClInclude Include="..\src\core\auth.h" />
     <ClInclude Include="..\src\core\commands.h" />
     <ClInclude Include="..\src\core\commands_builtin.h" />
+    <ClInclude Include="..\src\core\command_parser.h" />
     <ClInclude Include="..\src\core\config.h" />
     <ClInclude Include="..\src\core\eventid.h" />
     <ClInclude Include="..\src\core\eventqueue.h" />
