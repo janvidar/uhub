@@ -227,14 +227,14 @@ plugin_auth_sqlite_SOURCES := src/plugins/mod_auth_sqlite.c
 plugin_auth_sqlite_TARGET  := mod_auth_sqlite.so
 plugin_auth_sqlite_LIBS    := -lsqlite3
 
-plugin_chat_history_SOURCE := src/plugins/mod_chat_history.c
-plugin_chat_history_TARGET := mod_chat_history.so
+plugin_chat_history_SOURCES := src/plugins/mod_chat_history.c
+plugin_chat_history_TARGET  := mod_chat_history.so
 
-plugin_chat_only_SOURCE := src/plugins/mod_chat_only.c
-plugin_chat_only_TARGET := mod_chat_only.so
+plugin_chat_only_SOURCES := src/plugins/mod_chat_only.c
+plugin_chat_only_TARGET  := mod_chat_only.so
 
 plugin_topic_SOURCES := src/plugins/mod_topic.c
-plugin_topic_TARGET := mod_topic.so
+plugin_topic_TARGET  := mod_topic.so
 
 # Source to objects
 libuhub_OBJECTS       := $(libuhub_SOURCES:.c=.o)
@@ -247,9 +247,27 @@ uhub-passwd_OBJECTS   := $(uhub-passwd_SOURCES:.c=.o)
 adcrush_OBJECTS       := $(adcrush_SOURCES:.c=.o)
 admin_OBJECTS         := $(admin_SOURCES:.c=.o)
 
-all_plugins     := $(plugin_example_TARGET) $(plugin_logging_TARGET) $(plugin_auth_TARGET) $(plugin_auth_sqlite_TARGET) $(plugin_welcome_TARGET) $(plugin_chat_history_TARGET) $(plugin_chat_only_TARGET) $(plugin_topic_TARGET)
-all_OBJECTS     := $(libuhub_OBJECTS) $(uhub_OBJECTS) $(libutils_OBJECTS) $(adcrush_OBJECTS) $(autotest_OBJECTS) $(admin_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
-all_OBJECTS     += $(all_plugins)
+all_plugins := \
+		$(plugin_example_TARGET) \
+		$(plugin_logging_TARGET) \
+		$(plugin_auth_TARGET) \
+		$(plugin_auth_sqlite_TARGET) \
+		$(plugin_welcome_TARGET) \
+		$(plugin_chat_history_TARGET) \
+		$(plugin_chat_only_TARGET) \
+		$(plugin_topic_TARGET)
+
+all_OBJECTS := \
+		$(libuhub_OBJECTS) \
+		$(uhub_OBJECTS) \
+		$(libutils_OBJECTS) \
+		$(adcrush_OBJECTS) \
+		$(autotest_OBJECTS) \
+		$(admin_OBJECTS) \
+		$(libadc_common_OBJECTS) \
+		$(libadc_client_OBJECTS)
+
+all_OBJECTS += $(all_plugins)
 
 uhub_BINARY=uhub$(BIN_EXT)
 uhub-passwd_BINARY=uhub-passwd$(BIN_EXT)
@@ -284,10 +302,10 @@ $(plugin_example_TARGET): $(plugin_example_SOURCES) $(libutils_OBJECTS)
 $(plugin_logging_TARGET): $(plugin_logging_SOURCES) $(libutils_OBJECTS) $(libadc_common_OBJECTS) src/network/network.o
 	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
 
-$(plugin_chat_history_TARGET): $(plugin_chat_history_SOURCE) $(libutils_OBJECTS)
+$(plugin_chat_history_TARGET): $(plugin_chat_history_SOURCES) $(libutils_OBJECTS)
 	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
 
-$(plugin_chat_only_TARGET): $(plugin_chat_only_SOURCE) $(libutils_OBJECTS)
+$(plugin_chat_only_TARGET): $(plugin_chat_only_SOURCES) $(libutils_OBJECTS)
 	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
 
 $(plugin_welcome_TARGET): $(plugin_welcome_SOURCES) $(libutils_OBJECTS)
@@ -344,8 +362,8 @@ install: all
 	@cp $(uhub-passwd_BINARY) $(UHUB_PREFIX)/bin/
 	@if [ ! -d $(UHUB_CONF_DIR) ]; then echo Creating $(UHUB_CONF_DIR); mkdir -p $(UHUB_CONF_DIR); fi
 	@if [ ! -f $(UHUB_CONF_DIR)/uhub.conf ]; then cp doc/uhub.conf $(UHUB_CONF_DIR); fi
-	@if [ ! -f $(UHUB_CONF_DIR)/rules.txt ]; then cp doc/rules.txt  $(UHUB_CONF_DIR); fi
-	@if [ ! -f $(UHUB_CONF_DIR)/plugins.conf ]; then cp doc/plugins.conf  $(UHUB_CONF_DIR); fi
+	@if [ ! -f $(UHUB_CONF_DIR)/rules.txt ]; then cp doc/rules.txt $(UHUB_CONF_DIR); fi
+	@if [ ! -f $(UHUB_CONF_DIR)/plugins.conf ]; then cp doc/plugins.conf $(UHUB_CONF_DIR); fi
 	@if [ ! -d $(UHUB_MOD_DIR) ]; then echo Creating $(UHUB_MOD_DIR); mkdir -p $(UHUB_MOD_DIR); fi
 	@cp -f mod_*.so $(UHUB_MOD_DIR)
 	@touch $(UHUB_CONF_DIR)/motd.txt

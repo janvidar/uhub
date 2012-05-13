@@ -38,7 +38,7 @@ void plugin_log_chat_message(struct hub_info* hub, struct hub_user* from, const 
 
 /* IP ban related */
 plugin_st plugin_check_ip_early(struct hub_info* hub, struct ip_addr_encap* addr);
-plugin_st plugin_check_ip_late(struct hub_info* hub, struct ip_addr_encap* addr);
+plugin_st plugin_check_ip_late(struct hub_info* hub, struct hub_user* user, struct ip_addr_encap* addr);
 
 /* Nickname allow/deny handling */
 plugin_st plugin_check_nickname_valid(struct hub_info* hub, const char* nick);

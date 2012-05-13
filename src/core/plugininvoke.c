@@ -82,12 +82,13 @@ static struct plugin_user* convert_user_type(struct hub_user* user)
 
 plugin_st plugin_check_ip_early(struct hub_info* hub, struct ip_addr_encap* addr)
 {
-	PLUGIN_INVOKE_STATUS_1(hub, login_check_ip_early, addr);
+	PLUGIN_INVOKE_STATUS_1(hub, on_check_ip_early, addr);
 }
 
-plugin_st plugin_check_ip_late(struct hub_info* hub, struct ip_addr_encap* addr)
+plugin_st plugin_check_ip_late(struct hub_info* hub, struct hub_user* who, struct ip_addr_encap* addr)
 {
-	PLUGIN_INVOKE_STATUS_1(hub, login_check_ip_late, addr);
+	struct plugin_user* user = convert_user_type(who);
+	PLUGIN_INVOKE_STATUS_2(hub, on_check_ip_late, user, addr);
 }
 
 void plugin_log_connection_accepted(struct hub_info* hub, struct ip_addr_encap* ipaddr)

@@ -258,7 +258,7 @@ int file_read_lines(const char* file, void* data, file_line_handler_t handler)
 		return 0;
 	}
 
-	/* Parse configuaration */
+	/* Parse configuration */
 	split_data.handler = handler;
 	split_data.data = data;
 
@@ -303,47 +303,19 @@ int is_number(const char* value, int* num)
 }
 
 
-/*
- * FIXME: -INTMIN is wrong!
- */
 const char* uhub_itoa(int val)
 {
-	size_t i;
-	int value;
 	static char buf[22];
-	memset(buf, 0, sizeof(buf));
-	if (!val)
-	{
-		buf[0] = '0';
-		buf[1] = '\0';
-		return buf;
-	}
-	i = sizeof(buf) - 1;
-	for (value = abs(val); value && i > 0; value /= 10)
-		buf[--i] = "0123456789"[value % 10];
 
-	if (val < 0 && i > 0)
-		buf[--i] = '-';
-	return buf+i;
+	return snprintf(buf, sizeof(buf), "%d", val) < 0 ? NULL : buf;
 }
 
 
 const char* uhub_ulltoa(uint64_t val)
 {
-	size_t i;
-	static char buf[22] = { 0, };
-	memset(buf, 0, sizeof(buf));
-	
-	if (!val)
-	{
-		buf[0] = '0';
-		buf[1] = '\0';
-		return buf;
-	}
-	i = sizeof(buf) - 1;
-	for (; val && i > 0; val /= 10)
-		buf[--i] = "0123456789"[val % 10];
-	return buf+i;
+	static char buf[22];
+
+	return snprintf(buf, sizeof(buf), PRINTF_UINT64_T, val) < 0 ? NULL : buf;
 }
 
 
