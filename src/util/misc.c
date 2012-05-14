@@ -244,7 +244,7 @@ int file_read_lines(const char* file, void* data, file_line_handler_t handler)
 		return -2;
 	}
 	
-	ret = read(fd, buf, MAX_RECV_BUF);
+	ret = read(fd, buf, MAX_RECV_BUF-1);
 	close(fd);
 
 	if (ret < 0)
@@ -257,6 +257,8 @@ int file_read_lines(const char* file, void* data, file_line_handler_t handler)
 		LOG_WARN("File is empty.");
 		return 0;
 	}
+
+	buf[ret] = 0;
 
 	/* Parse configuration */
 	split_data.handler = handler;
