@@ -1,42 +1,18 @@
 #!/usr/bin/perl
 
-# use script 
-# sqlite3 users.db < `tools/convert_to_sqlite.pl /etc/uhub/users.conf`
+# Usage:
+#   cat /etc/uhub/users.conf | tools/convert_to_sqlite.pl | sqlite3 users.db
 
-my $input = $ARGV[0];
-
-
-open (FILE, "$input") || die "# Unable to open input file $input: $!";
-my @lines = <FILE>;
-close (FILE);
-
-print "CREATE TABLE users(nickname CHAR(64) UNIQUE, password CHAR(64), credentials CHAR(5));\n";
-
-foreach my $line (@lines) {
-
-	chomp($line);
-
-	$line =~ s/#.*//g;
-
-	next if ($line =~ /^\s*$/);
-
-	if ($line =~ /^\s*user_(op|admin|super|reg)\s*(.+):(.+)\s*/)
-	{
-		my $cred = $1;
-		my $nick = $2;
-		my $pass = $3;
-		
-		$nick =~ s/'/\\'/g;
-		$pass =~ s/'/\\'/g;
-
-		print "INSERT INTO users VALUES('" . $nick . "', '" . $pass . "', '" . $cred . "');\n";
-	}
-	else
-	{
-		# print "# Warning: Unrecognized line: \"" . $line . "\"\n";
-	}
-}
-
-
-
-
+print <<_;
+CREATE TABLE users(
+	nickname CHAR(64) UNIQUE,
+	password CHAR(64),
+	credentials CHAR(5),
+	created TIMESTAMP DEFAULT (DATETIME('NOW')),
+	activity TIMESTAMP DEFAULT (DATETIME('NOW'))
+);
+_
+sub e($) { (my $v = shift) =~ s/'/\\'/g; $v }
+s{^\s*user_(op|admin|super|reg)\s+([^#\s]+):([^#\s]+)}{
+	printf "INSERT INTO users (nickname, password, credentials) VALUES('%s','%s','%s');\n", e $2, e $3, $1
+}eg while(<>);
