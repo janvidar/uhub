@@ -905,6 +905,7 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 
 	if (hub_plugins_load(hub) < 0)
 	{
+		LOG_FATAL("Unable to load plugins.");
 		hub->status = hub_status_shutdown;
 	}
 	else
