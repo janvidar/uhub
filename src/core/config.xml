@@ -13,7 +13,7 @@
 		<check min="1" max="65535" />
 		<since>0.1.0</since>
 		<short>Server port to bind to</short>
-		<description><![CDATA[This is specifies the port number the hub should listen on.]]></description>
+		<description><![CDATA[This specifies the port number the hub should listen on.]]></description>
 	</option>
 
 	<option name="server_bind_addr" type="string" default="any">
@@ -409,7 +409,7 @@
 	</option>
 
 	<option name="tls_require" type="boolean" default="0">
-		<short>If SSL/TLS enabled, should it be required (default: 0)</short>
+		<short>If SSL/TLS enabled, should it be required</short>
 		<description><![CDATA[
 			If TLS/SSL support is enabled it can either be optional or mandatory.
 			If this option is disabled then SSL/TLS is not required to enter the hub, however it is possible to enter either with or without.
@@ -590,7 +590,7 @@
 	</option>
 
 	<option name="msg_error_no_memory" type="message" default="No memory">
-		<description><![CDATA[]]></description>
+		<description><![CDATA[Hub has no more memory]]></description>
 		<since>0.2.0</since>
 	</option>
 

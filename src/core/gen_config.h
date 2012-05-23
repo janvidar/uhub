@@ -4,9 +4,9 @@ struct hub_config
 {
 	int   hub_enabled;                     /*<<< Is server enabled (default: 1) */
 	int   server_port;                     /*<<< Server port to bind to (default: 1511) */
-	char* server_bind_addr;                /*<<< Server bind address (default: any) */
+	char* server_bind_addr;                /*<<< Server bind address (default: "any") */
 	int   server_listen_backlog;           /*<<< Server listen backlog (default: 50) */
-	char* server_alt_ports;                /*<<< Comma separated list of alternative ports to listen to (default: ) */
+	char* server_alt_ports;                /*<<< Comma separated list of alternative ports to listen to (default: "") */
 	int   show_banner;                     /*<<< Show banner on connect (default: 1) */
 	int   show_banner_sys_info;            /*<<< Show banner on connect (default: 1) */
 	int   max_users;                       /*<<< Maximum number of users allowed on the hub (default: 500) */
@@ -14,9 +14,9 @@ struct hub_config
 	int   register_self;                   /*<<< Allow users to register themselves on the hub. (default: 0) */
 	int   obsolete_clients;                /*<<< Support obsolete clients using a ADC protocol prior to 1.0 (default: 0) */
 	int   chat_is_privileged;              /*<<< Allow chat for operators and above only (default: 0) */
-	char* hub_name;                        /*<<< Name of hub (default: uhub) */
-	char* hub_description;                 /*<<< Short hub description, topic or subject. (default: no description) */
-	char* redirect_addr;                   /*<<< A common hub redirect address. (default: ) */
+	char* hub_name;                        /*<<< Name of hub (default: "uhub") */
+	char* hub_description;                 /*<<< Short hub description, topic or subject. (default: "no description") */
+	char* redirect_addr;                   /*<<< A common hub redirect address. (default: "") */
 	int   max_recv_buffer;                 /*<<< Max read buffer before parse, per user (default: 4096) */
 	int   max_send_buffer;                 /*<<< Max send buffer before disconnect, per user (default: 131072) */
 	int   max_send_buffer_soft;            /*<<< Max send buffer before message drops, per user (default: 98304) */
@@ -41,12 +41,12 @@ struct hub_config
 	int   flood_ctl_update;                /*<<< Max updates allowed in time interval (default: 0) */
 	int   flood_ctl_extras;                /*<<< Max extra messages allowed in time interval (default: 0) */
 	int   tls_enable;                      /*<<< Enable SSL/TLS support (default: 0) */
-	int   tls_require;                     /*<<< If SSL/TLS enabled, should it be required (default: 0) (default: 0) */
-	char* tls_require_redirect_addr;       /*<<< A redirect address in case a client connects using "adc://" when "adcs://" is required. (default: ) */
-	char* tls_certificate;                 /*<<< Certificate file (default: ) */
-	char* tls_private_key;                 /*<<< Private key file (default: ) */
-	char* file_acl;                        /*<<< File containing access control lists (default: ) */
-	char* file_plugins;                    /*<<< Plugin configuration file (default: ) */
+	int   tls_require;                     /*<<< If SSL/TLS enabled, should it be required (default: 0) */
+	char* tls_require_redirect_addr;       /*<<< A redirect address in case a client connects using "adc://" when "adcs://" is required. (default: "") */
+	char* tls_certificate;                 /*<<< Certificate file (default: "") */
+	char* tls_private_key;                 /*<<< Private key file (default: "") */
+	char* file_acl;                        /*<<< File containing access control lists (default: "") */
+	char* file_plugins;                    /*<<< Plugin configuration file (default: "") */
 	char* msg_hub_full;                    /*<<< "Hub is full" */
 	char* msg_hub_disabled;                /*<<< "Hub is disabled" */
 	char* msg_hub_registered_users_only;   /*<<< "Hub is for registered users only" */

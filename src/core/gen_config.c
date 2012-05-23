@@ -102,7 +102,9 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 
 	if (!strcmp(key, "server_port"))
 	{
-		if (!apply_integer(key, data, &config->server_port, 0, 0))
+		min = 1;
+		max = 65535;
+		if (!apply_integer(key, data, &config->server_port, &min, &max))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -122,7 +124,8 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 
 	if (!strcmp(key, "server_listen_backlog"))
 	{
-		if (!apply_integer(key, data, &config->server_listen_backlog, 0, 0))
+		min = 5;
+		if (!apply_integer(key, data, &config->server_listen_backlog, &min, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -244,7 +247,9 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 
 	if (!strcmp(key, "max_recv_buffer"))
 	{
-		if (!apply_integer(key, data, &config->max_recv_buffer, 0, 0))
+		min = 1024;
+		max = 1048576;
+		if (!apply_integer(key, data, &config->max_recv_buffer, &min, &max))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -254,7 +259,8 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 
 	if (!strcmp(key, "max_send_buffer"))
 	{
-		if (!apply_integer(key, data, &config->max_send_buffer, 0, 0))
+		min = 2048;
+		if (!apply_integer(key, data, &config->max_send_buffer, &min, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -264,7 +270,8 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 
 	if (!strcmp(key, "max_send_buffer_soft"))
 	{
-		if (!apply_integer(key, data, &config->max_send_buffer_soft, 0, 0))
+		min = 1024;
+		if (!apply_integer(key, data, &config->max_send_buffer_soft, &min, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -284,7 +291,9 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 
 	if (!strcmp(key, "max_chat_history"))
 	{
-		if (!apply_integer(key, data, &config->max_chat_history, 0, 0))
+		min = 0;
+		max = 250;
+		if (!apply_integer(key, data, &config->max_chat_history, &min, &max))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -294,7 +303,9 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 
 	if (!strcmp(key, "max_logout_log"))
 	{
-		if (!apply_integer(key, data, &config->max_logout_log, 0, 0))
+		min = 0;
+		max = 2000;
+		if (!apply_integer(key, data, &config->max_logout_log, &min, &max))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -304,7 +315,8 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 
 	if (!strcmp(key, "limit_max_hubs_user"))
 	{
-		if (!apply_integer(key, data, &config->limit_max_hubs_user, 0, 0))
+		min = 0;
+		if (!apply_integer(key, data, &config->limit_max_hubs_user, &min, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -314,7 +326,8 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 
 	if (!strcmp(key, "limit_max_hubs_reg"))
 	{
-		if (!apply_integer(key, data, &config->limit_max_hubs_reg, 0, 0))
+		min = 0;
+		if (!apply_integer(key, data, &config->limit_max_hubs_reg, &min, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -324,7 +337,8 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 
 	if (!strcmp(key, "limit_max_hubs_op"))
 	{
-		if (!apply_integer(key, data, &config->limit_max_hubs_op, 0, 0))
+		min = 0;
+		if (!apply_integer(key, data, &config->limit_max_hubs_op, &min, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -334,7 +348,8 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 
 	if (!strcmp(key, "limit_max_hubs"))
 	{
-		if (!apply_integer(key, data, &config->limit_max_hubs, 0, 0))
+		min = 0;
+		if (!apply_integer(key, data, &config->limit_max_hubs, &min, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -344,7 +359,8 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 
 	if (!strcmp(key, "limit_min_hubs_user"))
 	{
-		if (!apply_integer(key, data, &config->limit_min_hubs_user, 0, 0))
+		min = 0;
+		if (!apply_integer(key, data, &config->limit_min_hubs_user, &min, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -354,7 +370,8 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 
 	if (!strcmp(key, "limit_min_hubs_reg"))
 	{
-		if (!apply_integer(key, data, &config->limit_min_hubs_reg, 0, 0))
+		min = 0;
+		if (!apply_integer(key, data, &config->limit_min_hubs_reg, &min, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -364,7 +381,8 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 
 	if (!strcmp(key, "limit_min_hubs_op"))
 	{
-		if (!apply_integer(key, data, &config->limit_min_hubs_op, 0, 0))
+		min = 0;
+		if (!apply_integer(key, data, &config->limit_min_hubs_op, &min, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -385,7 +403,8 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 
 	if (!strcmp(key, "limit_max_share"))
 	{
-		if (!apply_integer(key, data, &config->limit_max_share, 0, 0))
+		min = 0;
+		if (!apply_integer(key, data, &config->limit_max_share, &min, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -395,7 +414,8 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 
 	if (!strcmp(key, "limit_min_slots"))
 	{
-		if (!apply_integer(key, data, &config->limit_min_slots, 0, 0))
+		min = 0;
+		if (!apply_integer(key, data, &config->limit_min_slots, &min, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -405,7 +425,8 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 
 	if (!strcmp(key, "limit_max_slots"))
 	{
-		if (!apply_integer(key, data, &config->limit_max_slots, 0, 0))
+		min = 0;
+		if (!apply_integer(key, data, &config->limit_max_slots, &min, 0))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -907,7 +928,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 
 	/* Still here -- unknown directive */
 	LOG_ERROR("Unknown configuration directive: '%s'", key);
-		return -1;
+	return -1;
 }
 
 void free_config(struct hub_config* config)
