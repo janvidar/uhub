@@ -1,3 +1,10 @@
+0.4.0:
+- Added support of plug-ins written in C.
+- Added plug-ins which provide authentication using SQLite, logging and chat history.
+- Improved support of SSL/TLS. This feature became stable and now enabled by default.
+- Fixed compilation and work in MS Windows systems. Visual Studio Express 2010 is used.
+- Fixed compilation in Debian GNU/kFreeBSD, Debian GNU/Hurd and on s390/s390x architectures.
+
 0.3.2:
 - Fixed bugs in the kqueue network backend (OSX/BSD)
 - Rewrote the configuration backend code.
