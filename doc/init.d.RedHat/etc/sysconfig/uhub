@@ -1,3 +1,6 @@
+# locate bin file
+UHUBBINFILE=/usr/bin/uhub
+
 # Options to UHUB
 #  -v          Verbose mode. Add more -v's for higher verbosity.
 #  -q          Quiet mode - no output

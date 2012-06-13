@@ -31,7 +31,8 @@ fi
 # Check that networking is up.
 [ ${NETWORKING} = "no" ] && exit 1
 
-# Check that uhub.conf exists.
+# Check that bin and uhub.conf exists.
+[ -f $UHUBBINFILE ] || exit 6
 [ -f /etc/uhub/uhub.conf ] || exit 6
 
 RETVAL=0
@@ -40,7 +41,7 @@ RETVAL=0
 start() {
         KIND="Uhub"
 	echo -n $"Starting $KIND services: "
-	daemon uhub $UHUBOPTIONS
+	daemon $UHUBBINFILE $UHUBOPTIONS
 	RETVAL=$?
         echo "" 
 	return $RETVAL
@@ -49,7 +50,7 @@ start() {
 stop() {
         KIND="Uhub"
 	echo -n $"Shutting down $KIND services: "
-	killproc uhub
+	killproc  $UHUBBINFILE
 	RETVAL=$?
 	echo ""
 	return $RETVAL
@@ -77,7 +78,7 @@ relog() {
 }
 
 rhstatus() {
-	status uhub
+	status  $UHUBBINFILE
         RETVAL=$?
         if [ $RETVAL -ne 0 ] ; then
                 return $RETVAL
