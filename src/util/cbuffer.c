@@ -36,6 +36,7 @@ extern struct cbuffer* cbuf_create(size_t capacity)
 	buf->size = 0;
 	buf->flags = 0;
 	buf->buf = hub_malloc(capacity + 1);
+	buf->buf[0] = '\0';
 	return buf;
 }
 
