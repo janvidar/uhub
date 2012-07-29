@@ -129,6 +129,14 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 				CHECK_FLOOD(connect, 1);
 				ROUTE_MSG;
 
+			case ADC_CMD_BCMD:
+			case ADC_CMD_DCMD:
+			case ADC_CMD_ECMD:
+			case ADC_CMD_FCMD:
+			case ADC_CMD_HCMD:
+				CHECK_FLOOD(extras, 1);
+				break;
+
 			default:
 				CHECK_FLOOD(extras, 1);
 				ROUTE_MSG;

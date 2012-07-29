@@ -33,7 +33,7 @@ typedef uint32_t fourcc_t;
 #define FOURCC(a,b,c,d) (fourcc_t) ((a << 24) | (b << 16) | (c << 8) | d)
 
 /* default welcome protocol support message, as sent by this server */
-#define ADC_PROTO_SUPPORT "ADBASE ADTIGR ADPING"
+#define ADC_PROTO_SUPPORT "ADBASE ADTIGR ADPING ADUCMD"
 
 /* Server sent commands */
 #define ADC_CMD_ISID FOURCC('I','S','I','D')
@@ -92,6 +92,15 @@ typedef uint32_t fourcc_t;
 
 /* Extension messages */
 #define ADC_CMD_HCHK FOURCC('H','C','H','K')
+
+/* UCMD Extension */
+#define ADC_CMD_BCMD FOURCC('B','C','M','D')
+#define ADC_CMD_DCMD FOURCC('D','C','M','D')
+#define ADC_CMD_ECMD FOURCC('E','C','M','D')
+#define ADC_CMD_FCMD FOURCC('F','C','M','D')
+#define ADC_CMD_HCMD FOURCC('H','C','M','D')
+#define ADC_CMD_ICMD FOURCC('I','C','M','D')
+
 
 #define ADC_INF_FLAG_IPV4_ADDR          "I4" /* ipv4 address */
 #define ADC_INF_FLAG_IPV6_ADDR          "I6" /* ipv6 address */
