@@ -20,7 +20,7 @@
 #ifndef HAVE_UHUB_PLUGIN_TYPES_H
 #define HAVE_UHUB_PLUGIN_TYPES_H
 
-#define PLUGIN_API_VERSION 1
+#define PLUGIN_API_VERSION 2
 
 #ifndef MAX_NICK_LEN
 #define MAX_NICK_LEN 64
@@ -103,5 +103,57 @@ enum plugin_command_arg_type
 	plugin_cmd_arg_type_credentials,
 };
 
+/* Specifies which categories a command appears in. To make a command appear in
+ * multiple categories, simply OR the appropriate values together. */
+enum plugin_ucmd_categories
+{
+	/* Appears in the main hub chat window. */
+	ucmd_category_hub = 1,
+
+	/* Appears in the hub user list. */
+	ucmd_category_user = 2,
+
+	/* Appears in the search results. */
+	ucmd_category_search = 4,
+
+	/* Appears in the file list. */
+	ucmd_category_file = 8,
+
+	/* Special case: appear everywhere. */
+	ucmd_category_all = 15,
+};
+
+/* Holds information about a user command. Note that a unique name is required
+ * for every command, even if it is only a separator.
+ *
+ * You should not create one of these yourself but instead use the
+ * plugin_handle->hub.ucmd_create() function.
+ *
+ * Similarly, you should only manually modify the first four entries below, and
+ * use the plugin_handle->hub.ucmd_xxxx() functions to make any other changes.
+ * */
+struct plugin_ucmd
+{
+	/* Which categories the command appears in. */
+	enum plugin_ucmd_categories categories;
+
+	/* If true, removes an existing command rather than adding a new one. */
+	int remove;
+
+	/* If true, adds a separator to the user command menu rather than an actual command. */
+	int separator;
+
+	/* Sometimes a command can be sent on multiple users (e.g., in search
+	 * results). If this field is true, the command is limited to run once per
+	 * CID. */
+	int constrained;
+
+	/* Plugins must not modify the following fields. */
+	char *name;
+	size_t namelen;
+	char *tt;
+	size_t length;
+	size_t capacity;
+};
 
 #endif /* HAVE_UHUB_PLUGIN_TYPES_H */

@@ -152,6 +152,7 @@ libuhub_SOURCES := \
 		src/core/plugincallback.c \
 		src/core/plugininvoke.c \
 		src/core/pluginloader.c \
+		src/core/pluginucmd.c \
 		src/network/backend.c \
 		src/network/connection.c \
 		src/network/epoll.c \
