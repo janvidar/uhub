@@ -200,6 +200,7 @@ void plugin_register_callback_functions(struct plugin_handle* handle)
 	handle->hub.set_description = cbfunc_set_hub_description;
 	handle->hub.ucmd_create = cbfunc_ucmd_create;
 	handle->hub.ucmd_add_chat = cbfunc_ucmd_add_chat;
+	handle->hub.ucmd_add_pm = cbfunc_ucmd_add_pm;
 	handle->hub.ucmd_send = cbfunc_ucmd_send;
 	handle->hub.ucmd_free = cbfunc_ucmd_free;
 }

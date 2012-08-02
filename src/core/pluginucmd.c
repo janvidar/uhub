@@ -145,6 +145,59 @@ int cbfunc_ucmd_add_chat(struct plugin_handle* plugin, struct plugin_ucmd* ucmd,
 	return 1;
 }
 
+int cbfunc_ucmd_add_pm(struct plugin_handle* plugin, struct plugin_ucmd* ucmd, const char* to, const char* message, int echo)
+{
+	/* Double-escape the message - once for when the client sends it back, and
+	 * then again to insert it into the user command message we send to them. */
+	char* temp = adc_msg_escape(message);
+	char* escmsg = adc_msg_escape(temp);
+	free(temp);
+	size_t msglen = strlen(escmsg);
+
+	/* If no target SID is given, use the keyword expansion %[userSID] for the
+	 * client to fill in with the currently selected user. */
+	size_t tolen = (to == NULL) ? 10 : 4;
+
+	/* Format of an echoed PM: "EMSG\s%[mySID]\s<target SID>\s<double-escaped message>\sPM%[mySID]\n".
+	 * Format of a non-echoed PM: "DMSG\s%[mySID]\s<target SID>\s<double-escaped message>\sPM%[mySID]\n". */
+	size_t required = 32 + tolen + msglen;
+	if(required > (ucmd->capacity - ucmd->length))
+	{
+		if(ucmd_expand_tt(ucmd, ucmd->capacity + required) == 0)
+		{
+			plugin->error_msg = "Could not expand memory to store private message.";
+			free(escmsg);
+			return 0;
+		}
+	}
+
+	/* Start with the appropriate ADC command plus the client SID placeholder. */
+	if(echo) strncpy(ucmd->tt + ucmd->length, "EMSG\\s%[mySID]\\s", 16);
+	else strncpy(ucmd->tt + ucmd->length, "DMSG\\s%[mySID]\\s", 16);
+	ucmd->length += 16;
+
+	/* Copy the target ID. */
+	if(to != NULL) strncpy(ucmd->tt + ucmd->length, to, tolen);
+	else strncpy(ucmd->tt + ucmd->length, "%[userSID]", tolen);
+	ucmd->length += tolen;
+
+	/* Space between target and message. */
+	ucmd->tt[ucmd->length++] = '\\';
+	ucmd->tt[ucmd->length++] = 's';
+
+	/* Message. */
+	strncpy(ucmd->tt + ucmd->length, escmsg, msglen);
+	ucmd->length += msglen;
+	free(escmsg);
+
+	/* Add the PM flag and final line break. */
+	strncpy(ucmd->tt + ucmd->length, "\\sPM%[mySID]\\n", 14);
+	ucmd->length += 14;
+
+	/* Done. */
+	return 1;
+}
+
 int cbfunc_ucmd_send(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_ucmd* ucmd)
 {
 	/* Make sure we have a command. */

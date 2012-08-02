@@ -125,6 +125,7 @@ typedef void  (*hfunc_set_hub_description)(struct plugin_handle*, const char*);
 
 typedef struct plugin_ucmd* (*hfunc_ucmd_create)(struct plugin_handle*, const char*, size_t);
 typedef int                 (*hfunc_ucmd_add_chat)(struct plugin_handle*, struct plugin_ucmd*, const char*, int);
+typedef int                 (*hfunc_ucmd_add_pm)(struct plugin_handle*, struct plugin_ucmd*, const char*, const char*, int);
 typedef int                 (*hfunc_ucmd_send)(struct plugin_handle*, struct plugin_user*, struct plugin_ucmd*);
 typedef void                (*hfunc_ucmd_free)(struct plugin_handle*, struct plugin_ucmd*);
 
@@ -147,6 +148,7 @@ struct plugin_hub_funcs
 	hfunc_set_hub_description set_description;
 	hfunc_ucmd_create ucmd_create;
 	hfunc_ucmd_add_chat ucmd_add_chat;
+	hfunc_ucmd_add_pm ucmd_add_pm;
 	hfunc_ucmd_send ucmd_send;
 	hfunc_ucmd_free ucmd_free;
 };
