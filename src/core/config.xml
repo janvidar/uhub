@@ -117,6 +117,24 @@
 		<since>0.4.0</since>
    </option>
 
+   <option name="reserved_sids" type="string" default="">
+		<short>Alias reserved SIDs to certain users.</short>
+		<check regexp="((\S+)(\s(\S+))*)?" />
+		<description><![CDATA[
+			<p>
+			When setting up user commands, you may want to be able to use them to private message a certain account (e.g., a bot connected to the hub). Since a session ID (SID) is allocated to a client prior to it sending its nickname, this is not directly possible. Instead, you can reserve fixed SIDs which are aliased to a particular user when they connect. As they are reserved when the hub starts up, these have predictable values.
+			</p>
+			<p>
+			Each nickname in the list must be separated by a space. The SID AAAA is reserved for the hub itself. The first nickname in the list will be aliased to AAAB, the second to AAAC and so on. Fixed SIDs can only be allocated to registered users - if somebody without a password logs in under a reserved nickname, the alias will not be applied (but they can still log in). Also, they are only checked when a private message is sent, so any other messages to/from the aliased SID will be dropped as an unknown user per the ADC protocol.
+			</p>
+		]]></description>
+		<example><![CDATA[
+			# QuoteBot = AAAB, StatBot = AAAC
+			reserved_sids = QuoteBot StatBot
+		]]></example>
+		<since>0.5.0</since>
+   </option>
+
 	<option name="obsolete_clients" type="boolean" default="0">
 		<short>Support obsolete clients using a ADC protocol prior to 1.0</short>
 		<description><![CDATA[

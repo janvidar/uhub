@@ -12,6 +12,7 @@ void config_defaults(struct hub_config* config)
 	config->max_users = 500;
 	config->registered_users_only = 0;
 	config->register_self = 0;
+	config->reserved_sids = hub_strdup("");
 	config->obsolete_clients = 0;
 	config->chat_is_privileged = 0;
 	config->hub_name = hub_strdup("uhub");
@@ -188,6 +189,16 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 	if (!strcmp(key, "register_self"))
 	{
 		if (!apply_boolean(key, data, &config->register_self))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "reserved_sids"))
+	{
+		if (!apply_string(key, data, &config->reserved_sids, (char*) ""))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -937,6 +948,8 @@ void free_config(struct hub_config* config)
 
 	hub_free(config->server_alt_ports);
 
+	hub_free(config->reserved_sids);
+
 	hub_free(config->hub_name);
 
 	hub_free(config->hub_description);
@@ -1058,6 +1071,9 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 
 	if (!ignore_defaults || config->register_self != 0)
 		fprintf(stdout, "register_self = %s\n", config->register_self ? "yes" : "no");
+
+	if (!ignore_defaults || strcmp(config->reserved_sids, "") != 0)
+		fprintf(stdout, "reserved_sids = \"%s\"\n", config->reserved_sids);
 
 	if (!ignore_defaults || config->obsolete_clients != 0)
 		fprintf(stdout, "obsolete_clients = %s\n", config->obsolete_clients ? "yes" : "no");

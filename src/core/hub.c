@@ -342,7 +342,14 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 		{
 			struct hub_user* target = uman_get_user_by_sid(hub, cmd->target);
 			if (target)
+			{
+				/* The SID the PM was sent to is reserved for some user. Hence
+				 * we need to update the target SID in the message so it is
+				 * routed properly. */
+				if(cmd->target != target->id.sid) strncpy(cmd->cache + 10, sid_to_string(target->id.sid), 4);
+
 				status = plugin_handle_private_message(hub, u, target, message_decoded, 0);
+			}
 			else
 				relay = 0;
 		}

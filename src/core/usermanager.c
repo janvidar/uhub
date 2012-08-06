@@ -73,6 +73,60 @@ static void timer_statistics(struct timeout_evt* t)
 	timeout_queue_reschedule(net_backend_get_timeout_queue(), hub->users->timeout, TIMEOUT_STATS);
 }
 
+int add_reserved_sid(char* nick, int splitcount, void* data)
+{
+	struct hub_user_manager* users = (struct hub_user_manager*)data;
+
+	/* Safety check: make sure the nickname can fit. */
+	size_t nicklen = strlen(nick);
+	if(nicklen > MAX_NICK_LEN)
+	{
+		LOG_ERROR("Nickname %s for reserved SID is too long (length %d, max %d)", nick, nicklen, MAX_NICK_LEN);
+		return -1;
+	}
+
+	/* Try to create a structure for the new reserved SID. */
+	struct reserved_sid* newresv = (struct reserved_sid*)malloc(sizeof(struct reserved_sid));
+	if(newresv == NULL)
+	{
+		LOG_ERROR("Could not allocate memory for reserved SID for %s", nick);
+		return -1;
+	}
+
+	/* Try to create a dummy user for the reserved SID. */
+	newresv->dummy_user = (struct hub_user*)malloc(sizeof(struct hub_user));
+	if(newresv->dummy_user == NULL)
+	{
+		LOG_ERROR("Could not allocate memory for reserved SID for %s", nick);
+		free(newresv);
+		return -1;
+	}
+	strncpy(newresv->dummy_user->id.nick, nick, nicklen+1);
+
+	/* No users logged in at this point. */
+	newresv->real_user = NULL;
+
+	/* Allocate the SID. */
+	newresv->pool = users->sids;
+	newresv->sid = sid_alloc(users->sids, newresv->dummy_user);
+
+	/* Add to the list and keep track of how many we've allocated. */
+	list_append(users->reserved, newresv);
+	users->reserved_end = newresv->sid;
+
+	/* Done. */
+	LOG_INFO("Reserved SID %s for %s", sid_to_string(newresv->sid), newresv->dummy_user->id.nick);
+	return 1;
+}
+
+void remove_reserved_sid(void *node)
+{
+	struct reserved_sid* resv = (struct reserved_sid*)node;
+	LOG_INFO("Removing reserved SID %s for %s", sid_to_string(resv->sid), resv->dummy_user->id.nick);
+	sid_free(resv->pool, resv->sid);
+	free(resv->dummy_user);
+}
+
 int uman_init(struct hub_info* hub)
 {
 	struct hub_user_manager* users = NULL;
@@ -100,6 +154,11 @@ int uman_init(struct hub_info* hub)
 		timeout_queue_insert(net_backend_get_timeout_queue(), users->timeout, TIMEOUT_STATS);
 	}
 
+	/* Process any reserved SIDs. */
+	users->reserved = list_create();
+	users->reserved_end = 0;
+	string_split(hub->config->reserved_sids, " ", (void*)users, &add_reserved_sid);
+
 	hub->users = users;
 	return 0;
 }
@@ -114,6 +173,12 @@ int uman_shutdown(struct hub_info* hub)
 	{
 		timeout_queue_remove(net_backend_get_timeout_queue(), hub->users->timeout);
 		hub_free(hub->users->timeout);
+	}
+
+	if (hub->users->reserved)
+	{
+		list_clear(hub->users->reserved, &remove_reserved_sid);
+		list_destroy(hub->users->reserved);
 	}
 
 	if (hub->users->list)
@@ -138,6 +203,23 @@ int uman_add(struct hub_info* hub, struct hub_user* user)
 	if (user->hub)
 		return -1;
 
+	/* Check if a SID has been reserved for this user. NB. user must be
+	 * registered for reserved SIDs to be used. */
+	if(hub->users->reserved_end && user->credentials >= auth_cred_user)
+	{
+		struct reserved_sid* resv = (struct reserved_sid*)list_get_first(hub->users->reserved);
+		while(resv)
+		{
+			if(strcmp(resv->dummy_user->id.nick, user->id.nick) == 0)
+			{
+				resv->real_user = user;
+				LOG_INFO("Reserved user %s logged in.", user->id.nick);
+				break;
+			}
+			resv = (struct reserved_sid*)list_get_next(hub->users->reserved);
+		}
+	}
+
 	list_append(hub->users->list, user);
 	hub->users->count++;
 	hub->users->count_peak = MAX(hub->users->count, hub->users->count_peak);
@@ -153,6 +235,22 @@ int uman_remove(struct hub_info* hub, struct hub_user* user)
 {
 	if (!hub || !user)
 		return -1;
+
+	/* Check if a SID has been reserved for this user. */
+	if(hub->users->reserved_end)
+	{
+		struct reserved_sid* resv = (struct reserved_sid*)list_get_first(hub->users->reserved);
+		while(resv)
+		{
+			if(resv->real_user == user)
+			{
+				resv->real_user = NULL;
+				LOG_INFO("Reserved user %s has left the building.", user->id.nick);
+				break;
+			}
+			resv = (struct reserved_sid*)list_get_next(hub->users->reserved);
+		}
+	}
 
 	list_remove(hub->users->list, user);
 
@@ -176,6 +274,17 @@ int uman_remove(struct hub_info* hub, struct hub_user* user)
 
 struct hub_user* uman_get_user_by_sid(struct hub_info* hub, sid_t sid)
 {
+	/* This is a reserved SID. */
+	if(sid && sid <= hub->users->reserved_end)
+	{
+		struct reserved_sid* resv = (struct reserved_sid*)list_get_index(hub->users->reserved, sid-1);
+
+		/* See if the real user is currently logged on and return accordingly. */
+		if(resv->real_user != NULL) return resv->real_user;
+		return 0;
+	}
+
+	/* Use the SID lookup code. */
 	return sid_lookup(hub->users->sids, sid);
 }
 
