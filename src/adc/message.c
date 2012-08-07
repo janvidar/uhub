@@ -63,6 +63,27 @@ static void msg_free(void* ptr)
 #define msg_free(X)         hub_free(X)
 #endif /* MSG_MEMORY_DEBUG */
 
+static int msg_check_escapes(const char* string, size_t len)
+{
+        char* start = (char*) string;
+        while ((start = memchr(start, '\\', len - (start - string))))
+        {
+                if (start+1 == (string + len))
+                        return 0;
+
+                switch (*(++start))
+                {
+                        case '\\':
+                        case 'n':
+                        case 's':
+                                break;
+                        default:
+                                return 0;
+                }
+        }
+        return 1;
+}
+
 
 struct adc_message* adc_msg_incref(struct adc_message* msg)
 {
@@ -315,6 +336,13 @@ struct adc_message* adc_msg_parse(const char* line, size_t length)
 	if (!is_printable_utf8(line, length))
 	{
 		LOG_DEBUG("Dropped message with non-printable UTF-8 characters.");
+		msg_free(command);
+		return NULL;
+	}
+
+	if (!msg_check_escapes(line, length))
+	{
+		LOG_DEBUG("Dropped message with invalid ADC escape.");
 		msg_free(command);
 		return NULL;
 	}
@@ -876,7 +904,6 @@ char* adc_msg_unescape(const char* string)
 	*ptr = 0;
 	return new_string;
 }
-
 
 char* adc_msg_escape(const char* string)
 {
