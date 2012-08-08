@@ -57,6 +57,107 @@ int ucmd_expand_tt(struct plugin_ucmd* ucmd, size_t size)
 	return 1;
 }
 
+/* Calculate the number of characters needed to store the escaped message. */
+size_t ucmd_msg_escape_length(const char* message)
+{
+	size_t extra = 0;
+	size_t i;
+	int insub = 0;
+	for(i = 0; message[i]; i++)
+	{
+		/* In a substitution block, no escaping needed. */
+		if(insub == 2)
+		{
+			if(message[i] == ']') insub = 0;
+		}
+
+		/* Not in a substitution block. */
+		else{
+			/* A character that needs escaping. */
+			if(message[i] == ' ' || message[i] == '\n' || message[i] == '\\'){
+				extra++;
+				insub = 0;
+			}
+
+			/* See if we're heading into a substitution block. */
+			else if(message[i] == '%') insub = 1;
+			else if(message[i] == '[' && insub == 1) insub = 2;
+			else insub = 0;
+		}
+	}
+
+	/* Done. */
+	return i + extra;
+}
+
+/* Escape a message that is being put into a user command. We cannot use
+ * adc_msg_escape for this as keyword substitutions should not be escaped while
+ * general text should be. */
+char* ucmd_msg_escape(const char* message)
+{
+	/* Allocate the memory we need. */
+	size_t esclen = ucmd_msg_escape_length(message);
+	char *escaped = malloc(esclen + 1);
+
+	int insub = 0;
+	size_t i;
+	size_t n = 0;
+
+	for(i = 0; message[i]; i++)
+	{
+		/* In a substitution block, no escaping needed. */
+		if(insub == 2)
+		{
+			if(message[i] == ']') insub = 0;
+			escaped[n++] = message[i];
+		}
+
+		/* Not in a substitution block. */
+		else
+		{
+			switch(message[i])
+			{
+				/* Deal with characters that need escaping. */
+				case '\\':
+					escaped[n++] = '\\';
+					escaped[n++] = '\\';
+					insub = 0;
+					break;
+				case '\n':
+					escaped[n++] = '\\';
+					escaped[n++] = 'n';
+					insub = 0;
+					break;
+				case ' ':
+					escaped[n++] = '\\';
+					escaped[n++] = 's';
+					insub = 0;
+					break;
+
+				/* Characters that start a substitution block. */
+				case '%':
+					escaped[n++] = message[i];
+					insub = 1;
+					break;
+				case '[':
+					escaped[n++] = message[i];
+					if(insub == 1) insub = 2;
+					break;
+
+				/* Standard character. */
+				default:
+					escaped[n++] = message[i];
+					insub = 0;
+					break;
+			}
+		}
+	}
+
+	/* Done. */
+	escaped[n] = 0;
+	return escaped;
+}
+
 struct plugin_ucmd* cbfunc_ucmd_create(struct plugin_handle* plugin, const char* name, size_t length){
 	/* Need a name. */
 	if(name == NULL)
@@ -102,8 +203,10 @@ struct plugin_ucmd* cbfunc_ucmd_create(struct plugin_handle* plugin, const char*
 int cbfunc_ucmd_add_chat(struct plugin_handle* plugin, struct plugin_ucmd* ucmd, const char* message, int me)
 {
 	/* Double-escape the message - once for when the client sends it back, and
-	 * then again to insert it into the user command message we send to them. */
-	char* temp = adc_msg_escape(message);
+	 * then again to insert it into the user command message we send to them.
+	 * Note the two different escape functions used for the different escapes -
+	 * the UCMD escape is needed to handle substitution blocks correctly. */
+	char* temp = ucmd_msg_escape(message);
 	char* escmsg = adc_msg_escape(temp);
 	free(temp);
 	size_t msglen = strlen(escmsg);
@@ -148,8 +251,10 @@ int cbfunc_ucmd_add_chat(struct plugin_handle* plugin, struct plugin_ucmd* ucmd,
 int cbfunc_ucmd_add_pm(struct plugin_handle* plugin, struct plugin_ucmd* ucmd, const char* to, const char* message, int echo)
 {
 	/* Double-escape the message - once for when the client sends it back, and
-	 * then again to insert it into the user command message we send to them. */
-	char* temp = adc_msg_escape(message);
+	 * then again to insert it into the user command message we send to them.
+	 * Note the two different escape functions used for the different escapes -
+	 * the UCMD escape is needed to handle substitution blocks correctly. */
+	char* temp = ucmd_msg_escape(message);
 	char* escmsg = adc_msg_escape(temp);
 	free(temp);
 	size_t msglen = strlen(escmsg);
