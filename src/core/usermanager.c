@@ -125,6 +125,7 @@ void remove_reserved_sid(void *node)
 	LOG_INFO("Removing reserved SID %s for %s", sid_to_string(resv->sid), resv->dummy_user->id.nick);
 	sid_free(resv->pool, resv->sid);
 	free(resv->dummy_user);
+	free(resv);
 }
 
 int uman_init(struct hub_info* hub)
