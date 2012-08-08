@@ -237,6 +237,9 @@ plugin_chat_only_TARGET  := mod_chat_only.so
 plugin_topic_SOURCES := src/plugins/mod_topic.c
 plugin_topic_TARGET  := mod_topic.so
 
+plugin_ucmd_SOURCES := src/plugins/mod_ucmd.c
+plugin_ucmd_TARGET  := mod_ucmd.so
+
 # Source to objects
 libuhub_OBJECTS       := $(libuhub_SOURCES:.c=.o)
 libutils_OBJECTS      := $(libutils_SOURCES:.c=.o)
@@ -256,7 +259,8 @@ all_plugins := \
 		$(plugin_welcome_TARGET) \
 		$(plugin_chat_history_TARGET) \
 		$(plugin_chat_only_TARGET) \
-		$(plugin_topic_TARGET)
+		$(plugin_topic_TARGET) \
+		$(plugin_ucmd_TARGET)
 
 all_OBJECTS := \
 		$(libuhub_OBJECTS) \
@@ -315,6 +319,8 @@ $(plugin_welcome_TARGET): $(plugin_welcome_SOURCES) $(libutils_OBJECTS)
 $(plugin_topic_TARGET): $(plugin_topic_SOURCES) $(libutils_OBJECTS)
 	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
 
+$(plugin_ucmd_TARGET): $(plugin_ucmd_SOURCES) $(libutils_OBJECTS)
+	$(MSG_CC) $(CC) -shared -fPIC -o $@ $^ $(CFLAGS)
 
 $(adcrush_BINARY): $(adcrush_OBJECTS) $(libuhub_OBJECTS) $(libutils_OBJECTS) $(libadc_common_OBJECTS) $(libadc_client_OBJECTS)
 	$(MSG_LD) $(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
@@ -365,6 +371,7 @@ install: all
 	@if [ ! -f $(UHUB_CONF_DIR)/uhub.conf ]; then cp doc/uhub.conf $(UHUB_CONF_DIR); fi
 	@if [ ! -f $(UHUB_CONF_DIR)/rules.txt ]; then cp doc/rules.txt $(UHUB_CONF_DIR); fi
 	@if [ ! -f $(UHUB_CONF_DIR)/plugins.conf ]; then cp doc/plugins.conf $(UHUB_CONF_DIR); fi
+	@if [ ! -f $(UHUB_CONF_DIR)/ucmd.conf ]; then cp doc/ucmd.conf $(UHUB_CONF_DIR); fi
 	@if [ ! -d $(UHUB_MOD_DIR) ]; then echo Creating $(UHUB_MOD_DIR); mkdir -p $(UHUB_MOD_DIR); fi
 	@cp -f mod_*.so $(UHUB_MOD_DIR)
 	@touch $(UHUB_CONF_DIR)/motd.txt
