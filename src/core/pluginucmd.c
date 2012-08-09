@@ -305,6 +305,15 @@ int cbfunc_ucmd_add_pm(struct plugin_handle* plugin, struct plugin_ucmd* ucmd, c
 
 int cbfunc_ucmd_send(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_ucmd* ucmd)
 {
+	/* Check the user is still connected. */
+	struct hub_info* hub = plugin_get_hub(plugin);
+	struct hub_user* huser = uman_get_user_by_sid(hub, user->sid);
+	if(huser == NULL)
+	{
+		plugin->error_msg = "User is not connected to the hub.";
+		return 0;
+	}
+
 	/* Make sure we have a command. */
 	if(!ucmd->length && !(ucmd->separator || ucmd->remove))
 	{
@@ -359,7 +368,7 @@ int cbfunc_ucmd_send(struct plugin_handle* plugin, struct plugin_user* user, str
 	}
 
 	/* Send it. */
-	route_to_user(plugin_get_hub(plugin), (struct hub_user*)user, message);
+	route_to_user(hub, huser, message);
 
 	/* Success. */
 	adc_msg_free(message);
