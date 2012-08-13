@@ -127,6 +127,9 @@
 			<p>
 			Each nickname in the list must be separated by a space. The SID AAAA is reserved for the hub itself. The first nickname in the list will be aliased to AAAB, the second to AAAC and so on. Fixed SIDs can only be allocated to registered users - if somebody without a password logs in under a reserved nickname, the alias will not be applied (but they can still log in). Also, they are only checked when a private message is sent, so any other messages to/from the aliased SID will be dropped as an unknown user per the ADC protocol.
 			</p>
+			<p>
+			<strong>As these SIDs are reserved when the hub starts up, any change to the values are ignored when the configuration is reloaded. You have to restart the hub for the changes to take effect.</strong>
+			</p>
 		]]></description>
 		<example><![CDATA[
 			# QuoteBot = AAAB, StatBot = AAAC
