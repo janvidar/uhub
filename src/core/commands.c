@@ -450,7 +450,7 @@ static int command_whoip(struct command_base* cbase, struct hub_user* user, stru
 static int command_broadcast(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
 	struct hub_command_arg_data* arg = hub_command_arg_next(cmd, type_string);
-	char* message = arg->data.string;
+	char* message = adc_msg_escape(arg->data.string);
 	size_t message_len = strlen(message);
 	char pm_flag[7] = "PM";
 	char from_sid[5];
@@ -485,6 +485,7 @@ static int command_broadcast(struct command_base* cbase, struct hub_user* user, 
 
 	cbuf_append_format(buf, "*** %s: Delivered to " PRINTF_SIZE_T " user%s", cmd->prefix, recipients, (recipients != 1 ? "s" : ""));
 	send_message(cbase, user, buf);
+	free(message);
 	return 0;
 }
 
