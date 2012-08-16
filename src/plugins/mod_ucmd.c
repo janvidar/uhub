@@ -483,13 +483,6 @@ int parse_config(struct plugin_handle* plugin, const char* config)
 int plugin_register(struct plugin_handle *plugin, const char *config){
 	PLUGIN_INITIALIZE(plugin, "User command plugin", "0.1", "Provide custom commands to users.");
 
-	/* Need version 2 or later of the plugin API. */
-	if(plugin->plugin_api_version < 2)
-	{
-		plugin->error_msg = "UCMD support requires version 2 or later of the plugin API";
-		return -1;
-	}
-
 	/* Attempt to parse the config we were given. */
 	if(parse_config(plugin, config) == -1) return -1;
 
