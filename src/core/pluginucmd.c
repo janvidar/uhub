@@ -38,17 +38,14 @@ int ucmd_expand_tt(struct plugin_ucmd* ucmd, size_t size)
 
 	/* Try to allocate the space. NB we add one to the space to enforce a null
 	 * byte. */
-	char* newtt = (char*)malloc(size+1);
+	char* newtt = (char*)hub_malloc_zero(size+1);
 	if(newtt == NULL) return 0;
-
-	/* Empty the contents. */
-	memset(newtt, 0, size+1);
 
 	/* Copy any existing data. */
 	if(ucmd->tt != NULL)
 	{
 		memcpy(newtt, ucmd->tt, ucmd->length);
-		free(ucmd->tt);
+		hub_free(ucmd->tt);
 	}
 
 	/* Update the structure. */
@@ -97,7 +94,7 @@ char* ucmd_msg_escape(const char* message)
 {
 	/* Allocate the memory we need. */
 	size_t esclen = ucmd_msg_escape_length(message);
-	char *escaped = malloc(esclen + 1);
+	char *escaped = hub_malloc(esclen + 1);
 
 	int insub = 0;
 	size_t i;
@@ -167,7 +164,7 @@ struct plugin_ucmd* cbfunc_ucmd_create(struct plugin_handle* plugin, const char*
 	}
 
 	/* Allocate space for the command structure. */
-	struct plugin_ucmd* cmd = (struct plugin_ucmd*)malloc(sizeof(struct plugin_ucmd));
+	struct plugin_ucmd* cmd = (struct plugin_ucmd*)hub_malloc(sizeof(struct plugin_ucmd));
 	if(cmd == NULL)
 	{
 		plugin->error_msg = "Not enough memory to create user command.";
@@ -208,7 +205,7 @@ int cbfunc_ucmd_add_chat(struct plugin_handle* plugin, struct plugin_ucmd* ucmd,
 	 * the UCMD escape is needed to handle substitution blocks correctly. */
 	char* temp = ucmd_msg_escape(message);
 	char* escmsg = adc_msg_escape(temp);
-	free(temp);
+	hub_free(temp);
 	size_t msglen = strlen(escmsg);
 
 	/* Format of a chat message: "BMSG\s%[mySID]\s<double-escaped message>\n".
@@ -219,7 +216,7 @@ int cbfunc_ucmd_add_chat(struct plugin_handle* plugin, struct plugin_ucmd* ucmd,
 		if(ucmd_expand_tt(ucmd, ucmd->capacity + required) == 0)
 		{
 			plugin->error_msg = "Could not expand memory to store chat message.";
-			free(escmsg);
+			hub_free(escmsg);
 			return 0;
 		}
 	}
@@ -231,7 +228,7 @@ int cbfunc_ucmd_add_chat(struct plugin_handle* plugin, struct plugin_ucmd* ucmd,
 	/* Copy the message. */
 	strncpy(ucmd->tt + ucmd->length, escmsg, msglen);
 	ucmd->length += msglen;
-	free(escmsg);
+	hub_free(escmsg);
 
 	/* If it is a 'me' message, add the flag. */
 	if(me)
@@ -256,7 +253,7 @@ int cbfunc_ucmd_add_pm(struct plugin_handle* plugin, struct plugin_ucmd* ucmd, c
 	 * the UCMD escape is needed to handle substitution blocks correctly. */
 	char* temp = ucmd_msg_escape(message);
 	char* escmsg = adc_msg_escape(temp);
-	free(temp);
+	hub_free(temp);
 	size_t msglen = strlen(escmsg);
 
 	/* If no target SID is given, use the keyword expansion %[userSID] for the
@@ -271,7 +268,7 @@ int cbfunc_ucmd_add_pm(struct plugin_handle* plugin, struct plugin_ucmd* ucmd, c
 		if(ucmd_expand_tt(ucmd, ucmd->capacity + required) == 0)
 		{
 			plugin->error_msg = "Could not expand memory to store private message.";
-			free(escmsg);
+			hub_free(escmsg);
 			return 0;
 		}
 	}
@@ -293,7 +290,7 @@ int cbfunc_ucmd_add_pm(struct plugin_handle* plugin, struct plugin_ucmd* ucmd, c
 	/* Message. */
 	strncpy(ucmd->tt + ucmd->length, escmsg, msglen);
 	ucmd->length += msglen;
-	free(escmsg);
+	hub_free(escmsg);
 
 	/* Add the PM flag and final line break. */
 	strncpy(ucmd->tt + ucmd->length, "\\sPM%[mySID]\\n", 14);
@@ -378,13 +375,13 @@ int cbfunc_ucmd_send(struct plugin_handle* plugin, struct plugin_user* user, str
 void cbfunc_ucmd_free(struct plugin_handle* plugin, struct plugin_ucmd* ucmd){
 	if(ucmd->name != NULL)
 	{
-		free(ucmd->name);
+		hub_free(ucmd->name);
 		ucmd->name = NULL;
 	}
 	if(ucmd->tt != NULL)
 	{
-		free(ucmd->tt);
+		hub_free(ucmd->tt);
 		ucmd->tt = NULL;
 	}
-	free(ucmd);
+	hub_free(ucmd);
 }

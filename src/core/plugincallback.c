@@ -259,11 +259,11 @@ static struct linked_list* cbfunc_get_user_list(struct plugin_handle* plugin, en
 			 * data in case the user disconnects before the plugin uses the
 			 * list. This way, any hub functions the plugin tries to call will
 			 * fail, but at least it won't be trying to access free'd memory. */
-			struct plugin_user* puser = (struct plugin_user*)malloc(sizeof(struct plugin_user));
+			struct plugin_user* puser = (struct plugin_user*)hub_malloc(sizeof(struct plugin_user));
 			if(puser == NULL)
 			{
 				plugin->error_msg = "Unable to allocate memory for list entry in get_user_list.";
-				list_clear(new_list, &free);
+				list_clear(new_list, &hub_free);
 				list_destroy(new_list);
 				return NULL;
 			}
@@ -286,7 +286,7 @@ static void cbfunc_free_user_list(struct plugin_handle* handle, struct linked_li
 {
 	if(list != NULL)
 	{
-		list_clear(list, &free);
+		list_clear(list, &hub_free);
 		list_destroy(list);
 	}
 }

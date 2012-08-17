@@ -22,6 +22,7 @@
 #include "plugin_api/handle.h"
 #include "plugin_api/types.h"
 #include "util/list.h"
+#include "util/memory.h"
 #include "util/misc.h"
 #include "util/config_token.h"
 
@@ -107,7 +108,7 @@ void free_data(struct plugin_handle* plugin, struct ucmd_data* data)
 		}
 
 		/* Done with the data structure. */
-		free(data);
+		hub_free(data);
 	}
 }
 
@@ -242,13 +243,13 @@ int parse_pm(struct parse_state* state, char* args)
 			return -1;
 		}
 		args[4] = 0;
-		target = strdup(args);
+		target = hub_strdup(args);
 		args += 5;
 	}
 
 	/* Add the message. */
 	int retval = state->plugin->hub.ucmd_add_pm(state->plugin, state->ucmd, target, args, echo);
-	if(target != NULL) free(target);
+	if(target != NULL) hub_free(target);
 
 	/* Done. */
 	if(retval)
@@ -351,7 +352,7 @@ int parse_line(char *line, int line_number, void* data)
 int parse_file(struct plugin_handle* plugin, struct ucmd_data* data, const char* filename)
 {
 	/* Create the parser state. */
-	struct parse_state* state = (struct parse_state*)malloc(sizeof(struct parse_state));
+	struct parse_state* state = (struct parse_state*)hub_malloc(sizeof(struct parse_state));
 	state->plugin = plugin;
 	state->data = data;
 	state->ucmd = NULL;
@@ -383,7 +384,7 @@ int parse_file(struct plugin_handle* plugin, struct ucmd_data* data, const char*
 	/* Clean up memory from the state. If ucmd is not null, then there was an
 	 * error and it is a partially-processed object we also need to free. */
 	if(state->ucmd != NULL) plugin->hub.ucmd_free(plugin, state->ucmd);
-	free(state);
+	hub_free(state);
 
 	/* Done. */
 	return retval;
@@ -397,7 +398,7 @@ int parse_config(struct plugin_handle* plugin, const char* config)
 	int got_file = 0;
 
 	/* Create space for the data we need. */
-	struct ucmd_data *data = (struct ucmd_data *)malloc(sizeof(struct ucmd_data));
+	struct ucmd_data *data = (struct ucmd_data *)hub_malloc(sizeof(struct ucmd_data));
 	if(data == NULL){
 		plugin->error_msg = "Could not allocate data storage.";
 		return -1;
@@ -414,7 +415,7 @@ int parse_config(struct plugin_handle* plugin, const char* config)
 			 * lists have been initialised. */
 			int j;
 			for(j = 0; j < i; j++) list_destroy(data->commands[j]);
-			free(data);
+			hub_free(data);
 			plugin->error_msg = "Could not allocate data storage.";
 			return -1;
 		}

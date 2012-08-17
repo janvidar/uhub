@@ -86,7 +86,7 @@ int add_reserved_sid(char* nick, int splitcount, void* data)
 	}
 
 	/* Try to create a structure for the new reserved SID. */
-	struct reserved_sid* newresv = (struct reserved_sid*)malloc(sizeof(struct reserved_sid));
+	struct reserved_sid* newresv = (struct reserved_sid*)hub_malloc(sizeof(struct reserved_sid));
 	if(newresv == NULL)
 	{
 		LOG_ERROR("Could not allocate memory for reserved SID for %s", nick);
@@ -94,11 +94,11 @@ int add_reserved_sid(char* nick, int splitcount, void* data)
 	}
 
 	/* Try to create a dummy user for the reserved SID. */
-	newresv->dummy_user = (struct hub_user*)malloc(sizeof(struct hub_user));
+	newresv->dummy_user = (struct hub_user*)hub_malloc(sizeof(struct hub_user));
 	if(newresv->dummy_user == NULL)
 	{
 		LOG_ERROR("Could not allocate memory for reserved SID for %s", nick);
-		free(newresv);
+		hub_free(newresv);
 		return -1;
 	}
 	strncpy(newresv->dummy_user->id.nick, nick, nicklen+1);
@@ -124,8 +124,8 @@ void remove_reserved_sid(void *node)
 	struct reserved_sid* resv = (struct reserved_sid*)node;
 	LOG_INFO("Removing reserved SID %s for %s", sid_to_string(resv->sid), resv->dummy_user->id.nick);
 	sid_free(resv->pool, resv->sid);
-	free(resv->dummy_user);
-	free(resv);
+	hub_free(resv->dummy_user);
+	hub_free(resv);
 }
 
 int uman_init(struct hub_info* hub)
