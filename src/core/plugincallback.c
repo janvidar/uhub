@@ -217,11 +217,7 @@ static struct linked_list* cbfunc_get_user_list(struct plugin_handle* plugin, en
 	}
 
 	/* Check the credential level is valid. */
-	if(credentials > auth_cred_admin)
-	{
-		plugin->error_msg = "Invalid credential level in get_user_list";
-		return NULL;
-	}
+	uhub_assert(credentials <= auth_cred_admin);
 
 	/* Get the master user list and prepare our copy. */
 	struct hub_info* hub = plugin_get_hub(plugin);
