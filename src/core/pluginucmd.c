@@ -32,7 +32,7 @@
  * terminator. Since unused bytes are set to zero, there should always be a
  * terminator.
  */
-int ucmd_expand_tt(struct plugin_ucmd* ucmd, size_t size)
+static int ucmd_expand_tt(struct plugin_ucmd* ucmd, size_t size)
 {
 	if(size < ucmd->capacity) return 1;
 
@@ -55,31 +55,44 @@ int ucmd_expand_tt(struct plugin_ucmd* ucmd, size_t size)
 }
 
 /* Calculate the number of characters needed to store the escaped message. */
-size_t ucmd_msg_escape_length(const char* message)
+static size_t ucmd_msg_escape_length(const char* message)
 {
-	size_t extra = 0;
 	size_t i;
-	int insub = 0;
+	size_t extra = 0;
+
+	/* Keep track of substitution blocks. */
+	int substart = 0;  /* Possible start of a block. */
+	int sublevel = 0;  /* Number of nested blocks we are in. */
+
 	for(i = 0; message[i]; i++)
 	{
-		/* In a substitution block, no escaping needed. */
-		if(insub == 2)
+		switch(message[i])
 		{
-			if(message[i] == ']') insub = 0;
-		}
+			/* Character to escape. */
+			case ' ':
+			case '\n':
+			case '\\':
+				if(!sublevel) extra++;
+				substart = 0;
+				break;
 
-		/* Not in a substitution block. */
-		else{
-			/* A character that needs escaping. */
-			if(message[i] == ' ' || message[i] == '\n' || message[i] == '\\'){
-				extra++;
-				insub = 0;
-			}
+			/* Heading into a substitution block. */
+			case '%':
+				substart = 1;
+				break;
+			case '[':
+				if(substart) sublevel++;
+				substart = 0;
+				break;
 
-			/* See if we're heading into a substitution block. */
-			else if(message[i] == '%') insub = 1;
-			else if(message[i] == '[' && insub == 1) insub = 2;
-			else insub = 0;
+			/* Coming out of a substitution block. */
+			case ']':
+				substart = 0;
+				if(sublevel) sublevel --;
+				break;
+
+			default:
+				break;
 		}
 	}
 
@@ -90,63 +103,78 @@ size_t ucmd_msg_escape_length(const char* message)
 /* Escape a message that is being put into a user command. We cannot use
  * adc_msg_escape for this as keyword substitutions should not be escaped while
  * general text should be. */
-char* ucmd_msg_escape(const char* message)
+static char* ucmd_msg_escape(const char* message)
 {
 	/* Allocate the memory we need. */
 	size_t esclen = ucmd_msg_escape_length(message);
 	char *escaped = hub_malloc(esclen + 1);
+	if(escaped == NULL) return NULL;
 
-	int insub = 0;
+	/* Keep track of substitution blocks. */
+	int substart = 0;  /* Possible start of a block. */
+	int sublevel = 0;  /* Number of nested blocks we are in. */
+
 	size_t i;
 	size_t n = 0;
-
 	for(i = 0; message[i]; i++)
 	{
-		/* In a substitution block, no escaping needed. */
-		if(insub == 2)
+		switch(message[i])
 		{
-			if(message[i] == ']') insub = 0;
-			escaped[n++] = message[i];
-		}
-
-		/* Not in a substitution block. */
-		else
-		{
-			switch(message[i])
-			{
-				/* Deal with characters that need escaping. */
-				case '\\':
-					escaped[n++] = '\\';
-					escaped[n++] = '\\';
-					insub = 0;
-					break;
-				case '\n':
-					escaped[n++] = '\\';
-					escaped[n++] = 'n';
-					insub = 0;
-					break;
-				case ' ':
+			/* Characters to escape provided we are *outside*
+			 * any substitution blocks. */
+			case ' ':
+				if(sublevel)
+				{
+					escaped[n++] = ' ';
+				}
+				else
+				{
 					escaped[n++] = '\\';
 					escaped[n++] = 's';
-					insub = 0;
+				}
+				substart = 0;
+				break;
+			case '\n':
+				if(sublevel)
+				{
+					escaped[n++] = '\n';
+				}
+				else
+				{
+					escaped[n++] = '\\';
+					escaped[n++] = 'n';
+					substart = 0;
 					break;
+				}
+			case '\\':
+				escaped[n++] = '\\';
+				if(!sublevel) escaped[n++] = '\\';
+				substart = 0;
+				break;
 
-				/* Characters that start a substitution block. */
-				case '%':
-					escaped[n++] = message[i];
-					insub = 1;
-					break;
-				case '[':
-					escaped[n++] = message[i];
-					if(insub == 1) insub = 2;
-					break;
+			/* Heading into a substitution block. */
+			case '%':
+				escaped[n++] = '%';
+				substart = 1;
+				break;
+			case '[':
+				escaped[n++] = '[';
+				if(substart) sublevel++;
+				substart = 0;
+				break;
 
-				/* Standard character. */
-				default:
-					escaped[n++] = message[i];
-					insub = 0;
-					break;
-			}
+			/* Coming out of a substitution block. */
+			case ']':
+				escaped[n++] = ']';
+				if(sublevel) sublevel--;
+				substart = 0;
+				break;
+
+			/* Normal character. */
+			default:
+				escaped[n++] = message[i];
+				substart = 0;
+				break;
 		}
 	}
 
