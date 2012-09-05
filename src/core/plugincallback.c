@@ -58,7 +58,12 @@ static struct hub_user* convert_user_type(struct plugin_handle* plugin, struct p
 	 * the data in case the user quits before the plugin uses the list. Hence
 	 * we need to look it up by SID. */
 	struct hub_info* hub = plugin_get_hub(plugin);
-	return uman_get_user_by_sid(hub, user->sid);
+	struct hub_user* huser = uman_get_user_by_sid(hub, user->sid);
+
+	/* Also need to check the CID matches to handle
+	 * the case where the SID is re-used. */
+	if(huser->id.cid == user->cid) return huser;
+	return NULL;
 }
 
 static int cbfunc_send_message(struct plugin_handle* plugin, struct plugin_user* user, const char* message)
