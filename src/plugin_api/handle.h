@@ -123,6 +123,15 @@ typedef void  (*hfunc_set_hub_name)(struct plugin_handle*, const char*);
 typedef char* (*hfunc_get_hub_description)(struct plugin_handle*);
 typedef void  (*hfunc_set_hub_description)(struct plugin_handle*, const char*);
 
+typedef struct plugin_ucmd* (*hfunc_ucmd_create)(struct plugin_handle*, const char*, size_t);
+typedef int                 (*hfunc_ucmd_add_chat)(struct plugin_handle*, struct plugin_ucmd*, const char*, int);
+typedef int                 (*hfunc_ucmd_add_pm)(struct plugin_handle*, struct plugin_ucmd*, const char*, const char*, int);
+typedef int                 (*hfunc_ucmd_send)(struct plugin_handle*, struct plugin_user*, struct plugin_ucmd*);
+typedef void                (*hfunc_ucmd_free)(struct plugin_handle*, struct plugin_ucmd*);
+
+typedef struct linked_list* (*hfunc_get_user_list)(struct plugin_handle*, enum auth_credentials);
+typedef void                (*hfunc_free_user_list)(struct plugin_handle*, struct linked_list*);
+
 /**
  * These are functions created and initialized by the hub and which can be used
  * by plugins to access functionality internal to the hub.
@@ -140,6 +149,13 @@ struct plugin_hub_funcs
 	hfunc_set_hub_name set_name;
 	hfunc_get_hub_description get_description;
 	hfunc_set_hub_description set_description;
+	hfunc_ucmd_create ucmd_create;
+	hfunc_ucmd_add_chat ucmd_add_chat;
+	hfunc_ucmd_add_pm ucmd_add_pm;
+	hfunc_ucmd_send ucmd_send;
+	hfunc_ucmd_free ucmd_free;
+	hfunc_get_user_list get_user_list;
+	hfunc_free_user_list free_user_list;
 };
 
 struct plugin_handle

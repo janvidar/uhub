@@ -39,7 +39,7 @@ enum user_flags
 	feature_base    = 0x00000001, /** BASE: Basic configuration (required by all clients) */
 	feature_auto    = 0x00000002, /** AUT0: Automatic nat detection traversal */
 	feature_bbs     = 0x00000004, /** BBS0: Bulletin board system (not supported) */
-	feature_ucmd    = 0x00000008, /** UCMD: User commands (not supported by this software) */
+	feature_ucmd    = 0x00000008, /** UCMD: User commands */
 	feature_zlif    = 0x00000010, /** ZLIF: gzip stream compression (not supported) */
 	feature_tiger   = 0x00000020, /** TIGR: Client supports the tiger hash algorithm */
 	feature_bloom   = 0x00000040, /** BLO0: Bloom filter (not supported) */

@@ -95,6 +95,7 @@ extern "C" {
 #include "core/plugincallback.h"
 #include "core/plugininvoke.h"
 #include "core/pluginloader.h"
+#include "core/pluginucmd.h"
 
 
 

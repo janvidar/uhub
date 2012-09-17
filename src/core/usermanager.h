@@ -20,6 +20,14 @@
 #ifndef HAVE_UHUB_USER_MANAGER_H
 #define HAVE_UHUB_USER_MANAGER_H
 
+struct reserved_sid
+{
+	sid_t sid;                   /**<< "Reserved SID" */
+	struct sid_pool* pool;       /**<< "Pool the SID was reserved from" */
+	struct hub_user* dummy_user; /**<< "Dummy user account for the reserved SID" */
+	struct hub_user* real_user;  /**<< "Real user account the SID links to, or NULL if not logged in" */
+};
+
 struct hub_user_manager
 {
 	size_t count;                   /**<< "Number of all fully connected and logged in users" */
@@ -29,6 +37,8 @@ struct hub_user_manager
 	uint64_t shared_files;          /**<< "The total number of shared files among fully connected users." */
 	struct linked_list* list;       /**<< "Contains all logged in users" */
 	struct timeout_evt* timeout;    /**<< "Timeout handler for statistics" */
+	struct linked_list* reserved;   /**<< "Contains reserved SID information" */
+	sid_t reserved_end;             /**<< "Value of last reserved SID" */
 };
 
 /**

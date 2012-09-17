@@ -51,18 +51,29 @@ static int plugin_command_dispatch(struct command_base* cbase, struct hub_user* 
 	return 0;
 }
 
-static struct hub_user* convert_user_type(struct plugin_user* user)
+static struct hub_user* convert_user_type(struct plugin_handle* plugin, struct plugin_user* user)
 {
-	struct hub_user* huser = (struct hub_user*) user;
-	return huser;
+	/* The plugin_user is not guaranteed to point at the same memory as the
+	 * corresponding hub_user - for example, get_user_list() makes a copy of
+	 * the data in case the user quits before the plugin uses the list. Hence
+	 * we need to look it up by SID. */
+	struct hub_info* hub = plugin_get_hub(plugin);
+	struct hub_user* huser = uman_get_user_by_sid(hub, user->sid);
+
+	/* Also need to check the CID matches to handle
+	 * the case where the SID is re-used. */
+	if(huser->id.cid == user->cid) return huser;
+	return NULL;
 }
 
 static int cbfunc_send_message(struct plugin_handle* plugin, struct plugin_user* user, const char* message)
 {
+	struct hub_user* huser = convert_user_type(plugin, user);
+	if(huser == NULL) return 0;
 	char* buffer = adc_msg_escape(message);
 	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
 	adc_msg_add_argument(command, buffer);
-	route_to_user(plugin_get_hub(plugin), convert_user_type(user), command);
+	route_to_user(plugin_get_hub(plugin), huser, command);
 	adc_msg_free(command);
 	hub_free(buffer);
 	return 1;
@@ -70,13 +81,15 @@ static int cbfunc_send_message(struct plugin_handle* plugin, struct plugin_user*
 
 static int cbfunc_send_status(struct plugin_handle* plugin, struct plugin_user* user, int code, const char* message)
 {
+	struct hub_user* huser = convert_user_type(plugin, user);
+	if(huser == NULL) return 0;
 	char code_str[4];
 	char* buffer = adc_msg_escape(message);
 	struct adc_message* command = adc_msg_construct(ADC_CMD_ISTA, strlen(buffer) + 10);
 	snprintf(code_str, sizeof(code_str), "%03d", code);
 	adc_msg_add_argument(command, code_str);
 	adc_msg_add_argument(command, buffer);
-	route_to_user(plugin_get_hub(plugin), convert_user_type(user), command);
+	route_to_user(plugin_get_hub(plugin), huser, command);
 	adc_msg_free(command);
 	hub_free(buffer);
 	return 1;
@@ -84,7 +97,8 @@ static int cbfunc_send_status(struct plugin_handle* plugin, struct plugin_user* 
 
 static int cbfunc_user_disconnect(struct plugin_handle* plugin, struct plugin_user* user)
 {
-	hub_disconnect_user(plugin_get_hub(plugin), convert_user_type(user), quit_kicked);
+	struct hub_user* huser = convert_user_type(plugin, user);
+	if(huser != NULL) hub_disconnect_user(plugin_get_hub(plugin), huser, quit_kicked);
 	return 0;
 }
 
@@ -185,6 +199,99 @@ static void cbfunc_set_hub_description(struct plugin_handle* plugin, const char*
 	hub_free(new_str);
 }
 
+/* Get a list of users currently connected to the hub. The list can be filtered
+ * with the credentials parameter:
+ * - auth_cred_none means no filtering i.e., everybody returned.
+ * - Any of the other auth_cred_xxx values means only users of that credential
+ *   level are returned.
+ * - The negative of an auth_cred_xxx value means only users of at least that
+ *   credential level are returned. For example, -auth_cred_operators returns
+ *   any operators or admins.
+ *
+ * NULL is returned on error, and an empty list is returned if no users match
+ * the requested credentials.
+ */
+static struct linked_list* cbfunc_get_user_list(struct plugin_handle* plugin, enum auth_credentials credentials)
+{
+	/* Determine the comparison mode. */
+	int atleast = 0;
+	if((int)credentials < 0)
+	{
+		credentials = -credentials;
+		atleast = 1;
+	}
+
+	/* Check the credential level is valid. */
+	uhub_assert(credentials <= auth_cred_admin);
+
+	/* Get the master user list and prepare our copy. */
+	struct hub_info* hub = plugin_get_hub(plugin);
+	struct linked_list* orig_list = hub->users->list;
+	struct linked_list* new_list = list_create();
+	if(new_list == NULL)
+	{
+		plugin->error_msg = "Unable to allocate memory for user list";
+		return NULL;
+	}
+
+	/* Go through each connected user. */
+	struct hub_user* user = (struct hub_user*)list_get_first(orig_list);
+	while(user != NULL)
+	{
+		/* Check if we should be including them in the output. */
+		int include = 0;
+		if(credentials == 0) include = 1;
+		else
+		{
+			if(atleast)
+			{
+				if(user->credentials >= credentials) include = 1;
+			}
+			else
+			{
+				if(user->credentials == credentials) include = 1;
+			}
+		}
+
+		/* Do we need to include this user? */
+		if(include)
+		{
+			/* Try to allocate space. We are going to make a copy of the user
+			 * data in case the user disconnects before the plugin uses the
+			 * list. This way, any hub functions the plugin tries to call will
+			 * fail, but at least it won't be trying to access free'd memory. */
+			struct plugin_user* puser = (struct plugin_user*)hub_malloc(sizeof(struct plugin_user));
+			if(puser == NULL)
+			{
+				plugin->error_msg = "Unable to allocate memory for list entry in get_user_list.";
+				list_clear(new_list, &hub_free);
+				list_destroy(new_list);
+				return NULL;
+			}
+
+			/* Copy the pertinent information across and add it to the list. */
+			memcpy(puser, user, sizeof(struct plugin_user));
+			list_append(new_list, puser);
+		}
+
+		/* Next user please. */
+		user = (struct hub_user*)list_get_next(orig_list);
+	}
+
+	/* Done. */
+	return new_list;
+}
+
+/* Clean up the memory used by a user list. */
+static void cbfunc_free_user_list(struct plugin_handle* handle, struct linked_list* list)
+{
+	if(list != NULL)
+	{
+		list_clear(list, &hub_free);
+		list_destroy(list);
+	}
+}
+
 void plugin_register_callback_functions(struct plugin_handle* handle)
 {
 	handle->hub.send_message = cbfunc_send_message;
@@ -198,6 +305,13 @@ void plugin_register_callback_functions(struct plugin_handle* handle)
 	handle->hub.set_name = cbfunc_set_hub_name;
 	handle->hub.get_description = cbfunc_get_hub_description;
 	handle->hub.set_description = cbfunc_set_hub_description;
+	handle->hub.ucmd_create = cbfunc_ucmd_create;
+	handle->hub.ucmd_add_chat = cbfunc_ucmd_add_chat;
+	handle->hub.ucmd_add_pm = cbfunc_ucmd_add_pm;
+	handle->hub.ucmd_send = cbfunc_ucmd_send;
+	handle->hub.ucmd_free = cbfunc_ucmd_free;
+	handle->hub.get_user_list = cbfunc_get_user_list;
+	handle->hub.free_user_list = cbfunc_free_user_list;
 }
 
 void plugin_unregister_callback_functions(struct plugin_handle* handle)
