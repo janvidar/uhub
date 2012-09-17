@@ -76,6 +76,12 @@ static int msg_check_escapes(const char* string, size_t len)
                         case '\\':
                         case 'n':
                         case 's':
+                                /* Increment so we don't check the escaped
+                                * character next time around. Not doing so
+                                * leads to messages with escaped backslashes
+                                * being incorrectly reported as having invalid
+                                * escapes. */
+                                ++start;
                                 break;
                         default:
                                 return 0;
