@@ -33,7 +33,7 @@ my $config_dump = "void dump_config(struct hub_config* config, int ignore_defaul
 
 foreach my $option (@options)
 {
-	my ($type, $name, $default, $advanced, $short, $desc, $since, $example, $check) = @$option;
+	my ($type, $name, $default, $advanced, $short, $desc, $since, $example, $check, $ifdef) = @$option;
 	my $string = ($type =~ /(string|file|message)/);
 	my $min = undef;
 	my $max = undef;
@@ -50,12 +50,15 @@ foreach my $option (@options)
 		$regexp = undef if ($regexp eq "");
 	}
 
+	$config_defaults .= "#ifdef $ifdef\n" if ($ifdef ne "");
 	$config_defaults .= "\tconfig->$name = ";
 	$config_defaults .= "hub_strdup(\"" if ($string);
 	$config_defaults .= $default;
 	$config_defaults .= "\")" if ($string);
 	$config_defaults .= ";\n";
+	$config_defaults .= "#endif /* $ifdef */\n" if ($ifdef ne "");
 
+	$config_apply .= "#ifdef $ifdef\n" if ($ifdef ne "");
 	$config_apply .= "\tif (!strcmp(key, \"" . $name . "\"))\n\t{\n";
 
 	if ($type eq "int")
@@ -82,10 +85,17 @@ foreach my $option (@options)
 				  "\t\t\treturn -1;\n" .
 				  "\t\t}\n" .
 				  "\t\treturn 0;\n" .
-				  "\t}\n\n";
+				  "\t}\n";
+	$config_apply .= "#endif /* $ifdef */\n" if ($ifdef ne "");
+	$config_apply .= "\n";
 
-	$config_free .= "\thub_free(config->" . $name . ");\n\n" if ($string);
-
+	if ($string)
+	{
+		$config_free .= "#ifdef $ifdef\n" if ($ifdef ne "");
+		$config_free .= "\thub_free(config->" . $name . ");\n";
+		$config_free .= "#endif /* $ifdef */\n" if ($ifdef ne "");
+		$config_free .= "\n";
+	}
 
 	my $out = "%s";
 	my $val = "config->$name";
@@ -100,8 +110,11 @@ foreach my $option (@options)
 		$test = "strcmp(config->$name, \"$default\") != 0";
 	}
 
+	$config_dump .= "#ifdef $ifdef\n" if ($ifdef ne "");
 	$config_dump .= "\tif (!ignore_defaults || $test)\n";
-	$config_dump .= "\t\tfprintf(stdout, \"$name = $out\\n\", $val);\n\n";
+	$config_dump .= "\t\tfprintf(stdout, \"$name = $out\\n\", $val);\n";
+	$config_dump .= "#endif /* $ifdef */\n" if ($ifdef ne "");
+	$config_dump .= "\n";
 }
 
 $config_apply .= "\t/* Still here -- unknown directive */\n";
@@ -128,12 +141,14 @@ sub get_data($)
 	my $example = "";
 	my $description = "";
 	my $since = "";
+	my $ifdef = "";
 
 	$short = $p->getElementsByTagName("short")->item(0)->getFirstChild()->getData() if ($p->getElementsByTagName("short")->getLength());
 	$since = $p->getElementsByTagName("since")->item(0)->getFirstChild()->getData() if ($p->getElementsByTagName("since")->getLength());
 	$example = $p->getElementsByTagName("example")->item(0)->getFirstChild()->getData() if ($p->getElementsByTagName("example")->getLength());
 	$description = $p->getElementsByTagName("description")->item(0)->getFirstChild()->getData() if ($p->getElementsByTagName("description")->getLength());
 	my $check = $p->getElementsByTagName("check")->item(0);
+	$ifdef = $p->getElementsByTagName("ifdef")->item(0)->getFirstChild()->getData() if ($p->getElementsByTagName("ifdef")->getLength());
 
 	my @data = (
 			$p->getAttribute("type"),
@@ -144,7 +159,8 @@ sub get_data($)
 			$description,
 			$since,
 			$example,
-			$check
+			$check,
+			$ifdef
 		);
 	return @data;
 }
@@ -160,9 +176,11 @@ sub write_c_header(@)
 
 	foreach my $option (@data)
 	{
-		my ($type, $name, $default, $advanced, $short, $desc, $since, $example) = @$option;
+		my ($type, $name, $default, $advanced, $short, $desc, $since, $example, $check, $ifdef) = @$option;
 
 		my $string = ($type =~ /(string|file|message)/);
+
+		print GENHEAD "#ifdef $ifdef\n" if ($ifdef ne "");
 
 		print GENHEAD "\t";
 		print GENHEAD "int  " if ($type eq "int");
@@ -198,6 +216,7 @@ sub write_c_header(@)
 			$comment = $pad . "/*<<< " . $comment . " */";
 		}
 		print GENHEAD $comment . "\n";
+		print GENHEAD "#endif /* $ifdef */\n" if ($ifdef ne "");
 	}
 
 	print GENHEAD "};\n\n";
@@ -224,7 +243,7 @@ sub write_sql_dump(@)
 
 	foreach my $option (@data)
 	{
-		my ($type, $name, $default, $advanced, $short, $desc, $since, $example) = @$option;
+		my ($type, $name, $default, $advanced, $short, $desc, $since, $example, $check, $ifdef) = @$option;
 
 		if ($type =~ /(string|file|message)/ )
 		{
