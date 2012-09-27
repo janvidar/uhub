@@ -295,7 +295,7 @@ void net_con_callback(struct net_connection* con, int events)
 
 	if (events == NET_EVENT_TIMEOUT)
 	{
-		LOG_TRACE("net_con_callback(%p, TIMEOUT", con);
+		LOG_TRACE("net_con_callback(%p, TIMEOUT)", con);
 		con->callback(con, events, con->ptr);
 		return;
 	}
