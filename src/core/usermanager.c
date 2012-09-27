@@ -38,50 +38,48 @@ static void clear_user_list_callback(void* ptr)
 	}
 }
 
-void uman_update_stats(struct hub_info* hub)
+#ifdef STATS_SUPPORT
+void uman_update_stats(struct hub_user_manager* users)
 {
 	const int factor = TIMEOUT_STATS;
 	struct net_statistics* total;
 	struct net_statistics* intermediate;
 	net_stats_get(&intermediate, &total);
 
-	hub->stats.net_tx = (intermediate->tx / factor);
-	hub->stats.net_rx = (intermediate->rx / factor);
-	hub->stats.net_tx_peak = MAX(hub->stats.net_tx, hub->stats.net_tx_peak);
-	hub->stats.net_rx_peak = MAX(hub->stats.net_rx, hub->stats.net_rx_peak);
-	hub->stats.net_tx_total = total->tx;
-	hub->stats.net_rx_total = total->rx;
+	users->stats.net_tx = (intermediate->tx / factor);
+	users->stats.net_rx = (intermediate->rx / factor);
+	users->stats.net_tx_peak = MAX(users->stats.net_tx, users->stats.net_tx_peak);
+	users->stats.net_rx_peak = MAX(users->stats.net_rx, users->stats.net_rx_peak);
+	users->stats.net_tx_total = total->tx;
+	users->stats.net_rx_total = total->rx;
 	
 	net_stats_reset();
 }
 
-void uman_print_stats(struct hub_info* hub)
+void uman_print_stats(struct hub_user_manager* users)
 {
 	LOG_INFO("Statistics  users=" PRINTF_SIZE_T " (peak_users=" PRINTF_SIZE_T "), net_tx=%d KB/s, net_rx=%d KB/s (peak_tx=%d KB/s, peak_rx=%d KB/s)",
-		hub->users->count,
-		hub->users->count_peak,
-		(int) hub->stats.net_tx / 1024,
-		(int) hub->stats.net_rx / 1024,
-		(int) hub->stats.net_tx_peak / 1024,
-		(int) hub->stats.net_rx_peak / 1024);
+		users->users->count,
+		users->users->count_peak,
+		(int) users->stats.net_tx / 1024,
+		(int) users->stats.net_rx / 1024,
+		(int) users->stats.net_tx_peak / 1024,
+		(int) users->stats.net_rx_peak / 1024);
 }
 
 static void timer_statistics(struct timeout_evt* t)
 {
-	struct hub_info* hub = (struct hub_info*) t->ptr;
-	uman_update_stats(hub);
-	timeout_queue_reschedule(net_backend_get_timeout_queue(), hub->users->timeout, TIMEOUT_STATS);
+	struct hub_user_manager* users = (struct hub_user_manager*) t->ptr;
+	uman_update_stats(users);
+	timeout_queue_reschedule(net_backend_get_timeout_queue(), users->timeout, TIMEOUT_STATS);
 }
+#endif // STATS_SUPPORT
 
-int uman_init(struct hub_info* hub)
+struct hub_user_manager* uman_init()
 {
-	struct hub_user_manager* users = NULL;
-	if (!hub)
-		return -1;
-
-	users = (struct hub_user_manager*) hub_malloc_zero(sizeof(struct hub_user_manager));
+	struct hub_user_manager* users = (struct hub_user_manager*) hub_malloc_zero(sizeof(struct hub_user_manager));
 	if (!users)
-		return -1;
+		return NULL;
 
 	users->list = list_create();
 	users->sids = sid_pool_create(net_get_max_sockets());
@@ -90,143 +88,136 @@ int uman_init(struct hub_info* hub)
 	{
 		list_destroy(users->list);
 		hub_free(users);
-		return -1;
+		return NULL;
 	}
 
+#ifdef STATS_SUPPORT
 	if (net_backend_get_timeout_queue())
 	{
 		users->timeout = hub_malloc_zero(sizeof(struct timeout_evt));
 		timeout_evt_initialize(users->timeout, timer_statistics, hub);
 		timeout_queue_insert(net_backend_get_timeout_queue(), users->timeout, TIMEOUT_STATS);
 	}
+#endif // STATS_SUPPORT
 
-	hub->users = users;
-	return 0;
+	return users;
 }
 
 
-int uman_shutdown(struct hub_info* hub)
+int uman_shutdown(struct hub_user_manager* users)
 {
-	if (!hub || !hub->users)
+	if (!users)
 		return -1;
 
+#ifdef STATS_SUPPORT
 	if (net_backend_get_timeout_queue())
 	{
-		timeout_queue_remove(net_backend_get_timeout_queue(), hub->users->timeout);
-		hub_free(hub->users->timeout);
+		timeout_queue_remove(net_backend_get_timeout_queue(), users->timeout);
+		hub_free(users->timeout);
 	}
+#endif
 
-	if (hub->users->list)
+	if (users->list)
 	{
-		list_clear(hub->users->list, &clear_user_list_callback);
-		list_destroy(hub->users->list);
+		list_clear(users->list, &clear_user_list_callback);
+		list_destroy(users->list);
 	}
-	sid_pool_destroy(hub->users->sids);
-	hub_free(hub->users);
-	hub->users = 0;
+	sid_pool_destroy(users->sids);
 
-
+	hub_free(users);
 	return 0;
 }
 
 
-int uman_add(struct hub_info* hub, struct hub_user* user)
+int uman_add(struct hub_user_manager* users, struct hub_user* user)
 {
-	if (!hub || !user)
+	if (!users || !user)
 		return -1;
 
-	if (user->hub)
-		return -1;
+	list_append(users->list, user);
+	users->count++;
+	users->count_peak = MAX(users->count, users->count_peak);
 
-	list_append(hub->users->list, user);
-	hub->users->count++;
-	hub->users->count_peak = MAX(hub->users->count, hub->users->count_peak);
-
-	hub->users->shared_size  += user->limits.shared_size;
-	hub->users->shared_files += user->limits.shared_files;
-
-	user->hub = hub;
+	users->shared_size  += user->limits.shared_size;
+	users->shared_files += user->limits.shared_files;
 	return 0;
 }
 
-int uman_remove(struct hub_info* hub, struct hub_user* user)
+int uman_remove(struct hub_user_manager* users, struct hub_user* user)
 {
-	if (!hub || !user)
+	if (!users || !user)
 		return -1;
 
-	list_remove(hub->users->list, user);
+	list_remove(users->list, user);
 
-	if (hub->users->count > 0)
+	if (users->count > 0)
 	{
-		hub->users->count--;
+		users->count--;
 	}
 	else
 	{
 		uhub_assert(!"negative count!");
 	}
 
-	hub->users->shared_size  -= user->limits.shared_size;
-	hub->users->shared_files -= user->limits.shared_files;
-
-	user->hub = 0;
-
+	users->shared_size  -= user->limits.shared_size;
+	users->shared_files -= user->limits.shared_files;
 	return 0;
 }
 
 
-struct hub_user* uman_get_user_by_sid(struct hub_info* hub, sid_t sid)
+struct hub_user* uman_get_user_by_sid(struct hub_user_manager* users, sid_t sid)
 {
-	return sid_lookup(hub->users->sids, sid);
+	return sid_lookup(users->sids, sid);
 }
 
 
-struct hub_user* uman_get_user_by_cid(struct hub_info* hub, const char* cid)
+struct hub_user* uman_get_user_by_cid(struct hub_user_manager* users, const char* cid)
 {
-	struct hub_user* user = (struct hub_user*) list_get_first(hub->users->list); /* iterate users - only on incoming INF msg */
+	struct hub_user* user = (struct hub_user*) list_get_first(users->list); /* iterate users - only on incoming INF msg */
 	while (user)
 	{
 		if (strcmp(user->id.cid, cid) == 0)
 			return user;
-		user = (struct hub_user*) list_get_next(hub->users->list);
+		user = (struct hub_user*) list_get_next(users->list);
 	}
 	return NULL;
 }
 
 
-struct hub_user* uman_get_user_by_nick(struct hub_info* hub, const char* nick)
+struct hub_user* uman_get_user_by_nick(struct hub_user_manager* users, const char* nick)
 {
-	struct hub_user* user = (struct hub_user*) list_get_first(hub->users->list); /* iterate users - only on incoming INF msg */
+	struct hub_user* user = (struct hub_user*) list_get_first(users->list); /* iterate users - only on incoming INF msg */
 	while (user)
 	{
 		if (strcmp(user->id.nick, nick) == 0)
 			return user;
-		user = (struct hub_user*) list_get_next(hub->users->list);
+		user = (struct hub_user*) list_get_next(users->list);
 	}
 	return NULL;
 }
 
-size_t uman_get_user_by_addr(struct hub_info* hub, struct linked_list* users, struct ip_range* range)
+size_t uman_get_user_by_addr(struct hub_user_manager* users, struct linked_list* target, struct ip_range* range)
 {
 	size_t num = 0;
-	struct hub_user* user = (struct hub_user*) list_get_first(hub->users->list); /* iterate users - only on incoming INF msg */
+	struct hub_user* user = (struct hub_user*) list_get_first(users->list); /* iterate users - only on incoming INF msg */
 	while (user)
 	{
 		if (ip_in_range(&user->id.addr, range))
 		{
-			list_append(users, user);
+			list_append(target, user);
 			num++;
 		}
-		user = (struct hub_user*) list_get_next(hub->users->list);
+		user = (struct hub_user*) list_get_next(users->list);
 	}
 	return num;
 }
 
-int uman_send_user_list(struct hub_info* hub, struct hub_user* target)
+int uman_send_user_list(struct hub_info* hub, struct hub_user_manager* users, struct hub_user* target)
 {
 	int ret = 1;
 	struct hub_user* user;
 	user_flag_set(target, flag_user_list);
-	user = (struct hub_user*) list_get_first(hub->users->list); /* iterate users - only on INF or PAS msg */
+	user = (struct hub_user*) list_get_first(users->list); /* iterate users - only on INF or PAS msg */
 	while (user)
 	{
 		if (user_is_logged_in(user))
@@ -235,7 +226,7 @@ int uman_send_user_list(struct hub_info* hub, struct hub_user* target)
 			if (!ret)
 				break;
 		}
-		user = (struct hub_user*) list_get_next(hub->users->list);
+		user = (struct hub_user*) list_get_next(users->list);
 	}
 
 #if 0
@@ -248,7 +239,7 @@ int uman_send_user_list(struct hub_info* hub, struct hub_user* target)
 	return ret;
 }
 
-void uman_send_quit_message(struct hub_info* hub, struct hub_user* leaving)
+void uman_send_quit_message(struct hub_info* hub, struct hub_user_manager* users, struct hub_user* leaving)
 {
 	struct adc_message* command = adc_msg_construct(ADC_CMD_IQUI, 6);
 	adc_msg_add_argument(command, (const char*) sid_to_string(leaving->id.sid));
@@ -261,9 +252,9 @@ void uman_send_quit_message(struct hub_info* hub, struct hub_user* leaving)
 	adc_msg_free(command);
 }
 
-sid_t uman_get_free_sid(struct hub_info* hub, struct hub_user* user)
+sid_t uman_get_free_sid(struct hub_user_manager* users, struct hub_user* user)
 {
-	sid_t sid = sid_alloc(hub->users->sids, user);
+	sid_t sid = sid_alloc(users->sids, user);
 	user->id.sid = sid;
 	return sid;
 }

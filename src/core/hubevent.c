@@ -24,12 +24,12 @@
 void on_login_success(struct hub_info* hub, struct hub_user* u)
 {
 	/* Send user list of all existing users */
-	if (!uman_send_user_list(hub, u))
+	if (!uman_send_user_list(hub, hub->users, u))
 		return;
 
 	/* Mark as being in the normal state, and add user to the user list */
 	user_set_state(u, state_normal);
-	uman_add(hub, u);
+	uman_add(hub->users, u);
 
 	/* Announce new user to all connected users */
 	if (user_is_logged_in(u))

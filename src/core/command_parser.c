@@ -117,7 +117,7 @@ static enum command_parse_status command_extract_arguments(struct hub_info* hub,
 			case 'u':
 				data = hub_malloc(sizeof(*data));
 				data->type = type_user;
-				data->data.user = uman_get_user_by_nick(hub, token);
+				data->data.user = uman_get_user_by_nick(hub->users, token);
 				if (!data->data.user)
 				{
 					hub_free(data);
@@ -129,7 +129,7 @@ static enum command_parse_status command_extract_arguments(struct hub_info* hub,
 			case 'i':
 				data = hub_malloc(sizeof(*data));
 				data->type = type_user;
-				data->data.user = uman_get_user_by_cid(hub, token);
+				data->data.user = uman_get_user_by_cid(hub->users, token);
 				if (!data->data.user)
 				{
 					hub_free(data);

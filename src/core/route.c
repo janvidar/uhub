@@ -30,7 +30,7 @@ int route_message(struct hub_info* hub, struct hub_user* u, struct adc_message* 
 			break;
 			
 		case 'D':
-			target = uman_get_user_by_sid(hub, msg->target);
+			target = uman_get_user_by_sid(hub->users, msg->target);
 			if (target)
 			{
 				route_to_user(hub, target, msg);
@@ -38,7 +38,7 @@ int route_message(struct hub_info* hub, struct hub_user* u, struct adc_message* 
 			break;
 			
 		case 'E':
-			target = uman_get_user_by_sid(hub, msg->target);
+			target = uman_get_user_by_sid(hub->users, msg->target);
 			if (target)
 			{
 				route_to_user(hub, target, msg);

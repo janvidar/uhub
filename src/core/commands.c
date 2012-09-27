@@ -421,7 +421,7 @@ static int command_whoip(struct command_base* cbase, struct hub_user* user, stru
 	struct hub_user* u;
 	int ret = 0;
 
-	ret = uman_get_user_by_addr(cbase->hub, users, arg->data.range);
+	ret = uman_get_user_by_addr(cbase->hub->users, users, arg->data.range);
 	if (!ret)
 	{
 		list_clear(users, &null_free);

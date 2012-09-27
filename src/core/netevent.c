@@ -21,9 +21,6 @@
 #include "hubio.h"
 #include "probe.h"
 
-/* FIXME: This should not be needed! */
-extern struct hub_info* g_hub;
-
 int handle_net_read(struct hub_user* user)
 {
 	static char buf[MAX_RECV_BUF];
@@ -71,9 +68,9 @@ int handle_net_read(struct hub_user* user)
 			}
 			else
 			{
-				if (((pos - start) > 0) && g_hub->config->max_recv_buffer > (pos - start))
+				if (((pos - start) > 0) && user->hub->config->max_recv_buffer > (pos - start))
 				{
-					if (hub_handle_message(g_hub, user, start, (pos - start)) == -1)
+					if (hub_handle_message(user->hub, user, start, (pos - start)) == -1)
 					{
 							return quit_protocol_error;
 					}
@@ -88,7 +85,7 @@ int handle_net_read(struct hub_user* user)
 
 		if (lastPos || remaining)
 		{
-			if (remaining < (size_t) g_hub->config->max_recv_buffer)
+			if (remaining < (size_t) user->hub->config->max_recv_buffer)
 			{
 				hub_recvq_set(q, lastPos ? lastPos : buf, remaining);
 			}
@@ -144,7 +141,7 @@ void net_event(struct net_connection* con, int event, void *arg)
 	{
 		if (user_is_connecting(user))
 		{
-			hub_disconnect_user(g_hub, user, quit_timeout);
+			hub_disconnect_user(user->hub, user, quit_timeout);
 		}
 		return;
 	}
@@ -154,7 +151,7 @@ void net_event(struct net_connection* con, int event, void *arg)
 		flag_close = handle_net_read(user);
 		if (flag_close)
 		{
-			hub_disconnect_user(g_hub, user, flag_close);
+			hub_disconnect_user(user->hub, user, flag_close);
 			return;
 		}
 	}
@@ -164,7 +161,7 @@ void net_event(struct net_connection* con, int event, void *arg)
 		flag_close = handle_net_write(user);
 		if (flag_close)
 		{
-			hub_disconnect_user(g_hub, user, flag_close);
+			hub_disconnect_user(user->hub, user, flag_close);
 			return;
 		}
 	}

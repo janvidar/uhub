@@ -19,7 +19,8 @@ EXO_TEST(setup, {
 	hub = hub_malloc_zero(sizeof(struct hub_info));
 	cbase = command_initialize(hub);
 	hub->commands = cbase;
-	return cbase && hub && uman_init(hub) == 0;
+	hub->users = uman_init();
+	return cbase && hub && hub->users;
 });
 
 static int test_handler(struct command_base* cbase, struct hub_user* user, struct hub_command* hcmd)
@@ -127,7 +128,7 @@ EXO_TEST(command_number_3, { return verify("!test3 -12", cmd_status_ok); });
 
 EXO_TEST(command_user_1, { return verify("!test4 tester", cmd_status_arg_nick); });
 EXO_TEST(command_user_2, { return verify("!test5 3AGHMAASJA2RFNM22AA6753V7B7DYEPNTIWHBAY", cmd_status_arg_cid); });
-EXO_TEST(command_user_3, { return uman_add(hub, &user) == 0; });
+EXO_TEST(command_user_3, { return uman_add(hub->users, &user) == 0; });
 EXO_TEST(command_user_4, { return verify("!test4 tester", cmd_status_ok); });
 EXO_TEST(command_user_5, { return verify("!test5 3AGHMAASJA2RFNM22AA6753V7B7DYEPNTIWHBAY", cmd_status_ok); });
 
@@ -225,7 +226,7 @@ EXO_TEST(command_argument_cred_6, {
 
 #undef SETUP_COMMAND
 
-EXO_TEST(command_user_destroy, { return uman_remove(hub, &user) == 0; });
+EXO_TEST(command_user_destroy, { return uman_remove(hub->users, &user) == 0; });
 
 EXO_TEST(command_destroy, {
 
@@ -239,5 +240,12 @@ EXO_TEST(command_destroy, {
 	DEL_TEST(c_test5);
 	DEL_TEST(c_test6);
 	DEL_TEST(c_test7);
+	return 1;
+});
+
+EXO_TEST(cleanup, {
+	uman_shutdown(hub->users);
+	command_shutdown(hub->commands);
+	hub_free(hub);
 	return 1;
 });
