@@ -19,52 +19,122 @@
 
 #include "adcclient.h"
 
+static struct ADC_user g_usermap[SID_MAX];
+
+static void user_add(const struct ADC_user* user)
+{
+	printf(" >> JOIN: %s (%s)\n", user->name, user->address);
+	memcpy(&g_usermap[user->sid], user, sizeof(struct ADC_user));
+}
+
+static struct ADC_user* user_get(sid_t sid)
+{
+
+	struct ADC_user* user = &g_usermap[sid];
+	uhub_assert(user->sid != 0);
+	return user;
+}
+
+
+static void user_remove(const struct ADC_client_quit_reason* quit)
+{
+	struct ADC_user* user = user_get(quit->sid);
+	printf(" << QUIT: %s (%s)\n", user->name, quit->message);
+	memset(&g_usermap[quit->sid], 0, sizeof(struct ADC_user));
+}
+
+static void on_message(struct ADC_chat_message* chat)
+{
+	struct ADC_user* user;
+	const char* pm = (chat->flags & chat_flags_private) ? "PM" : "  ";
+	const char* brack1 = (chat->flags & chat_flags_action) ? "*" : "<";
+	const char* brack2 = (chat->flags & chat_flags_action) ? "" : ">";
+	struct linked_list* lines;
+	int ret;
+	char* line;
+
+	if (!chat->from_sid)
+	{
+		printf("HUB ");
+	}
+	else
+	{
+		user = user_get(chat->from_sid);
+		printf(" %s %s%s%s ", pm, brack1, user->name, brack2);
+	}
+
+	lines = list_create();
+	ret = split_string(chat->message, "\n", lines, 1);
+
+	line = (char*) list_get_first(lines);
+
+	ret = 0;
+	while (line)
+	{
+		if (ret > 0)
+			printf("    ");
+		printf("%s\n", line);
+		ret++;
+		line = (char*) list_get_next(lines);
+	}
+
+	list_clear(lines, &hub_free);
+	list_destroy(lines);
+}
+
+static void status(const char* msg)
+{
+	printf("*** %s\n", msg);
+}
+
 static int handle(struct ADC_client* client, enum ADC_client_callback_type type, struct ADC_client_callback_data* data)
 {
 	switch (type)
 	{
 		case ADC_CLIENT_CONNECTING:
-			puts("*** Connecting...");
+			status("Connecting...");
 			break;
 
 		case ADC_CLIENT_CONNECTED:
-			puts("*** Connected.");
+			status("Connected.");
 			break;
 
 		case ADC_CLIENT_DISCONNECTED:
-			puts("*** Disconnected.");
+			status("Disconnected.");
 			break;
 
 		case ADC_CLIENT_SSL_HANDSHAKE:
-			puts("*** SSL handshake.");
+			status("SSL handshake.");
 			break;
 
 		case ADC_CLIENT_LOGGING_IN:
-			puts("*** Logging in...");
+			status("Logging in...");
 			break;
 
 		case ADC_CLIENT_PASSWORD_REQ:
-			puts("*** Requesting password.");
+			status("Requesting password.");
 			break;
 
 		case ADC_CLIENT_LOGGED_IN:
-			puts("*** Logged in.");
+			status("Logged in.");
 			break;
 
 		case ADC_CLIENT_LOGIN_ERROR:
-			puts("*** Login error");
+			status("Login error");
 			break;
 
+
 		case ADC_CLIENT_MESSAGE:
-			printf("    <%s> %s\n", sid_to_string(data->chat->from_sid), data->chat->message);
+			on_message(data->chat);
 			break;
 
 		case ADC_CLIENT_USER_JOIN:
-			printf("    JOIN: %s %s\n", sid_to_string(data->user->sid), data->user->name);
+			
+			user_add(data->user);
 			break;
 
 		case ADC_CLIENT_USER_QUIT:
-			printf("    QUIT\n");
+			user_remove(data->quit);
 			break;
 
 		case ADC_CLIENT_SEARCH_REQ:
@@ -95,6 +165,8 @@ int main(int argc, char** argv)
 
 	struct ADC_client client;
 	net_initialize();
+
+	memset(g_usermap, 0, sizeof(g_usermap));
 
 	ADC_client_create(&client, "uhub-admin", "stresstester");
 	ADC_client_set_callback(&client, handle);
