@@ -92,6 +92,12 @@ extern struct adc_message* adc_msg_create(const char* string);
 extern struct adc_message* adc_msg_construct(fourcc_t fourcc, size_t size);
 
 /**
+ * Construct a message for the given 'fourcc' and add a source SID to it,
+ * in addition pre-allocate 'size' bytes at the end of the message.
+ */
+extern struct adc_message* adc_msg_construct_source(fourcc_t fourcc, sid_t source, size_t size);
+
+/**
  * Remove a named argument from the command.
  *
  * @arg prefix a 2 character argument prefix
@@ -194,6 +200,14 @@ extern int adc_msg_add_named_argument_uint64(struct adc_message* cmd, const char
  * @return string or NULL if out of memory
  */
 extern char* adc_msg_unescape(const char* string);
+
+/**
+ * Convert a ADC command escaped string to a regular string.
+ * @return The number of bytes written to target. If the target is not large enough then
+ * the -1 is returned, but the string is guaranteed to always be \0 terminated.
+ */
+extern int adc_msg_unescape_to_target(const char* string, char* target, size_t target_size);
+
 
 /**
  * Convert a string to a ADC command escaped string.
