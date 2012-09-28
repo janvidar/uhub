@@ -23,7 +23,9 @@
 #define ADC_CID_SIZE 39
 #define BIG_BUFSIZE 32768
 #define TIGERSIZE 24
+
 // #define ADCC_DEBUG
+// #define ADC_CLIENT_DEBUG_PROTO
 
 static ssize_t ADC_client_recv(struct ADC_client* client);
 static void ADC_client_send_info(struct ADC_client* client);
@@ -156,11 +158,24 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 			TARGET = NULL; \
 		hub_free(TMP);
 
+#define UNESCAPE_ARG_X(TMP, TARGET, SIZE) \
+		if (TMP) \
+			adc_msg_unescape_to_target(TMP, TARGET, SIZE); \
+		else \
+			TARGET[0] = '\0'; \
+		hub_free(TMP);
+
 #define EXTRACT_NAMED_ARG(MSG, NAME, TARGET) \
 		do { \
 			char* tmp = adc_msg_get_named_argument(MSG, NAME); \
 			UNESCAPE_ARG(tmp, TARGET); \
 		} while (0)
+
+#define EXTRACT_NAMED_ARG_X(MSG, NAME, TARGET, SIZE) \
+		do { \
+			char* tmp = adc_msg_get_named_argument(MSG, NAME); \
+			UNESCAPE_ARG_X(tmp, TARGET, SIZE); \
+		} while(0)
 
 #define EXTRACT_POS_ARG(MSG, POS, TARGET) \
 		do { \
@@ -171,9 +186,12 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 
 static void ADC_client_on_recv_line(struct ADC_client* client, const char* line, size_t length)
 {
+	struct ADC_chat_message chat;
+	struct ADC_client_callback_data data;
+
 	ADC_TRACE;
 #ifdef ADC_CLIENT_DEBUG_PROTO
-	ADC_client_debug(client, "- LINE: '%s'", start);
+	ADC_client_debug(client, "- LINE: '%s'", line);
 #endif
 
 	/* Parse message */
@@ -210,12 +228,18 @@ static void ADC_client_on_recv_line(struct ADC_client* client, const char* line,
 		case ADC_CMD_DMSG:
 		case ADC_CMD_IMSG:
 		{
-			struct ADC_chat_message chat;
-			struct ADC_client_callback_data data;
 			chat.from_sid       = msg->source;
 			chat.to_sid         = msg->target;
 			data.chat = &chat;
 			EXTRACT_POS_ARG(msg, 0, chat.message);
+			chat.flags = 0;
+
+			if (adc_msg_has_named_argument(msg, ADC_MSG_FLAG_ACTION))
+				chat.flags |= chat_flags_action;
+
+			if (adc_msg_has_named_argument(msg, ADC_MSG_FLAG_PRIVATE))
+				chat.flags |= chat_flags_private;
+
 			client->callback(client, ADC_CLIENT_MESSAGE, &data);
 			hub_free(chat.message);
 			break;
@@ -259,23 +283,32 @@ static void ADC_client_on_recv_line(struct ADC_client* client, const char* line,
 				{
 					struct ADC_user user;
 					user.sid = msg->source;
-					EXTRACT_NAMED_ARG(msg, "NI", user.name);
-					EXTRACT_NAMED_ARG(msg, "DE", user.description);
-					EXTRACT_NAMED_ARG(msg, "VE", user.version);
-					EXTRACT_NAMED_ARG(msg, "ID", user.cid);
-					EXTRACT_NAMED_ARG(msg, "I4", user.address);
+					EXTRACT_NAMED_ARG_X(msg, "NI", user.name, sizeof(user.name));
+					EXTRACT_NAMED_ARG_X(msg, "DE", user.description, sizeof(user.description));
+					EXTRACT_NAMED_ARG_X(msg, "VE", user.version, sizeof(user.version));
+					EXTRACT_NAMED_ARG_X(msg, "ID", user.cid, sizeof(user.cid));
+					EXTRACT_NAMED_ARG_X(msg, "I4", user.address, sizeof(user.address));
 
 					struct ADC_client_callback_data data;
 					data.user = &user;
 					client->callback(client, ADC_CLIENT_USER_JOIN, &data);
-
-					hub_free(user.name);
-					hub_free(user.description);
-					hub_free(user.version);
-					hub_free(user.cid);
-					hub_free(user.address);
 				}
 			}
+		}
+		break;
+
+		case ADC_CMD_IQUI:
+		{
+			struct ADC_client_quit_reason reason;
+			memset(&reason, 0, sizeof(reason));
+			reason.sid = string_to_sid(&line[5]);
+
+			if (adc_msg_has_named_argument(msg, ADC_QUI_FLAG_DISCONNECT))
+				reason.flags |= 1;
+
+			data.quit = &reason;
+			client->callback(client, ADC_CLIENT_USER_QUIT, &data);
+			break;
 		}
 
 		case ADC_CMD_ISTA:
@@ -360,9 +393,7 @@ void ADC_client_send(struct ADC_client* client, char* msg)
 void ADC_client_send_info(struct ADC_client* client)
 {
 	ADC_TRACE;
-	char binf[11];
-	snprintf(binf, 11, "BINF %s\n", sid_to_string(client->sid));
-	client->info = adc_msg_create(binf);
+	client->info = adc_msg_construct_source(ADC_CMD_BINF, client->sid, 64);
 
 	adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_NICK, client->nick);
 

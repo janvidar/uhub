@@ -71,6 +71,13 @@ struct ADC_hub_info
 	char* version;
 };
 
+enum ADC_chat_message_flags
+{
+	chat_flags_none = 0,
+	chat_flags_action = 1,
+	chat_flags_private = 2
+};
+
 struct ADC_chat_message
 {
 	sid_t from_sid;
@@ -79,14 +86,23 @@ struct ADC_chat_message
 	int flags;
 };
 
+#define MAX_DESC_LEN 128
 struct ADC_user
 {
 	sid_t sid;
-	char* cid;
-	char* name;
-	char* description;
-	char* address;
-	char* version;
+	char cid[MAX_CID_LEN+1];
+	char name[MAX_NICK_LEN+1];
+	char description[MAX_DESC_LEN+1];
+	char address[INET6_ADDRSTRLEN+1];
+	char version[MAX_UA_LEN+1];
+};
+
+struct ADC_client_quit_reason
+{
+	sid_t sid;
+	sid_t initator; // 0 = default/hub.
+	char message[128]; // optional
+	int flags;
 };
 
 
@@ -96,6 +112,7 @@ struct ADC_client_callback_data
 		struct ADC_hub_info* hubinfo;
 		struct ADC_chat_message* chat;
 		struct ADC_user* user;
+		struct ADC_client_quit_reason* quit;
 	};
 };
 
