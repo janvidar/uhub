@@ -82,7 +82,7 @@ extern "C" {
 #include "core/eventid.h"
 #include "core/eventqueue.h"
 #include "core/netevent.h"
-#include "core/hubio.h"
+#include "core/ioqueue.h"
 #include "core/user.h"
 #include "core/usermanager.h"
 #include "core/route.h"

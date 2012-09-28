@@ -108,17 +108,17 @@ int route_to_user(struct hub_info* hub, struct hub_user* user, struct adc_messag
 
 	uhub_assert(msg->cache && *msg->cache);
 
-	if (hub_sendq_is_empty(user->send_queue) && !user_flag_get(user, flag_pipeline))
+	if (ioq_send_is_empty(user->send_queue) && !user_flag_get(user, flag_pipeline))
 	{
 		/* Perform oportunistic write */
-		hub_sendq_add(user->send_queue, msg);
+		ioq_send_add(user->send_queue, msg);
 		handle_net_write(user);
 	}
 	else
 	{
 		if (check_send_queue(hub, user, msg) >= 0)
 		{
-			hub_sendq_add(user->send_queue, msg);
+			ioq_send_add(user->send_queue, msg);
 			if (!user_flag_get(user, flag_pipeline))
 				user_net_io_want_write(user);
 		}
@@ -128,7 +128,7 @@ int route_to_user(struct hub_info* hub, struct hub_user* user, struct adc_messag
 
 int route_flush_pipeline(struct hub_info* hub, struct hub_user* u)
 {
-	if (hub_sendq_is_empty(u->send_queue))
+	if (ioq_send_is_empty(u->send_queue))
 		return 0;
 
 	handle_net_write(u);

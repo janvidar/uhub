@@ -18,14 +18,14 @@
  */
 
 #include <uhub.h>
-#include "hubio.h"
+#include "ioqueue.h"
 #include "probe.h"
 
 int handle_net_read(struct hub_user* user)
 {
 	static char buf[MAX_RECV_BUF];
-	struct hub_recvq* q = user->recv_queue;
-	size_t buf_size = hub_recvq_get(q, buf, MAX_RECV_BUF);
+	struct ioq_recv* q = user->recv_queue;
+	size_t buf_size = ioq_recv_get(q, buf, MAX_RECV_BUF);
 	ssize_t size;
 
 	if (user_flag_get(user, flag_maxbuf))
@@ -87,18 +87,18 @@ int handle_net_read(struct hub_user* user)
 		{
 			if (remaining < (size_t) user->hub->config->max_recv_buffer)
 			{
-				hub_recvq_set(q, lastPos ? lastPos : buf, remaining);
+				ioq_recv_set(q, lastPos ? lastPos : buf, remaining);
 			}
 			else
 			{
-				hub_recvq_set(q, 0, 0);
+				ioq_recv_set(q, 0, 0);
 				user_flag_set(user, flag_maxbuf);
 				LOG_WARN("Received message past max_recv_buffer, dropping message.");
 			}
 		}
 		else
 		{
-			hub_recvq_set(q, 0, 0);
+			ioq_recv_set(q, 0, 0);
 		}
 	}
 	return 0;
@@ -107,9 +107,9 @@ int handle_net_read(struct hub_user* user)
 int handle_net_write(struct hub_user* user)
 {
 	int ret = 0;
-	while (hub_sendq_get_bytes(user->send_queue))
+	while (ioq_send_get_bytes(user->send_queue))
 	{
-		ret = hub_sendq_send(user->send_queue, user);
+		ret = ioq_send_send(user->send_queue, user);
 		if (ret <= 0)
 			break;
 	}
@@ -117,7 +117,7 @@ int handle_net_write(struct hub_user* user)
 	if (ret < 0)
 		return quit_socket_error;
 
-	if (hub_sendq_get_bytes(user->send_queue))
+	if (ioq_send_get_bytes(user->send_queue))
 	{
 		user_net_io_want_write(user);
 	}

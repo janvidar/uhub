@@ -142,8 +142,8 @@ libuhub_SOURCES := \
 		src/core/eventqueue.c \
 		src/core/hub.c \
 		src/core/hubevent.c \
-		src/core/hubio.c \
 		src/core/inf.c \
+		src/core/ioqueue.c \
 		src/core/netevent.c \
 		src/core/probe.c \
 		src/core/route.c \

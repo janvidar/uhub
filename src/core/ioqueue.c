@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2012, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,7 +18,6 @@
  */
 
 #include "uhub.h"
-#include "hubio.h"
 
 #ifdef DEBUG_SENDQ
 static void debug_msg(const char* prefix, struct adc_message* msg)
@@ -35,13 +34,13 @@ static void debug_msg(const char* prefix, struct adc_message* msg)
 }
 #endif
 
-struct hub_recvq* hub_recvq_create()
+struct ioq_recv* ioq_recv_create()
 {
-	struct hub_recvq* q = hub_malloc_zero(sizeof(struct hub_recvq));
+	struct ioq_recv* q = hub_malloc_zero(sizeof(struct ioq_recv));
 	return q;
 }
 
-void hub_recvq_destroy(struct hub_recvq* q)
+void ioq_recv_destroy(struct ioq_recv* q)
 {
 	if (q)
 	{
@@ -50,7 +49,7 @@ void hub_recvq_destroy(struct hub_recvq* q)
 	}
 }
 
-size_t hub_recvq_get(struct hub_recvq* q, void* buf, size_t bufsize)
+size_t ioq_recv_get(struct ioq_recv* q, void* buf, size_t bufsize)
 {
 	uhub_assert(bufsize >= q->size);
 	if (q->size)
@@ -65,7 +64,7 @@ size_t hub_recvq_get(struct hub_recvq* q, void* buf, size_t bufsize)
 	return 0;
 }
 
-size_t hub_recvq_set(struct hub_recvq* q, void* buf, size_t bufsize)
+size_t ioq_recv_set(struct ioq_recv* q, void* buf, size_t bufsize)
 {
 	if (q->buf)
 	{
@@ -89,9 +88,9 @@ size_t hub_recvq_set(struct hub_recvq* q, void* buf, size_t bufsize)
 }
 
 
-struct hub_sendq* hub_sendq_create()
+struct ioq_send* ioq_send_create()
 {
-	struct hub_sendq* q = hub_malloc_zero(sizeof(struct hub_sendq));
+	struct ioq_send* q = hub_malloc_zero(sizeof(struct ioq_send));
 	if (!q)
 		return 0;
 
@@ -110,7 +109,7 @@ static void clear_send_queue_callback(void* ptr)
 	adc_msg_free((struct adc_message*) ptr);
 }
 
-void hub_sendq_destroy(struct hub_sendq* q)
+void ioq_send_destroy(struct ioq_send* q)
 {
 	if (q)
 	{
@@ -120,21 +119,21 @@ void hub_sendq_destroy(struct hub_sendq* q)
 	}
 }
 
-void hub_sendq_add(struct hub_sendq* q, struct adc_message* msg_)
+void ioq_send_add(struct ioq_send* q, struct adc_message* msg_)
 {
 	struct adc_message* msg = adc_msg_incref(msg_);
 #ifdef DEBUG_SENDQ
-	debug_msg("hub_sendq_add", msg);
+	debug_msg("ioq_send_add", msg);
 #endif
 	uhub_assert(msg->cache && *msg->cache);
 	list_append(q->queue, msg);
 	q->size += msg->length;
 }
 
-void hub_sendq_remove(struct hub_sendq* q, struct adc_message* msg)
+void ioq_send_remove(struct ioq_send* q, struct adc_message* msg)
 {
 #ifdef DEBUG_SENDQ
-	debug_msg("hub_sendq_remove", msg);
+	debug_msg("ioq_send_remove", msg);
 #endif
 	list_remove(q->queue, msg);
 	q->size  -= msg->length;
@@ -142,7 +141,7 @@ void hub_sendq_remove(struct hub_sendq* q, struct adc_message* msg)
 	q->offset = 0;
 }
 
-int hub_sendq_send(struct hub_sendq* q, struct hub_user* user)
+int ioq_send_send(struct ioq_send* q, struct hub_user* user)
 {
 	int ret;
 	struct adc_message* msg = list_get_first(q->queue);
@@ -156,18 +155,18 @@ int hub_sendq_send(struct hub_sendq* q, struct hub_user* user)
 		if (msg->length - q->offset > 0)
 			return 0;
 
-		hub_sendq_remove(q, msg);
+		ioq_send_remove(q, msg);
 		return 1;
 	}
 	return ret;
 }
 
-int hub_sendq_is_empty(struct hub_sendq* q)
+int ioq_send_is_empty(struct ioq_send* q)
 {
 	return (q->size - q->offset) == 0;
 }
 
-size_t hub_sendq_get_bytes(struct hub_sendq* q)
+size_t ioq_send_get_bytes(struct ioq_send* q)
 {
 	return q->size - q->offset;
 }
