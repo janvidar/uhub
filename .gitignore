@@ -1,7 +1,13 @@
 *~
 *.[oa]
+*.lib
 *.exe
+*.manifest
 *.gch
+CMakeFiles/*
+cmake_install.cmake
+mod_*.dll
+mod_*.exp
 mod_*.so
 uhub-admin
 adcrush
@@ -14,3 +20,4 @@ debian/uhub.postrm.debhelper
 debian/uhub.prerm.debhelper
 debian/uhub.substvars
 uhub-passwd
+src/version.h
