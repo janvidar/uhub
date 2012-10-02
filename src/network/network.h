@@ -31,6 +31,7 @@ struct net_statistics
 };
 
 struct net_socket_t;
+struct ip_addr_encap;
 
 /**
  * Initialize the socket monitor subsystem.

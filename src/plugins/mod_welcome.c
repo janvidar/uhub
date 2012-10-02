@@ -22,7 +22,7 @@
 #include "adc/sid.h"
 #include "util/cbuffer.h"
 #include "util/memory.h"
-#include "util/ipcalc.h"
+#include "network/ipcalc.h"
 #include "plugin_api/handle.h"
 #include "plugin_api/command_api.h"
 

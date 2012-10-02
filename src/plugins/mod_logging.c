@@ -21,7 +21,7 @@
 #include "adc/adcconst.h"
 #include "adc/sid.h"
 #include "util/memory.h"
-#include "util/ipcalc.h"
+#include "network/ipcalc.h"
 #include "plugin_api/handle.h"
 
 #include "util/misc.h"

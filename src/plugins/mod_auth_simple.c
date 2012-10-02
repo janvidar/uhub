@@ -20,7 +20,6 @@
 #include "plugin_api/handle.h"
 #include "util/memory.h"
 #include "util/list.h"
-#include "util/ipcalc.h"
 #include "util/misc.h"
 #include "util/log.h"
 #include "util/config_token.h"

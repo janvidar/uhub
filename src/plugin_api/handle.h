@@ -26,7 +26,7 @@
 
 #include "system.h"
 #include "util/credentials.h"
-#include "util/ipcalc.h"
+#include "network/ipcalc.h"
 #include "plugin_api/types.h"
 
 typedef void (*on_connection_accepted_t)(struct plugin_handle*, struct ip_addr_encap*);

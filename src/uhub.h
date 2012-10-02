@@ -63,7 +63,6 @@ extern "C" {
 #include "util/credentials.h"
 #include "util/floodctl.h"
 #include "util/getopt.h"
-#include "util/ipcalc.h"
 #include "util/list.h"
 #include "util/log.h"
 #include "util/memory.h"
@@ -75,6 +74,7 @@ extern "C" {
 
 #include "network/network.h"
 #include "network/connection.h"
+#include "network/ipcalc.h"
 #include "network/timeout.h"
 
 #include "core/auth.h"
