@@ -6,7 +6,6 @@ mod_*.so
 uhub-admin
 adcrush
 uhub
-revision.h*
 build-stamp
 debian/files
 debian/uhub.debhelper.log
