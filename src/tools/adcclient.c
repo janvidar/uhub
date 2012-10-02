@@ -66,8 +66,10 @@ struct ADC_client
 	int flags;
 	void* ptr;
 #ifdef SSL_SUPPORT
+#ifdef SSL_USE_OPENSSL
 	const SSL_METHOD* ssl_method;
 	SSL_CTX* ssl_ctx;
+#endif /* SSL_USE_OPENSSL */
 #endif /*  SSL_SUPPORT */
 };
 

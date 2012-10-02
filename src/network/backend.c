@@ -180,12 +180,14 @@ void net_con_close(struct net_connection* con)
 	g_backend->handler.con_del(g_backend->data, con);
 
 #ifdef SSL_SUPPORT
+#ifdef SSL_USE_OPENSSL
 	if (con->ssl)
 	{
 		SSL_shutdown(con->ssl);
 		SSL_clear(con->ssl);
 	}
-#endif
+#endif /* SSL_USE_OPENSSL */
+#endif /* SSL_SUPPORT */
 
 	net_close(con->sd);
 	con->sd = -1;

@@ -35,10 +35,17 @@
 	net_connection_cb    callback;  /** Callback function */ \
 	struct timeout_evt*  timeout;   /** timeout event handler */
 
+#ifdef SSL_USE_OPENSSL
 #define NET_CON_STRUCT_SSL \
 	SSL*                 ssl;       /** SSL handle */ \
 	uint32_t             ssl_state; /** SSL state */ \
-	size_t               write_len; /** Length of last SSL_write(), only used if flags is NET_WANT_SSL_READ. */ \
+	size_t               write_len; /** Length of last SSL_write(), only used if flags is NET_WANT_SSL_READ. */
+#endif
+
+#ifdef SSL_USE_GNUTLS
+#define NET_CON_STRUCT_SSL \
+	uint32_t             ssl_state; /** SSL state */
+#endif
 
 #ifdef SSL_SUPPORT
 #define NET_CON_STRUCT_COMMON \

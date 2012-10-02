@@ -100,11 +100,13 @@ enum net_con_ssl_mode
 	net_con_ssl_mode_client,
 };
 
+#ifdef SSL_USE_OPENSSL
 extern ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode, SSL_CTX* ssl_ctx);
-
-extern int   net_con_is_ssl(struct net_connection* con);
 extern SSL* net_con_get_ssl(struct net_connection* con);
 extern void net_con_set_ssl(struct net_connection* con, SSL*);
+#endif // SSL_USE_OPENSSL
+extern int   net_con_is_ssl(struct net_connection* con);
+
 #endif /* SSL_SUPPORT */
 
 #endif /* HAVE_UHUB_NETWORK_CONNECTION_H */

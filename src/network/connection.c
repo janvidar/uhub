@@ -32,6 +32,7 @@ enum uhub_tls_state
 	tls_st_disconnecting,
 };
 
+#ifdef SSL_USE_OPENSSL
 static int handle_openssl_error(struct net_connection* con, int ret)
 {
 	uhub_assert(con);
@@ -72,15 +73,18 @@ static int handle_openssl_error(struct net_connection* con, int ret)
 	}
 	return -1;
 }
+#endif /* SSL_USE_OPENSSL */
 
 ssize_t net_con_ssl_accept(struct net_connection* con)
 {
 	uhub_assert(con);
 	con->ssl_state = tls_st_accepting;
-	ssize_t ret = SSL_accept(con->ssl);
+	ssize_t ret;
+#ifdef SSL_USE_OPENSSL
+	ret = SSL_accept(con->ssl);
 #ifdef NETWORK_DUMP_DEBUG
 	LOG_PROTO("SSL_accept() ret=%d", ret);
-#endif
+#endif /* NETWORK_DUMP_DEBUG */
 	if (ret > 0)
 	{
 		net_con_update(con, NET_EVENT_READ);
@@ -90,18 +94,20 @@ ssize_t net_con_ssl_accept(struct net_connection* con)
 	{
 		return handle_openssl_error(con, ret);
 	}
+#endif /* SSL_USE_OPENSSL */
 	return ret;
 }
 
 ssize_t net_con_ssl_connect(struct net_connection* con)
 {
 	uhub_assert(con);
-
+	ssize_t ret;
 	con->ssl_state = tls_st_connecting;
-	ssize_t ret = SSL_connect(con->ssl);
+#ifdef SSL_USE_OPENSSL
+	ret = SSL_connect(con->ssl);
 #ifdef NETWORK_DUMP_DEBUG
 	LOG_PROTO("SSL_connect() ret=%d", ret);
-#endif
+#endif /* NETWORK_DUMP_DEBUG */
 	if (ret > 0)
 	{
 		con->ssl_state = tls_st_connected;
@@ -111,12 +117,15 @@ ssize_t net_con_ssl_connect(struct net_connection* con)
 	{
 		return handle_openssl_error(con, ret);
 	}
+#endif /* SSL_USE_OPENSSL */
 	return ret;
 }
 
+#ifdef SSL_USE_OPENSSL
 ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode ssl_mode, SSL_CTX* ssl_ctx)
 {
 	uhub_assert(con);
+
 	SSL* ssl = 0;
 
 	if (ssl_mode == net_con_ssl_mode_server)
@@ -138,7 +147,9 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode 
 		net_con_set_ssl(con, ssl);
 		return net_con_ssl_connect(con);
 	}
+
 }
+#endif /* SSL_USE_OPENSSL */
 #endif /* SSL_SUPPORT */
 
 #ifdef SSL_SUPPORT
@@ -150,7 +161,9 @@ ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 {
 	int ret;
 #ifdef SSL_SUPPORT
+#ifdef SSL_USE_OPENSSL
 	if (!con->ssl)
+#endif /* SSL_USE_OPENSSL */
 	{
 #endif
 		ret = net_send(con->sd, buf, len, UHUB_SEND_SIGNAL);
@@ -168,6 +181,7 @@ ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 		}
 #ifdef SSL_SUPPORT
 	}
+#ifdef SSL_USE_OPENSSL
 	else
 	{
 		con->write_len = len;
@@ -182,7 +196,8 @@ ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 			 net_stats_add_tx(ret);
 		}
 	}
-#endif
+#endif /* SSL_USE_OPENSSL */
+#endif /* SSL_SUPPORT */
 	return ret;
 }
 
@@ -214,6 +229,7 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 	}
 	else
 	{
+#ifdef SSL_USE_OPENSSL
 		if (con->ssl_state == tls_st_error)
 			return -1;
 
@@ -228,8 +244,9 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 		{
 			return handle_openssl_error(con, ret);
 		}
+#endif /* SSL_USE_OPENSSL */
 	}
-#endif
+#endif /* SSL_SUPPORT */
 	return ret;
 }
 
@@ -254,11 +271,15 @@ ssize_t net_con_peek(struct net_connection* con, void* buf, size_t len)
 }
 
 #ifdef SSL_SUPPORT
+
 int net_con_is_ssl(struct net_connection* con)
 {
+#ifdef SSL_USE_OPENSSL
 	return con->ssl != 0;
+#endif
 }
 
+#ifdef SSL_USE_OPENSSL
 SSL* net_con_get_ssl(struct net_connection* con)
 {
 	return con->ssl;
@@ -268,6 +289,7 @@ void net_con_set_ssl(struct net_connection* con, SSL* ssl)
 {
 	con->ssl = ssl;
 }
+#endif /* SSL_USE_OPENSSL */
 #endif /* SSL_SUPPORT */
 
 int net_con_get_sd(struct net_connection* con)
@@ -283,7 +305,9 @@ void* net_con_get_ptr(struct net_connection* con)
 void net_con_destroy(struct net_connection* con)
 {
 #ifdef SSL_SUPPORT
+#ifdef SSL_USE_OPENSSL
 	SSL_free(con->ssl);
+#endif /* SSL_USE_OPENSSL */
 #endif
 	hub_free(con);
 }
@@ -301,13 +325,17 @@ void net_con_callback(struct net_connection* con, int events)
 	}
 
 #ifdef SSL_SUPPORT
+#ifdef SSL_USE_OPENSSL
 	if (!con->ssl)
+#endif /* SSL_USE_OPENSSL */
 	{
 #endif
 		con->callback(con, events, con->ptr);
 #ifdef SSL_SUPPORT
 	}
+#ifdef SSL_USE_OPENSSL
 	else
+#endif /* SSL_USE_OPENSSL */
 	{
 #ifdef NETWORK_DUMP_DEBUG
 		LOG_PROTO("net_con_event: events=%d, con=%p, state=%d", events, con, con->ssl_state);

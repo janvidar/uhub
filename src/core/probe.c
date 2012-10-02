@@ -85,7 +85,9 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 					{
 						probe->connection = 0;
 					}
+#ifdef SSL_USE_OPENSSL
 					net_con_ssl_handshake(con, net_con_ssl_mode_server, probe->hub->ssl_ctx);
+#endif /* SSL_USE_OPENSSL */
 				}
 				else
 				{

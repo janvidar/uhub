@@ -116,8 +116,10 @@ struct hub_info
 	struct uhub_plugins* plugins;        /* Plug-ins loaded for this hub instance. */
 
 #ifdef SSL_SUPPORT
+#ifdef SSL_USE_OPENSSL
 	SSL_METHOD* ssl_method;
 	SSL_CTX* ssl_ctx;
+#endif // SSL_USE_OPENSSL
 #endif /*  SSL_SUPPORT */
 };
 

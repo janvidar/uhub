@@ -731,6 +731,7 @@ static int load_ssl_certificates(struct hub_info* hub, struct hub_config* config
 {
 	if (config->tls_enable)
 	{
+#ifdef SSL_USE_OPENSSL
 		hub->ssl_method = (SSL_METHOD*) SSLv23_method(); /* TLSv1_method() */
 		hub->ssl_ctx = SSL_CTX_new(hub->ssl_method);
 
@@ -754,18 +755,21 @@ static int load_ssl_certificates(struct hub_info* hub, struct hub_config* config
 			return 0;
 		}
 		LOG_INFO("Enabling TLS, using certificate: %s, private key: %s", config->tls_certificate, config->tls_private_key);
+#endif /* SSL_USE_OPENSSL */
 	}
 	return 1;
 }
 
 static void unload_ssl_certificates(struct hub_info* hub)
 {
+#ifdef SSL_USE_OPENSSL
 	if (hub->ssl_ctx)
 	{
 		SSL_CTX_free(hub->ssl_ctx);
 	}
+#endif /* SSL_USE_OPENSSL */
 }
-#endif
+#endif /* SSL_SUPPORT */
 
 struct hub_info* hub_start_service(struct hub_config* config)
 {
