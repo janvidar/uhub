@@ -3,7 +3,7 @@
 ## Copyright (C) 2007-2012, Jan Vidar Krey <janvidar@extatic.org>
  #
 
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 2.8.3)
 
 project (uhub)
 
