@@ -28,7 +28,6 @@
 
 #include "util/misc.h"
 #include "util/config_token.h"
-#include <syslog.h>
 
 #define MAX_WELCOME_SIZE 16384
 

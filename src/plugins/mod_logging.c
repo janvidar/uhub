@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2011, Jan Vidar Krey
+ * Copyright (C) 2007-2012, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,7 +26,9 @@
 
 #include "util/misc.h"
 #include "util/config_token.h"
+#ifndef WIN32
 #include <syslog.h>
+#endif
 
 struct ip_addr_encap;
 
@@ -60,11 +62,13 @@ static int log_open_file(struct plugin_handle* plugin, struct log_data* data)
 	return (data->fd != -1);
 }
 
+#ifndef WIN32
 static int log_open_syslog(struct plugin_handle* plugin)
 {
 	openlog("uhub", 0, LOG_USER);
 	return 1;
 }
+#endif
 
 static struct log_data* parse_config(const char* line, struct plugin_handle* plugin)
 {
@@ -94,6 +98,7 @@ static struct log_data* parse_config(const char* line, struct plugin_handle* plu
 			data->logfile = strdup(cfg_settings_get_value(setting));
 			data->logmode = mode_file;
 		}
+#ifndef WIN32
 		else if (strcmp(cfg_settings_get_key(setting), "syslog") == 0)
 		{
 			int use_syslog = 0;
@@ -102,6 +107,7 @@ static struct log_data* parse_config(const char* line, struct plugin_handle* plu
 				data->logmode = (use_syslog) ? mode_syslog : mode_file;
 			}
 		}
+#endif
 		else
 		{
 			set_error_message(plugin, "Unknown startup parameters given");
@@ -134,6 +140,7 @@ static struct log_data* parse_config(const char* line, struct plugin_handle* plu
 			return 0;
 		}
 	}
+#ifndef WIN32
 	else
 	{
 		if (!log_open_syslog(plugin))
@@ -144,7 +151,7 @@ static struct log_data* parse_config(const char* line, struct plugin_handle* plu
 			return 0;
 		}
 	}
-
+#endif
 	return data;
 }
 
@@ -155,10 +162,12 @@ static void log_close(struct log_data* data)
 		hub_free(data->logfile);
 		close(data->fd);
 	}
+#ifndef WIN32
 	else
 	{
 		closelog();
 	}
+#endif
 	hub_free(data);
 }
 
@@ -186,19 +195,25 @@ static void log_message(struct log_data* data, const char *format, ...)
 		}
 		else
 		{
+#ifdef WIN32
+			_commit(data->fd);
+#else
 #if defined _POSIX_SYNCHRONIZED_IO && _POSIX_SYNCHRONIZED_IO > 0
 			fdatasync(data->fd);
 #else
 			fsync(data->fd);
 #endif
+#endif
 		}
 	}
+#ifndef WIN32
 	else
 	{
 		va_start(args, format);
 		vsyslog(LOG_INFO, format, args);
 		va_end(args);
 	}
+#endif
 }
 
 static void log_user_login(struct plugin_handle* plugin, struct plugin_user* user)
