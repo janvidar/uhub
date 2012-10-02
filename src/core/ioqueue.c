@@ -141,13 +141,13 @@ void ioq_send_remove(struct ioq_send* q, struct adc_message* msg)
 	q->offset = 0;
 }
 
-int ioq_send_send(struct ioq_send* q, struct hub_user* user)
+int ioq_send_send(struct ioq_send* q, struct net_connection* con)
 {
 	int ret;
 	struct adc_message* msg = list_get_first(q->queue);
 	if (!msg) return 0;
 	uhub_assert(msg->cache && *msg->cache);
-	ret = net_con_send(user->connection, msg->cache + q->offset, msg->length - q->offset);
+	ret = net_con_send(con, msg->cache + q->offset, msg->length - q->offset);
 
 	if (ret > 0)
 	{

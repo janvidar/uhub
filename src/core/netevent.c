@@ -109,7 +109,7 @@ int handle_net_write(struct hub_user* user)
 	int ret = 0;
 	while (ioq_send_get_bytes(user->send_queue))
 	{
-		ret = ioq_send_send(user->send_queue, user);
+		ret = ioq_send_send(user->send_queue, user->connection);
 		if (ret <= 0)
 			break;
 	}

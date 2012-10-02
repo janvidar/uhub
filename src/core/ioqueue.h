@@ -60,7 +60,7 @@ extern void ioq_send_add(struct ioq_send*, struct adc_message* msg);
  * Process the send queue, and send as many messages as possible.
  * @returns -1 on error, 0 if unable to send more, 1 if more can be sent.
  */
-extern int  ioq_send_send(struct ioq_send*, struct hub_user*);
+extern int  ioq_send_send(struct ioq_send*, struct net_connection* con);
 
 /**
  * @returns 1 if send queue is empty, 0 otherwise.

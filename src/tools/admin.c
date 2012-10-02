@@ -163,18 +163,18 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	struct ADC_client client;
+	struct ADC_client* client;
 	net_initialize();
 
 	memset(g_usermap, 0, sizeof(g_usermap));
 
-	ADC_client_create(&client, "uhub-admin", "stresstester");
-	ADC_client_set_callback(&client, handle);
-	ADC_client_connect(&client, argv[1]);
+	client = ADC_client_create("uhub-admin", "stresstester");
+	ADC_client_set_callback(client, handle);
+	ADC_client_connect(client, argv[1]);
 
 	while (running && net_backend_process()) { }
 
-	ADC_client_destroy(&client);
+	ADC_client_destroy(client);
 	net_destroy();
 	return 0;
 }
