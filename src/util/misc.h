@@ -42,6 +42,19 @@ extern char* strip_off_quotes(char* line);
  */
 extern int is_number(const char* str, int* num);
 
+/**
+ * Convert the 'bytes' number into a formatted byte size string.
+ * E.g. "129012" becomes "125.99 KB".
+ * Note, if the output buffer is not large enough then the output
+ * will be truncated. The buffer will always be \0 terminated.
+ *
+ * @param bytes the number that should be formatted.
+ * @param[out] buf the buffer the string should be formatted into
+ * @param bufsize the size of 'buf'
+ * @return A pointer to buf.
+ */
+extern const char* format_size(size_t bytes, char* buf, size_t bufsize);
+
 extern int file_read_lines(const char* file, void* data, file_line_handler_t handler);
 
 /**
