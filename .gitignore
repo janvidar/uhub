@@ -5,6 +5,7 @@
 *.manifest
 *.gch
 CMakeFiles/*
+CMakeCache.txt
 cmake_install.cmake
 mod_*.dll
 mod_*.exp
