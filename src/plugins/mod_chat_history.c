@@ -67,7 +67,7 @@ static size_t get_messages(struct chat_history_data* data, size_t num, struct cb
 	char* message;
 	int skiplines = 0;
 	size_t lines = 0;
-	int total = list_size(messages);
+	size_t total = list_size(messages);
 
 	if (total == 0)
 		return 0;

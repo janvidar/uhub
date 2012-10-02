@@ -270,6 +270,7 @@ typedef unsigned __int64 uint64_t;
 #define open _open
 #define close _close
 #define read _read
+#define write _write
 #define NEED_GETOPT
 #endif
 
