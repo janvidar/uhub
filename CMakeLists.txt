@@ -5,7 +5,8 @@
 
 cmake_minimum_required (VERSION 2.8.3)
 
-project (uhub)
+project (uhub NONE)
+enable_language(C)
 
 set (UHUB_VERSION_MAJOR 0)
 set (UHUB_VERSION_MINOR 4)
