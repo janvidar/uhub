@@ -557,14 +557,28 @@ static int command_stats(struct command_base* cbase, struct hub_user* user, stru
 {
 	struct cbuffer* buf = cbuf_create(128);
 	struct hub_info* hub = cbase->hub;
+	static char rxbuf[64] = { "0 B" };
+	static char txbuf[64] = { "0 B" };
 
-	cbuf_append_format(buf, PRINTF_SIZE_T " users, peak: " PRINTF_SIZE_T ". Network (up/down): %d/%d KB/s, peak: %d/%d KB/s",
-		hub->users->count,
-		hub->users->count_peak,
-		(int) hub->stats.net_tx / 1024,
-		(int) hub->stats.net_rx / 1024,
-		(int) hub->stats.net_tx_peak / 1024,
-		(int) hub->stats.net_rx_peak / 1024);
+	cbuf_append(buf, "Hub statistics: ");
+	cbuf_append_format(buf, PRINTF_SIZE_T "/" PRINTF_SIZE_T " users (peak %d). ", hub->users->count, hub->config->max_users, hub->users->count_peak);
+
+	format_size(hub->stats.net_rx, rxbuf, sizeof(rxbuf));
+	format_size(hub->stats.net_tx, txbuf, sizeof(txbuf));
+
+	cbuf_append_format(buf, "Network: tx=%s/s, rx=%s/s", txbuf, rxbuf);
+
+#ifdef SHOW_PEAK_NET_STATS /* currently disabled */
+	format_size(hub->stats.net_rx_peak, rxbuf, sizeof(rxbuf));
+	format_size(hub->stats.net_tx_peak, txbuf, sizeof(txbuf));
+	cbuf_append_format(buf, ", peak_tx=%s/s, peak_rx=%s/s", txbuf, rxbuf);
+#endif
+
+	format_size(hub->stats.net_rx_total, rxbuf, sizeof(rxbuf));
+	format_size(hub->stats.net_tx_total, txbuf, sizeof(txbuf));
+	cbuf_append_format(buf, ", total_tx=%s", txbuf);
+	cbuf_append_format(buf, ", total_rx=%s", rxbuf);
+
 	return command_status(cbase, user, cmd, buf);
 }
 
