@@ -105,13 +105,19 @@ struct ADC_client_callback_data
 	};
 };
 
+sid_t ADC_client_get_sid(const struct ADC_client* client);
+const char* ADC_client_get_nick(const struct ADC_client* client);
+const char* ADC_client_get_description(const struct ADC_client* client);
+void* ADC_client_get_ptr(const struct ADC_client* client);
+
 typedef int (*adc_client_cb)(struct ADC_client*, enum ADC_client_callback_type, struct ADC_client_callback_data* data);
 
-struct ADC_client* ADC_client_create(const char* nickname, const char* description);
+struct ADC_client* ADC_client_create(const char* nickname, const char* description, void* ptr);
 void ADC_client_set_callback(struct ADC_client* client, adc_client_cb);
 void ADC_client_destroy(struct ADC_client* client);
 int ADC_client_connect(struct ADC_client* client, const char* address);
 void ADC_client_disconnect(struct ADC_client* client);
+void ADC_client_send(struct ADC_client* client, struct adc_message* msg);
 
 #endif /* HAVE_UHUB_ADC_CLIENT_H */
 

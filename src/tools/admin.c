@@ -168,7 +168,7 @@ int main(int argc, char** argv)
 
 	memset(g_usermap, 0, sizeof(g_usermap));
 
-	client = ADC_client_create("uhub-admin", "stresstester");
+	client = ADC_client_create("uhub-admin", "stresstester", NULL);
 	ADC_client_set_callback(client, handle);
 	ADC_client_connect(client, argv[1]);
 

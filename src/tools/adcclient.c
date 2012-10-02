@@ -64,6 +64,7 @@ struct ADC_client
 	char* nick;
 	char* desc;
 	int flags;
+	void* ptr;
 #ifdef SSL_SUPPORT
 	const SSL_METHOD* ssl_method;
 	SSL_CTX* ssl_ctx;
@@ -81,7 +82,6 @@ static void ADC_client_on_disconnected(struct ADC_client* client);
 static void ADC_client_on_login(struct ADC_client* client);
 static int ADC_client_parse_address(struct ADC_client* client, const char* arg);
 static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, size_t length);
-static void ADC_client_send(struct ADC_client* client, struct adc_message* msg);
 static int ADC_client_send_queue(struct ADC_client* client);
 
 static void ADC_client_debug(struct ADC_client* client, const char* format, ...)
@@ -513,7 +513,7 @@ void ADC_client_send_info(struct ADC_client* client)
 }
 
 
-struct ADC_client* ADC_client_create(const char* nickname, const char* description)
+struct ADC_client* ADC_client_create(const char* nickname, const char* description, void* ptr)
 {
 	ADC_TRACE;
 	struct ADC_client* client = (struct ADC_client*) hub_malloc_zero(sizeof(struct ADC_client));
@@ -539,6 +539,7 @@ struct ADC_client* ADC_client_create(const char* nickname, const char* descripti
 	client->send_queue = ioq_send_create();
 	client->recv_queue = ioq_recv_create();
 
+	client->ptr = ptr;
 	return client;
 }
 
@@ -550,6 +551,8 @@ void ADC_client_destroy(struct ADC_client* client)
 	/* FIXME */
 	net_timer_shutdown(client->timer);
 #endif
+	ioq_send_destroy(client->send_queue);
+	ioq_recv_destroy(client->recv_queue);
 	hub_free(client->timer);
 	adc_msg_free(client->info);
 	hub_free(client->nick);
@@ -611,8 +614,9 @@ static void ADC_client_on_connected_ssl(struct ADC_client* client)
 {
 	ADC_TRACE;
 	net_con_update(client->con, NET_EVENT_READ);
+	client->callback(client, ADC_CLIENT_SSL_OK, 0);
 	client->callback(client, ADC_CLIENT_CONNECTED, 0);
-	ADC_client_send(client, ADC_HANDSHAKE);
+	ADC_client_send(client, adc_msg_create(ADC_HANDSHAKE));
 	ADC_client_set_state(client, ps_protocol);
 }
 #endif
@@ -703,4 +707,24 @@ void ADC_client_set_callback(struct ADC_client* client, adc_client_cb cb)
 {
 	ADC_TRACE;
 	client->callback = cb;
+}
+
+sid_t ADC_client_get_sid(const struct ADC_client* client)
+{
+	return client->sid;
+}
+
+const char* ADC_client_get_nick(const struct ADC_client* client)
+{
+	return client->nick;
+}
+
+const char* ADC_client_get_description(const struct ADC_client* client)
+{
+	return client->desc;
+}
+
+void* ADC_client_get_ptr(const struct ADC_client* client)
+{
+	return client->ptr;
 }
