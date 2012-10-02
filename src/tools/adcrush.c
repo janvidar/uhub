@@ -138,23 +138,6 @@ static void bot_output(struct ADC_client* client, int level, const char* format,
 	}
 }
 
-static const char* format_size(size_t bytes)
-{
-	static char buf[64];
-	static const char* quant[] = { "B", "KB", "MB", "GB", "TB", "PB", "EB" };
-	size_t b = bytes;
-	size_t factor = 0;
-	size_t divisor = 1;
-	while (b > 1024)
-	{
-		factor++;
-		b = (b >> 10);
-		divisor = (divisor << 10);
-	}
-
-	snprintf(buf, sizeof(buf), "%.2f %s", (double) bytes / (double) divisor, quant[factor]);
-	return buf;
-}
 
 static size_t get_wait_rand(size_t max)
 {
@@ -438,8 +421,8 @@ void p_status()
 		rx = stats_intermediate->rx / cfg_netstats_interval;
 		tx = stats_intermediate->tx / cfg_netstats_interval;
 		net_stats_reset();
-		strcpy(rxbuf, format_size(rx));
-		strcpy(txbuf, format_size(tx));
+		format_size(rx, rxbuf, sizeof(rxbuf));
+		format_size(tx, txbuf, sizeof(txbuf));
 	}
 
 	n = blank;
