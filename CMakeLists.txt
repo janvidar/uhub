@@ -83,6 +83,7 @@ set (utils_SOURCES
 
 set (adcclient_SOURCES
 	${PROJECT_SOURCE_DIR}/tools/adcclient.c
+	${PROJECT_SOURCE_DIR}/core/ioqueue.c
 )
 
 add_library(adc       STATIC ${adc_SOURCES})
@@ -110,6 +111,10 @@ if (SQLITE_SUPPORT)
 	target_link_libraries(mod_auth_sqlite sqlite3)
 	target_link_libraries(uhub-passwd sqlite3)
 	set_target_properties(mod_auth_sqlite PROPERTIES PREFIX "")
+
+	if (UNIX)
+		target_link_libraries(uhub pthread)
+	endif()
 endif()
 
 if(WIN32)
