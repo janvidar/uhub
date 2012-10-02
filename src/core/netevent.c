@@ -55,7 +55,7 @@ int handle_net_read(struct hub_user* user)
 
 		while ((pos = memchr(start, '\n', remaining)))
 		{
-			lastPos = pos;
+			lastPos = pos+1;
 			pos[0] = '\0';
 
 #ifdef DEBUG_SENDQ

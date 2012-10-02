@@ -403,7 +403,7 @@ static ssize_t ADC_client_recv(struct ADC_client* client)
 
 		while ((pos = memchr(start, '\n', remaining)))
 		{
-			lastPos = pos;
+			lastPos = pos+1;
 			pos[0] = '\0';
 
 #ifdef DEBUG_SENDQ
