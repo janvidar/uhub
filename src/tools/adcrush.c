@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2011, Jan Vidar Krey
+ * Copyright (C) 2007-2012, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,9 +24,11 @@
 #define ADC_CID_SIZE 39
 #define BIG_BUFSIZE 32768
 #define TIGERSIZE 24
+#define STATS_INTERVAL 3
 #define ADCRUSH "adcrush/0.3"
 #define ADC_NICK "[BOT]adcrush"
 #define ADC_DESC "crash\\stest\\sdummy"
+
 
 #define LVL_INFO 1
 #define LVL_DEBUG 2
@@ -38,6 +40,32 @@ static int cfg_level       = 1; /* activity level (0..3) */
 static int cfg_chat        = 0; /* chat mode, allow sending chat messages */
 static int cfg_quiet       = 0; /* quiet mode (no output) */
 static int cfg_clients     = ADC_CLIENTS_DEFAULT; /* number of clients */
+static int cfg_netstats_interval = STATS_INTERVAL;
+static int running         = 1;
+static int logged_in       = 0;
+static int blank           = 0;
+static struct net_statistics* stats_intermediate;
+static struct net_statistics* stats_total;
+
+static int handle(struct ADC_client* client, enum ADC_client_callback_type type, struct ADC_client_callback_data* data);
+static void timer_callback(struct timeout_evt* t);
+
+static void do_blank(int n)
+{
+	n++;
+	while (n > 0)
+	{
+		fprintf(stdout, " ");
+		n--;
+	}
+}
+
+struct AdcFuzzUser
+{
+	struct ADC_client* client;
+	struct timeout_evt* timer;
+	int logged_in;
+};
 
 #define MAX_CHAT_MSGS 35
 const char* chat_messages[MAX_CHAT_MSGS] = {
@@ -103,10 +131,31 @@ static void bot_output(struct ADC_client* client, int level, const char* format,
 	va_end(args);
 
 	if (cfg_debug >= level)
-	fprintf(stdout, "* [%p] %s\n", client, logmsg);
+	{
+		int num = fprintf(stdout, "* [%p] %s", client, logmsg);
+		do_blank(blank - num);
+		fprintf(stdout, "\n");
+	}
 }
 
-#if 0
+static const char* format_size(size_t bytes)
+{
+	static char buf[64];
+	static const char* quant[] = { "B", "KB", "MB", "GB", "TB", "PB", "EB" };
+	size_t b = bytes;
+	size_t factor = 0;
+	size_t divisor = 1;
+	while (b > 1024)
+	{
+		factor++;
+		b = (b >> 10);
+		divisor = (divisor << 10);
+	}
+
+	snprintf(buf, sizeof(buf), "%.2f %s", (double) bytes / (double) divisor, quant[factor]);
+	return buf;
+}
+
 static size_t get_wait_rand(size_t max)
 {
 	static size_t next = 0;
@@ -115,120 +164,144 @@ static size_t get_wait_rand(size_t max)
 	return ((size_t )(next / 65536) % max);
 }
 
+static size_t get_next_timeout_evt()
+{
+	switch (cfg_level)
+	{
+		case 0: return get_wait_rand(120);
+		case 1: return get_wait_rand(60);
+		case 2: return get_wait_rand(15);
+		case 3: return get_wait_rand(5);
+	}
+
+}
+
 
 static void perf_result(struct ADC_client* client, sid_t target, const char* what, const char* token);
 
 static void perf_chat(struct ADC_client* client, int priv)
 {
-	char buf[1024] = { 0, };
 	size_t r = get_wait_rand(MAX_CHAT_MSGS-1);
 	char* msg = adc_msg_escape(chat_messages[r]);
+	struct adc_message* cmd = NULL;
 
 	if (priv)
-	{
-		strcat(buf, "EMSG ");
-		strcat(buf, sid_to_string(client->sid));
-		strcat(buf, " ");
-		strcat(buf, sid_to_string(client->sid));
-	}
+		cmd = adc_msg_construct_source_dest(ADC_CMD_DMSG, ADC_client_get_sid(client), ADC_client_get_sid(client), strlen(msg));
 	else
-	{
-		strcat(buf, "BMSG ");
-		strcat(buf, sid_to_string(client->sid));
-	}
-	strcat(buf, " ");
-
-	strcat(buf, msg);
+		cmd = adc_msg_construct_source(ADC_CMD_BMSG, ADC_client_get_sid(client), strlen(msg));
 	hub_free(msg);
 	
-	strcat(buf, "\n");
-	ADC_client_send(client, buf);
+	ADC_client_send(client, cmd);
 }
 
 static void perf_search(struct ADC_client* client)
 {
-	char buf[1024] = { 0, };
 	size_t r = get_wait_rand(MAX_SEARCH_MSGS-1);
 	size_t pst = get_wait_rand(100);
-	
+	struct adc_message* cmd = NULL;
+
 	if (pst > 80)
 	{
-		strcat(buf, "FSCH ");
-		strcat(buf, sid_to_string(client->sid));
-		strcat(buf, " +TCP4 ");
+		cmd = adc_msg_construct_source(ADC_CMD_FSCH, ADC_client_get_sid(client), strlen(search_messages[r]) + 6);
+		adc_msg_add_argument(cmd, "+TCP4");
 	}
 	else
 	{
-		strcat(buf, "BSCH ");
-		strcat(buf, sid_to_string(client->sid));
-		strcat(buf, " ");
+		cmd = adc_msg_construct_source(ADC_CMD_BSCH, ADC_client_get_sid(client), strlen(search_messages[r]) + 6);
+		adc_msg_add_argument(cmd, "+TCP4");
 	}
-	strcat(buf, search_messages[r]);
-	strcat(buf, "\n");
-	ADC_client_send(client, buf);
+	ADC_client_send(client, cmd);
 }
 
 static void perf_result(struct ADC_client* client, sid_t target, const char* what, const char* token)
 {
-	char buf[1024] = { 0, };
-	strcat(buf, "DRES ");
-	strcat(buf, sid_to_string(client->sid));
-	strcat(buf, " ");
-	strcat(buf, sid_to_string(target));
-	strcat(buf, " FN" "test/");
-	strcat(buf, what);
-	strcat(buf, ".dat");
-	strcat(buf, " SL" "0");
-	strcat(buf, " SI" "908987128912");
-	strcat(buf, " TR" "5T6YJYKO3WECS52BKWVSOP5VUG4IKNSZBZ5YHBA");
-	strcat(buf, " TO");
-	strcat(buf, token);
-	strcat(buf, "\n");
-	ADC_client_send(client, buf);
+	char tmp[256];
+	struct adc_message* cmd = adc_msg_construct_source_dest(ADC_CMD_DRES, ADC_client_get_sid(client), target, strlen(what) + strlen(token) + 64);
+
+	snprintf(tmp, sizeof(tmp), "FNtest/%s.dat", what);
+	adc_msg_add_argument(cmd, tmp);
+
+	adc_msg_add_argument(cmd, "SL0");
+	adc_msg_add_argument(cmd, "SI1209818412");
+	adc_msg_add_argument(cmd, "TR5T6YJYKO3WECS52BKWVSOP5VUG4IKNSZBZ5YHBA");
+	snprintf(tmp, sizeof(tmp), "TO%s", token);
+	adc_msg_add_argument(cmd, tmp);
+
+	ADC_client_send(client, cmd);
 }
 
 static void perf_ctm(struct ADC_client* client)
 {
 	char buf[1024] = { 0, };
-	strcat(buf, "DCTM ");
-	strcat(buf, sid_to_string(client->sid));
-	strcat(buf, " ");
-	strcat(buf, sid_to_string(client->sid));
-	strcat(buf, " ");
-	strcat(buf, "ADC/1.0");
-	strcat(buf, " TOKEN111");
-	strcat(buf, sid_to_string(client->sid));
-	strcat(buf, "\n");
-	ADC_client_send(client, buf);
+	struct adc_message* cmd = adc_msg_construct_source_dest(ADC_CMD_DCTM, ADC_client_get_sid(client), ADC_client_get_sid(client), 32);
+	adc_msg_add_argument(cmd, "ADC/1.0");
+	adc_msg_add_argument(cmd, "TOKEN123456");
+	adc_msg_add_argument(cmd, sid_to_string(ADC_client_get_sid(client)));
+	ADC_client_send(client, cmd);
 }
 
 
 static void perf_update(struct ADC_client* client)
 {
-	char buf[1024] = { 0, };
+	char buf[16] = { 0, };
 	int n = (int) get_wait_rand(10)+1;
-	
-	strcat(buf, "BINF ");
-	strcat(buf, sid_to_string(client->sid));
-	strcat(buf, " HN");
-	strcat(buf, uhub_itoa(n));
+	struct adc_message* cmd = adc_msg_construct_source(ADC_CMD_BINF, ADC_client_get_sid(client), 32);
+	snprintf(buf, sizeof(buf), "HN%d", n);
+	adc_msg_add_argument(cmd, buf);
+	ADC_client_send(client, cmd);
+}
 
-	strcat(buf, "\n");
-	ADC_client_send(client, buf);
+static void client_disconnect(struct AdcFuzzUser* c)
+{
+		ADC_client_destroy(c->client);
+		hub_free(c->client);
+		c->client = 0;
+
+		timeout_queue_remove(net_backend_get_timeout_queue(), c->timer);
+		hub_free(c->timer);
+		c->timer = 0;
+
+		c->logged_in = 0;
+}
+
+static void client_connect(struct AdcFuzzUser* c, const char* nick, const char* description)
+{
+	size_t timeout = get_next_timeout_evt();
+	struct ADC_client* client = ADC_client_create(nick, description, c);
+
+	c->client = client;
+	c->timer = (struct timeout_evt*) hub_malloc(sizeof(struct timeout_evt));
+	timeout_evt_initialize(c->timer, timer_callback, c);
+	timeout_queue_insert(net_backend_get_timeout_queue(), c->timer, timeout);
+
+	bot_output(client, LVL_VERBOSE, "Initial timeout: %d seconds", timeout);
+	c->logged_in = 0;
+
+	ADC_client_set_callback(client, handle);
+	ADC_client_connect(client, cfg_uri);
 }
 
 static void perf_normal_action(struct ADC_client* client)
 {
+	struct AdcFuzzUser* user = (struct AdcFuzzUser*) ADC_client_get_ptr(client);
 	size_t r = get_wait_rand(5);
 	size_t p = get_wait_rand(100);
 
 	switch (r)
 	{
 		case 0:
-			if (p > (90 - (10 * cfg_level)))
+			// if (p > (90 - (10 * cfg_level)))
 			{
+				struct ADC_client* c;
+				char* nick = hub_strdup(ADC_client_get_nick(client));
+				char* desc = hub_strdup(ADC_client_get_description(client));
+
 				bot_output(client, LVL_VERBOSE, "timeout -> disconnect");
-				ADC_client_disconnect(client);
+				client_disconnect(user);
+				client_connect(user, nick, desc);
+
+				hub_free(nick);
+				hub_free(desc);
 			}
 			break;
 
@@ -236,37 +309,43 @@ static void perf_normal_action(struct ADC_client* client)
 			if (cfg_chat)
 			{
 				bot_output(client, LVL_VERBOSE, "timeout -> chat");
-				perf_chat(client, 0);
+				if (user->logged_in)
+					perf_chat(client, 0);
 				
 			}
 			break;
 
 		case 2:
 			bot_output(client, LVL_VERBOSE, "timeout -> search");
-			perf_search(client);
+			if (user->logged_in)
+				perf_search(client);
 			break;
 
 		case 3:
 			bot_output(client, LVL_VERBOSE, "timeout -> update");
-			perf_update(client);
+			if (user->logged_in)
+				perf_update(client);
 			break;
 
 		case 4:
 			bot_output(client, LVL_VERBOSE, "timeout -> privmsg");
-			perf_chat(client, 1);
+			if (user->logged_in)
+				perf_chat(client, 1);
 			break;
 
 		case 5:
 			bot_output(client, LVL_VERBOSE, "timeout -> ctm/rcm");
-			perf_ctm(client);
+			if (user->logged_in)
+				perf_ctm(client);
 			break;
 
 	}
 }
-#endif
 
 static int handle(struct ADC_client* client, enum ADC_client_callback_type type, struct ADC_client_callback_data* data)
 {
+	struct AdcFuzzUser* user = (struct AdcFuzzUser*) ADC_client_get_ptr(client);
+
 	switch (type)
 	{
 		case ADC_CLIENT_CONNECTING:
@@ -274,7 +353,7 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 			break;
 
 		case ADC_CLIENT_CONNECTED:
-			bot_output(client, LVL_DEBUG, "*** Connected.");
+			// bot_output(client, LVL_DEBUG, "*** Connected.");
 			break;
 
 		case ADC_CLIENT_DISCONNECTED:
@@ -282,38 +361,40 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 			break;
 
 		case ADC_CLIENT_LOGGING_IN:
-			bot_output(client, LVL_DEBUG, "*** Logging in...");
+			// bot_output(client, LVL_DEBUG, "*** Logging in...");
 			break;
 
 		case ADC_CLIENT_PASSWORD_REQ:
-			bot_output(client, LVL_DEBUG, "*** Requesting password.");
+			//bot_output(client, LVL_DEBUG, "*** Requesting password.");
+			break;
 
 		case ADC_CLIENT_LOGGED_IN:
 			bot_output(client, LVL_DEBUG, "*** Logged in.");
+			user->logged_in = 1;
 			break;
 
 		case ADC_CLIENT_LOGIN_ERROR:
 			bot_output(client, LVL_DEBUG, "*** Login error");
 			break;
 
+		case ADC_CLIENT_SSL_HANDSHAKE:
+		case ADC_CLIENT_SSL_OK:
+			break;
+
 		case ADC_CLIENT_MESSAGE:
-			bot_output(client, LVL_DEBUG, "    <%s> %s", sid_to_string(data->chat->from_sid), data->chat->message);
+// 			bot_output(client, LVL_DEBUG, "    <%s> %s", sid_to_string(data->chat->from_sid), data->chat->message);
 			break;
 
 		case ADC_CLIENT_USER_JOIN:
-			bot_output(client, LVL_VERBOSE, "    JOIN: %s", data->user->name);
 			break;
 
 		case ADC_CLIENT_USER_QUIT:
-			bot_output(client, LVL_VERBOSE, "    QUIT");
 			break;
 
 		case ADC_CLIENT_SEARCH_REQ:
 			break;
 
 		case ADC_CLIENT_HUB_INFO:
-			bot_output(client, LVL_DEBUG, "    Hub: \"%s\" [%s]\n"
-				   "         \"%s\"\n", data->hubinfo->name, data->hubinfo->version, data->hubinfo->description);
 			break;
 
 		default:
@@ -324,30 +405,71 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 	return 1;
 }
 
+static void timer_callback(struct timeout_evt* t)
+{
+	size_t timeout = get_next_timeout_evt();
+	struct AdcFuzzUser* client = (struct AdcFuzzUser*) t->ptr;
+	if (client->logged_in)
+	{
+		perf_normal_action(client->client);
+		bot_output(client->client, LVL_VERBOSE, "Next timeout: %d seconds", (int) timeout);
+	}
+	timeout_queue_reschedule(net_backend_get_timeout_queue(), client->timer, timeout);
+}
+
+static struct AdcFuzzUser client[ADC_MAX_CLIENTS];
+void p_status()
+{
+	static char rxbuf[64] = { "0 B" };
+	static char txbuf[64] = { "0 B" };
+	int logged_in = 0;
+	size_t n;
+	static size_t rx = 0, tx = 0;
+
+	for (n = 0; n < cfg_clients; n++)
+	{
+		if (client[n].logged_in)
+			logged_in++;
+	}
+
+	if (difftime(time(NULL), stats_intermediate->timestamp) >= cfg_netstats_interval)
+	{
+		net_stats_get(&stats_intermediate, &stats_total);
+		rx = stats_intermediate->rx / cfg_netstats_interval;
+		tx = stats_intermediate->tx / cfg_netstats_interval;
+		net_stats_reset();
+		strcpy(rxbuf, format_size(rx));
+		strcpy(txbuf, format_size(tx));
+	}
+
+	n = blank;
+	blank = printf("Connected bots: %d/%d, network: rx=%s/s, tx=%s/s", logged_in, cfg_clients, rxbuf, txbuf);
+	if (n > blank)
+		do_blank(n-blank);
+	printf("\r");
+}
+
 void runloop(size_t clients)
 {
 	size_t n = 0;
-	struct ADC_client* client[ADC_MAX_CLIENTS];
+	blank = 0;
 
 	for (n = 0; n < clients; n++)
 	{
 		char nick[20];
 		snprintf(nick, 20, "adcrush_%d", (int) n);
-		struct ADC_client* c = ADC_client_create(nick, "stresstester");
-		client[n] = c;
-		ADC_client_set_callback(c, handle);
-		ADC_client_connect(c, cfg_uri);
+		client_connect(&client[n], nick, "stresstester");
 	}
 
-	while (net_backend_process())
+	while (running && net_backend_process())
 	{
+		p_status();
 	}
 
 	for (n = 0; n < clients; n++)
 	{
-		ADC_client_destroy(client[n]);
-		free(client[n]);
-		client[n] = 0;
+		struct AdcFuzzUser* c = &client[n];
+		client_disconnect(c);
 	}
 }
 
@@ -371,6 +493,7 @@ static void print_usage(const char* program)
 	printf("    -c          Allow broadcasting chat messages.\n");
 	printf("    -d          Enable debug output.\n");
 	printf("    -q          Quiet mode (no output).\n");
+	printf("    -i <num>    Average network statistics for given interval (default: 3)\n");
 	printf("\n");
 
 	exit(0);
@@ -404,6 +527,10 @@ int parse_arguments(int argc, char** argv)
 		{
 			cfg_level = MIN(MAX(uhub_atoi(argv[opt]), 0), 3);
 		}
+		else if (!strcmp(argv[opt], "-i") && (++opt) < argc)
+		{
+			cfg_netstats_interval = MAX(uhub_atoi(argv[opt]), 1);
+		}
 		else if (!strcmp(argv[opt], "-n") && (++opt) < argc)
 		{
 			cfg_clients = MIN(MAX(uhub_atoi(argv[opt]), 1), ADC_MAX_CLIENTS);
@@ -425,13 +552,15 @@ void parse_command_line(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
+
 	parse_command_line(argc, argv);
 	
 	net_initialize();
+	net_stats_get(&stats_intermediate, &stats_total);
 
 	hub_log_initialize(NULL, 0);
 	hub_set_log_verbosity(1000);
-
+	setvbuf(stdout, NULL, _IONBF, 0);
 	runloop(cfg_clients);
 
 	net_destroy();

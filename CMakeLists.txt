@@ -164,6 +164,9 @@ if(OPENSSL_FOUND)
 	endif()
 	target_link_libraries(mod_welcome ${OPENSSL_LIBRARIES})
 	target_link_libraries(mod_logging ${OPENSSL_LIBRARIES})
+	if (ADC_STRESS)
+		target_link_libraries(adcrush ${OPENSSL_LIBRARIES})
+	endif()
 endif()
 
 configure_file ("${PROJECT_SOURCE_DIR}/version.h.in" "${PROJECT_SOURCE_DIR}/version.h")
@@ -173,7 +176,7 @@ if (RELEASE)
 	set(CMAKE_BUILD_TYPE Release)
 else()
 	set(CMAKE_BUILD_TYPE Debug)
-	add_definitions(-DDEBUG)
+	# add_definitions(-DDEBUG)
 endif()
 
 
