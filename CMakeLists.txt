@@ -17,6 +17,7 @@ option(RELEASE "Release build, debug build if disabled" ON)
 option(LINK_SUPPORT "Allow hub linking" OFF)
 option(SSL_SUPPORT "Enable SSL support" ON)
 option(SQLITE_SUPPORT "Enable SQLite support" ON)
+option(ADC_STRESS "Enable the stress tester client" OFF)
 
 find_package(Git)
 
@@ -137,8 +138,13 @@ target_link_libraries(uhub ${CMAKE_DL_LIBS} adc network utils)
 
 if(UNIX)
 	add_library(adcclient STATIC ${adcclient_SOURCES})
-	add_executable(uhub-admin ${PROJECT_SOURCE_DIR}/tools/admin.c ${adcclient_SOURCES})
+	add_executable(uhub-admin ${PROJECT_SOURCE_DIR}/tools/admin.c)
 	target_link_libraries(uhub-admin adcclient adc network utils)
+
+	if (ADC_STRESS)
+		add_executable(adcrush ${PROJECT_SOURCE_DIR}/tools/adcrush.c ${adcclient_SOURCES})
+		target_link_libraries(adcrush adcclient adc network utils)
+	endif()
 endif()
 
 if(GIT_FOUND AND IS_DIRECTORY ".git")
@@ -166,6 +172,7 @@ if (RELEASE)
 	set(CMAKE_BUILD_TYPE Release)
 else()
 	set(CMAKE_BUILD_TYPE Debug)
+	add_definitions(-DDEBUG)
 endif()
 
 

@@ -331,13 +331,10 @@ void runloop(size_t clients)
 
 	for (n = 0; n < clients; n++)
 	{
-		struct ADC_client* c = malloc(sizeof(struct ADC_client));
-		client[n] = c;
-
 		char nick[20];
 		snprintf(nick, 20, "adcrush_%d", (int) n);
-
-		ADC_client_create(c, nick, "stresstester");
+		struct ADC_client* c = ADC_client_create(nick, "stresstester");
+		client[n] = c;
 		ADC_client_set_callback(c, handle);
 		ADC_client_connect(c, cfg_uri);
 	}
@@ -357,7 +354,7 @@ void runloop(size_t clients)
 static void print_version()
 {
 	printf(ADCRUSH "\n");
-	printf("Copyright (C) 2008-2009, Jan Vidar Krey\n");
+	printf("Copyright (C) 2008-2012, Jan Vidar Krey\n");
 	printf("\n");
 }
 
