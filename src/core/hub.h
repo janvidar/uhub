@@ -81,6 +81,7 @@ struct hub_stats
 	size_t net_rx_peak;
 	size_t net_tx_total;
 	size_t net_rx_total;
+	struct timeout_evt* timeout;    /**<< "Timeout handler for statistics" */
 };
 
 struct hub_logout_info

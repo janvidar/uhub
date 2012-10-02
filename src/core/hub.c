@@ -600,6 +600,31 @@ static void hub_event_dispatcher(void* callback_data, struct event_data* message
 	}
 }
 
+
+static void hub_update_stats(struct hub_info* hub)
+{
+	const int factor = TIMEOUT_STATS;
+	struct net_statistics* total;
+	struct net_statistics* intermediate;
+	net_stats_get(&intermediate, &total);
+
+	hub->stats.net_tx = (intermediate->tx / factor);
+	hub->stats.net_rx = (intermediate->rx / factor);
+	hub->stats.net_tx_peak = MAX(hub->stats.net_tx, hub->stats.net_tx_peak);
+	hub->stats.net_rx_peak = MAX(hub->stats.net_rx, hub->stats.net_rx_peak);
+	hub->stats.net_tx_total = total->tx;
+	hub->stats.net_rx_total = total->rx;
+
+	net_stats_reset();
+}
+
+static void hub_timer_statistics(struct timeout_evt* t)
+{
+	struct hub_info* hub = (struct hub_info*) t->ptr;
+	hub_update_stats(hub);
+	timeout_queue_reschedule(net_backend_get_timeout_queue(), hub->stats.timeout, TIMEOUT_STATS);
+}
+
 static struct net_connection* start_listening_socket(const char* bind_addr, uint16_t port, int backlog, struct hub_info* hub)
 {
 	struct net_connection* server;
@@ -816,6 +841,13 @@ struct hub_info* hub_start_service(struct hub_config* config)
 
 	g_hub = hub;
 
+	if (net_backend_get_timeout_queue())
+	{
+		hub->stats.timeout = hub_malloc_zero(sizeof(struct timeout_evt));
+		timeout_evt_initialize(hub->stats.timeout, hub_timer_statistics, hub);
+		timeout_queue_insert(net_backend_get_timeout_queue(), hub->stats.timeout, TIMEOUT_STATS);
+	}
+
 	// Start the hub command sub-system
 	hub->commands = command_initialize(hub);
 	return hub;
@@ -825,6 +857,12 @@ struct hub_info* hub_start_service(struct hub_config* config)
 void hub_shutdown_service(struct hub_info* hub)
 {
 	LOG_DEBUG("hub_shutdown_service()");
+
+	if (net_backend_get_timeout_queue())
+	{
+		timeout_queue_remove(net_backend_get_timeout_queue(), hub->stats.timeout);
+		hub_free(hub->stats.timeout);
+	}
 
 #ifdef SSL_SUPPORT
 	unload_ssl_certificates(hub);

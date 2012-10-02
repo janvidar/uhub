@@ -38,42 +38,6 @@ static void clear_user_list_callback(void* ptr)
 	}
 }
 
-#ifdef STATS_SUPPORT
-void uman_update_stats(struct hub_user_manager* users)
-{
-	const int factor = TIMEOUT_STATS;
-	struct net_statistics* total;
-	struct net_statistics* intermediate;
-	net_stats_get(&intermediate, &total);
-
-	users->stats.net_tx = (intermediate->tx / factor);
-	users->stats.net_rx = (intermediate->rx / factor);
-	users->stats.net_tx_peak = MAX(users->stats.net_tx, users->stats.net_tx_peak);
-	users->stats.net_rx_peak = MAX(users->stats.net_rx, users->stats.net_rx_peak);
-	users->stats.net_tx_total = total->tx;
-	users->stats.net_rx_total = total->rx;
-	
-	net_stats_reset();
-}
-
-void uman_print_stats(struct hub_user_manager* users)
-{
-	LOG_INFO("Statistics  users=" PRINTF_SIZE_T " (peak_users=" PRINTF_SIZE_T "), net_tx=%d KB/s, net_rx=%d KB/s (peak_tx=%d KB/s, peak_rx=%d KB/s)",
-		users->users->count,
-		users->users->count_peak,
-		(int) users->stats.net_tx / 1024,
-		(int) users->stats.net_rx / 1024,
-		(int) users->stats.net_tx_peak / 1024,
-		(int) users->stats.net_rx_peak / 1024);
-}
-
-static void timer_statistics(struct timeout_evt* t)
-{
-	struct hub_user_manager* users = (struct hub_user_manager*) t->ptr;
-	uman_update_stats(users);
-	timeout_queue_reschedule(net_backend_get_timeout_queue(), users->timeout, TIMEOUT_STATS);
-}
-#endif // STATS_SUPPORT
 
 struct hub_user_manager* uman_init()
 {
@@ -91,15 +55,6 @@ struct hub_user_manager* uman_init()
 		return NULL;
 	}
 
-#ifdef STATS_SUPPORT
-	if (net_backend_get_timeout_queue())
-	{
-		users->timeout = hub_malloc_zero(sizeof(struct timeout_evt));
-		timeout_evt_initialize(users->timeout, timer_statistics, hub);
-		timeout_queue_insert(net_backend_get_timeout_queue(), users->timeout, TIMEOUT_STATS);
-	}
-#endif // STATS_SUPPORT
-
 	return users;
 }
 
@@ -108,14 +63,6 @@ int uman_shutdown(struct hub_user_manager* users)
 {
 	if (!users)
 		return -1;
-
-#ifdef STATS_SUPPORT
-	if (net_backend_get_timeout_queue())
-	{
-		timeout_queue_remove(net_backend_get_timeout_queue(), users->timeout);
-		hub_free(users->timeout);
-	}
-#endif
 
 	if (users->list)
 	{
