@@ -532,9 +532,9 @@ struct adc_message* adc_msg_create(const char* line)
 	return adc_msg_parse(line, strlen(line));
 }
 
-extern struct adc_message* adc_msg_construct_source(fourcc_t fourcc, sid_t source, size_t size)
+struct adc_message* adc_msg_construct_source(fourcc_t fourcc, sid_t source, size_t size)
 {
-	struct adc_message* msg = adc_msg_construct(fourcc, size + 4);
+	struct adc_message* msg = adc_msg_construct(fourcc, size + 4 + 1);
 	if (!msg)
 		return NULL;
 
@@ -542,6 +542,20 @@ extern struct adc_message* adc_msg_construct_source(fourcc_t fourcc, sid_t sourc
 	msg->source = source;
 	return msg;
 }
+
+struct adc_message* adc_msg_construct_source_dest(fourcc_t fourcc, sid_t source, sid_t dest, size_t size)
+{
+	struct adc_message* msg = adc_msg_construct(fourcc, size + 4 + 4 + 1);
+	if (!msg)
+		return NULL;
+
+	adc_msg_add_argument(msg, sid_to_string(source));
+	adc_msg_add_argument(msg, sid_to_string(dest));
+	msg->source = source;
+	msg->target = dest;
+	return msg;
+}
+
 
 struct adc_message* adc_msg_construct(fourcc_t fourcc, size_t size)
 {

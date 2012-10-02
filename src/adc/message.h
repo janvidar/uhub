@@ -96,6 +96,7 @@ extern struct adc_message* adc_msg_construct(fourcc_t fourcc, size_t size);
  * in addition pre-allocate 'size' bytes at the end of the message.
  */
 extern struct adc_message* adc_msg_construct_source(fourcc_t fourcc, sid_t source, size_t size);
+extern struct adc_message* adc_msg_construct_source_dest(fourcc_t fourcc, sid_t source, sid_t dest, size_t size);
 
 /**
  * Remove a named argument from the command.
