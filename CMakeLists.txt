@@ -141,10 +141,11 @@ if(UNIX)
 	target_link_libraries(uhub-admin adcclient adc network utils)
 endif()
 
-if(GIT_FOUND)
+if(GIT_FOUND AND IS_DIRECTORY ".git")
 	execute_process(COMMAND ${GIT_EXECUTABLE} show -s --pretty=format:%h OUTPUT_VARIABLE UHUB_REVISION)
 	set (UHUB_GIT_VERSION "${UHUB_VERSION_MAJOR}.${UHUB_VERSION_MINOR}.${UHUB_VERSION_PATCH}-git-${UHUB_REVISION}")
 else()
+	set (UHUB_GIT_VERSION "${UHUB_VERSION_MAJOR}.${UHUB_VERSION_MINOR}.${UHUB_VERSION_PATCH}-release")
 endif()
 
 if(OPENSSL_FOUND)
