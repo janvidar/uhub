@@ -307,7 +307,7 @@ int is_number(const char* value, int* num)
 
 const char* format_size(size_t bytes, char* buf, size_t bufsize)
 {
-	static const char* quant[] = { "B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB" };
+	static const char* quant[] = { "B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB" };
 	size_t b = bytes;
 	size_t factor = 0;
 	size_t divisor = 1;
@@ -317,7 +317,11 @@ const char* format_size(size_t bytes, char* buf, size_t bufsize)
 		b = (b >> 10);
 		divisor = (divisor << 10);
 	}
-	snprintf(buf, bufsize, "%.2f %s", (double) bytes / (double) divisor, quant[factor]);
+	uhub_assert(factor < (sizeof(quant) / sizeof(const char*)));
+	if (factor >= 2)
+		snprintf(buf, bufsize, "%.1f %s", (double) bytes / (double) divisor, quant[factor]);
+	else
+		snprintf(buf, bufsize, PRINTF_SIZE_T " %s", bytes / divisor, quant[factor]);
 	return buf;
 }
 
