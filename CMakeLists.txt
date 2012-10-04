@@ -11,7 +11,7 @@ set (UHUB_VERSION_MAJOR 0)
 set (UHUB_VERSION_MINOR 4)
 set (UHUB_VERSION_PATCH 1)
 
-set (PROJECT_SOURCE_DIR "src")
+set (PROJECT_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src")
 
 option(RELEASE "Release build, debug build if disabled" ON)
 option(LINK_SUPPORT "Allow hub linking" OFF)
