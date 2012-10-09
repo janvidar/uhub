@@ -91,20 +91,22 @@ set (adcclient_SOURCES
 add_library(adc       STATIC ${adc_SOURCES})
 add_library(network   STATIC ${network_SOURCES})
 add_library(utils     STATIC ${utils_SOURCES})
-
+if(CMAKE_COMPILER_IS_GNUCC)
+	set_target_properties(utils PROPERTIES COMPILE_FLAGS -fPIC)
+endif()
 
 add_dependencies(adc utils)
 add_dependencies(network utils)
 
 add_executable(uhub ${PROJECT_SOURCE_DIR}/core/main.c ${uhub_SOURCES} )
 
-add_library(mod_example MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_example.c ${utils_SOURCES})
-add_library(mod_welcome MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_welcome.c ${utils_SOURCES} ${network_SOURCES})
-add_library(mod_logging MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_logging.c ${utils_SOURCES} ${PROJECT_SOURCE_DIR}/adc/sid.c ${network_SOURCES})
-add_library(mod_auth_simple MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_auth_simple.c ${utils_SOURCES})
-add_library(mod_chat_history MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_chat_history.c ${utils_SOURCES})
-add_library(mod_chat_only MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_chat_only.c ${utils_SOURCES})
-add_library(mod_topic MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_topic.c ${utils_SOURCES})
+add_library(mod_example MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_example.c)
+add_library(mod_welcome MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_welcome.c ${network_SOURCES})
+add_library(mod_logging MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_logging.c ${PROJECT_SOURCE_DIR}/adc/sid.c ${network_SOURCES})
+add_library(mod_auth_simple MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_auth_simple.c )
+add_library(mod_chat_history MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_chat_history.c )
+add_library(mod_chat_only MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_chat_only.c)
+add_library(mod_topic MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_topic.c)
 
 if (SQLITE_SUPPORT)
 	add_library(mod_auth_sqlite MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_auth_sqlite.c ${utils_SOURCES})
@@ -113,11 +115,14 @@ if (SQLITE_SUPPORT)
 	target_link_libraries(mod_auth_sqlite sqlite3)
 	target_link_libraries(uhub-passwd sqlite3)
 	set_target_properties(mod_auth_sqlite PROPERTIES PREFIX "")
+	target_link_libraries(mod_auth_sqlite utils)
 
 	if (UNIX)
 		target_link_libraries(uhub pthread)
 	endif()
 endif()
+
+
 
 if(WIN32)
 	target_link_libraries(uhub ws2_32)
@@ -136,6 +141,13 @@ set_target_properties(
 	PROPERTIES PREFIX "")
 
 target_link_libraries(uhub ${CMAKE_DL_LIBS} adc network utils)
+target_link_libraries(mod_example utils)
+target_link_libraries(mod_welcome utils)
+target_link_libraries(mod_auth_simple utils)
+target_link_libraries(mod_chat_history utils)
+target_link_libraries(mod_chat_only utils)
+target_link_libraries(mod_logging utils)
+target_link_libraries(mod_topic utils)
 
 if(UNIX)
 	add_library(adcclient STATIC ${adcclient_SOURCES})
