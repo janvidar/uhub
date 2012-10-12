@@ -182,10 +182,7 @@ void net_con_close(struct net_connection* con)
 #ifdef SSL_SUPPORT
 #ifdef SSL_USE_OPENSSL
 	if (con->ssl)
-	{
-		SSL_shutdown(con->ssl);
-		SSL_clear(con->ssl);
-	}
+		net_ssl_shutdown(con);
 #endif /* SSL_USE_OPENSSL */
 #endif /* SSL_SUPPORT */
 

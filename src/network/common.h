@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2012, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,6 +26,10 @@
 #define NET_WANT_SSL_CONNECT      0x0080
 #define NET_WANT_SSL_X509_LOOKUP  0x0100
 
+#define NET_SSL_ANY NET_WANT_SSL_READ | NET_WANT_SSL_WRITE | NET_WANT_SSL_ACCEPT | NET_WANT_SSL_CONNECT | NET_WANT_SSL_X509_LOOKUP
+
+struct ssl_handle; /* abstract type */
+
 #define NET_CLEANUP               0x8000
 
 #define NET_CON_STRUCT_BASIC \
@@ -35,17 +39,8 @@
 	net_connection_cb    callback;  /** Callback function */ \
 	struct timeout_evt*  timeout;   /** timeout event handler */
 
-#ifdef SSL_USE_OPENSSL
 #define NET_CON_STRUCT_SSL \
-	SSL*                 ssl;       /** SSL handle */ \
-	uint32_t             ssl_state; /** SSL state */ \
-	size_t               write_len; /** Length of last SSL_write(), only used if flags is NET_WANT_SSL_READ. */
-#endif
-
-#ifdef SSL_USE_GNUTLS
-#define NET_CON_STRUCT_SSL \
-	uint32_t             ssl_state; /** SSL state */
-#endif
+	struct ssl_handle* ssl;         /** SSL handle */
 
 #ifdef SSL_SUPPORT
 #define NET_CON_STRUCT_COMMON \

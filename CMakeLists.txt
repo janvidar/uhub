@@ -49,6 +49,7 @@ set (network_SOURCES
 	${PROJECT_SOURCE_DIR}/network/timeout.c
 	${PROJECT_SOURCE_DIR}/network/timer.c
 	${PROJECT_SOURCE_DIR}/network/network.c
+	${PROJECT_SOURCE_DIR}/network/openssl.c
 	${PROJECT_SOURCE_DIR}/network/ipcalc.c
 )
 

@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2012, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@
 #include "uhub.h"
 #include "network/common.h"
 #include "network/backend.h"
+#include "network/tls.h"
 
 #define NET_EVENT_TIMEOUT         0x0001
 #define NET_EVENT_READ            0x0002
@@ -82,32 +83,6 @@ extern ssize_t net_con_peek(struct net_connection* con, void* buf, size_t len);
  */
 extern void net_con_set_timeout(struct net_connection* con, int seconds);
 extern void net_con_clear_timeout(struct net_connection* con);
-
-#ifdef SSL_SUPPORT
-/**
- * Start SSL_accept()
- */
-extern ssize_t net_con_ssl_accept(struct net_connection*);
-
-/**
- * Start SSL_connect()
- */
-extern ssize_t net_con_ssl_connect(struct net_connection*);
-
-enum net_con_ssl_mode
-{
-	net_con_ssl_mode_server,
-	net_con_ssl_mode_client,
-};
-
-#ifdef SSL_USE_OPENSSL
-extern ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode, SSL_CTX* ssl_ctx);
-extern SSL* net_con_get_ssl(struct net_connection* con);
-extern void net_con_set_ssl(struct net_connection* con, SSL*);
-#endif // SSL_USE_OPENSSL
-extern int   net_con_is_ssl(struct net_connection* con);
-
-#endif /* SSL_SUPPORT */
 
 #endif /* HAVE_UHUB_NETWORK_CONNECTION_H */
 
