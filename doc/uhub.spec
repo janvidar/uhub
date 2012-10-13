@@ -41,7 +41,7 @@ mkdir -p $RPM_BUILD_ROOT/etc/init.d
 mkdir -p $RPM_BUILD_ROOT/etc/logrotate.d
 mkdir -p $RPM_BUILD_ROOT/etc/sysconfig
 mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1
-mkdir -p $RPM_BUILD_ROOT/var/lib/uhub
+mkdir -p $RPM_BUILD_ROOT/usr/lib/uhub
 
 install uhub $RPM_BUILD_ROOT/usr/bin/
 install uhub-passwd $RPM_BUILD_ROOT/usr/bin/
@@ -52,7 +52,7 @@ install -m644 doc/init.d.RedHat/etc/sysconfig/uhub  $RPM_BUILD_ROOT/etc/sysconfi
 install -m644 doc/init.d.RedHat/etc/logrotate.d/uhub $RPM_BUILD_ROOT/etc/logrotate.d/
 /bin/gzip -9c doc/uhub.1 > doc/uhub.1.gz &&
 install -m644 doc/uhub.1.gz $RPM_BUILD_ROOT/usr/share/man/man1
-install -m644 mod_*.so $RPM_BUILD_ROOT/var/lib/uhub
+install -m644 mod_*.so $RPM_BUILD_ROOT/usr/lib/uhub
 
 
 %files
