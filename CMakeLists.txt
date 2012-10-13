@@ -196,7 +196,7 @@ endif()
 
 if (UNIX)
 	install( TARGETS uhub RUNTIME DESTINATION bin )
-	install( TARGETS mod_example mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_chat_history mod_chat_only mod_topic DESTINATION /var/lib/uhub/ OPTIONAL )
+	install( TARGETS mod_example mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_chat_history mod_chat_only mod_topic DESTINATION /usr/lib/uhub/ OPTIONAL )
 	install( FILES ${CMAKE_SOURCE_DIR}/doc/uhub.conf ${CMAKE_SOURCE_DIR}/doc/plugins.conf ${CMAKE_SOURCE_DIR}/doc/rules.txt ${CMAKE_SOURCE_DIR}/doc/motd.txt DESTINATION /etc/uhub OPTIONAL )
 
 	if (SQLITE_SUPPORT)
