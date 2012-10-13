@@ -32,56 +32,15 @@ endif()
 
 include_directories("${PROJECT_SOURCE_DIR}")
 
-set (network_SOURCES
-	${PROJECT_SOURCE_DIR}/network/backend.c
-	${PROJECT_SOURCE_DIR}/network/connection.c
-	${PROJECT_SOURCE_DIR}/network/epoll.c
-	${PROJECT_SOURCE_DIR}/network/kqueue.c
-	${PROJECT_SOURCE_DIR}/network/select.c
-	${PROJECT_SOURCE_DIR}/network/timeout.c
-	${PROJECT_SOURCE_DIR}/network/timer.c
-	${PROJECT_SOURCE_DIR}/network/network.c
-	${PROJECT_SOURCE_DIR}/network/ipcalc.c
+file (GLOB uhub_SOURCES ${PROJECT_SOURCE_DIR}/core/*.c)
+list (REMOVE_ITEM uhub_SOURCES
+	${PROJECT_SOURCE_DIR}/core/gen_config.c
+	${PROJECT_SOURCE_DIR}/core/main.c
 )
 
-set (uhub_SOURCES
-	${PROJECT_SOURCE_DIR}/core/auth.c
-	${PROJECT_SOURCE_DIR}/core/command_parser.c
-	${PROJECT_SOURCE_DIR}/core/commands.c
-	${PROJECT_SOURCE_DIR}/core/config.c
-	${PROJECT_SOURCE_DIR}/core/eventqueue.c
-	${PROJECT_SOURCE_DIR}/core/hub.c
-	${PROJECT_SOURCE_DIR}/core/hubevent.c
-	${PROJECT_SOURCE_DIR}/core/inf.c
-	${PROJECT_SOURCE_DIR}/core/ioqueue.c
-	${PROJECT_SOURCE_DIR}/core/netevent.c
-	${PROJECT_SOURCE_DIR}/core/probe.c
-	${PROJECT_SOURCE_DIR}/core/route.c
-	${PROJECT_SOURCE_DIR}/core/user.c
-	${PROJECT_SOURCE_DIR}/core/usermanager.c
-	${PROJECT_SOURCE_DIR}/core/plugincallback.c
-	${PROJECT_SOURCE_DIR}/core/plugininvoke.c
-	${PROJECT_SOURCE_DIR}/core/pluginloader.c
-)
-
-set (adc_SOURCES
-	${PROJECT_SOURCE_DIR}/adc/message.c
-	${PROJECT_SOURCE_DIR}/adc/sid.c
-)
-
-set (utils_SOURCES
-	${PROJECT_SOURCE_DIR}/util/cbuffer.c
-	${PROJECT_SOURCE_DIR}/util/config_token.c
-	${PROJECT_SOURCE_DIR}/util/credentials.c
-	${PROJECT_SOURCE_DIR}/util/floodctl.c
-	${PROJECT_SOURCE_DIR}/util/getopt.c
-	${PROJECT_SOURCE_DIR}/util/list.c
-	${PROJECT_SOURCE_DIR}/util/log.c
-	${PROJECT_SOURCE_DIR}/util/memory.c
-	${PROJECT_SOURCE_DIR}/util/misc.c
-	${PROJECT_SOURCE_DIR}/util/rbtree.c
-	${PROJECT_SOURCE_DIR}/util/tiger.c
-)
+file (GLOB adc_SOURCES ${PROJECT_SOURCE_DIR}/adc/*.c)
+file (GLOB network_SOURCES ${PROJECT_SOURCE_DIR}/network/*.c)
+file (GLOB utils_SOURCES ${PROJECT_SOURCE_DIR}/util/*.c)
 
 set (adcclient_SOURCES
 	${PROJECT_SOURCE_DIR}/tools/adcclient.c
@@ -121,7 +80,6 @@ if (SQLITE_SUPPORT)
 		target_link_libraries(uhub pthread)
 	endif()
 endif()
-
 
 
 if(WIN32)
@@ -205,6 +163,3 @@ if (UNIX)
 endif()
 
 
-
-
- 
