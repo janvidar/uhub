@@ -65,12 +65,6 @@ struct ADC_client
 	char* desc;
 	int flags;
 	void* ptr;
-#ifdef SSL_SUPPORT
-#ifdef SSL_USE_OPENSSL
-	const SSL_METHOD* ssl_method;
-	SSL_CTX* ssl_ctx;
-#endif /* SSL_USE_OPENSSL */
-#endif /*  SSL_SUPPORT */
 };
 
 
@@ -524,15 +518,7 @@ struct ADC_client* ADC_client_create(const char* nickname, const char* descripti
 	if (sd == -1) return NULL;
 
 	client->con = net_con_create();
-#if 0
-	/* FIXME */
-	client->timer = 0; /* FIXME: hub_malloc(sizeof(struct net_timer)); */
-#endif
 	net_con_initialize(client->con, sd, event_callback, client, 0);
-#if 0
-	/* FIXME */
-	net_timer_initialize(client->timer, timer_callback, client);
-#endif
 	ADC_client_set_state(client, ps_none);
 
 	client->nick = hub_strdup(nickname);
@@ -549,10 +535,6 @@ void ADC_client_destroy(struct ADC_client* client)
 {
 	ADC_TRACE;
 	ADC_client_disconnect(client);
-#if 0
-	/* FIXME */
-	net_timer_shutdown(client->timer);
-#endif
 	ioq_send_destroy(client->send_queue);
 	ioq_recv_destroy(client->recv_queue);
 	hub_free(client->timer);
@@ -600,6 +582,8 @@ static void ADC_client_on_connected(struct ADC_client* client)
 		net_con_update(client->con, NET_EVENT_READ | NET_EVENT_WRITE);
 		client->callback(client, ADC_CLIENT_SSL_HANDSHAKE, 0);
 		ADC_client_set_state(client, ps_conn_ssl);
+
+		net_con_ssl_handshake(client->con, net_con_ssl_mode_client, NULL);
 	}
 	else
 #endif
@@ -615,9 +599,9 @@ static void ADC_client_on_connected(struct ADC_client* client)
 static void ADC_client_on_connected_ssl(struct ADC_client* client)
 {
 	ADC_TRACE;
-	net_con_update(client->con, NET_EVENT_READ);
 	client->callback(client, ADC_CLIENT_SSL_OK, 0);
 	client->callback(client, ADC_CLIENT_CONNECTED, 0);
+	net_con_update(client->con, NET_EVENT_READ);
 	ADC_client_send(client, adc_msg_create(ADC_HANDSHAKE));
 	ADC_client_set_state(client, ps_protocol);
 }

@@ -41,6 +41,33 @@ enum net_con_ssl_mode
 	net_con_ssl_mode_client,
 };
 
+struct ssl_context_handle;
+
+/**
+ * Returns a string describing the TLS/SSL provider information
+ */
+extern const char* net_ssl_get_provider();
+
+/**
+ * Create a new SSL context.
+ */
+extern struct ssl_context_handle* net_ssl_context_create();
+extern void net_ssl_context_destroy(struct ssl_context_handle* ctx);
+
+/**
+ * Return 0 on error, 1 otherwise.
+ */
+extern int ssl_load_certificate(struct ssl_context_handle* ctx, const char* pem_file);
+
+/**
+ * Return 0 on error, 1 otherwise.
+ */
+extern int ssl_load_private_key(struct ssl_context_handle* ctx, const char* pem_file);
+
+/**
+ * Return 0 if private key does not match certificate, 1 if everything is OK.
+ */
+extern int ssl_check_private_key(struct ssl_context_handle* ctx);
 
 /**
  * Start SSL_accept()
@@ -60,9 +87,10 @@ extern void net_ssl_destroy(struct net_connection* con);
 extern void net_ssl_callback(struct net_connection* con, int events);
 
 
-#ifdef SSL_USE_OPENSSL
-extern ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode, SSL_CTX* ssl_ctx);
+
+extern ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode, struct ssl_context_handle* ssl_ctx);
 extern SSL* net_con_get_ssl(struct net_connection* con);
+#ifdef SSL_USE_OPENSSL
 extern void net_con_set_ssl(struct net_connection* con, SSL*);
 #endif // SSL_USE_OPENSSL
 extern int   net_con_is_ssl(struct net_connection* con);

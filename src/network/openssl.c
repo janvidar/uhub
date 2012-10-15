@@ -24,16 +24,88 @@
 #ifdef SSL_SUPPORT
 #ifdef SSL_USE_OPENSSL
 
+#define NETWORK_DUMP_DEBUG
+
 struct net_ssl_openssl
 {
 	SSL* ssl;
 	enum ssl_state state;
 };
 
+struct net_context_openssl
+{
+	SSL_METHOD* ssl_method;
+	SSL_CTX* ssl_ctx;
+};
+
 static struct net_ssl_openssl* get_handle(struct net_connection* con)
 {
 	uhub_assert(con);
 	return (struct net_ssl_openssl*) con->ssl;
+}
+
+const char* net_ssl_get_provider()
+{
+	return OPENSSL_VERSION_TEXT;
+}
+
+
+/**
+ * Create a new SSL context.
+ */
+struct ssl_context_handle* net_ssl_context_create()
+{
+
+	struct net_context_openssl* ctx = (struct net_context_openssl*) hub_malloc_zero(sizeof(struct net_context_openssl));
+	ctx->ssl_method = (SSL_METHOD*) SSLv23_method(); /* TLSv1_method() */
+	ctx->ssl_ctx = SSL_CTX_new(ctx->ssl_method);
+
+	/* Disable SSLv2 */
+	SSL_CTX_set_options(ctx->ssl_ctx, SSL_OP_NO_SSLv2);
+	SSL_CTX_set_quiet_shutdown(ctx->ssl_ctx, 1);
+
+	return (struct ssl_context_handle*) ctx;
+}
+
+extern void net_ssl_context_destroy(struct ssl_context_handle* ctx_)
+{
+	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
+	SSL_CTX_free(ctx->ssl_ctx);
+	hub_free(ctx);
+}
+
+int ssl_load_certificate(struct ssl_context_handle* ctx_, const char* pem_file)
+{
+	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
+	if (SSL_CTX_use_certificate_file(ctx->ssl_ctx, pem_file, SSL_FILETYPE_PEM) < 0)
+	{
+		LOG_ERROR("SSL_CTX_use_certificate_file: %s", ERR_error_string(ERR_get_error(), NULL));
+		return 0;
+	}
+
+	return 1;
+}
+
+int ssl_load_private_key(struct ssl_context_handle* ctx_, const char* pem_file)
+{
+	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
+	if (SSL_CTX_use_PrivateKey_file(ctx->ssl_ctx, pem_file, SSL_FILETYPE_PEM) < 0)
+	{
+		LOG_ERROR("SSL_CTX_use_PrivateKey_file: %s", ERR_error_string(ERR_get_error(), NULL));
+		return 0;
+	}
+	return 1;
+}
+
+int ssl_check_private_key(struct ssl_context_handle* ctx_)
+{
+	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
+	if (SSL_CTX_check_private_key(ctx->ssl_ctx) != 1)
+	{
+		LOG_FATAL("SSL_CTX_check_private_key: Private key does not match the certificate public key: %s", ERR_error_string(ERR_get_error(), NULL));
+		return 0;
+	}
+	return 1;
 }
 
 static int handle_openssl_error(struct net_connection* con, int ret)
@@ -103,10 +175,12 @@ ssize_t net_con_ssl_connect(struct net_connection* con)
 	ssize_t ret;
 	handle->state = tls_st_connecting;
 
+
 	ret = SSL_connect(handle->ssl);
 #ifdef NETWORK_DUMP_DEBUG
 	LOG_PROTO("SSL_connect() ret=%d", ret);
 #endif /* NETWORK_DUMP_DEBUG */
+
 	if (ret > 0)
 	{
 		handle->state = tls_st_connected;
@@ -119,15 +193,16 @@ ssize_t net_con_ssl_connect(struct net_connection* con)
 	return ret;
 }
 
-ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode ssl_mode, SSL_CTX* ssl_ctx)
+ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode ssl_mode, struct ssl_context_handle* ssl_ctx)
 {
 	uhub_assert(con);
 
+	struct net_context_openssl* ctx = (struct net_context_openssl*) ssl_ctx;
 	struct net_ssl_openssl* handle = (struct net_ssl_openssl*) hub_malloc_zero(sizeof(struct net_ssl_openssl));
 
 	if (ssl_mode == net_con_ssl_mode_server)
 	{
-		handle->ssl = SSL_new(ssl_ctx);
+		handle->ssl = SSL_new(ctx->ssl_ctx);
 		if (!handle->ssl)
 		{
 			LOG_ERROR("Unable to create new SSL stream\n");
@@ -197,7 +272,7 @@ void net_ssl_destroy(struct net_connection* con)
 void net_ssl_callback(struct net_connection* con, int events)
 {
 	struct net_ssl_openssl* handle = get_handle(con);
-
+	int ret;
 	uint32_t flags = con->flags;
 	con->flags &= ~NET_SSL_ANY; /* reset the SSL related flags */
 
@@ -219,10 +294,9 @@ void net_ssl_callback(struct net_connection* con, int events)
 			break;
 
 		case tls_st_connecting:
-			if (net_con_ssl_connect(con) < 0)
-			{
+			ret = net_con_ssl_connect(con);
+			if (ret != 0)
 				con->callback(con, NET_EVENT_READ, con->ptr);
-			}
 			break;
 
 		case tls_st_connected:
