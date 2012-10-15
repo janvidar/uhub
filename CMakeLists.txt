@@ -136,7 +136,7 @@ if (NOT UHUB_REVISION)
 endif()
 
 set (UHUB_GIT_VERSION "${UHUB_VERSION_MAJOR}.${UHUB_VERSION_MINOR}.${UHUB_VERSION_PATCH}-${UHUB_REVISION}")
-message (STATUS "Current uHub version: ${UHUB_GIT_VERSION}")
+message (STATUS "Configuring uhub version: ${UHUB_GIT_VERSION}")
 
 if(OPENSSL_FOUND)
 	add_definitions(-DSSL_SUPPORT=1)
