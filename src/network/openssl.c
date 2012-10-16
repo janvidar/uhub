@@ -142,7 +142,7 @@ ssize_t net_con_ssl_accept(struct net_connection* con)
 				return 0;
 
 			case SSL_ERROR_SYSCALL:
-				return -1;
+				return -2;
 		}
 	}
 	return ret;
@@ -182,7 +182,7 @@ ssize_t net_con_ssl_connect(struct net_connection* con)
 				return 0;
 
 			case SSL_ERROR_SYSCALL:
-				return -1;
+				return -2;
 		}
 	}
 	return ret;
@@ -255,7 +255,7 @@ ssize_t net_ssl_send(struct net_connection* con, const void* buf, size_t len)
 				return 0;
 
 			case SSL_ERROR_SYSCALL:
-				return -1;
+				return -2;
 		}
 	}
 }
@@ -266,7 +266,7 @@ ssize_t net_ssl_recv(struct net_connection* con, void* buf, size_t len)
 	ssize_t ret;
 
 	if (handle->state == tls_st_error)
-		return -1;
+		return -2;
 
 	uhub_assert(handle->state == tls_st_connected || handle->state == tls_st_need_read);
 
@@ -299,7 +299,7 @@ ssize_t net_ssl_recv(struct net_connection* con, void* buf, size_t len)
 				return 0;
 
 			case SSL_ERROR_SYSCALL:
-				return -1;
+				return -2;
 		}
 	}
 }
