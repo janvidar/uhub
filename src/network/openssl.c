@@ -111,6 +111,32 @@ int ssl_check_private_key(struct ssl_context_handle* ctx_)
 	return 1;
 }
 
+static int handle_openssl_error(struct net_connection* con, int ret, enum ssl_state forced_rwstate)
+{
+	struct net_ssl_openssl* handle = get_handle(con);
+	int err = SSL_get_error(handle->ssl, ret);
+	switch (err)
+	{
+		case SSL_ERROR_ZERO_RETURN:
+			// Not really an error, but SSL was shut down.
+			return -1;
+
+		case SSL_ERROR_WANT_READ:
+			handle->state = forced_rwstate;
+			net_con_update(con, NET_EVENT_READ);
+			return 0;
+
+		case SSL_ERROR_WANT_WRITE:
+			handle->state = forced_rwstate;
+			net_con_update(con, NET_EVENT_WRITE);
+			return 0;
+
+		case SSL_ERROR_SYSCALL:
+			handle->state = tls_st_error;
+			return -2;
+	}
+}
+
 ssize_t net_con_ssl_accept(struct net_connection* con)
 {
 	struct net_ssl_openssl* handle = get_handle(con);
@@ -123,29 +149,9 @@ ssize_t net_con_ssl_accept(struct net_connection* con)
 	{
 		net_con_update(con, NET_EVENT_READ);
 		handle->state = tls_st_connected;
+		return ret;
 	}
-	else
-	{
-		int err = SSL_get_error(handle->ssl, ret);
-		switch (err)
-		{
-			case SSL_ERROR_ZERO_RETURN:
-				// Not really an error, but SSL was shut down.
-				return -1;
-
-			case SSL_ERROR_WANT_READ:
-				net_con_update(con, NET_EVENT_READ);
-				return 0;
-
-			case SSL_ERROR_WANT_WRITE:
-				net_con_update(con, NET_EVENT_WRITE);
-				return 0;
-
-			case SSL_ERROR_SYSCALL:
-				return -2;
-		}
-	}
-	return ret;
+	return handle_openssl_error(con, ret, tls_st_accepting);
 }
 
 ssize_t net_con_ssl_connect(struct net_connection* con)
@@ -163,29 +169,9 @@ ssize_t net_con_ssl_connect(struct net_connection* con)
 	{
 		handle->state = tls_st_connected;
 		net_con_update(con, NET_EVENT_READ);
+		return ret;
 	}
-	else
-	{
-		int err = SSL_get_error(handle->ssl, ret);
-		switch (err)
-		{
-			case SSL_ERROR_ZERO_RETURN:
-				// Not really an error, but SSL was shut down.
-				return -1;
-
-			case SSL_ERROR_WANT_READ:
-				net_con_update(con, NET_EVENT_READ);
-				return 0;
-
-			case SSL_ERROR_WANT_WRITE:
-				net_con_update(con, NET_EVENT_WRITE);
-				return 0;
-
-			case SSL_ERROR_SYSCALL:
-				return -2;
-		}
-	}
-	return ret;
+	return handle_openssl_error(con, ret, tls_st_connecting);
 }
 
 ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode ssl_mode, struct ssl_context_handle* ssl_ctx)
@@ -235,29 +221,7 @@ ssize_t net_ssl_send(struct net_connection* con, const void* buf, size_t len)
 		handle->state = tls_st_connected;
 		return ret;
 	}
-	else if (ret <= 0)
-	{
-		int err = SSL_get_error(handle->ssl, ret);
-		switch (err)
-		{
-			case SSL_ERROR_ZERO_RETURN:
-				// Not really an error, but SSL was shut down.
-				return -1;
-
-			case SSL_ERROR_WANT_READ:
-				handle->state = tls_st_need_write;
-				net_con_update(con, NET_EVENT_READ);
-				return 0;
-
-			case SSL_ERROR_WANT_WRITE:
-				handle->state = tls_st_need_write;
-				net_con_update(con, NET_EVENT_WRITE);
-				return 0;
-
-			case SSL_ERROR_SYSCALL:
-				return -2;
-		}
-	}
+	return handle_openssl_error(con, ret, tls_st_need_write);
 }
 
 ssize_t net_ssl_recv(struct net_connection* con, void* buf, size_t len)
@@ -279,29 +243,7 @@ ssize_t net_ssl_recv(struct net_connection* con, void* buf, size_t len)
 		handle->state = tls_st_connected;
 		return ret;
 	}
-	else if (ret <= 0)
-	{
-		int err = SSL_get_error(handle->ssl, ret);
-		switch (err)
-		{
-			case SSL_ERROR_ZERO_RETURN:
-				// Not really an error, but SSL was shut down.
-				return -1;
-
-			case SSL_ERROR_WANT_READ:
-				handle->state = tls_st_need_read;
-				net_con_update(con, NET_EVENT_READ);
-				return 0;
-
-			case SSL_ERROR_WANT_WRITE:
-				handle->state = tls_st_need_read;
-				net_con_update(con, NET_EVENT_WRITE);
-				return 0;
-
-			case SSL_ERROR_SYSCALL:
-				return -2;
-		}
-	}
+	return handle_openssl_error(con, ret, tls_st_need_read);
 }
 
 void net_ssl_shutdown(struct net_connection* con)
