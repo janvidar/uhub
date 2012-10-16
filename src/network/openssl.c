@@ -320,9 +320,6 @@ void net_ssl_destroy(struct net_connection* con)
 void net_ssl_callback(struct net_connection* con, int events)
 {
 	struct net_ssl_openssl* handle = get_handle(con);
-	int ret;
-	uint32_t flags = con->flags;
-	con->flags &= ~NET_SSL_ANY; /* reset the SSL related flags */
 
 	switch (handle->state)
 	{
@@ -335,15 +332,12 @@ void net_ssl_callback(struct net_connection* con, int events)
 			break;
 
 		case tls_st_accepting:
-			if (net_con_ssl_accept(con) < 0)
-			{
+			if (net_con_ssl_accept(con) != 0)
 				con->callback(con, NET_EVENT_READ, con->ptr);
-			}
 			break;
 
 		case tls_st_connecting:
-			ret = net_con_ssl_connect(con);
-			if (ret != 0)
+			if (net_con_ssl_connect(con) != 0)
 				con->callback(con, NET_EVENT_READ, con->ptr);
 			break;
 
