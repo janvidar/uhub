@@ -32,6 +32,8 @@ enum ssl_state
 	tls_st_accepting,
 	tls_st_connecting,
 	tls_st_connected,
+	tls_st_need_read,  /* special case of connected */
+	tls_st_need_write, /* special case of connected */
 	tls_st_disconnecting,
 };
 

@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2012, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -180,10 +180,8 @@ void net_con_close(struct net_connection* con)
 	g_backend->handler.con_del(g_backend->data, con);
 
 #ifdef SSL_SUPPORT
-#ifdef SSL_USE_OPENSSL
 	if (con->ssl)
 		net_ssl_shutdown(con);
-#endif /* SSL_USE_OPENSSL */
 #endif /* SSL_SUPPORT */
 
 	net_close(con->sd);

@@ -25,6 +25,18 @@ void net_stats_add_tx(size_t bytes);
 void net_stats_add_rx(size_t bytes);
 #endif
 
+static int is_blocked_or_interrupted()
+{
+	int err = net_error();
+	return
+#ifdef WINSOCK
+				err == WSAEWOULDBLOCK
+#else
+				err == EWOULDBLOCK
+#endif
+				|| err == EINTR;
+}
+
 ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 {
 	int ret;
@@ -35,13 +47,7 @@ ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 		ret = net_send(con->sd, buf, len, UHUB_SEND_SIGNAL);
 		if (ret == -1)
 		{
-			if (
-#ifdef WINSOCK
-				net_error() == WSAEWOULDBLOCK
-#else
-				net_error() == EWOULDBLOCK 
-#endif
-				|| net_error() == EINTR)
+			if (is_blocked_or_interrupted())
 				return 0;
 			return -1;
 		}
@@ -65,13 +71,7 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 		ret = net_recv(con->sd, buf, len, 0);
 		if (ret == -1)
 		{
-			if (
-#ifdef WINSOCK
-				net_error() == WSAEWOULDBLOCK
-#else
-				net_error() == EWOULDBLOCK
-#endif
-				|| net_error() == EINTR)
+			if (is_blocked_or_interrupted())
 				return 0;
 			return -net_error();
 		}
@@ -94,13 +94,7 @@ ssize_t net_con_peek(struct net_connection* con, void* buf, size_t len)
 	int ret = net_recv(con->sd, buf, len, MSG_PEEK);
 	if (ret == -1)
 	{
-		if (
-#ifdef WINSOCK
-				net_error() == WSAEWOULDBLOCK
-#else
-				net_error() == EWOULDBLOCK 
-#endif
-				|| net_error() == EINTR)
+		if (is_blocked_or_interrupted())
 			return 0;
 		return -net_error();
 	}
@@ -149,12 +143,10 @@ void net_con_callback(struct net_connection* con, int events)
 	}
 
 #ifdef SSL_SUPPORT
-	if (!con->ssl)
+	if (con->ssl)
+		net_ssl_callback(con, events);
+	else
 #endif
 		con->callback(con, events, con->ptr);
-#ifdef SSL_SUPPORT
-	else
-		net_ssl_callback(con, events);
-#endif
 }
 
