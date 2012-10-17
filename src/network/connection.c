@@ -20,11 +20,6 @@
 #include "uhub.h"
 #include "network/common.h"
 
-#ifdef SSL_SUPPORT
-void net_stats_add_tx(size_t bytes);
-void net_stats_add_rx(size_t bytes);
-#endif
-
 static int is_blocked_or_interrupted()
 {
 	int err = net_error();

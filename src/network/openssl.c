@@ -24,15 +24,17 @@
 #ifdef SSL_SUPPORT
 #ifdef SSL_USE_OPENSSL
 
-#define NETWORK_DUMP_DEBUG
+void net_stats_add_tx(size_t bytes);
+void net_stats_add_rx(size_t bytes);
 
 struct net_ssl_openssl
 {
 	SSL* ssl;
+	BIO* bio;
 	enum ssl_state state;
 	uint32_t flags;
-	BIO* biow;
-	BIO* bior;
+	size_t bytes_rx;
+	size_t bytes_tx;
 };
 
 struct net_context_openssl
@@ -76,7 +78,20 @@ int net_ssl_library_shutdown()
 	return 1;
 }
 
+static void add_io_stats(struct net_ssl_openssl* handle)
+{
+	if (handle->bio->num_read > handle->bytes_rx)
+	{
+		net_stats_add_rx(handle->bio->num_read - handle->bytes_rx);
+		handle->bytes_rx = handle->bio->num_read;
+	}
 
+	if (handle->bio->num_write > handle->bytes_tx)
+	{
+		net_stats_add_tx(handle->bio->num_write - handle->bytes_tx);
+		handle->bytes_tx = handle->bio->num_write;
+	}
+}
 
 /**
  * Create a new SSL context.
@@ -186,9 +201,7 @@ ssize_t net_con_ssl_connect(struct net_connection* con)
 	handle->state = tls_st_connecting;
 
 	ret = SSL_connect(handle->ssl);
-#ifdef NETWORK_DUMP_DEBUG
 	LOG_PROTO("SSL_connect() ret=%d", ret);
-#endif /* NETWORK_DUMP_DEBUG */
 
 	if (ret > 0)
 	{
@@ -215,8 +228,7 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode 
 			return -1;
 		}
 		SSL_set_fd(handle->ssl, con->sd);
-		handle->bior = SSL_get_rbio(handle->ssl);
-		handle->biow = SSL_get_wbio(handle->ssl);
+		handle->bio = SSL_get_rbio(handle->ssl);
 		con->ssl = (struct ssl_handle*) handle;
 		return net_con_ssl_accept(con);
 	}
@@ -224,8 +236,7 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode 
 	{
 		handle->ssl = SSL_new(SSL_CTX_new(TLSv1_method()));
 		SSL_set_fd(handle->ssl, con->sd);
-		handle->bior = SSL_get_rbio(handle->ssl);
-		handle->biow = SSL_get_wbio(handle->ssl);
+		handle->bio = SSL_get_rbio(handle->ssl);
 		con->ssl = (struct ssl_handle*) handle;
 		return net_con_ssl_connect(con);
 	}
@@ -240,6 +251,7 @@ ssize_t net_ssl_send(struct net_connection* con, const void* buf, size_t len)
 
 	ERR_clear_error();
 	ssize_t ret = SSL_write(handle->ssl, buf, len);
+	add_io_stats(handle);
 	LOG_PROTO("SSL_write(con=%p, buf=%p, len=" PRINTF_SIZE_T ") => %d", con, buf, len, ret);
 	if (ret > 0)
 	{
@@ -262,6 +274,7 @@ ssize_t net_ssl_recv(struct net_connection* con, void* buf, size_t len)
 	ERR_clear_error();
 
 	ret = SSL_read(handle->ssl, buf, len);
+	add_io_stats(handle);
 	LOG_PROTO("SSL_read(con=%p, buf=%p, len=" PRINTF_SIZE_T ") => %d", con, buf, len, ret);
 	if (ret > 0)
 	{
