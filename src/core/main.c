@@ -136,7 +136,13 @@ int main_loop()
 		{
 			hub = hub_start_service(&configuration);
 			if (!hub)
+			{
+				acl_shutdown(&acl);
+				free_config(&configuration);
+				net_destroy();
+				hub_log_shutdown();
 				return -1;
+			}
 #if !defined(WIN32)
 			setup_signal_handlers(hub);
 #endif
