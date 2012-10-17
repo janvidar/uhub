@@ -40,57 +40,15 @@ endif()
 
 include_directories("${PROJECT_SOURCE_DIR}")
 
-set (network_SOURCES
-	${PROJECT_SOURCE_DIR}/network/backend.c
-	${PROJECT_SOURCE_DIR}/network/connection.c
-	${PROJECT_SOURCE_DIR}/network/epoll.c
-	${PROJECT_SOURCE_DIR}/network/kqueue.c
-	${PROJECT_SOURCE_DIR}/network/select.c
-	${PROJECT_SOURCE_DIR}/network/timeout.c
-	${PROJECT_SOURCE_DIR}/network/timer.c
-	${PROJECT_SOURCE_DIR}/network/network.c
-	${PROJECT_SOURCE_DIR}/network/openssl.c
-	${PROJECT_SOURCE_DIR}/network/ipcalc.c
+file (GLOB uhub_SOURCES ${PROJECT_SOURCE_DIR}/core/*.c)
+list (REMOVE_ITEM uhub_SOURCES
+	${PROJECT_SOURCE_DIR}/core/gen_config.c
+	${PROJECT_SOURCE_DIR}/core/main.c
 )
 
-set (uhub_SOURCES
-	${PROJECT_SOURCE_DIR}/core/auth.c
-	${PROJECT_SOURCE_DIR}/core/command_parser.c
-	${PROJECT_SOURCE_DIR}/core/commands.c
-	${PROJECT_SOURCE_DIR}/core/config.c
-	${PROJECT_SOURCE_DIR}/core/eventqueue.c
-	${PROJECT_SOURCE_DIR}/core/hub.c
-	${PROJECT_SOURCE_DIR}/core/hubevent.c
-	${PROJECT_SOURCE_DIR}/core/inf.c
-	${PROJECT_SOURCE_DIR}/core/ioqueue.c
-	${PROJECT_SOURCE_DIR}/core/netevent.c
-	${PROJECT_SOURCE_DIR}/core/probe.c
-	${PROJECT_SOURCE_DIR}/core/route.c
-	${PROJECT_SOURCE_DIR}/core/user.c
-	${PROJECT_SOURCE_DIR}/core/usermanager.c
-	${PROJECT_SOURCE_DIR}/core/plugincallback.c
-	${PROJECT_SOURCE_DIR}/core/plugininvoke.c
-	${PROJECT_SOURCE_DIR}/core/pluginloader.c
-)
-
-set (adc_SOURCES
-	${PROJECT_SOURCE_DIR}/adc/message.c
-	${PROJECT_SOURCE_DIR}/adc/sid.c
-)
-
-set (utils_SOURCES
-	${PROJECT_SOURCE_DIR}/util/cbuffer.c
-	${PROJECT_SOURCE_DIR}/util/config_token.c
-	${PROJECT_SOURCE_DIR}/util/credentials.c
-	${PROJECT_SOURCE_DIR}/util/floodctl.c
-	${PROJECT_SOURCE_DIR}/util/getopt.c
-	${PROJECT_SOURCE_DIR}/util/list.c
-	${PROJECT_SOURCE_DIR}/util/log.c
-	${PROJECT_SOURCE_DIR}/util/memory.c
-	${PROJECT_SOURCE_DIR}/util/misc.c
-	${PROJECT_SOURCE_DIR}/util/rbtree.c
-	${PROJECT_SOURCE_DIR}/util/tiger.c
-)
+file (GLOB adc_SOURCES ${PROJECT_SOURCE_DIR}/adc/*.c)
+file (GLOB network_SOURCES ${PROJECT_SOURCE_DIR}/network/*.c)
+file (GLOB utils_SOURCES ${PROJECT_SOURCE_DIR}/util/*.c)
 
 set (adcclient_SOURCES
 	${PROJECT_SOURCE_DIR}/tools/adcclient.c
@@ -100,33 +58,37 @@ set (adcclient_SOURCES
 add_library(adc       STATIC ${adc_SOURCES})
 add_library(network   STATIC ${network_SOURCES})
 add_library(utils     STATIC ${utils_SOURCES})
-
+if(CMAKE_COMPILER_IS_GNUCC)
+	set_target_properties(utils PROPERTIES COMPILE_FLAGS -fPIC)
+	set_target_properties(network PROPERTIES COMPILE_FLAGS -fPIC)
+endif()
 
 add_dependencies(adc utils)
 add_dependencies(network utils)
 
 add_executable(uhub ${PROJECT_SOURCE_DIR}/core/main.c ${uhub_SOURCES} )
 
-add_library(mod_example MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_example.c ${utils_SOURCES})
-add_library(mod_welcome MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_welcome.c ${utils_SOURCES} ${network_SOURCES})
-add_library(mod_logging MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_logging.c ${utils_SOURCES} ${PROJECT_SOURCE_DIR}/adc/sid.c ${network_SOURCES})
-add_library(mod_auth_simple MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_auth_simple.c ${utils_SOURCES})
-add_library(mod_chat_history MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_chat_history.c ${utils_SOURCES})
-add_library(mod_chat_only MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_chat_only.c ${utils_SOURCES})
-add_library(mod_topic MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_topic.c ${utils_SOURCES})
+add_library(mod_example MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_example.c)
+add_library(mod_welcome MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_welcome.c)
+add_library(mod_logging MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_logging.c ${PROJECT_SOURCE_DIR}/adc/sid.c)
+add_library(mod_auth_simple MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_auth_simple.c )
+add_library(mod_chat_history MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_chat_history.c )
+add_library(mod_chat_only MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_chat_only.c)
+add_library(mod_topic MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_topic.c)
 
 if (SQLITE_SUPPORT)
-	add_library(mod_auth_sqlite MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_auth_sqlite.c ${utils_SOURCES})
-	add_executable(uhub-passwd ${PROJECT_SOURCE_DIR}/tools/uhub-passwd.c ${PROJECT_SOURCE_DIR}/util/misc.c ${PROJECT_SOURCE_DIR}/util/memory.c ${PROJECT_SOURCE_DIR}/util/log.c ${PROJECT_SOURCE_DIR}/util/list.c)
+	add_library(mod_auth_sqlite MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_auth_sqlite.c)
+	add_executable(uhub-passwd ${PROJECT_SOURCE_DIR}/tools/uhub-passwd.c)
 
-	target_link_libraries(mod_auth_sqlite sqlite3)
-	target_link_libraries(uhub-passwd sqlite3)
+	target_link_libraries(mod_auth_sqlite sqlite3 utils)
+	target_link_libraries(uhub-passwd sqlite3 utils)
 	set_target_properties(mod_auth_sqlite PROPERTIES PREFIX "")
 
 	if (UNIX)
 		target_link_libraries(uhub pthread)
 	endif()
 endif()
+
 
 if(WIN32)
 	target_link_libraries(uhub ws2_32)
@@ -145,6 +107,16 @@ set_target_properties(
 	PROPERTIES PREFIX "")
 
 target_link_libraries(uhub ${CMAKE_DL_LIBS} adc network utils)
+target_link_libraries(mod_example utils)
+target_link_libraries(mod_welcome utils)
+target_link_libraries(mod_auth_simple utils)
+target_link_libraries(mod_chat_history utils)
+target_link_libraries(mod_chat_only utils)
+target_link_libraries(mod_logging utils)
+target_link_libraries(mod_topic utils)
+
+target_link_libraries(mod_welcome network)
+target_link_libraries(mod_logging network)
 
 if(UNIX)
 	add_library(adcclient STATIC ${adcclient_SOURCES})
@@ -157,12 +129,22 @@ if(UNIX)
 	endif()
 endif()
 
-if(GIT_FOUND AND IS_DIRECTORY ".git")
-	execute_process(COMMAND ${GIT_EXECUTABLE} show -s --pretty=format:%h OUTPUT_VARIABLE UHUB_REVISION)
-	set (UHUB_GIT_VERSION "${UHUB_VERSION_MAJOR}.${UHUB_VERSION_MINOR}.${UHUB_VERSION_PATCH}-git-${UHUB_REVISION}")
-else()
-	set (UHUB_GIT_VERSION "${UHUB_VERSION_MAJOR}.${UHUB_VERSION_MINOR}.${UHUB_VERSION_PATCH}-release")
+if (NOT UHUB_REVISION AND GIT_FOUND)
+	execute_process(COMMAND ${GIT_EXECUTABLE} show -s --pretty=format:%h
+					WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+					OUTPUT_VARIABLE UHUB_REVISION_TEMP
+					OUTPUT_STRIP_TRAILING_WHITESPACE)
+	if (UHUB_REVISION_TEMP)
+		set (UHUB_REVISION "git-${UHUB_REVISION_TEMP}")
+	endif()
 endif()
+
+if (NOT UHUB_REVISION)
+	set (UHUB_REVISION "release")
+endif()
+
+set (UHUB_GIT_VERSION "${UHUB_VERSION_MAJOR}.${UHUB_VERSION_MINOR}.${UHUB_VERSION_PATCH}-${UHUB_REVISION}")
+message (STATUS "Configuring uhub version: ${UHUB_GIT_VERSION}")
 
 if(OPENSSL_FOUND)
 	set(SSL_LIBS ${OPENSSL_LIBRARIES})
@@ -200,8 +182,8 @@ endif()
 
 if (UNIX)
 	install( TARGETS uhub RUNTIME DESTINATION bin )
-	install( TARGETS mod_example mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_chat_history mod_chat_only mod_topic DESTINATION /var/lib/uhub/ OPTIONAL )
-	install( FILES ${CMAKE_SOURCE_DIR}/uhub.conf ${CMAKE_SOURCE_DIR}/plugins.conf ${CMAKE_SOURCE_DIR}/rules.txt ${CMAKE_SOURCE_DIR}/motd.txt DESTINATION /etc/uhub OPTIONAL )
+	install( TARGETS mod_example mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_chat_history mod_chat_only mod_topic DESTINATION /usr/lib/uhub/ OPTIONAL )
+	install( FILES ${CMAKE_SOURCE_DIR}/doc/uhub.conf ${CMAKE_SOURCE_DIR}/doc/plugins.conf ${CMAKE_SOURCE_DIR}/doc/rules.txt ${CMAKE_SOURCE_DIR}/doc/motd.txt DESTINATION /etc/uhub OPTIONAL )
 
 	if (SQLITE_SUPPORT)
 		install( TARGETS uhub-passwd RUNTIME DESTINATION bin )
@@ -209,6 +191,3 @@ if (UNIX)
 endif()
 
 
-
-
- 

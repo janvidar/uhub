@@ -129,7 +129,7 @@
 #include <sys/select.h>
 #endif
 
-#if defined(BSD_LIKE) || defined(__sun__)
+#if ( defined(BSD_LIKE) && !defined(__FreeBSD_kernel__) ) || defined(__sun__)
 #undef HAVE_STRNDUP
 #undef HAVE_MEMMEM
 #endif
