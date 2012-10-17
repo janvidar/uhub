@@ -52,6 +52,31 @@ const char* net_ssl_get_provider()
 	return OPENSSL_VERSION_TEXT;
 }
 
+int net_ssl_library_init()
+{
+	LOG_TRACE("Initializing OpenSSL...");
+	SSL_library_init();
+	SSL_load_error_strings();
+	return 1;
+}
+
+int net_ssl_library_shutdown()
+{
+	ERR_clear_error();
+	ERR_remove_state(0);
+
+	ENGINE_cleanup();
+	CONF_modules_unload(1);
+
+        ERR_free_strings();
+	EVP_cleanup();
+        CRYPTO_cleanup_all_ex_data();
+	
+	// sk_SSL_COMP_free(SSL_COMP_get_compression_methods());
+	return 1;
+}
+
+
 
 /**
  * Create a new SSL context.
@@ -303,3 +328,4 @@ void net_ssl_callback(struct net_connection* con, int events)
 
 #endif /* SSL_USE_OPENSSL */
 #endif /* SSL_SUPPORT */
+

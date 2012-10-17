@@ -51,6 +51,12 @@ struct ssl_context_handle;
 extern const char* net_ssl_get_provider();
 
 /**
+ * return 0 if error, 1 on success.
+ */
+extern int net_ssl_library_init();
+extern int net_ssl_library_shutdown();
+
+/**
  * Create a new SSL context.
  */
 extern struct ssl_context_handle* net_ssl_context_create();
@@ -91,11 +97,8 @@ extern void net_ssl_callback(struct net_connection* con, int events);
 
 
 extern ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode, struct ssl_context_handle* ssl_ctx);
-extern SSL* net_con_get_ssl(struct net_connection* con);
-#ifdef SSL_USE_OPENSSL
-extern void net_con_set_ssl(struct net_connection* con, SSL*);
-#endif // SSL_USE_OPENSSL
 extern int   net_con_is_ssl(struct net_connection* con);
 
 #endif /* SSL_SUPPORT */
 #endif /* HAVE_UHUB_NETWORK_TLS_H */
+

@@ -49,7 +49,11 @@ int net_initialize()
 		}
 #endif /* WINSOCK */
 
-		if (!net_backend_init())
+		if (!net_backend_init()
+#ifdef SSL_SUPPORT
+			|| !net_ssl_library_init()
+#endif
+			)
 		{
 #ifdef WINSOCK
 			WSACleanup();
@@ -57,15 +61,6 @@ int net_initialize()
 			return -1;
 		}
 		net_stats_initialize();
-
-#ifdef SSL_SUPPORT
-#ifdef SSL_USE_OPENSSL
-		LOG_TRACE("Initializing OpenSSL...");
-		SSL_library_init();
-		SSL_load_error_strings();
-#endif /* SSL_USE_OPENSSL */
-#endif /*  SSL_SUPPORT */
-
 		net_initialized = 1;
 		return 0;
 	}
@@ -102,11 +97,7 @@ int net_destroy()
 		net_backend_shutdown();
 		
 #ifdef SSL_SUPPORT
-#ifdef SSL_USE_OPENSSL
-		ERR_free_strings();
-		EVP_cleanup();
-		CRYPTO_cleanup_all_ex_data();
-#endif /* SSL_USE_OPENSSL */
+		net_ssl_library_shutdown();
 #endif /* SSL_SUPPORT */
 
 #ifdef WINSOCK
