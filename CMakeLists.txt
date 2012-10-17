@@ -17,7 +17,7 @@ set (PROJECT_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src")
 option(RELEASE "Release build, debug build if disabled" ON)
 option(LINK_SUPPORT "Allow hub linking" OFF)
 option(SSL_SUPPORT "Enable SSL support" ON)
-option(USE_OPENSSL "Use OpenSSL's SSL support" OFF)
+option(USE_OPENSSL "Use OpenSSL's SSL support" ON )
 option(SQLITE_SUPPORT "Enable SQLite support" ON)
 option(ADC_STRESS "Enable the stress tester client" OFF)
 
