@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2012, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,11 +20,10 @@
 #define NET_WANT_READ             NET_EVENT_READ
 #define NET_WANT_WRITE            NET_EVENT_WRITE
 #define NET_WANT_ACCEPT           NET_EVENT_READ
-#define NET_WANT_SSL_READ         0x0010
-#define NET_WANT_SSL_WRITE        0x0020
-#define NET_WANT_SSL_ACCEPT       0x0040
-#define NET_WANT_SSL_CONNECT      0x0080
-#define NET_WANT_SSL_X509_LOOKUP  0x0100
+
+#define NET_SSL_ANY NET_WANT_SSL_READ | NET_WANT_SSL_WRITE | NET_WANT_SSL_ACCEPT | NET_WANT_SSL_CONNECT | NET_WANT_SSL_X509_LOOKUP
+
+struct ssl_handle; /* abstract type */
 
 #define NET_CLEANUP               0x8000
 
@@ -36,9 +35,7 @@
 	struct timeout_evt*  timeout;   /** timeout event handler */
 
 #define NET_CON_STRUCT_SSL \
-	SSL*                 ssl;       /** SSL handle */ \
-	uint32_t             ssl_state; /** SSL state */ \
-	size_t               write_len; /** Length of last SSL_write(), only used if flags is NET_WANT_SSL_READ. */ \
+	struct ssl_handle* ssl;         /** SSL handle */
 
 #ifdef SSL_SUPPORT
 #define NET_CON_STRUCT_COMMON \

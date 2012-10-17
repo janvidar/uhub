@@ -731,41 +731,25 @@ static int load_ssl_certificates(struct hub_info* hub, struct hub_config* config
 {
 	if (config->tls_enable)
 	{
-		hub->ssl_method = (SSL_METHOD*) SSLv23_method(); /* TLSv1_method() */
-		hub->ssl_ctx = SSL_CTX_new(hub->ssl_method);
-
-		/* Disable SSLv2 */
-		SSL_CTX_set_options(hub->ssl_ctx, SSL_OP_NO_SSLv2);
-		SSL_CTX_set_quiet_shutdown(hub->ssl_ctx, 1);
-
-		if (SSL_CTX_use_certificate_file(hub->ssl_ctx, config->tls_certificate, SSL_FILETYPE_PEM) < 0)
+		hub->ctx = net_ssl_context_create();
+		if (ssl_load_certificate(hub->ctx, config->tls_certificate) &&
+			ssl_load_private_key(hub->ctx, config->tls_private_key) &&
+			ssl_check_private_key(hub->ctx))
 		{
-			LOG_ERROR("SSL_CTX_use_certificate_file: %s", ERR_error_string(ERR_get_error(), NULL));
+			LOG_INFO("Enabling TLS (%s), using certificate: %s, private key: %s", net_ssl_get_provider(), config->tls_certificate, config->tls_private_key);
+			return 1;
 		}
-
-		if (SSL_CTX_use_PrivateKey_file(hub->ssl_ctx, config->tls_private_key, SSL_FILETYPE_PEM) < 0)
-		{
-			LOG_ERROR("SSL_CTX_use_PrivateKey_file: %s", ERR_error_string(ERR_get_error(), NULL));
-		}
-
-		if (SSL_CTX_check_private_key(hub->ssl_ctx) != 1)
-		{
-			LOG_FATAL("SSL_CTX_check_private_key: Private key does not match the certificate public key: %s", ERR_error_string(ERR_get_error(), NULL));
-			return 0;
-		}
-		LOG_INFO("Enabling TLS, using certificate: %s, private key: %s", config->tls_certificate, config->tls_private_key);
+		return 0;
 	}
 	return 1;
 }
 
 static void unload_ssl_certificates(struct hub_info* hub)
 {
-	if (hub->ssl_ctx)
-	{
-		SSL_CTX_free(hub->ssl_ctx);
-	}
+	if (hub->ctx)
+		net_ssl_context_destroy(hub->ctx);
 }
-#endif
+#endif /* SSL_SUPPORT */
 
 struct hub_info* hub_start_service(struct hub_config* config)
 {

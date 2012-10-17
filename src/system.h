@@ -99,8 +99,13 @@
 #endif
 
 #ifdef SSL_SUPPORT
+#ifdef SSL_USE_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#endif /* SSL_USE_OPENSSL */
+#ifdef SSL_USE_GNUTLS
+#include <gnutls/gnutls.h>
+#endif /* SSL_USE_GNUTLS */
 #endif
 
 #include "version.h"

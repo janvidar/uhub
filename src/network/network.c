@@ -59,9 +59,11 @@ int net_initialize()
 		net_stats_initialize();
 
 #ifdef SSL_SUPPORT
+#ifdef SSL_USE_OPENSSL
 		LOG_TRACE("Initializing OpenSSL...");
 		SSL_library_init();
 		SSL_load_error_strings();
+#endif /* SSL_USE_OPENSSL */
 #endif /*  SSL_SUPPORT */
 
 		net_initialized = 1;
@@ -100,10 +102,12 @@ int net_destroy()
 		net_backend_shutdown();
 		
 #ifdef SSL_SUPPORT
+#ifdef SSL_USE_OPENSSL
 		ERR_free_strings();
 		EVP_cleanup();
 		CRYPTO_cleanup_all_ex_data();
-#endif
+#endif /* SSL_USE_OPENSSL */
+#endif /* SSL_SUPPORT */
 
 #ifdef WINSOCK
 		WSACleanup();
