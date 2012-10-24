@@ -34,6 +34,7 @@
 #ifndef WINSOCK
 #define WINSOCK
 #endif
+#define WINTHREAD_SUPPORT 1
 #endif
 
 #if defined(__CYGWIN__) || defined(__MINGW32__)
