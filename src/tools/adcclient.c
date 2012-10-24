@@ -30,6 +30,7 @@
 enum ADC_client_state
 {
 	ps_none, /* Not connected */
+	ps_dns,  /* looking up name */
 	ps_conn, /* Connecting... */
 	ps_conn_ssl, /* SSL handshake */
 	ps_protocol, /* Have sent HSUP */
@@ -46,6 +47,13 @@ enum ADC_client_flags
 	cflag_pipe = 4,
 };
 
+struct ADC_client_address
+{
+	enum Protocol { ADC, ADCS } protocol;
+	char* hostname;
+	uint16_t port;
+};
+
 struct ADC_client
 {
 	sid_t sid;
@@ -59,8 +67,9 @@ struct ADC_client
 	size_t timeout;
 	struct net_connection* con;
 	struct net_timer* timer;
-	struct sockaddr_in addr;
-	char* hub_address;
+	struct sockaddr_storage addr;
+	struct net_dns_job* dns_job;
+	struct ADC_client_address address;
 	char* nick;
 	char* desc;
 	int flags;
@@ -100,6 +109,7 @@ static void ADC_client_debug(struct ADC_client* client, const char* format, ...)
 static const char* ADC_client_state_string[] =
 {
 	"ps_none",
+	"ps_dns",
 	"ps_conn",
 	"ps_conn_ssl",
 	"ps_protocol",
@@ -154,6 +164,9 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 
 	switch (client->state)
 	{
+		case ps_dns:
+			break;
+
 		case ps_conn:
 			if (events == NET_EVENT_TIMEOUT)
 			{
@@ -162,7 +175,7 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 			}
 
 			if (events & NET_EVENT_WRITE)
-				ADC_client_connect(client, 0);
+				ADC_client_connect_internal(client);
 			break;
 
 #ifdef SSL_SUPPORT
@@ -493,7 +506,7 @@ void ADC_client_send(struct ADC_client* client, struct adc_message* msg)
 void ADC_client_send_info(struct ADC_client* client)
 {
 	ADC_TRACE;
-	client->info = adc_msg_construct_source(ADC_CMD_BINF, client->sid, 64);
+	client->info = adc_msg_construct_source(ADC_CMD_BINF, client->sid, 96);
 
 	adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_NICK, client->nick);
 
@@ -502,7 +515,17 @@ void ADC_client_send_info(struct ADC_client* client)
 		adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_DESCRIPTION, client->desc);
 	}
 
-	adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_USER_AGENT, PRODUCT "/" VERSION);
+	adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_USER_AGENT, PRODUCT " " VERSION);
+	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_UPLOAD_SLOTS, 0);
+	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_SHARED_SIZE, 0);
+	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_SHARED_FILES, 0);
+
+	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_COUNT_HUB_NORMAL, 1);
+	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_COUNT_HUB_REGISTER, 0);
+	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_COUNT_HUB_OPERATOR, 0);
+
+	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_DOWNLOAD_SPEED, 5 * 1024 * 1024);
+	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_UPLOAD_SPEED, 10 * 1024 * 1024);
 
 	adc_cid_pid(client);
 	ADC_client_send(client, client->info);
@@ -541,20 +564,31 @@ void ADC_client_destroy(struct ADC_client* client)
 	adc_msg_free(client->info);
 	hub_free(client->nick);
 	hub_free(client->desc);
-	hub_free(client->hub_address);
+	hub_free(client->address.hostname);
 }
 
 int ADC_client_connect(struct ADC_client* client, const char* address)
 {
 	ADC_TRACE;
-	if (!client->hub_address)
+	if (client->state == ps_none)
 	{
+		// Parse address and start name resolving!
 		if (!ADC_client_parse_address(client, address))
 			return 0;
-	
+		return 1;
+	}
+	else if (client->state == ps_dns)
+	{
+		// Done name resolving!
 		client->callback(client, ADC_CLIENT_CONNECTING, 0);
+		ADC_client_set_state(client, ps_conn);
 	}
 
+	return ADC_client_connect_internal(client);
+}
+
+int ADC_client_connect_internal(struct ADC_client* client)
+{
 	int ret = net_connect(net_con_get_sd(client->con), (struct sockaddr*) &client->addr, sizeof(struct sockaddr_in));
 	if (ret == 0 || (ret == -1 && net_error() == EISCONN))
 	{
@@ -632,18 +666,52 @@ void ADC_client_disconnect(struct ADC_client* client)
 	}
 }
 
+int ADC_client_dns_callback(struct net_dns_job* job, const struct net_dns_result* result)
+{
+	struct ADC_client* client = (struct ADC_client*) net_dns_job_get_ptr(job);
+	struct ip_addr_encap* ipaddr;
+	LOG_WARN("ADC_client_dns_callback(): result=%p (%d)", result, net_dns_result_size(result));
+
+	memset(&client->addr, 0, sizeof(client->addr));
+
+	ipaddr = net_dns_result_first(result);
+	switch (ipaddr->af)
+	{
+		case AF_INET:
+		{
+			struct sockaddr_in* addr4 = (struct sockaddr_in*) &client->addr;
+			addr4->sin_family = AF_INET;
+			addr4->sin_port = htons(client->address.port);
+			memcpy(&addr4->sin_addr, &ipaddr->internal_ip_data.in, sizeof(struct in_addr));
+			break;
+		}
+
+		case AF_INET6:
+		{
+			struct sockaddr_in6* addr6 = (struct sockaddr_in6*) &client->addr;
+			addr6->sin6_family = AF_INET6;
+			addr6->sin6_port = htons(client->address.port);
+			memcpy(&addr6->sin6_addr, &ipaddr->internal_ip_data.in6, sizeof(struct in6_addr));
+			break;
+		}
+
+		default:
+			LOG_WARN("Unknown ipaddr!");
+	}
+
+	ADC_client_connect_internal(client);
+	return 1;
+}
+
 static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 {
 	ADC_TRACE;
+	const char* hub_address = arg;
 	char* split;
 	int ssl = 0;
-	struct hostent* dns;
-	struct in_addr* addr;
 
 	if (!arg)
 		return 0;
-
-	client->hub_address = hub_strdup(arg);
 
 	/* Minimum length of a valid address */
 	if (strlen(arg) < 9)
@@ -653,39 +721,33 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 	if (!strncmp(arg, "adc://", 6))
 	{
 		client->flags &= ~cflag_ssl;
+		client->address.protocol = ADC;
 	}
 	else if (!strncmp(arg, "adcs://", 7))
 	{
 		client->flags |= cflag_ssl;
 		ssl = 1;
+		client->address.protocol = ADCS;
 	}
 	else
 		return 0;
 
 	/* Split hostname and port (if possible) */
-	split = strrchr(client->hub_address + 6 + ssl, ':');
+	hub_address = arg + 6 + ssl;
+	split = strrchr(hub_address, ':');
 	if (split == 0 || strlen(split) < 2 || strlen(split) > 6)
 		return 0;
 
 	/* Ensure port number is valid */
-	int port = strtol(split+1, NULL, 10);
-	if (port <= 0 || port > 65535)
+	client->address.port = strtol(split+1, NULL, 10);
+	if (client->address.port <= 0 || client->address.port > 65535)
 		return 0;
 
-	split[0] = 0;
+	client->address.hostname = strndup(hub_address, &split[0] - &hub_address[0]);
 
-	/* Resolve IP address (FIXME: blocking call) */
-	dns = gethostbyname(client->hub_address + 6 + ssl);
-	if (dns)
-	{
-		addr = (struct in_addr*) dns->h_addr_list[0];
-	}
-
-	// Initialize the sockaddr struct.
-	memset(&client->addr, 0, sizeof(client->addr));
-	client->addr.sin_family = AF_INET;
-	client->addr.sin_port   = htons(port);
-	memcpy(&client->addr.sin_addr, addr, sizeof(struct in_addr));
+	client->callback(client, ADC_CLIENT_NAME_LOOKUP, 0);
+	ADC_client_set_state(client, ps_dns);
+	client->dns_job = net_dns_gethostbyname(client->address.hostname, AF_UNSPEC, ADC_client_dns_callback, client);
 	return 1;
 }
 

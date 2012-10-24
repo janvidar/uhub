@@ -91,6 +91,10 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 {
 	switch (type)
 	{
+		case ADC_CLIENT_NAME_LOOKUP:
+			status("Looking up hostname...");
+			break;
+
 		case ADC_CLIENT_CONNECTING:
 			status("Connecting...");
 			break;
@@ -105,6 +109,9 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 
 		case ADC_CLIENT_SSL_HANDSHAKE:
 			status("SSL handshake.");
+			break;
+
+		case ADC_CLIENT_SSL_OK:
 			break;
 
 		case ADC_CLIENT_LOGGING_IN:

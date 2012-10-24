@@ -28,6 +28,7 @@ struct ADC_client;
 
 enum ADC_client_callback_type
 {
+	ADC_CLIENT_NAME_LOOKUP      = 1000,
 	ADC_CLIENT_CONNECTING       = 1001,
 	ADC_CLIENT_CONNECTED        = 1002,
 	ADC_CLIENT_DISCONNECTED     = 1003,
