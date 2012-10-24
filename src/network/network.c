@@ -60,6 +60,9 @@ int net_initialize()
 #endif
 			return -1;
 		}
+
+		net_dns_initialize();
+
 		net_stats_initialize();
 		net_initialized = 1;
 		return 0;
@@ -94,8 +97,10 @@ int net_destroy()
 	{
 		LOG_TRACE("Shutting down network monitor");
 
+		net_dns_destroy();
+
 		net_backend_shutdown();
-		
+
 #ifdef SSL_SUPPORT
 		net_ssl_library_shutdown();
 #endif /* SSL_SUPPORT */
@@ -490,7 +495,6 @@ int net_socket_create(int af, int type, int protocol)
 		}
 	}
 #endif
-
 	return sd;
 }
 

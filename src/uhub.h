@@ -74,6 +74,7 @@ extern "C" {
 
 #include "network/network.h"
 #include "network/connection.h"
+#include "network/dnsresolver.h"
 #include "network/ipcalc.h"
 #include "network/timeout.h"
 

@@ -83,10 +83,6 @@ if (SQLITE_SUPPORT)
 	target_link_libraries(mod_auth_sqlite sqlite3 utils)
 	target_link_libraries(uhub-passwd sqlite3 utils)
 	set_target_properties(mod_auth_sqlite PROPERTIES PREFIX "")
-
-	if (UNIX)
-		target_link_libraries(uhub pthread)
-	endif()
 endif()
 
 
@@ -121,11 +117,12 @@ target_link_libraries(mod_logging network)
 if(UNIX)
 	add_library(adcclient STATIC ${adcclient_SOURCES})
 	add_executable(uhub-admin ${PROJECT_SOURCE_DIR}/tools/admin.c)
-	target_link_libraries(uhub-admin adcclient adc network utils)
+	target_link_libraries(uhub-admin adcclient adc network utils pthread)
+	target_link_libraries(uhub pthread)
 
 	if (ADC_STRESS)
 		add_executable(adcrush ${PROJECT_SOURCE_DIR}/tools/adcrush.c ${adcclient_SOURCES})
-		target_link_libraries(adcrush adcclient adc network utils)
+		target_link_libraries(adcrush adcclient adc network utils pthread)
 	endif()
 endif()
 
