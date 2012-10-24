@@ -110,7 +110,7 @@ target_link_libraries(mod_chat_history utils)
 target_link_libraries(mod_chat_only utils)
 target_link_libraries(mod_logging utils)
 target_link_libraries(mod_topic utils)
-
+target_link_libraries(utils network)
 target_link_libraries(mod_welcome network)
 target_link_libraries(mod_logging network)
 
