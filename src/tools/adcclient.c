@@ -508,6 +508,7 @@ void ADC_client_send_info(struct ADC_client* client)
 	ADC_TRACE;
 	client->info = adc_msg_construct_source(ADC_CMD_BINF, client->sid, 96);
 
+
 	adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_NICK, client->nick);
 
 	if (client->desc)
@@ -528,6 +529,7 @@ void ADC_client_send_info(struct ADC_client* client)
 	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_UPLOAD_SPEED, 10 * 1024 * 1024);
 
 	adc_cid_pid(client);
+
 	ADC_client_send(client, client->info);
 }
 
@@ -565,6 +567,7 @@ void ADC_client_destroy(struct ADC_client* client)
 	hub_free(client->nick);
 	hub_free(client->desc);
 	hub_free(client->address.hostname);
+	hub_free(client);
 }
 
 int ADC_client_connect(struct ADC_client* client, const char* address)
@@ -577,19 +580,20 @@ int ADC_client_connect(struct ADC_client* client, const char* address)
 			return 0;
 		return 1;
 	}
-	else if (client->state == ps_dns)
+	return ADC_client_connect_internal(client);
+}
+
+int ADC_client_connect_internal(struct ADC_client* client)
+{
+	int ret;
+	if (client->state == ps_dns)
 	{
 		// Done name resolving!
 		client->callback(client, ADC_CLIENT_CONNECTING, 0);
 		ADC_client_set_state(client, ps_conn);
 	}
 
-	return ADC_client_connect_internal(client);
-}
-
-int ADC_client_connect_internal(struct ADC_client* client)
-{
-	int ret = net_connect(net_con_get_sd(client->con), (struct sockaddr*) &client->addr, sizeof(struct sockaddr_in));
+	ret = net_connect(net_con_get_sd(client->con), (struct sockaddr*) &client->addr, sizeof(struct sockaddr_in));
 	if (ret == 0 || (ret == -1 && net_error() == EISCONN))
 	{
 		ADC_client_on_connected(client);
@@ -622,10 +626,12 @@ static void ADC_client_on_connected(struct ADC_client* client)
 	else
 #endif
 	{
+		struct adc_message* handshake = adc_msg_create(ADC_HANDSHAKE);
 		net_con_update(client->con, NET_EVENT_READ);
 		client->callback(client, ADC_CLIENT_CONNECTED, 0);
-		ADC_client_send(client, adc_msg_create(ADC_HANDSHAKE));
+		ADC_client_send(client, handshake);
 		ADC_client_set_state(client, ps_protocol);
+		adc_msg_free(handshake);
 	}
 }
 
@@ -633,11 +639,13 @@ static void ADC_client_on_connected(struct ADC_client* client)
 static void ADC_client_on_connected_ssl(struct ADC_client* client)
 {
 	ADC_TRACE;
+	struct adc_message* handshake = adc_msg_create(ADC_HANDSHAKE);
 	client->callback(client, ADC_CLIENT_SSL_OK, 0);
 	client->callback(client, ADC_CLIENT_CONNECTED, 0);
 	net_con_update(client->con, NET_EVENT_READ);
-	ADC_client_send(client, adc_msg_create(ADC_HANDSHAKE));
+	ADC_client_send(client, handshake);
 	ADC_client_set_state(client, ps_protocol);
+	adc_msg_free(handshake);
 }
 #endif
 
