@@ -19,9 +19,6 @@
 
 #include "uhub.h"
 
-// #define DEBUG_LOOKUP_TIME 1
-#define MAX_CONCURRENT_JOBS 25
-
 static struct net_dns_job* find_and_remove_job(struct net_dns_job* job);
 static struct net_dns_result* find_and_remove_result(struct net_dns_job* job);
 
@@ -56,6 +53,22 @@ static void free_job(struct net_dns_job* job)
 	}
 }
 
+static void shutdown_free_jobs(void* ptr)
+{
+	struct net_dns_job* job = (struct net_dns_job*) ptr;
+	uhub_thread_cancel(job->thread_handle);
+	uhub_thread_join(job->thread_handle);
+	free_job(job);
+}
+
+static void shutdown_free_results(void* ptr)
+{
+	struct net_dns_result* result = (struct net_dns_result*) ptr;
+	uhub_thread_join(result->job->thread_handle);
+	net_dns_result_free(result);
+}
+
+
 // NOTE: Any job manipulating the members of this
 // struct must lock the mutex!
 struct net_dns_subsystem
@@ -79,19 +92,21 @@ void net_dns_initialize()
 void net_dns_destroy()
 {
 	struct net_dns_job* job;
+	struct net_dns_result* result;
+
 	uhub_mutex_lock(&g_dns->mutex);
 	LOG_TRACE("net_dns_destroy(): jobs=%d", (int) list_size(g_dns->jobs));
-	job = (struct net_dns_job*) list_get_first(g_dns->jobs);
+	list_clear(g_dns->jobs, &shutdown_free_jobs);
+
+	LOG_TRACE("net_dns_destroy(): results=%d", (int) list_size(g_dns->results));
+	list_clear(g_dns->results, &shutdown_free_results);
 	uhub_mutex_unlock(&g_dns->mutex);
 
-	while (job)
-	{
-		net_dns_job_cancel(job);
-
-		uhub_mutex_lock(&g_dns->mutex);
-		job = (struct net_dns_job*) list_get_first(g_dns->jobs);
-		uhub_mutex_unlock(&g_dns->mutex);
-	}
+	list_destroy(g_dns->jobs);
+	list_destroy(g_dns->results);
+	uhub_mutex_destroy(&g_dns->mutex);
+	hub_free(g_dns);
+	g_dns = NULL;
 }
 
 static void dummy_free(void* ptr)
@@ -149,9 +164,9 @@ static void* job_thread_resolve_name(void* ptr)
 	hints.ai_protocol = IPPROTO_TCP;
 
 	ret = getaddrinfo(job->host, NULL, &hints, &result);
-	if (ret != 0)
+	if (ret != 0 && ret != EAI_NONAME)
 	{
-		LOG_WARN("getaddrinfo() failed: %s", gai_strerror(ret));
+		LOG_TRACE("getaddrinfo() failed: %s", gai_strerror(ret));
 		return NULL;
 	}
 
@@ -159,32 +174,39 @@ static void* job_thread_resolve_name(void* ptr)
 	dns_results->addr_list = list_create();
 	dns_results->job = job;
 
-	for (it = result; it; it = it->ai_next)
+	if (ret != EAI_NONAME)
 	{
-		struct ip_addr_encap* ipaddr = hub_malloc_zero(sizeof(struct ip_addr_encap));
-		ipaddr->af = it->ai_family;
+		for (it = result; it; it = it->ai_next)
+		{
+			struct ip_addr_encap* ipaddr = hub_malloc_zero(sizeof(struct ip_addr_encap));
+			ipaddr->af = it->ai_family;
 
-		if (it->ai_family == AF_INET)
-		{
-			struct sockaddr_in* addr4 = (struct sockaddr_in*) it->ai_addr;
-			memcpy(&ipaddr->internal_ip_data.in, &addr4->sin_addr, sizeof(struct in_addr));
-		}
-		else if (it->ai_family == AF_INET6)
-		{
-			struct sockaddr_in6* addr6 = (struct sockaddr_in6*) it->ai_addr;
-			memcpy(&ipaddr->internal_ip_data.in6, &addr6->sin6_addr, sizeof(struct in6_addr));
-		}
-		else
-		{
-			LOG_WARN("getaddrinfo() returned result with unknown address family: %d", it->ai_family);
-			hub_free(ipaddr);
-			continue;
-		}
+			if (it->ai_family == AF_INET)
+			{
+				struct sockaddr_in* addr4 = (struct sockaddr_in*) it->ai_addr;
+				memcpy(&ipaddr->internal_ip_data.in, &addr4->sin_addr, sizeof(struct in_addr));
+			}
+			else if (it->ai_family == AF_INET6)
+			{
+				struct sockaddr_in6* addr6 = (struct sockaddr_in6*) it->ai_addr;
+				memcpy(&ipaddr->internal_ip_data.in6, &addr6->sin6_addr, sizeof(struct in6_addr));
+			}
+			else
+			{
+				LOG_TRACE("getaddrinfo() returned result with unknown address family: %d", it->ai_family);
+				hub_free(ipaddr);
+				continue;
+			}
 
-		LOG_WARN("getaddrinfo() - Address (%d): %s", ret++, ip_convert_to_string(ipaddr));
-		list_append(dns_results->addr_list, ipaddr);
+			LOG_DUMP("getaddrinfo() - Address (%d) %s for \"%s\"", ret++, ip_convert_to_string(ipaddr), job->host);
+			list_append(dns_results->addr_list, ipaddr);
+		}
+		freeaddrinfo(result);
 	}
-	freeaddrinfo(result);
+	else
+	{
+		/* hm */
+	}
 
 #ifdef DEBUG_LOOKUP_TIME
 	gettimeofday(&job->time_finish, NULL);
