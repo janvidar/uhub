@@ -20,6 +20,12 @@
 #include "uhub.h"
 
 #ifdef POSIX_THREAD_SUPPORT
+
+struct pthread_data
+{
+	pthread_t handle;
+};
+
 void uhub_mutex_init(uhub_mutex_t* mutex)
 {
 	pthread_mutex_init(mutex, NULL);
@@ -48,23 +54,25 @@ int uhub_mutex_trylock(uhub_mutex_t* mutex)
 
 uhub_thread_t* uhub_thread_create(uhub_thread_start start, void* arg)
 {
-	uhub_thread_t* thread = (uhub_thread_t*) hub_malloc_zero(sizeof(uhub_thread_t));
-	int ret = pthread_create(thread, NULL, start, arg);
-	if (ret == 0)
-		return thread;
-	hub_free(thread);
-	return NULL;
+	struct pthread_data* thread = (struct pthread_data*) hub_malloc_zero(sizeof(struct pthread_data));
+	int ret = pthread_create(&thread->handle, NULL, start, arg);
+	if (ret != 0)
+	{
+		hub_free(thread);
+		thread = NULL;
+	}
+	return thread;
 }
 
 void uhub_thread_cancel(uhub_thread_t* thread)
 {
-	pthread_cancel(thread);
+	pthread_cancel(thread->handle);
 }
 
 void* uhub_thread_join(uhub_thread_t* thread)
 {
 	void* ret = NULL;
-	pthread_join(thread, &ret);
+	pthread_join(thread->handle, &ret);
 	hub_free(thread);
 	return ret;
 }
