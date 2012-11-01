@@ -117,10 +117,11 @@ static struct rb_node* rb_tree_rotate_double(struct rb_node* node, int dir)
 
 static struct rb_node* rb_tree_insert_r(struct rb_tree* tree, struct rb_node* node, const void* key, const void* value)
 {
+	int res;
 	if (!node)
 		return create_node(tree, key, value);
 
-	int res = tree->compare(node->key, key);
+	res = tree->compare(node->key, key);
 	if (!res)
 	{
 		puts("Node already exists!");
@@ -171,15 +172,15 @@ struct rb_tree* rb_tree_create(rb_tree_compare compare, rb_tree_alloc a, rb_tree
 void rb_tree_destroy(struct rb_tree* tree)
 {
 	list_destroy(tree->iterator.stack);
-	rb_tree_free f = tree->free;
-	f(tree);
+	tree->free(tree);
 }
 
 int rb_tree_insert(struct rb_tree* tree, const void* key, const void* value)
 {
+	struct rb_node* node;
 	if (tree_search(tree, key))
 		return 0;
-	struct rb_node* node = rb_tree_insert_r(tree, tree->root, key, value);
+	node = rb_tree_insert_r(tree, tree->root, key, value);
 	tree->root = node;
 	tree->root->red = 0;
 	tree->elements++;

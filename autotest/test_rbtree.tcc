@@ -126,8 +126,8 @@ EXO_TEST(rbtree_iterate_10000, {
 
 static void free_node(struct rb_node* n)
 {
-	hub_free(n->key);
-	hub_free(n->value);
+	hub_free((void*) n->key);
+	hub_free((void*) n->value);
 }
 
 EXO_TEST(rbtree_remove_5000, {
