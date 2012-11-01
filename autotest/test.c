@@ -54,6 +54,7 @@ extern int  exotic_run(struct exotic_handle* handle);
 #include "test_memory.tcc"
 #include "test_message.tcc"
 #include "test_misc.tcc"
+#include "test_rbtree.tcc"
 #include "test_sid.tcc"
 #include "test_tiger.tcc"
 #include "test_timer.tcc"
@@ -696,6 +697,33 @@ int main(int argc, char** argv)
 	exotic_add_test(&handle, &exotic_test_utf8_valid_10, "utf8_valid_10");
 	exotic_add_test(&handle, &exotic_test_utf8_valid_11, "utf8_valid_11");
 	exotic_add_test(&handle, &exotic_test_utf8_valid_12, "utf8_valid_12");
+	exotic_add_test(&handle, &exotic_test_rbtree_create_destroy, "rbtree_create_destroy");
+	exotic_add_test(&handle, &exotic_test_rbtree_create_1, "rbtree_create_1");
+	exotic_add_test(&handle, &exotic_test_rbtree_size_0, "rbtree_size_0");
+	exotic_add_test(&handle, &exotic_test_rbtree_insert_1, "rbtree_insert_1");
+	exotic_add_test(&handle, &exotic_test_rbtree_insert_2, "rbtree_insert_2");
+	exotic_add_test(&handle, &exotic_test_rbtree_insert_3, "rbtree_insert_3");
+	exotic_add_test(&handle, &exotic_test_rbtree_insert_3_again, "rbtree_insert_3_again");
+	exotic_add_test(&handle, &exotic_test_rbtree_size_1, "rbtree_size_1");
+	exotic_add_test(&handle, &exotic_test_rbtree_search_1, "rbtree_search_1");
+	exotic_add_test(&handle, &exotic_test_rbtree_search_2, "rbtree_search_2");
+	exotic_add_test(&handle, &exotic_test_rbtree_search_3, "rbtree_search_3");
+	exotic_add_test(&handle, &exotic_test_rbtree_search_4, "rbtree_search_4");
+	exotic_add_test(&handle, &exotic_test_rbtree_remove_1, "rbtree_remove_1");
+	exotic_add_test(&handle, &exotic_test_rbtree_size_2, "rbtree_size_2");
+	exotic_add_test(&handle, &exotic_test_rbtree_remove_2, "rbtree_remove_2");
+	exotic_add_test(&handle, &exotic_test_rbtree_remove_3, "rbtree_remove_3");
+	exotic_add_test(&handle, &exotic_test_rbtree_remove_3_again, "rbtree_remove_3_again");
+	exotic_add_test(&handle, &exotic_test_rbtree_search_5, "rbtree_search_5");
+	exotic_add_test(&handle, &exotic_test_rbtree_search_6, "rbtree_search_6");
+	exotic_add_test(&handle, &exotic_test_rbtree_search_7, "rbtree_search_7");
+	exotic_add_test(&handle, &exotic_test_rbtree_search_8, "rbtree_search_8");
+	exotic_add_test(&handle, &exotic_test_rbtree_size_3, "rbtree_size_3");
+	exotic_add_test(&handle, &exotic_test_rbtree_insert_10000, "rbtree_insert_10000");
+	exotic_add_test(&handle, &exotic_test_rbtree_size_4, "rbtree_size_4");
+	exotic_add_test(&handle, &exotic_test_rbtree_check_10000, "rbtree_check_10000");
+	exotic_add_test(&handle, &exotic_test_rbtree_iterate_10000, "rbtree_iterate_10000");
+	exotic_add_test(&handle, &exotic_test_rbtree_remove_5000, "rbtree_remove_5000");
 	exotic_add_test(&handle, &exotic_test_sid_create_pool, "sid_create_pool");
 	exotic_add_test(&handle, &exotic_test_sid_check_0a, "sid_check_0a");
 	exotic_add_test(&handle, &exotic_test_sid_check_0b, "sid_check_0b");
