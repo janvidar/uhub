@@ -23,7 +23,7 @@
 typedef void*(*uhub_thread_start)(void*) ;
 
 #ifdef POSIX_THREAD_SUPPORT
-typedef pthread_t uhub_thread_t;
+typedef struct pthread_data uhub_thread_t;
 typedef pthread_mutex_t uhub_mutex_t;
 #endif
 

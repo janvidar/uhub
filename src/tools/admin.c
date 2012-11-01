@@ -35,7 +35,6 @@ static struct ADC_user* user_get(sid_t sid)
 	return user;
 }
 
-
 static void user_remove(const struct ADC_client_quit_reason* quit)
 {
 	struct ADC_user* user = user_get(quit->sid);
@@ -162,6 +161,68 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 
 static int running = 1;
 
+#if !defined(WIN32)
+void adm_handle_signal(int sig)
+{
+	switch (sig)
+	{
+		case SIGINT:
+			LOG_INFO("Interrupted. Shutting down...");
+			running = 0;
+			break;
+
+		case SIGTERM:
+			LOG_INFO("Terminated. Shutting down...");
+			running = 0;
+			break;
+
+		case SIGPIPE:
+			break;
+
+		case SIGHUP:
+			break;
+
+		default:
+			LOG_TRACE("hub_handle_signal(): caught unknown signal: %d", signal);
+			running = 0;
+			break;
+	}
+}
+
+static int signals[] =
+{
+	SIGINT,  /* Interrupt the application */
+	SIGTERM, /* Terminate the application */
+	SIGPIPE, /* prevent sigpipe from kills the application */
+	SIGHUP,  /* reload configuration */
+	0
+};
+
+void adm_setup_signal_handlers()
+{
+	sigset_t sig_set;
+	struct sigaction act;
+	int i;
+
+	sigemptyset(&sig_set);
+	act.sa_mask = sig_set;
+	act.sa_flags = SA_ONSTACK | SA_RESTART;
+	act.sa_handler = adm_handle_signal;
+
+	for (i = 0; signals[i]; i++)
+	{
+		if (sigaction(signals[i], &act, 0) != 0)
+		{
+			LOG_ERROR("Error setting signal handler %d", signals[i]);
+		}
+	}
+}
+
+void adm_shutdown_signal_handlers()
+{
+}
+#endif /* !WIN32 */
+
 int main(int argc, char** argv)
 {
 	if (argc < 2)
@@ -169,6 +230,9 @@ int main(int argc, char** argv)
 		printf("Usage: %s adc[s]://host:port\n", argv[0]);
 		return 1;
 	}
+
+	hub_set_log_verbosity(5);
+	adm_setup_signal_handlers();
 
 	struct ADC_client* client;
 	net_initialize();
@@ -183,6 +247,7 @@ int main(int argc, char** argv)
 
 	ADC_client_destroy(client);
 	net_destroy();
+	adm_shutdown_signal_handlers();
 	return 0;
 }
 
