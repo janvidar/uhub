@@ -63,13 +63,14 @@ EXO_TEST(inf_create_setup,
 
 /* FIXME: MEMORY LEAK - Need to fix hub_handle_info_login */
 #define CHECK_INF(MSG, EXPECT) \
-	struct adc_message* msg = adc_msg_parse_verify(inf_user, MSG, strlen(MSG)); \
-	int ok = hub_handle_info_login(inf_hub, inf_user, msg); /* FIXME: MEMORY LEAK */ \
-	adc_msg_free(msg); \
-	if (ok == EXPECT) \
-		user_set_info(inf_user, 0); \
-	return ok == EXPECT;
-	
+	do { \
+		struct adc_message* msg = adc_msg_parse_verify(inf_user, MSG, strlen(MSG)); \
+		int ok = hub_handle_info_login(inf_hub, inf_user, msg); /* FIXME: MEMORY LEAK */ \
+		adc_msg_free(msg); \
+		if (ok == EXPECT) \
+			user_set_info(inf_user, 0); \
+		return ok == EXPECT; \
+	} while(0)
 
 EXO_TEST(inf_ok_1,  { CHECK_INF("BINF AAAB NIFriend IDGNSSMURMD7K466NGZIHU65TP3S3UZSQ6MN5B2RI PD3A4545WFVGZLSGUXZLG7OS6ULQUVG3HM2T63I7Y\n", 0); });
 
@@ -107,12 +108,15 @@ EXO_TEST(inf_nick_08, { CHECK_INF("BINF AAAB NIa\\nc IDGNSSMURMD7K466NGZIHU65TP3
 EXO_TEST(inf_nick_09, { CHECK_INF("BINF AAAB NIabc NIdef IDGNSSMURMD7K466NGZIHU65TP3S3UZSQ6MN5B2RI PD3A4545WFVGZLSGUXZLG7OS6ULQUVG3HM2T63I7Y\n", status_msg_inf_error_nick_multiple); });
 EXO_TEST(inf_nick_10, {
 	const char* line = "BINF AAAB IDGNSSMURMD7K466NGZIHU65TP3S3UZSQ6MN5B2RI PD3A4545WFVGZLSGUXZLG7OS6ULQUVG3HM2T63I7Y\n";
+	int ok;
 	char nick[10];
+	struct adc_message* msg;
+
 	nick[0] = 0xf7; nick[1] = 0x80; nick[2] = 0x7f; nick[3] = 0x81; nick[4] = 0x98; nick[5] = 0x00;
-	struct adc_message* msg = adc_msg_parse_verify(inf_user, line, strlen(line));
+	msg = adc_msg_parse_verify(inf_user, line, strlen(line));
 	
 	adc_msg_add_named_argument(msg, "NI", nick);
-	int ok = hub_handle_info_login(inf_hub, inf_user, msg);
+	ok = hub_handle_info_login(inf_hub, inf_user, msg);
 	adc_msg_free(msg);
 	if (ok != status_msg_inf_error_nick_not_utf8)
 		printf("Expected %d, got %d\n", status_msg_inf_error_nick_not_utf8, ok);

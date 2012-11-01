@@ -97,15 +97,25 @@ EXO_TEST(base32_invalid_31, { return !is_valid_base32_char('@'); });
 EXO_TEST(utf8_valid_1, { return is_valid_utf8("abcdefghijklmnopqrstuvwxyz"); });
 EXO_TEST(utf8_valid_2, { return is_valid_utf8("ABCDEFGHIJKLMNOPQRSTUVWXYZ"); });
 EXO_TEST(utf8_valid_3, { return is_valid_utf8("0123456789"); });
-EXO_TEST(utf8_valid_4, { return is_valid_utf8( (char[]) { 0x65, 0x00} ); });
-EXO_TEST(utf8_valid_5, { return !is_valid_utf8( (char[]) { 0xD8, 0x00} ); });
 
-EXO_TEST(utf8_valid_6, { return is_valid_utf8( (char[]) { 0x24, 0x00} ); });
-EXO_TEST(utf8_valid_7, { return !is_valid_utf8( (char[]) { 0xC2, 0x24, 0x00} ); });
-EXO_TEST(utf8_valid_8, { return is_valid_utf8( (char[]) { 0xC2, 0xA2, 0x00} ); });
-EXO_TEST(utf8_valid_9, { return is_valid_utf8( (char[]) { 0xE2, 0x82, 0xAC, 0x00} ); });
-EXO_TEST(utf8_valid_10, { return !is_valid_utf8( (char[]) { 0xC2, 0x32, 0x00} ); });
-EXO_TEST(utf8_valid_11, { return !is_valid_utf8( (char[]) { 0xE2, 0x82, 0x32, 0x00} ); });
-EXO_TEST(utf8_valid_12, { return !is_valid_utf8( (char[]) { 0xE2, 0x32, 0x82, 0x00} ); });
+static const char test_utf_seq_1[] = { 0x65, 0x00 }; // valid
+static const char test_utf_seq_2[] = { 0xD8, 0x00 }; // invalid
+static const char test_utf_seq_3[] = { 0x24, 0x00 }; // valid
+static const char test_utf_seq_4[] = { 0xC2, 0x24, 0x00}; // invalid
+static const char test_utf_seq_5[] = { 0xC2, 0xA2, 0x00}; // valid
+static const char test_utf_seq_6[] = { 0xE2, 0x82, 0xAC, 0x00}; // valid
+static const char test_utf_seq_7[] = { 0xC2, 0x32, 0x00}; // invalid
+static const char test_utf_seq_8[] = { 0xE2, 0x82, 0x32, 0x00}; // invalid
+static const char test_utf_seq_9[] = { 0xE2, 0x32, 0x82, 0x00}; // invalid
+
+EXO_TEST(utf8_valid_4, { return is_valid_utf8(test_utf_seq_1); });
+EXO_TEST(utf8_valid_5, { return !is_valid_utf8(test_utf_seq_2); });
+EXO_TEST(utf8_valid_6, { return is_valid_utf8(test_utf_seq_3); });
+EXO_TEST(utf8_valid_7, { return !is_valid_utf8(test_utf_seq_4); });
+EXO_TEST(utf8_valid_8, { return is_valid_utf8(test_utf_seq_5); });
+EXO_TEST(utf8_valid_9, { return is_valid_utf8(test_utf_seq_6); });
+EXO_TEST(utf8_valid_10, { return !is_valid_utf8(test_utf_seq_7); });
+EXO_TEST(utf8_valid_11, { return !is_valid_utf8(test_utf_seq_8); });
+EXO_TEST(utf8_valid_12, { return !is_valid_utf8(test_utf_seq_9); });
 
 

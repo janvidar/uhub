@@ -174,91 +174,102 @@ EXO_TEST(adc_message_parse_24, {
 
 
 EXO_TEST(adc_message_add_arg_1, {
+	int ok;
 	struct adc_message* msg = adc_msg_create(test_string1);
 	adc_msg_add_argument(msg, "XXwtf?");
-	int ok = strcmp(msg->cache, "IINF AAfoo BBbar CCwhat XXwtf?\n") == 0;
+	ok = strcmp(msg->cache, "IINF AAfoo BBbar CCwhat XXwtf?\n") == 0;
 	adc_msg_free(msg);
 	return ok;
 });
 
 EXO_TEST(adc_message_add_arg_2, {
+	int ok;
 	struct adc_message* msg = adc_msg_create(test_string1);
 	adc_msg_add_named_argument(msg, "XX", "wtf?");
-	int ok = strcmp(msg->cache, "IINF AAfoo BBbar CCwhat XXwtf?\n") == 0;
+	ok = strcmp(msg->cache, "IINF AAfoo BBbar CCwhat XXwtf?\n") == 0;
 	adc_msg_free(msg);
 	return ok;
 });
 
 EXO_TEST(adc_message_remove_arg_1, {
+	int ok;
 	struct adc_message* msg = adc_msg_create(test_string1);
 	adc_msg_remove_named_argument(msg, "AA");
-	int ok = strcmp(msg->cache, "IINF BBbar CCwhat\n") == 0;
+	ok = strcmp(msg->cache, "IINF BBbar CCwhat\n") == 0;
 	adc_msg_free(msg);
 	return ok;
 });
 
 EXO_TEST(adc_message_remove_arg_2, {
+	int ok;
 	struct adc_message* msg = adc_msg_create(test_string1);
 	adc_msg_remove_named_argument(msg, "BB");
-	int ok = strcmp(msg->cache, "IINF AAfoo CCwhat\n") == 0;
+	ok = strcmp(msg->cache, "IINF AAfoo CCwhat\n") == 0;
 	adc_msg_free(msg);
 	return ok;
 });
 
 EXO_TEST(adc_message_remove_arg_3, {
+	int ok;
 	struct adc_message* msg = adc_msg_create(test_string1);
 	adc_msg_remove_named_argument(msg, "CC");
-	int ok = strcmp(msg->cache, "IINF AAfoo BBbar\n") == 0;
+	ok = strcmp(msg->cache, "IINF AAfoo BBbar\n") == 0;
 	adc_msg_free(msg);
 	return ok;
 });
 
 EXO_TEST(adc_message_remove_arg_4, {
 	/* this ensures we can remove the last element also */
+	int ok;
 	struct adc_message* msg = adc_msg_parse_verify(g_user, test_string3, strlen(test_string3));
 	adc_msg_remove_named_argument(msg, "AW");
-	int ok = strcmp(msg->cache, "BINF AAAB IDAN7ZMSLIEBL53OPTM7WXGSTXUS3XOY6KQS5LBGX NIFriend DEstuff SL3 SS0 SF0 VEQuickDC/0.4.17 US6430 SUADC0,TCP4,UDP4 I4127.0.0.1 HO5 HN1\n") == 0;
+	ok = strcmp(msg->cache, "BINF AAAB IDAN7ZMSLIEBL53OPTM7WXGSTXUS3XOY6KQS5LBGX NIFriend DEstuff SL3 SS0 SF0 VEQuickDC/0.4.17 US6430 SUADC0,TCP4,UDP4 I4127.0.0.1 HO5 HN1\n") == 0;
 	adc_msg_free(msg);
 	return ok;
 });
 
 EXO_TEST(adc_message_replace_arg_1, {
+	int ok;
 	struct adc_message* msg = adc_msg_create(test_string1);
 	adc_msg_remove_named_argument(msg, "AA");
-	int ok = strcmp(msg->cache, "IINF BBbar CCwhat\n") == 0;
+	ok = strcmp(msg->cache, "IINF BBbar CCwhat\n") == 0;
 	adc_msg_free(msg);
 	return ok;
 });
 
 EXO_TEST(adc_message_replace_arg_2, {
+	int ok;
 	struct adc_message* msg = adc_msg_create(test_string1);
 	adc_msg_remove_named_argument(msg, "BB");
-	int ok = strcmp(msg->cache, "IINF AAfoo CCwhat\n") == 0;
+	ok = strcmp(msg->cache, "IINF AAfoo CCwhat\n") == 0;
 	adc_msg_free(msg);
 	return ok;
 });
 
 EXO_TEST(adc_message_replace_arg_3, {
+	int ok;
 	struct adc_message* msg = adc_msg_create(test_string1);
 	adc_msg_remove_named_argument(msg, "CC");
-	int ok = strcmp(msg->cache, "IINF AAfoo BBbar\n") == 0;
+	ok = strcmp(msg->cache, "IINF AAfoo BBbar\n") == 0;
 	adc_msg_free(msg);
 	return ok;
 });
 
 EXO_TEST(adc_message_get_arg_1, {
+	int ok;
 	struct adc_message* msg = adc_msg_create(test_string1);
 	char* c = adc_msg_get_argument(msg, 0);
-	int ok = strcmp(c, "AAfoo") == 0;
+	ok = strcmp(c, "AAfoo") == 0;
 	adc_msg_free(msg);
 	hub_free(c);
 	return ok;
 });
 
 EXO_TEST(adc_message_get_arg_2, {
+	int ok;
 	struct adc_message* msg = adc_msg_create(test_string1);
 	char* c = adc_msg_get_argument(msg, 1);
-	int ok = strcmp(c, "BBbar") == 0;
+	ok = strcmp(c, "BBbar") == 0;
 	adc_msg_free(msg);
 	hub_free(c);
 	return ok;
@@ -340,28 +351,31 @@ EXO_TEST(adc_message_has_named_arg_3, {
 });
 
 EXO_TEST(adc_message_has_named_arg_4, {
+	int n;
 	struct adc_message* msg = adc_msg_create(test_string1);
 	adc_msg_add_argument(msg, "XXwtf?");
-	int n = adc_msg_has_named_argument(msg, "XX");
+	n = adc_msg_has_named_argument(msg, "XX");
 	adc_msg_free(msg);
 	return n == 1;
 });
 
 EXO_TEST(adc_message_has_named_arg_5, {
+	int n;
 	struct adc_message* msg = adc_msg_create(test_string1);
 	adc_msg_add_argument(msg, "XXone");
 	adc_msg_add_argument(msg, "XXtwo");
-	int n = adc_msg_has_named_argument(msg, "XX");
+	n = adc_msg_has_named_argument(msg, "XX");
 	adc_msg_free(msg);
 	return n == 2;
 });
 
 EXO_TEST(adc_message_has_named_arg_6, {
+	int n;
 	struct adc_message* msg = adc_msg_create(test_string1);
 	adc_msg_add_argument(msg, "XXone");
 	adc_msg_add_argument(msg, "XXtwo");
 	adc_msg_add_argument(msg, "XXthree");
-	int n = adc_msg_has_named_argument(msg, "XX");
+	n = adc_msg_has_named_argument(msg, "XX");
 	adc_msg_free(msg);
 	return n == 3;
 });
@@ -374,63 +388,70 @@ EXO_TEST(adc_message_has_named_arg_7, {
 });
 
 EXO_TEST(adc_message_terminate_1, {
+	int ok;
 	struct adc_message* msg = adc_msg_create("IINF AAfoo BBbar CCwhat");
 	adc_msg_unterminate(msg);
-	int ok = strcmp(msg->cache, "IINF AAfoo BBbar CCwhat") == 0;
+	ok = strcmp(msg->cache, "IINF AAfoo BBbar CCwhat") == 0;
 	adc_msg_free(msg);
 	return ok;
 });
 
 EXO_TEST(adc_message_terminate_2, {
+	int ok;
 	struct adc_message* msg = adc_msg_create(test_string1);
 	adc_msg_unterminate(msg);
 	adc_msg_terminate(msg);
-	int ok = strcmp(msg->cache, "IINF AAfoo BBbar CCwhat\n") == 0;
+	ok = strcmp(msg->cache, "IINF AAfoo BBbar CCwhat\n") == 0;
 	adc_msg_free(msg);
 	return ok;
 });
 
 EXO_TEST(adc_message_terminate_3, {
+	int ok;
 	struct adc_message* msg = adc_msg_create(test_string1);
 	adc_msg_unterminate(msg);
 	adc_msg_terminate(msg);
 	adc_msg_unterminate(msg);
-	int ok = strcmp(msg->cache, "IINF AAfoo BBbar CCwhat") == 0;
+	ok = strcmp(msg->cache, "IINF AAfoo BBbar CCwhat") == 0;
 	adc_msg_free(msg);
 	return ok;
 });
 
 EXO_TEST(adc_message_terminate_4, {
+	int ok;
 	struct adc_message* msg = adc_msg_create(test_string1);
 	adc_msg_unterminate(msg);
 	adc_msg_terminate(msg);
 	adc_msg_terminate(msg);
-	int ok = strcmp(msg->cache, "IINF AAfoo BBbar CCwhat\n") == 0;
+	ok = strcmp(msg->cache, "IINF AAfoo BBbar CCwhat\n") == 0;
 	adc_msg_free(msg);
 	return ok;
 });
 
 EXO_TEST(adc_message_terminate_5, {
+	int ok;
 	struct adc_message* msg = adc_msg_create(test_string1);
 	adc_msg_terminate(msg);
 	adc_msg_terminate(msg);
-	int ok = strcmp(msg->cache, "IINF AAfoo BBbar CCwhat\n") == 0;
+	ok = strcmp(msg->cache, "IINF AAfoo BBbar CCwhat\n") == 0;
 	adc_msg_free(msg);
 	return ok;
 });
 
 EXO_TEST(adc_message_terminate_6, {
+	int ok;
 	struct adc_message* msg = adc_msg_create(test_string1);
 	adc_msg_unterminate(msg);
 	adc_msg_unterminate(msg);
-	int ok = strcmp(msg->cache, "IINF AAfoo BBbar CCwhat") == 0;
+	ok = strcmp(msg->cache, "IINF AAfoo BBbar CCwhat") == 0;
 	adc_msg_free(msg);
 	return ok;
 });
 
 EXO_TEST(adc_message_escape_1, {
+	int ok;
 	char* s = adc_msg_escape(test_string1);
-	int ok = strcmp(s, "IINF\\sAAfoo\\sBBbar\\sCCwhat\\n") == 0;
+	ok = strcmp(s, "IINF\\sAAfoo\\sBBbar\\sCCwhat\\n") == 0;
 	hub_free(s);
 	return ok;
 });

@@ -429,44 +429,51 @@ EXO_TEST(check_ban_ipv4_5, {
 });
 
 EXO_TEST(check_ban_ipv6_1, {
+	struct ip_addr_encap addr;
 	if (!ipv6) return 1;
-	struct ip_addr_encap addr; ip_convert_to_binary("2001::201:2ff:fefa:0", &addr);
+	ip_convert_to_binary("2001::201:2ff:fefa:0", &addr);
 	return ip_in_range(&addr, &ban6);
 });
 
 EXO_TEST(check_ban_ipv6_2, {
+	struct ip_addr_encap addr;
 	if (!ipv6) return 1;
-	struct ip_addr_encap addr; ip_convert_to_binary("2001::201:2ff:fefa:1", &addr);
+	ip_convert_to_binary("2001::201:2ff:fefa:1", &addr);
 	return ip_in_range(&addr, &ban6);
 });
 
 EXO_TEST(check_ban_ipv6_3, {
+	struct ip_addr_encap addr;
 	if (!ipv6) return 1;
-	struct ip_addr_encap addr; ip_convert_to_binary("2001::201:2ff:fefa:fffe", &addr);
+	ip_convert_to_binary("2001::201:2ff:fefa:fffe", &addr);
 	return ip_in_range(&addr, &ban6);
 });
 
 EXO_TEST(check_ban_ipv6_4, {
+	struct ip_addr_encap addr;
 	if (!ipv6) return 1;
-	struct ip_addr_encap addr; ip_convert_to_binary("2001::201:2ff:fefa:ffff", &addr);
+	ip_convert_to_binary("2001::201:2ff:fefa:ffff", &addr);
 	return ip_in_range(&addr, &ban6);
 });
 
 EXO_TEST(check_ban_ipv6_5, {
+	struct ip_addr_encap addr;
 	if (!ipv6) return 1;
-	struct ip_addr_encap addr; ip_convert_to_binary("2001::201:2ff:fefb:0", &addr);
+	ip_convert_to_binary("2001::201:2ff:fefb:0", &addr);
 	return !ip_in_range(&addr, &ban6);
 });
 
 EXO_TEST(check_ban_ipv6_6, {
+	struct ip_addr_encap addr;
 	if (!ipv6) return 1;
-	struct ip_addr_encap addr; ip_convert_to_binary("2001::201:2ff:fef9:ffff", &addr);
+	ip_convert_to_binary("2001::201:2ff:fef9:ffff", &addr);
 	return !ip_in_range(&addr, &ban6);
 });
 
 EXO_TEST(check_ban_afmix_1, {
+	struct ip_addr_encap addr;
 	if (!ipv6) return 1;
-	struct ip_addr_encap addr; ip_convert_to_binary("2001::201:2ff:fef9:ffff", &addr);
+	ip_convert_to_binary("2001::201:2ff:fef9:ffff", &addr);
 	return !ip_in_range(&addr, &ban4);
 });
 
@@ -610,8 +617,10 @@ EXO_TEST(ip_range_3, {
 });
 
 EXO_TEST(ip_range_4, {
-	struct ip_range range1; memset(&range1, 0, sizeof(range1));
-	struct ip_range range2; memset(&range2, 0, sizeof(range2));
+	struct ip_range range1;
+	struct ip_range range2;
+	memset(&range1, 0, sizeof(range1));
+	memset(&range2, 0, sizeof(range2));
 	return ip_convert_address_to_range("192.168.0.0/16", &range1) && ip_convert_address_to_range("192.168.0.0-192.168.255.255", &range2) && memcmp(&range1, &range2, sizeof(struct ip_range)) == 0;
 });
 

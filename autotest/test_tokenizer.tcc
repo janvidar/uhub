@@ -7,13 +7,15 @@
 static int match_str(const char* str1, char* str2)
 {
 	size_t i;
+	int ret;
+
 	for (i = 0; i < strlen(str2); i++)
 		if (str2[i] == '_')
 			str2[i] = ' ';
 		else if (str2[i] == '|')
 			str2[i] = '\t';
 
-	int ret = strcmp(str1, str2);
+	ret = strcmp(str1, str2);
 	if (ret) {
 		fprintf(stderr, "\n    Mismatch: \"%s\" != \"%s\"\n", str1, str2);
 	}
@@ -29,10 +31,11 @@ static int count(const char* STR, size_t EXPECT) {
 
 static int compare(const char* str, const char* ref) {
 	size_t i, max;
+	int pass;
 	struct linked_list* compare = list_create();
 	SETUP(tokens, str);
 	split_string(ref, " ", compare, 0);
-	int pass = cfg_token_count(tokens) == list_size(compare);
+	pass = cfg_token_count(tokens) == list_size(compare);
 	if (pass) {
 		max = cfg_token_count(tokens);
 		for (i = 0; i < max; i++) {

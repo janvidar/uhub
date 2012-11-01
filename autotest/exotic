@@ -289,13 +289,14 @@ int exotic_initialize(struct exotic_handle* handle, int argc, char** argv)
 
 void exotic_add_test(struct exotic_handle* handle, exo_test_t func, const char* name)
 {
+	struct exo_test_data* test;
 	if (!handle)
 	{
 		fprintf(stderr, "exotic_add_test: failed, no handle!\n");
 		exit(-1);
 	}
 	
-	struct exo_test_data* test = (struct exo_test_data*) malloc(sizeof(struct exo_test_data));
+	test = (struct exo_test_data*) malloc(sizeof(struct exo_test_data));
 	if (!test)
 	{
 		fprintf(stderr, "exotic_add_test: out of memory!\n");
