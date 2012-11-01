@@ -12,6 +12,7 @@ extern int hub_handle_info_login(struct hub_info* hub, struct hub_user* user, st
 
 static void inf_create_hub()
 {
+	net_initialize();
 	inf_hub = (struct hub_info*) hub_malloc_zero(sizeof(struct hub_info));
 	inf_hub->users = (struct hub_user_manager*) hub_malloc_zero(sizeof(struct hub_user_manager));
 	inf_hub->users->list = list_create();
@@ -35,6 +36,7 @@ static void inf_destroy_hub()
 	hub_free(inf_hub->acl);
 	hub_free(inf_hub->config);
 	hub_free(inf_hub);
+	net_destroy();
 }
 
 
