@@ -68,12 +68,14 @@ extern "C" {
 #include "util/memory.h"
 #include "util/misc.h"
 #include "util/tiger.h"
+#include "util/threads.h"
 
 #include "adc/sid.h"
 #include "adc/message.h"
 
 #include "network/network.h"
 #include "network/connection.h"
+#include "network/dnsresolver.h"
 #include "network/ipcalc.h"
 #include "network/timeout.h"
 

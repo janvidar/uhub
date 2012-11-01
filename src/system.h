@@ -34,6 +34,7 @@
 #ifndef WINSOCK
 #define WINSOCK
 #endif
+#define WINTHREAD_SUPPORT 1
 #endif
 
 #if defined(__CYGWIN__) || defined(__MINGW32__)
@@ -113,11 +114,13 @@
 #define uhub_assert assert
 
 #ifdef __linux__
+#define POSIX_THREAD_SUPPORT
 #define USE_EPOLL
 #include <sys/epoll.h>
 #endif
 
 #ifdef BSD_LIKE
+#define POSIX_THREAD_SUPPORT
 /*
 #define USE_KQUEUE
 #include <sys/event.h>
@@ -277,6 +280,10 @@ typedef unsigned __int64 uint64_t;
 #define read _read
 #define write _write
 #define NEED_GETOPT
+#endif
+
+#ifdef POSIX_THREAD_SUPPORT
+#include <pthread.h>
 #endif
 
 #if defined(__CYGWIN__) || defined(__MINGW32__) || defined(_MSC_VER)

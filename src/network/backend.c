@@ -146,6 +146,9 @@ int net_backend_process()
 		return 0;
 	}
 
+	// Process pending DNS results
+	net_dns_process();
+
 	g_backend->handler.backend_process(g_backend->data, res);
 
 	net_cleanup_process(g_backend->cleaner);
