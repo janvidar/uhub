@@ -105,6 +105,13 @@ struct ssl_context_handle* net_ssl_context_create()
 
 	/* Disable SSLv2 */
 	SSL_CTX_set_options(ctx->ssl_ctx, SSL_OP_NO_SSLv2);
+
+#ifdef SSL_OP_NO_COMPRESSION
+	/* Disable compression? */
+	LOG_TRACE("Disabling SSL compression."); /* "CRIME" attack */
+	SSL_CTX_set_options(ctx->ssl_ctx, SSL_OP_NO_COMPRESSION);
+#endif
+
 	SSL_CTX_set_quiet_shutdown(ctx->ssl_ctx, 1);
 
 	return (struct ssl_context_handle*) ctx;
