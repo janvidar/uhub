@@ -25,7 +25,7 @@
 struct topic_plugin_data
 {
 	struct plugin_command_handle* topic;
-	struct plugin_command_handle* cleartopic;
+	struct plugin_command_handle* resettopic;
 	struct plugin_command_handle* showtopic;
 };
 
@@ -34,18 +34,18 @@ static int command_topic_handler(struct plugin_handle* plugin, struct plugin_use
 	struct cbuffer* buf = cbuf_create(128);
 	struct plugin_command_arg_data* arg = plugin->hub.command_arg_next(plugin, cmd, plugin_cmd_arg_type_string);
 
-	plugin->hub.set_description(plugin, arg ? arg->data.string : NULL);
+	plugin->hub.set_description(plugin, arg->data.string);
 	cbuf_append_format(buf, "*** %s: Topic set to \"%s\"", cmd->prefix, arg->data.string);
 	plugin->hub.send_message(plugin, user, cbuf_get(buf));
 	cbuf_destroy(buf);
 	return 0;
 }
 
-static int command_cleartopic_handler(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_command* cmd)
+static int command_resettopic_handler(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_command* cmd)
 {
 	struct cbuffer* buf = cbuf_create(128);
 	plugin->hub.set_description(plugin, NULL);
-	cbuf_append_format(buf, "*** %s: Topic cleared.", cmd->prefix);
+	cbuf_append_format(buf, "*** %s: Topic reset.", cmd->prefix);
 	plugin->hub.send_message(plugin, user, cbuf_get(buf));
 	cbuf_destroy(buf);
 	return 0;
@@ -67,17 +67,17 @@ int plugin_register(struct plugin_handle* plugin, const char* config)
 	struct topic_plugin_data* data = (struct topic_plugin_data*) hub_malloc(sizeof(struct topic_plugin_data));
 
 	data->topic = (struct plugin_command_handle*) hub_malloc_zero(sizeof(struct plugin_command_handle));
-	data->cleartopic = (struct plugin_command_handle*) hub_malloc_zero(sizeof(struct plugin_command_handle));
+	data->resettopic = (struct plugin_command_handle*) hub_malloc_zero(sizeof(struct plugin_command_handle));
 	data->showtopic = (struct plugin_command_handle*) hub_malloc_zero(sizeof(struct plugin_command_handle));
 
 	PLUGIN_INITIALIZE(plugin, "Topic plugin", "1.0", "Add commands for changing the hub topic (description)");
 
 	PLUGIN_COMMAND_INITIALIZE(data->topic, (void*) data, "topic", "+m", auth_cred_operator, command_topic_handler, "Set new topic");
-	PLUGIN_COMMAND_INITIALIZE(data->cleartopic, (void*) data, "cleartopic", "", auth_cred_operator, command_cleartopic_handler, "Clear the current topic");
+	PLUGIN_COMMAND_INITIALIZE(data->resettopic, (void*) data, "resettopic", "", auth_cred_operator, command_resettopic_handler, "Set topic to default");
 	PLUGIN_COMMAND_INITIALIZE(data->showtopic, (void*) data, "showtopic", "", auth_cred_guest, command_showtopic_handler, "Shows the current topic");
 
 	plugin->hub.command_add(plugin, data->topic);
-	plugin->hub.command_add(plugin, data->cleartopic);
+	plugin->hub.command_add(plugin, data->resettopic);
 	plugin->hub.command_add(plugin, data->showtopic);
 	plugin->ptr = data;
 
@@ -90,10 +90,10 @@ int plugin_unregister(struct plugin_handle* plugin)
 	struct topic_plugin_data* data = (struct topic_plugin_data*) plugin->ptr;
 
 	plugin->hub.command_del(plugin, data->topic);
-	plugin->hub.command_del(plugin, data->cleartopic);
+	plugin->hub.command_del(plugin, data->resettopic);
 	plugin->hub.command_del(plugin, data->showtopic);
 	hub_free(data->topic);
-	hub_free(data->cleartopic);
+	hub_free(data->resettopic);
 	hub_free(data->showtopic);
 	hub_free(data);
 	plugin->ptr = NULL;
