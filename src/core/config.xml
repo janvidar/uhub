@@ -17,7 +17,7 @@
 	</option>
 
 	<option name="server_bind_addr" type="string" default="any">
-		<check regexp="(\d\.\d\.\d\.\d\)|(any)|(loopback)|(.*)" /><!-- FIXME: add better IPv6 regexp in the future! -->
+		<check regexp="[\x:.]+|any|loopback" />
 		<short>Server bind address</short>
 		<description><![CDATA[
 			Specify the IP address the local hub should bind to. This can be an IPv4 or IPv6 address, or one of the special addresses "any" or "loopback". <br />
@@ -58,7 +58,7 @@
 	</option>
 
 	<option name="server_alt_ports" type="string" default="">
-		<check regexp="((\d+)(,(\d+))*)?" />
+		<check regexp="\d+(,\d+)*" />
 		<short>Comma separated list of alternative ports to listen to</short>
 		<description><![CDATA[
 		In addition to the server_port the hub can listen to a list of alternative ports.
@@ -157,7 +157,7 @@
 	</option>
 
 	<option name="redirect_addr" type="string" default="">
-		<check regexp="(adc|adcs|dchub)://.*" />
+		<check regexp="(adcs?|dchub)://.*" />
 		<short>A common hub redirect address.</short>
 		<description><![CDATA[
 		This is the redirect address used when the hub wants to redirect a client for not fulfilling some requirements.
@@ -419,7 +419,7 @@
 	</option>
 
 	<option name="tls_require_redirect_addr" type="string" default="">
-		<check regexp="(adc|adcs|dchub)://.*" />
+		<check regexp="(adcs?|dchub)://.*" />
 		<short>A redirect address in case a client connects using "adc://" when "adcs://" is required.</short>
 		<description><![CDATA[
 		This is the redirect address used when the hub wants to redirect a client for not using ADCS.
