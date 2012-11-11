@@ -216,13 +216,17 @@ void print_usage(char* program)
 		"   -q          Quiet mode - no output\n"
 		"   -f          Fork to background\n"
 		"   -l <file>   Log messages to given file (default: stderr)\n"
-		"   -L          Log messages to syslog\n"
 		"   -c <file>   Specify configuration file (default: " SERVER_CONFIG ")\n"
 		"   -C          Check configuration and return\n"
 		"   -s          Show configuration parameters\n"
 		"   -S          Show configuration parameters, but ignore defaults\n"
 		"   -h          This message\n"
 #ifndef WIN32
+#ifdef SYSTEMD
+		"   -L          Log messages to journal\n"
+#else
+		"   -L          Log messages to syslog\n"
+#endif
 		"   -u <user>   Run as given user\n"
 		"   -g <group>  Run with given group permissions\n"
 		"   -p <file>   Store pid in file (process id)\n"

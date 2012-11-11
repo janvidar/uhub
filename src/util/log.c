@@ -21,7 +21,15 @@
 #include <locale.h>
 
 #ifndef WIN32
+
+#ifdef SYSTEMD
+#define SD_JOURNAL_SUPPRESS_LOCATION
+#include <systemd/sd-journal.h>
+
+#else
 #include <syslog.h>
+#endif
+
 static int use_syslog = 0;
 #endif
 
@@ -83,7 +91,9 @@ void hub_log_initialize(const char* file, int syslog)
 	if (syslog)
 	{
 		use_syslog = 1;
+                #ifndef SYSTEMD
 		openlog("uhub", LOG_PID, LOG_USER);
+                #endif
 	}
 #endif
 
@@ -132,7 +142,9 @@ void hub_log_shutdown()
 	if (use_syslog)
 	{
 		use_syslog = 0;
+                #ifndef SYSTEMD
 		closelog();
+                #endif
 	}
 #endif
 }
@@ -212,7 +224,12 @@ void hub_log(int log_verbosity, const char *format, ...)
 			case log_fatal:    level = LOG_CRIT; break;
 			case log_error:    level = LOG_ERR; break;
 			case log_warning:  level = LOG_WARNING; break;
-			case log_user:     level = LOG_INFO | LOG_AUTH; break;
+                        #ifdef SYSTEMD
+                        case log_user:     level = LOG_INFO; break;
+
+                        #else
+                        case log_user:     level = LOG_INFO | LOG_AUTH; break;
+                        #endif
 			case log_info:     level = LOG_INFO; break;
 			case log_debug:    level = LOG_DEBUG; break;
 			
@@ -224,8 +241,13 @@ void hub_log(int log_verbosity, const char *format, ...)
 		if (level == 0)
 			return;
 		
+                #ifdef SYSTEMD
+		sd_journal_print(level, "%s", logmsg);
+
+                #else
 		level |= (LOG_USER | LOG_DAEMON);
 		syslog(level, "%s", logmsg);
+                #endif
 	}
 #endif
 	
