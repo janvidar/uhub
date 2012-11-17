@@ -19,6 +19,10 @@
 
 #include "uhub.h"
 
+#ifdef SYSTEMD
+#include <systemd/sd-daemon.h>
+#endif
+
 static int arg_verbose = 5;
 static int arg_fork    = 0;
 static int arg_check_config = 0;
@@ -145,7 +149,16 @@ int main_loop()
 			}
 #if !defined(WIN32)
 			setup_signal_handlers(hub);
-#endif
+#ifdef SYSTEMD
+                        /* Notify the service manager that this daemon has 
+                         * been successfully initalized and shall enter the
+                         * main loop.
+                         */
+                        sd_notifyf(0, "READY=1\n"
+                                      "MAINPID=%lu", (unsigned long) getpid());
+#endif /* SYSTEMD */
+
+#endif /* ! WIN32 */
 		}
 
 		hub_set_variables(hub, &acl);
