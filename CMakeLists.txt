@@ -3,7 +3,7 @@
 ## Copyright (C) 2007-2012, Jan Vidar Krey <janvidar@extatic.org>
  #
 
-cmake_minimum_required (VERSION 2.8.3)
+cmake_minimum_required (VERSION 2.8.2)
 
 project (uhub NONE)
 enable_language(C)
@@ -13,16 +13,17 @@ set (UHUB_VERSION_MINOR 4)
 set (UHUB_VERSION_PATCH 1)
 
 set (PROJECT_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src")
+set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake/Modules)
 
 option(RELEASE "Release build, debug build if disabled" ON)
 option(LINK_SUPPORT "Allow hub linking" OFF)
 option(SSL_SUPPORT "Enable SSL support" ON)
 option(USE_OPENSSL "Use OpenSSL's SSL support" ON )
-option(SQLITE_SUPPORT "Enable SQLite support" ON)
 option(SYSTEMD_SUPPORT "Enable logging to the systemd journal" OFF)
 option(ADC_STRESS "Enable the stress tester client" OFF)
 
 find_package(Git)
+find_package(Sqlite3)
 
 if (SSL_SUPPORT)
 	if (USE_OPENSSL)
@@ -45,6 +46,7 @@ if (MSVC)
 endif()
 
 include_directories("${PROJECT_SOURCE_DIR}")
+include_directories(${SQLITE3_INCLUDE_DIRS})
 
 file (GLOB uhub_SOURCES ${PROJECT_SOURCE_DIR}/core/*.c)
 list (REMOVE_ITEM uhub_SOURCES
@@ -74,6 +76,7 @@ add_dependencies(network utils)
 
 add_executable(uhub ${PROJECT_SOURCE_DIR}/core/main.c ${uhub_SOURCES} )
 add_executable(test ${CMAKE_SOURCE_DIR}/autotest/test.c ${uhub_SOURCES} )
+add_executable(uhub-passwd ${PROJECT_SOURCE_DIR}/tools/uhub-passwd.c)
 
 add_library(mod_example MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_example.c)
 add_library(mod_welcome MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_welcome.c)
@@ -83,16 +86,7 @@ add_library(mod_chat_history MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_chat_histo
 add_library(mod_chat_only MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_chat_only.c)
 add_library(mod_topic MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_topic.c)
 add_library(mod_no_guest_downloads MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_no_guest_downloads.c)
-
-if (SQLITE_SUPPORT)
-	add_library(mod_auth_sqlite MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_auth_sqlite.c)
-	add_executable(uhub-passwd ${PROJECT_SOURCE_DIR}/tools/uhub-passwd.c)
-
-	target_link_libraries(mod_auth_sqlite sqlite3 utils)
-	target_link_libraries(uhub-passwd sqlite3 utils)
-	set_target_properties(mod_auth_sqlite PROPERTIES PREFIX "")
-endif()
-
+add_library(mod_auth_sqlite MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_auth_sqlite.c)
 
 if(WIN32)
 	target_link_libraries(uhub ws2_32)
@@ -106,6 +100,7 @@ set_target_properties(
 	mod_welcome
 	mod_logging
 	mod_auth_simple
+	mod_auth_sqlite
 	mod_chat_history
 	mod_chat_only
 	mod_no_guest_downloads
@@ -113,10 +108,12 @@ set_target_properties(
 	PROPERTIES PREFIX "")
 
 target_link_libraries(uhub ${CMAKE_DL_LIBS} adc network utils)
+target_link_libraries(uhub-passwd ${SQLITE3_LIBRARIES} utils)
 target_link_libraries(test ${CMAKE_DL_LIBS} adc network utils)
 target_link_libraries(mod_example utils)
 target_link_libraries(mod_welcome utils)
 target_link_libraries(mod_auth_simple utils)
+target_link_libraries(mod_auth_sqlite ${SQLITE3_LIBRARIES} utils)
 target_link_libraries(mod_chat_history utils)
 target_link_libraries(mod_no_guest_downloads utils)
 target_link_libraries(mod_chat_only utils)
@@ -125,6 +122,7 @@ target_link_libraries(mod_topic utils)
 target_link_libraries(utils network)
 target_link_libraries(mod_welcome network)
 target_link_libraries(mod_logging network)
+
 
 if(UNIX)
 	add_library(adcclient STATIC ${adcclient_SOURCES})
