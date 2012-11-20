@@ -127,6 +127,10 @@
 */
 #endif
 
+#ifdef __GNU__
+#define POSIX_THREAD_SUPPORT
+#endif
+
 #define USE_SELECT
 #ifndef WINSOCK
 #include <sys/select.h>
