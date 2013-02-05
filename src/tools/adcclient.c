@@ -30,7 +30,6 @@
 enum ADC_client_state
 {
 	ps_none, /* Not connected */
-	ps_dns,  /* looking up name */
 	ps_conn, /* Connecting... */
 	ps_conn_ssl, /* SSL handshake */
 	ps_protocol, /* Have sent HSUP */
@@ -68,7 +67,7 @@ struct ADC_client
 	struct net_connection* con;
 	struct net_timer* timer;
 	struct sockaddr_storage addr;
-	struct net_dns_job* dns_job;
+	struct net_connect_handle* connect_job;
 	struct ADC_client_address address;
 	char* nick;
 	char* desc;
@@ -109,7 +108,6 @@ static void ADC_client_debug(struct ADC_client* client, const char* format, ...)
 static const char* ADC_client_state_string[] =
 {
 	"ps_none",
-	"ps_dns",
 	"ps_conn",
 	"ps_conn_ssl",
 	"ps_protocol",
@@ -164,18 +162,12 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 
 	switch (client->state)
 	{
-		case ps_dns:
-			break;
-
 		case ps_conn:
 			if (events == NET_EVENT_TIMEOUT)
 			{
 				client->callback(client, ADC_CLIENT_DISCONNECTED, 0);
 				return;
 			}
-
-			if (events & NET_EVENT_WRITE)
-				ADC_client_connect_internal(client);
 			break;
 
 #ifdef SSL_SUPPORT
@@ -539,11 +531,6 @@ struct ADC_client* ADC_client_create(const char* nickname, const char* descripti
 	ADC_TRACE;
 	struct ADC_client* client = (struct ADC_client*) hub_malloc_zero(sizeof(struct ADC_client));
 
-	int sd = net_socket_create(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (sd == -1) return NULL;
-
-	client->con = net_con_create();
-	net_con_initialize(client->con, sd, event_callback, client, 0);
 	ADC_client_set_state(client, ps_none);
 
 	client->nick = hub_strdup(nickname);
@@ -570,46 +557,49 @@ void ADC_client_destroy(struct ADC_client* client)
 	hub_free(client);
 }
 
+static void connect_callback(struct net_connect_handle* handle, enum net_connect_status status, struct net_connection* con, void* ptr)
+{
+	struct ADC_client* client = (struct ADC_client*) ptr;
+	client->connect_job = NULL;
+	switch (status)
+	{
+		case net_connect_status_ok:
+			client->con = con;
+			net_con_reinitialize(client->con, event_callback, client, 0);
+			ADC_client_on_connected(client);
+			break;
+
+		case net_connect_status_host_not_found:
+		case net_connect_status_no_address:
+		case net_connect_status_dns_error:
+		case net_connect_status_refused:
+		case net_connect_status_unreachable:
+		case net_connect_status_timeout:
+		case net_connect_status_socket_error:
+			ADC_client_disconnect(client);
+			break;
+	}
+}
+
 int ADC_client_connect(struct ADC_client* client, const char* address)
 {
 	ADC_TRACE;
 	if (client->state == ps_none)
 	{
-		// Parse address and start name resolving!
 		if (!ADC_client_parse_address(client, address))
 			return 0;
-		return 1;
-	}
-	return ADC_client_connect_internal(client);
-}
-
-int ADC_client_connect_internal(struct ADC_client* client)
-{
-	int ret;
-	if (client->state == ps_dns)
-	{
-		// Done name resolving!
-		client->callback(client, ADC_CLIENT_CONNECTING, 0);
-		ADC_client_set_state(client, ps_conn);
 	}
 
-	ret = net_connect(net_con_get_sd(client->con), (struct sockaddr*) &client->addr, sizeof(struct sockaddr_in));
-	if (ret == 0 || (ret == -1 && net_error() == EISCONN))
-	{
-		ADC_client_on_connected(client);
-	}
-	else if (ret == -1 && (net_error() == EALREADY || net_error() == EINPROGRESS || net_error() == EWOULDBLOCK || net_error() == EINTR))
-	{
-		net_con_update(client->con, NET_EVENT_READ | NET_EVENT_WRITE);
-		ADC_client_set_state(client, ps_conn);
-	}
-	else
+	ADC_client_set_state(client, ps_conn);
+	client->connect_job = net_con_connect(client->address.hostname, client->address.port, connect_callback, client);
+	if (!client->connect_job)
 	{
 		ADC_client_on_disconnected(client);
 		return 0;
 	}
 	return 1;
 }
+
 
 static void ADC_client_on_connected(struct ADC_client* client)
 {
@@ -674,43 +664,6 @@ void ADC_client_disconnect(struct ADC_client* client)
 	}
 }
 
-int ADC_client_dns_callback(struct net_dns_job* job, const struct net_dns_result* result)
-{
-	struct ADC_client* client = (struct ADC_client*) net_dns_job_get_ptr(job);
-	struct ip_addr_encap* ipaddr;
-	LOG_WARN("ADC_client_dns_callback(): result=%p (%d)", result, net_dns_result_size(result));
-
-	memset(&client->addr, 0, sizeof(client->addr));
-
-	ipaddr = net_dns_result_first(result);
-	switch (ipaddr->af)
-	{
-		case AF_INET:
-		{
-			struct sockaddr_in* addr4 = (struct sockaddr_in*) &client->addr;
-			addr4->sin_family = AF_INET;
-			addr4->sin_port = htons(client->address.port);
-			memcpy(&addr4->sin_addr, &ipaddr->internal_ip_data.in, sizeof(struct in_addr));
-			break;
-		}
-
-		case AF_INET6:
-		{
-			struct sockaddr_in6* addr6 = (struct sockaddr_in6*) &client->addr;
-			addr6->sin6_family = AF_INET6;
-			addr6->sin6_port = htons(client->address.port);
-			memcpy(&addr6->sin6_addr, &ipaddr->internal_ip_data.in6, sizeof(struct in6_addr));
-			break;
-		}
-
-		default:
-			LOG_WARN("Unknown ipaddr!");
-	}
-
-	ADC_client_connect_internal(client);
-	return 1;
-}
-
 static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 {
 	ADC_TRACE;
@@ -753,9 +706,6 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 
 	client->address.hostname = strndup(hub_address, &split[0] - &hub_address[0]);
 
-	client->callback(client, ADC_CLIENT_NAME_LOOKUP, 0);
-	ADC_client_set_state(client, ps_dns);
-	client->dns_job = net_dns_gethostbyname(client->address.hostname, AF_UNSPEC, ADC_client_dns_callback, client);
 	return 1;
 }
 
