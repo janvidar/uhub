@@ -14,6 +14,7 @@ uhub-admin
 adcrush
 uhub
 build-stamp
+build.ninja
 debian/files
 debian/uhub.debhelper.log
 debian/uhub.postinst.debhelper
@@ -22,3 +23,4 @@ debian/uhub.prerm.debhelper
 debian/uhub.substvars
 uhub-passwd
 src/version.h
+

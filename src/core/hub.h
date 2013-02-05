@@ -115,6 +115,10 @@ struct hub_info
 	struct command_base* commands;       /* Hub command handler */
 	struct uhub_plugins* plugins;        /* Plug-ins loaded for this hub instance. */
 
+#ifdef LINK_SUPPORT
+	struct linked_list* hub_links;       /* Other hubs linked to this hub */
+#endif
+
 #ifdef SSL_SUPPORT
 	struct ssl_context_handle* ctx;
 #endif /*  SSL_SUPPORT */

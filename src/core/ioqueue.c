@@ -49,6 +49,34 @@ void ioq_recv_destroy(struct ioq_recv* q)
 	}
 }
 
+#define IOQ_RECV_FLAGS_PREALLOC 1
+#define IOQ_RECV_FLAGS_FULL 2
+
+enum ioq_recv_status ioq_recv_read(struct ioq_recv* q, struct net_connection* con)
+{
+	static char buf[MAX_RECV_BUF];
+	size_t buf_size = ioq_recv_get(q, buf, MAX_RECV_BUF);
+	ssize_t size;
+
+	if (buf_size >= MAX_RECV_BUF)
+		return ioq_recv_full;
+
+	size = net_con_recv(con, buf + buf_size, MAX_RECV_BUF - buf_size);
+
+	if (size > 0)
+		buf_size += size;
+	if (size < 0)
+		return ioq_recv_error;
+	if (size == 0)
+		return ioq_recv_later;
+
+	ioq_recv_set(q, buf, buf_size);
+	return ioq_recv_ok;
+}
+
+
+
+
 size_t ioq_recv_get(struct ioq_recv* q, void* buf, size_t bufsize)
 {
 	uhub_assert(bufsize >= q->size);
@@ -87,6 +115,21 @@ size_t ioq_recv_set(struct ioq_recv* q, void* buf, size_t bufsize)
 	return bufsize;
 }
 
+
+int ioq_recv_consume(struct ioq_recv* q, size_t bytes)
+{
+	size_t newsize;
+	void* ptr;
+
+	if (!q || bytes > q->size) return 0;
+
+	newsize = (q->size - bytes);
+	memmove(q->buf, q->buf + bytes, newsize);
+	ptr = hub_realloc(q->buf, newsize);
+	q->buf = ptr;
+	q->size = newsize;
+	return 1;
+}
 
 struct ioq_send* ioq_send_create()
 {

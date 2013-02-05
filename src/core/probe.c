@@ -71,6 +71,17 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 				probe_destroy(probe);
 				return;
 			}
+#ifdef LINK_SUPPORT
+			else if (probe->hub->config->hub_link_enabled && memcmp(probe_recvbuf, "LSUP", 4) == 0)
+			{
+				if (link_create(probe->hub, probe->connection, &probe->addr))
+				{
+					probe->connection = 0;
+				}
+				probe_destroy(probe);
+				return;
+			}
+#endif /* LINK_SUPPORT */
 #ifdef SSL_SUPPORT
 			else if (bytes >= 11 &&
 				probe_recvbuf[0] == 22 && 

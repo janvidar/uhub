@@ -17,6 +17,15 @@ struct hub_config
 	char* hub_name;                        /*<<< Name of hub (default: "uhub") */
 	char* hub_description;                 /*<<< Short hub description, topic or subject. (default: "no description") */
 	char* redirect_addr;                   /*<<< A common hub redirect address. (default: "") */
+#ifdef LINK_SUPPORT
+	int   hub_link_enabled;                /*<<< Allow other hubs to link to this hub (default: 0) */
+#endif /* LINK_SUPPORT */
+#ifdef LINK_SUPPORT
+	char* hub_link_secret;                 /*<<< A secret token required to accept hub linking (default: "") */
+#endif /* LINK_SUPPORT */
+#ifdef LINK_SUPPORT
+	char* hub_link_connect;                /*<<< Connect this to hub to another hub (default: "") */
+#endif /* LINK_SUPPORT */
 	int   max_recv_buffer;                 /*<<< Max read buffer before parse, per user (default: 4096) */
 	int   max_send_buffer;                 /*<<< Max send buffer before disconnect, per user (default: 131072) */
 	int   max_send_buffer_soft;            /*<<< Max send buffer before message drops, per user (default: 98304) */

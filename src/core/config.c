@@ -102,7 +102,7 @@ static int config_parse_line(char* line, int line_count, void* ptr_data)
 	data = strip_white_space(data);
 	data = strip_off_quotes(data);
 
-	if (!*key || !*data)
+	if (!*key /*|| !*data*/)
 	{
 		LOG_FATAL("Configuration parse error on line %d", line_count);
 		return -1;

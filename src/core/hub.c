@@ -787,6 +787,13 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	}
 #endif
 
+#ifdef LINK_SUPPORT
+	if (config->hub_link_enabled)
+	{
+		LOG_INFO("Hub linking support enabled");
+	}
+#endif
+
 	hub->config = config;
 	hub->users = NULL;
 
@@ -897,23 +904,14 @@ void hub_plugins_unload(struct hub_info* hub)
 
 void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 {
-	char* tmp;
-	char* server = adc_msg_escape(PRODUCT_STRING); /* FIXME: OOM */
-
 	hub->acl = acl;
 	hub->command_info = adc_msg_construct(ADC_CMD_IINF, 15);
 	if (hub->command_info)
 	{
 		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_CLIENT_TYPE, ADC_CLIENT_TYPE_HUB);
-		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_USER_AGENT, server);
-
-		tmp = adc_msg_escape(hub->config->hub_name);
-		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_NICK, tmp);
-		hub_free(tmp);
-
-		tmp = adc_msg_escape(hub->config->hub_description);
-		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_DESCRIPTION, tmp);
-		hub_free(tmp);
+		adc_msg_add_named_argument_string(hub->command_info, ADC_INF_FLAG_USER_AGENT, PRODUCT_STRING);
+		adc_msg_add_named_argument_string(hub->command_info, ADC_INF_FLAG_NICK, hub->config->hub_name);
+		adc_msg_add_named_argument_string(hub->command_info, ADC_INF_FLAG_DESCRIPTION, hub->config->hub_description);
 	}
 
 	hub->command_support = adc_msg_construct(ADC_CMD_ISUP, 6 + strlen(ADC_PROTO_SUPPORT));
@@ -922,16 +920,14 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 		adc_msg_add_argument(hub->command_support, ADC_PROTO_SUPPORT);
 	}
 
-	hub->command_banner = adc_msg_construct(ADC_CMD_ISTA, 100 + strlen(server));
+	hub->command_banner = adc_msg_construct(ADC_CMD_ISTA, 100 + adc_msg_escape_length(PRODUCT_STRING));
 	if (hub->command_banner)
 	{
-		if (hub->config->show_banner_sys_info)
-			tmp = adc_msg_escape("Powered by " PRODUCT_STRING " on " OPSYS "/" CPUINFO);
-		else
-			tmp = adc_msg_escape("Powered by " PRODUCT_STRING);
 		adc_msg_add_argument(hub->command_banner, "000");
-		adc_msg_add_argument(hub->command_banner, tmp);
-		hub_free(tmp);
+		if (hub->config->show_banner_sys_info)
+			adc_msg_add_argument_string(hub->command_banner, "Powered by " PRODUCT_STRING " on " OPSYS "/" CPUINFO);
+		else
+			adc_msg_add_argument_string(hub->command_banner, "Powered by " PRODUCT_STRING);
 	}
 
 	if (hub_plugins_load(hub) < 0)
@@ -942,7 +938,6 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 	else
 
 	hub->status = (hub->config->hub_enabled ? hub_status_running : hub_status_disabled);
-	hub_free(server);
 }
 
 

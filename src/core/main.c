@@ -124,6 +124,10 @@ int main_loop()
 			hub_log_initialize(arg_log, arg_log_syslog);
 			hub_set_log_verbosity(arg_verbose);
 		}
+
+#ifdef DEBUG
+		LOG_INFO("Debug messages enabled");
+#endif
 	
 		if (read_config(arg_config, &configuration, !arg_have_config) == -1)
 			return -1;

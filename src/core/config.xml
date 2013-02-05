@@ -165,6 +165,36 @@
 		<since>0.3.2</since>
 	</option>
 
+	<option name="hub_link_enabled" type="boolean" default="0">
+		<short>Allow other hubs to link to this hub</short>
+		<description><![CDATA[
+			This allows multiple hubs to link to this hub so
+			that users on the different hubs appear as being on one hub.
+			This is useful for distributing or load balancing large hubs.
+		]]></description>
+		<since>0.5.0</since>
+		<ifdef>LINK_SUPPORT</ifdef>
+	</option>
+
+	<option name="hub_link_secret" type="string" default="">
+		<short>A secret token required to accept hub linking</short>
+		<description><![CDATA[
+			This should be a secret token needed to authorize hubs
+			linking into this one.
+		]]></description>
+		<since>0.5.0</since>
+		<ifdef>LINK_SUPPORT</ifdef>
+	</option>
+
+	<option name="hub_link_connect" type="string" default="">
+		<short>Connect this to hub to another hub</short>
+		<description><![CDATA[
+			The other hub must allow links to be established.
+			Example: uhub://host:port
+		]]></description>
+		<since>0.5.0</since>
+		<ifdef>LINK_SUPPORT</ifdef>
+	</option>
 
 	<option name="max_recv_buffer" type="int" default="4096" advanced="true" >
 		<check min="1024" max="1048576" />

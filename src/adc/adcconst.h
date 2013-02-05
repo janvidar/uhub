@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2012, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -34,6 +34,7 @@ typedef uint32_t fourcc_t;
 
 /* default welcome protocol support message, as sent by this server */
 #define ADC_PROTO_SUPPORT "ADBASE ADTIGR ADPING ADUCMD"
+#define ADC_PROTO_LINK_SUPPORT "ADTIGR ADLINK"
 
 /* Server sent commands */
 #define ADC_CMD_ISID FOURCC('I','S','I','D')
@@ -101,6 +102,12 @@ typedef uint32_t fourcc_t;
 #define ADC_CMD_HCMD FOURCC('H','C','M','D')
 #define ADC_CMD_ICMD FOURCC('I','C','M','D')
 
+/* Link commands */
+#define ADC_CMD_LSUP FOURCC('L','S','U','P') /* Link support handshake */
+#define ADC_CMD_LINF FOURCC('L','I','N','F') /* Hub link info */
+#define ADC_CMD_LGPA FOURCC('L','G','P','A') /* Hub link get password */
+#define ADC_CMD_LPAS FOURCC('L','P','A','S') /* Hub link password */
+#define ADC_CMD_LSTA FOURCC('L','S','T','A') /* Hub link status */
 
 #define ADC_INF_FLAG_IPV4_ADDR          "I4" /* ipv4 address */
 #define ADC_INF_FLAG_IPV6_ADDR          "I6" /* ipv6 address */

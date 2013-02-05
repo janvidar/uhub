@@ -17,6 +17,15 @@ void config_defaults(struct hub_config* config)
 	config->hub_name = hub_strdup("uhub");
 	config->hub_description = hub_strdup("no description");
 	config->redirect_addr = hub_strdup("");
+#ifdef LINK_SUPPORT
+	config->hub_link_enabled = 0;
+#endif /* LINK_SUPPORT */
+#ifdef LINK_SUPPORT
+	config->hub_link_secret = hub_strdup("");
+#endif /* LINK_SUPPORT */
+#ifdef LINK_SUPPORT
+	config->hub_link_connect = hub_strdup("");
+#endif /* LINK_SUPPORT */
 	config->max_recv_buffer = 4096;
 	config->max_send_buffer = 131072;
 	config->max_send_buffer_soft = 98304;
@@ -244,6 +253,42 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 		}
 		return 0;
 	}
+
+#ifdef LINK_SUPPORT
+	if (!strcmp(key, "hub_link_enabled"))
+	{
+		if (!apply_boolean(key, data, &config->hub_link_enabled))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+#endif /* LINK_SUPPORT */
+
+#ifdef LINK_SUPPORT
+	if (!strcmp(key, "hub_link_secret"))
+	{
+		if (!apply_string(key, data, &config->hub_link_secret, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+#endif /* LINK_SUPPORT */
+
+#ifdef LINK_SUPPORT
+	if (!strcmp(key, "hub_link_connect"))
+	{
+		if (!apply_string(key, data, &config->hub_link_connect, (char*) ""))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+#endif /* LINK_SUPPORT */
 
 	if (!strcmp(key, "max_recv_buffer"))
 	{
@@ -943,6 +988,14 @@ void free_config(struct hub_config* config)
 
 	hub_free(config->redirect_addr);
 
+#ifdef LINK_SUPPORT
+	hub_free(config->hub_link_secret);
+#endif /* LINK_SUPPORT */
+
+#ifdef LINK_SUPPORT
+	hub_free(config->hub_link_connect);
+#endif /* LINK_SUPPORT */
+
 	hub_free(config->tls_require_redirect_addr);
 
 	hub_free(config->tls_certificate);
@@ -1073,6 +1126,21 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 
 	if (!ignore_defaults || strcmp(config->redirect_addr, "") != 0)
 		fprintf(stdout, "redirect_addr = \"%s\"\n", config->redirect_addr);
+
+#ifdef LINK_SUPPORT
+	if (!ignore_defaults || config->hub_link_enabled != 0)
+		fprintf(stdout, "hub_link_enabled = %s\n", config->hub_link_enabled ? "yes" : "no");
+#endif /* LINK_SUPPORT */
+
+#ifdef LINK_SUPPORT
+	if (!ignore_defaults || strcmp(config->hub_link_secret, "") != 0)
+		fprintf(stdout, "hub_link_secret = \"%s\"\n", config->hub_link_secret);
+#endif /* LINK_SUPPORT */
+
+#ifdef LINK_SUPPORT
+	if (!ignore_defaults || strcmp(config->hub_link_connect, "") != 0)
+		fprintf(stdout, "hub_link_connect = \"%s\"\n", config->hub_link_connect);
+#endif /* LINK_SUPPORT */
 
 	if (!ignore_defaults || config->max_recv_buffer != 4096)
 		fprintf(stdout, "max_recv_buffer = %d\n", config->max_recv_buffer);

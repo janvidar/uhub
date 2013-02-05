@@ -94,6 +94,7 @@ extern "C" {
 #include "core/commands.h"
 #include "core/inf.h"
 #include "core/hubevent.h"
+#include "core/link.h"
 #include "core/plugincallback.h"
 #include "core/plugininvoke.h"
 #include "core/pluginloader.h"

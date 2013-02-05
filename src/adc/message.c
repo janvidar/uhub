@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -178,6 +178,7 @@ int adc_msg_get_arg_offset(struct adc_message* msg)
 		
 		case 'I':
 		case 'H':
+		case 'L':
 			return 4;
 			
 		case 'B':
@@ -383,8 +384,9 @@ struct adc_message* adc_msg_parse(const char* line, size_t length)
 			ok = 0;
 			break;
 
-		case 'I':
-		case 'H':
+		case 'I': /* Hub to client */
+		case 'H': /* Clien to hub */
+		case 'L': /* hub to hub Link */
 			ok = (length > 3);
 			break;
 
@@ -787,6 +789,16 @@ int adc_msg_add_argument(struct adc_message* cmd, const char* string)
 	return 0;
 }
 
+int adc_msg_add_argument_string(struct adc_message* cmd, const char* string)
+{
+	char* arg = adc_msg_escape(string);
+	int ret;
+	if (!arg) return -1;
+	ret = adc_msg_add_argument(cmd, arg);
+	hub_free(arg);
+	return ret;
+}
+
 
 char* adc_msg_get_argument(struct adc_message* cmd, int offset)
 {
@@ -868,21 +880,21 @@ int adc_msg_get_argument_index(struct adc_message* cmd, const char prefix[2])
 
 
 
-int adc_msg_escape_length(const char* str)
+size_t adc_msg_escape_length(const char* str)
 {
-	int add = 0;
-	int n = 0;
+	size_t add = 0;
+	size_t n = 0;
 	for (; str[n]; n++)
 		if (str[n] == ' ' || str[n] == '\n' || str[n] == '\\') add++;
 	return n + add;
 }
 
 
-int adc_msg_unescape_length(const char* str)
+size_t adc_msg_unescape_length(const char* str)
 {
-	int add = 0;
-	int n = 0;
-	int escape = 0;
+	size_t add = 0;
+	size_t n = 0;
+	size_t escape = 0;
 	for (; str[n]; n++)
 	{
 		if (escape)
@@ -996,5 +1008,22 @@ char* adc_msg_escape(const char* string)
 	}
 	str[n] = '\0';
 	return str;
+}
+
+enum msg_type adc_msg_get_type(const struct adc_message* msg)
+{
+	switch (msg->cache[0])
+	{
+		case 'B': return msg_type_client_broadcast;
+		case 'C': return msg_type_client_to_client;
+		case 'D': return msg_type_client_direct;
+		case 'E': return msg_type_client_echo;
+		case 'F': return msg_type_client_feature;
+		case 'H': return msg_type_client_to_hub;
+		case 'I': return msg_type_hub_to_client;
+		case 'L': return msg_type_link_to_link;
+		case 'U': return msg_type_hub_to_client_udp;
+	}
+	return msg_type_unknown;
 }
 

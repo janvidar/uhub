@@ -39,6 +39,7 @@ struct ioq_recv
 {
 	char* buf;
 	size_t size;
+	// int flags;
 };
 
 /**
@@ -101,6 +102,27 @@ extern size_t ioq_recv_set(struct ioq_recv*, void* buf, size_t bufsize);
  */
 extern int ioq_recv_is_empty(struct ioq_recv* buf);
 
+
+enum ioq_recv_status
+{
+	ioq_recv_ok = 0,    // read data OK
+	ioq_recv_later = 1, // all OK, but call again later (no change)
+	ioq_recv_full  = 2, // all OK, but the buffer is full
+	ioq_recv_error = 3, // error (connection is not working)
+};
+
+/**
+ * Receive from connection into buffer.
+ */
+extern enum ioq_recv_status ioq_recv_read(struct ioq_recv* q, struct net_connection* con);
+
+/**
+ * Consume 'bytes' bytes.
+ * 'bytes' must be <= q->size
+ *
+ * @return 1 on success, or 0 on error (only if q == NULL or bytes is > q->size).
+ */
+extern int ioq_recv_consume(struct ioq_recv* q, size_t bytes);
 
 
 #endif /* HAVE_UHUB_IO_QUEUE_H */

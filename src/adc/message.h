@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -41,6 +41,20 @@ enum msg_status_level
 	status_level_info  = 0, /* Success/informative status message */
 	status_level_error = 1, /* Recoverable error */
 	status_level_fatal = 2, /* Fatal error (disconnect) */
+};
+
+enum msg_type
+{
+	msg_type_unknown           = 0,
+	msg_type_client_broadcast  = 'B',
+	msg_type_client_to_client  = 'C',
+	msg_type_client_direct     = 'D',
+	msg_type_client_echo       = 'E',
+	msg_type_client_feature    = 'F',
+	msg_type_client_to_hub     = 'H',
+	msg_type_hub_to_client     = 'I',
+	msg_type_link_to_link      = 'L',
+	msg_type_hub_to_client_udp = 'U',
 };
 
 /**
@@ -172,6 +186,13 @@ extern int adc_msg_replace_named_argument(struct adc_message* cmd, const char pr
 extern int adc_msg_add_argument(struct adc_message* cmd, const char* string);
 
 /**
+ * Append a string argumnent.
+ * The string will automatcally be escaped.
+ * @return  0 if successful, or -1 if an error occured (out of memory).
+ */
+extern int adc_msg_add_argument_string(struct adc_message* cmd, const char* string);
+
+/**
  * Append a named argument
  *
  * @arg prefix a 2 character argument prefix
@@ -217,6 +238,12 @@ extern int adc_msg_unescape_to_target(const char* string, char* target, size_t t
 extern char* adc_msg_escape(const char* string);
 
 /**
+ * Calculate the length str would be after escaping.
+ * Does not include any NULL terminator.
+ */
+size_t adc_msg_escape_length(const char* str);
+
+/**
  * This will ensure a newline is at the end of the command.
  */
 void adc_msg_terminate(struct adc_message* cmd);
@@ -233,5 +260,7 @@ void adc_msg_unterminate(struct adc_message* cmd);
  * this returns 4. Should be 4 + lengthOf(cid).
  */
 int adc_msg_get_arg_offset(struct adc_message* msg);
+
+enum msg_type adc_msg_get_type(const struct adc_message* msg);
 
 #endif /* HAVE_UHUB_COMMAND_H */
