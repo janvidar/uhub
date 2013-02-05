@@ -197,6 +197,7 @@ configure_file ("${PROJECT_SOURCE_DIR}/version.h.in" "${PROJECT_SOURCE_DIR}/vers
 mark_as_advanced(FORCE CMAKE_BUILD_TYPE)
 if (RELEASE)
 	set(CMAKE_BUILD_TYPE Release)
+	add_definitions(-DNDEBUG)
 else()
 	set(CMAKE_BUILD_TYPE Debug)
 	# add_definitions(-DDEBUG)
