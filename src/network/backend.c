@@ -132,10 +132,11 @@ struct timeout_queue* net_backend_get_timeout_queue()
  */
 int net_backend_process()
 {
-	int res;
+	int res = 0;
 	size_t secs = timeout_queue_get_next_timeout(&g_backend->timeout_queue, g_backend->now);
 
-	res = g_backend->handler.backend_poll(g_backend->data, secs * 1000);
+	if (g_backend->common.num)
+		res = g_backend->handler.backend_poll(g_backend->data, secs * 1000);
 
 	g_backend->now = time(0);
 	timeout_queue_process(&g_backend->timeout_queue, g_backend->now);
