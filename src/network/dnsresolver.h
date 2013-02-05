@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2012, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -114,6 +114,6 @@ extern struct ip_addr_encap* net_dns_result_first(const struct net_dns_result*);
 extern struct ip_addr_encap* net_dns_result_next(const struct net_dns_result*);
 
 /// When finished with the results
-extern void net_dns_result_free(struct net_dns_result*);
+extern void net_dns_result_free(const struct net_dns_result*);
 
 #endif /* HAVE_UHUB_NETWORK_DNS_RESOLVER_H */

@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2012, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -366,21 +366,24 @@ extern size_t net_dns_result_size(const struct net_dns_result* res)
 extern struct ip_addr_encap* net_dns_result_first(const struct net_dns_result* res)
 {
 	struct ip_addr_encap* ipaddr = list_get_first(res->addr_list);
-	LOG_TRACE("net_dns_result_first() - Address: %s", ip_convert_to_string(ipaddr));
+	LOG_TRACE("net_dns_result_first() - Address: %s", ipaddr ? ip_convert_to_string(ipaddr) : "(no address)");
 	return ipaddr;
 }
 
 extern struct ip_addr_encap* net_dns_result_next(const struct net_dns_result* res)
 {
 	struct ip_addr_encap* ipaddr = list_get_next(res->addr_list);
-	LOG_TRACE("net_dns_result_next() - Address: %s", ip_convert_to_string(ipaddr));
+	LOG_TRACE("net_dns_result_next() - Address: %s", ipaddr ? ip_convert_to_string(ipaddr) : "(no more addresses)");
 	return ipaddr;
 }
 
-extern void net_dns_result_free(struct net_dns_result* res)
+extern void net_dns_result_free(const struct net_dns_result* res)
 {
+	if (!res)
+		return;
+
 	list_clear(res->addr_list, &hub_free);
 	list_destroy(res->addr_list);
 	free_job(res->job);
-	hub_free(res);
+	hub_free((struct net_dns_result*) res);
 }
