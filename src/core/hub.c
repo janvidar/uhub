@@ -841,6 +841,15 @@ struct hub_info* hub_start_service(struct hub_config* config)
 
 	// Start the hub command sub-system
 	hub->commands = command_initialize(hub);
+
+#ifdef LINK_SUPPORT
+	if (*config->hub_link_connect)
+	{
+		link_connect_uri(hub, config->hub_link_connect);
+	}
+#endif
+
+
 	return hub;
 }
 

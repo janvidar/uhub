@@ -20,6 +20,7 @@
 #include "uhub.h"
 
 #ifdef LINK_SUPPORT
+static int link_send_support(struct hub_link* link);
 
 static void link_net_event(struct net_connection* con, int event, void *arg)
 {
@@ -56,7 +57,8 @@ static void link_net_event(struct net_connection* con, int event, void *arg)
 
 void link_disconnect(struct hub_link* link)
 {
-	net_con_close(link->connection);
+	if (link->connection)
+		net_con_close(link->connection);
 	link->connection = NULL;
 
 	ioq_send_destroy(link->send_queue);
@@ -96,22 +98,92 @@ struct hub_link* link_create(struct hub_info* hub, struct net_connection* con, s
 	return link;
 }
 
-struct hub_link* link_connect(struct hub_info* hub, const char* address)
+static void link_connect_callback(struct net_connect_handle* handle, enum net_connect_status status, struct net_connection* con, void* ptr)
 {
-	struct hub_link* link = link_create_internal(hub);
+	struct hub_link* link = (struct hub_link*) ptr;
+	link->connect_job = NULL;
 
-	// FIXME - no IPv6 support, no DNS resolution, no failover addresses etc.
-	int sd = net_socket_create(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (sd == -1)
+	LOG_DEBUG("link_connect_callback()");
+
+	switch (status)
 	{
-		hub_free(link);
+		case net_connect_status_ok:
+			link->connection = con;
+			net_con_reinitialize(link->connection, link_net_event, link, NET_EVENT_READ);
+			// FIXME: send handshake here
+			link_send_support(link);
+			break;
+
+		case net_connect_status_host_not_found:
+		case net_connect_status_no_address:
+		case net_connect_status_dns_error:
+		case net_connect_status_refused:
+		case net_connect_status_unreachable:
+		case net_connect_status_timeout:
+		case net_connect_status_socket_error:
+			// FIXME: Unable to connect - start timer and re-try connection establishment!
+			break;
+	}
+}
+
+struct link_address
+{
+	char host[256];
+	uint16_t port;
+};
+
+static int link_parse_address(const char* arg, struct link_address* addr)
+{
+	int port;
+	char* split;
+
+	memset(addr, 0, sizeof(struct link_address));
+
+	/* Split hostname and port (if possible) */
+	split = strrchr(arg, ':');
+	if (split == 0 || strlen(split) < 2 || strlen(split) > 6)
+		return 0;
+
+	/* Ensure port number is valid */
+	port = strtol(split+1, NULL, 10);
+	if (port <= 0 || port > 65535)
+		return 0;
+
+	memcpy(addr->host, arg, &split[0] - &arg[0]);
+	addr->port = port;
+	return 1;
+}
+
+
+struct hub_link* link_connect_uri(struct hub_info* hub, const char* address)
+{
+	struct link_address link_address;
+	if (!link_parse_address(address, &link_address))
+	{
+		LOG_INFO("Invalid master hub link address");
 		return NULL;
 	}
 
-	link->connection = net_con_create();
-	net_con_initialize(link->connection, sd, link_net_event, link, 0);
+	return link_connect(hub, link_address.host, link_address.port);
+}
+
+
+struct hub_link* link_connect(struct hub_info* hub, const char* address, uint16_t port)
+{
+	struct hub_link* link = link_create_internal(hub);
+
+	LOG_DEBUG("Connecting to master link at %s:%d...", address, port);
 
 	link->mode = link_mode_client;
+	link->connect_job = net_con_connect(address, port, link_connect_callback, link);
+	if (!link->connect_job)
+	{
+		// FIXME: Immediate failure!
+		LOG_DEBUG("Error connecting to master hub link.");
+		link_disconnect(link);
+		return NULL;
+	}
+
 	return link;
 }
 

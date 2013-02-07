@@ -32,6 +32,7 @@ struct hub_link
 	struct ioq_send* send_queue;
 	struct ioq_recv* recv_queue;
 	struct net_connection* connection; /** Connection data */
+	struct net_connect_handle* connect_job; /** Only used when establishing a connection in client mode */
 	struct hub_info* hub;
 	int flags;
 };
@@ -44,7 +45,8 @@ extern struct hub_link* link_create(struct hub_info* hub, struct net_connection*
 /**
  * Connect this hub to an upstream server (act as a link client).
  */
-extern struct hub_link* link_connect(struct hub_info* hub, const char* address);
+extern struct hub_link* link_connect(struct hub_info* hub, const char* address, uint16_t port);
+extern struct hub_link* link_connect_uri(struct hub_info* hub, const char* address);
 
 /**
  * Disconnect a link connection.
