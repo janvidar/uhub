@@ -41,6 +41,14 @@ extern int route_to_user(struct hub_info* hub, struct hub_user*, struct adc_mess
 extern int route_to_all(struct hub_info* hub, struct adc_message* command);
 
 /**
+ * Send a message to all operators.
+ * Technically it sends to all users with the flag_opnotify set
+ * which is intended to be set for only operators - allowing operators to opt-out
+ * of these messages.
+ */
+extern int route_to_operators(struct hub_info* hub, struct adc_message* command);
+
+/**
  * Broadcast message to all users subscribing to the type of message.
  */
 extern int route_to_subscribers(struct hub_info* hub, struct adc_message* command);

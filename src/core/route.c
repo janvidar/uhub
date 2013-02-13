@@ -149,6 +149,19 @@ int route_to_all(struct hub_info* hub, struct adc_message* command) /* iterate u
 	return 0;
 }
 
+int route_to_operators(struct hub_info* hub, struct adc_message* command) /* iterate users */
+{
+	struct hub_user* user = (struct hub_user*) list_get_first(hub->users->list);
+	while (user)
+	{
+		if (user_flag_get(user, flag_opnotify))
+			route_to_user(hub, user, command);
+		user = (struct hub_user*) list_get_next(hub->users->list);
+	}
+	return 0;
+}
+
+
 int route_to_subscribers(struct hub_info* hub, struct adc_message* command) /* iterate users */
 {
 	int do_send;

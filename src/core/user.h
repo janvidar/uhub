@@ -47,6 +47,7 @@ enum user_flags
 	feature_link    = 0x00000100, /** LINK: Hub link (not supported) */
 	feature_adcs    = 0x00000200, /** ADCS: ADC over TLS/SSL */
 	feature_bas0    = 0x00000400, /** BAS0: Obsolete pre-ADC/1.0 protocol version */
+	flag_opnotify   = 0x00200000, /** User should receive operation notifications. NOTE: Only operators should have this flag! */
 	flag_flood      = 0x00400000, /** User has been notified about flooding. */
 	flag_muted      = 0x00800000, /** User is muted (cannot chat) */
 	flag_ignore     = 0x01000000, /** Ignore further reads */
