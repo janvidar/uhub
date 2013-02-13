@@ -787,6 +787,13 @@ int adc_msg_add_argument(struct adc_message* cmd, const char* string)
 	return 0;
 }
 
+int adc_msg_add_argument_string(struct adc_message* cmd, const char* string)
+{
+	char* escaped = adc_msg_escape(string);
+	int ret = adc_msg_add_argument(cmd, escaped);
+	hub_free(escaped);
+	return ret;
+}
 
 char* adc_msg_get_argument(struct adc_message* cmd, int offset)
 {
@@ -865,8 +872,6 @@ int adc_msg_get_argument_index(struct adc_message* cmd, const char prefix[2])
 	adc_msg_terminate(cmd);
 	return -1;
 }
-
-
 
 int adc_msg_escape_length(const char* str)
 {

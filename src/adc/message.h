@@ -172,6 +172,12 @@ extern int adc_msg_replace_named_argument(struct adc_message* cmd, const char pr
 extern int adc_msg_add_argument(struct adc_message* cmd, const char* string);
 
 /**
+ * Add an argument string, the string will be automatcally escaped.
+ * @return  0 if successful, or -1 if an error occured (out of memory).
+ */
+extern int adc_msg_add_argument_string(struct adc_message* cmd, const char* string);
+
+/**
  * Append a named argument
  *
  * @arg prefix a 2 character argument prefix
@@ -209,6 +215,13 @@ extern char* adc_msg_unescape(const char* string);
  */
 extern int adc_msg_unescape_to_target(const char* string, char* target, size_t target_size);
 
+/**
+ * Returns the length of the string once escaped with
+ * adc_msg_escape().
+ *
+ * The string must be NULL terminated.
+ */
+extern int adc_msg_escape_length(const char* str);
 
 /**
  * Convert a string to a ADC command escaped string.
@@ -233,5 +246,6 @@ void adc_msg_unterminate(struct adc_message* cmd);
  * this returns 4. Should be 4 + lengthOf(cid).
  */
 int adc_msg_get_arg_offset(struct adc_message* msg);
+
 
 #endif /* HAVE_UHUB_COMMAND_H */
