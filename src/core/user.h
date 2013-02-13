@@ -105,21 +105,30 @@ struct hub_user_limits
 	size_t              hub_count_total;       /** The number of hubs connected to in total */
 };
 
+enum user_type
+{
+	user_type_client,   /** A user connected normally as an ADC client */
+	user_type_bot,      /** Not really a user, but a bot inside the hub */
+};
+
+typedef void (*bot_recv_msg)(struct hub_user*, struct adc_message* msg);
+
 struct hub_user
 {
 	struct hub_user_info    id;                 /** Contains nick name and CID */
 	enum auth_credentials   credentials;        /** see enum user_credentials */
 	enum user_state         state;              /** see enum user_state */
+	enum user_type          type;
 	uint32_t                flags;              /** see enum user_flags */
 	struct linked_list*     feature_cast;       /** Features supported by feature cast */
 	struct adc_message*     info;               /** ADC 'INF' message (broadcasted to everyone joining the hub) */
 	struct hub_info*        hub;                /** The hub instance this user belong to */
+	void* ptr;
 	struct ioq_recv*        recv_queue;
 	struct ioq_send*        send_queue;
 	struct net_connection*  connection;         /** Connection data */
 	struct hub_user_limits  limits;             /** Data used for limitation */
 	enum user_quit_reason   quit_reason;        /** Quit reason (see user_quit_reason) */
-
 	struct flood_control   flood_chat;
 	struct flood_control   flood_connect;
 	struct flood_control   flood_search;
@@ -139,6 +148,7 @@ struct hub_user
  * @return User object or NULL if not enough memory is available.
  */
 extern struct hub_user* user_create(struct hub_info* hub, struct net_connection* con, struct ip_addr_encap* addr);
+extern struct hub_user* user_create_bot(struct hub_info* hub, const char* nick, const char* description, bot_recv_msg msg_handler);
 
 /**
  * Delete a user.

@@ -104,7 +104,19 @@ int route_to_user(struct hub_info* hub, struct hub_user* user, struct adc_messag
 #endif
 
 	if (!user->connection)
-		return 0;
+	{
+		switch (user->type)
+		{
+			case user_type_client:
+				return 0; // No connection - we're about to drop this user.
+			case user_type_bot:
+			{
+				bot_recv_msg handler = (bot_recv_msg) user->ptr;
+				handler(user, msg);
+				return 0;
+			}
+		}
+	}
 
 	uhub_assert(msg->cache && *msg->cache);
 

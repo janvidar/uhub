@@ -104,7 +104,7 @@ static int cbfunc_command_add(struct plugin_handle* plugin, struct plugin_comman
 	cmdh->internal_handle = command;
 	list_append(data->commands, cmdh);
 	command_add(plugin_get_hub(plugin)->commands, command, (void*) plugin);
-	printf("*** Add plugin command: %s (%p, %p)\n", command->prefix, command, cmdh);
+	LOG_DEBUG("*** Add plugin command: %s (%p, %p)\n", command->prefix, command, cmdh);
 	return 0;
 }
 
@@ -113,7 +113,7 @@ static int cbfunc_command_del(struct plugin_handle* plugin, struct plugin_comman
 	struct plugin_callback_data* data = get_callback_data(plugin);
 	struct command_handle* command = (struct command_handle*) cmdh->internal_handle;
 
-	printf("*** Del plugin command: %s (%p, %p)\n", command->prefix, command, cmdh);
+	LOG_DEBUG("*** Del plugin command: %s (%p, %p)\n", command->prefix, command, cmdh);
 	list_remove(data->commands, cmdh);
 	command_del(plugin_get_hub(plugin)->commands, command);
 	hub_free(command);

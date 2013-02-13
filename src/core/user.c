@@ -42,7 +42,6 @@ struct hub_user* user_create(struct hub_info* hub, struct net_connection* con, s
 	LOG_TRACE("user_create(), hub=%p, con[sd=%d]", hub, net_con_get_sd(con));
 
 	user = (struct hub_user*) hub_malloc_zero(sizeof(struct hub_user));
-
 	if (user == NULL)
 		return NULL; /* OOM */
 
@@ -54,6 +53,7 @@ struct hub_user* user_create(struct hub_info* hub, struct net_connection* con, s
 
 	memcpy(&user->id.addr, addr, sizeof(struct ip_addr_encap));
 	user_set_state(user, state_protocol);
+	user->type = user_type_client;
 
 	flood_control_reset(&user->flood_chat);
 	flood_control_reset(&user->flood_connect);
@@ -65,6 +65,38 @@ struct hub_user* user_create(struct hub_info* hub, struct net_connection* con, s
 	return user;
 }
 
+struct hub_user* user_create_bot(struct hub_info* hub, const char* nick, const char* description, bot_recv_msg msg_handler)
+{
+	struct hub_user* user = NULL;
+	LOG_TRACE("user_create_bot(), hub=%p, con[sd=%d]", hub, net_con_get_sd(con));
+
+	user = (struct hub_user*) hub_malloc_zero(sizeof(struct hub_user));
+	if (user == NULL)
+		return NULL; /* OOM */
+
+	strcpy(user->id.nick, nick);
+	uman_get_free_sid(hub->users, user);
+
+	user_set_state(user, state_normal);
+	user->type = user_type_bot;
+	user->credentials = auth_cred_bot;
+
+	// The message handler
+	user->ptr = (void*) msg_handler;
+
+	user->info = adc_msg_construct(ADC_CMD_BINF, 15);
+	if (user->info)
+	{
+		adc_msg_add_argument(user->info, sid_to_string(user->id.sid));
+		adc_msg_add_named_argument(user->info, ADC_INF_FLAG_CLIENT_TYPE, ADC_CLIENT_TYPE_BOT);
+		adc_msg_add_named_argument_string(user->info, ADC_INF_FLAG_USER_AGENT, PRODUCT_STRING);
+		adc_msg_add_named_argument_string(user->info, ADC_INF_FLAG_NICK, nick);
+		adc_msg_add_named_argument_string(user->info, ADC_INF_FLAG_DESCRIPTION, description);
+	}
+
+	user->hub = hub;
+	return user;
+}
 
 void user_destroy(struct hub_user* user)
 {

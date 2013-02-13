@@ -806,6 +806,19 @@ static void unload_ssl_certificates(struct hub_info* hub)
 }
 #endif /* SSL_SUPPORT */
 
+// #ifdef BOT_SUPPORT
+
+static void hub_bot_op_notify_handle(struct hub_user* bot, struct adc_message* msg)
+{
+	LOG_INFO("Invoked hub_bot_op_notify_handle()");
+}
+
+static void hub_bot_op_notify_create(struct hub_info* hub)
+{
+	struct hub_user* opcom = user_create_bot(hub, "Operations", "Hub operators", hub_bot_op_notify_handle);
+}
+// #endif
+
 struct hub_info* hub_start_service(struct hub_config* config)
 {
 	struct hub_info* hub = 0;
@@ -889,6 +902,8 @@ struct hub_info* hub_start_service(struct hub_config* config)
 
 	// Start the hub command sub-system
 	hub->commands = command_initialize(hub);
+
+	hub_bot_op_notify_create(hub);
 	return hub;
 }
 
