@@ -31,6 +31,10 @@ void on_login_success(struct hub_info* hub, struct hub_user* u)
 	user_set_state(u, state_normal);
 	uman_add(hub->users, u);
 
+	// Make operators receive hub notifications by default.
+	if (user_is_protected(u))
+		user_flag_set(u, flag_opnotify);
+
 	/* Announce new user to all connected users */
 	if (user_is_logged_in(u))
 		route_info_message(hub, u);

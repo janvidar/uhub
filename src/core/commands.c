@@ -353,6 +353,7 @@ static int command_kick(struct command_base* cbase, struct hub_user* user, struc
 	}
 	else
 	{
+		hub_notify(cbase->hub, notify_info, "Kicking user \"%s\" (%s)", target->id.nick, user->id.nick);
 		cbuf_append_format(buf, "Kicking user \"%s\".", target->id.nick);
 		hub_disconnect_user(cbase->hub, target, quit_kicked);
 	}
@@ -362,6 +363,7 @@ static int command_kick(struct command_base* cbase, struct hub_user* user, struc
 static int command_reload(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
 	cbase->hub->status = hub_status_restart;
+	hub_notify(cbase->hub, notify_info, "Reloading configuration (%s)", user->id.nick);
 	return command_status(cbase, user, cmd, cbuf_create_const("Reloading configuration..."));
 }
 
@@ -384,6 +386,7 @@ static int command_unload(struct command_base* cbase, struct hub_user* user, str
 
 static int command_shutdown_hub(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
+	hub_notify(cbase->hub, notify_warn, "Shutting down hub (%s)", user->id.nick);
 	cbase->hub->status = hub_status_shutdown;
 	return command_status(cbase, user, cmd, cbuf_create_const("Hub shutting down..."));
 }

@@ -106,7 +106,7 @@ struct hub_info
 	struct adc_message* command_support; /* The hub's SUP command */
 	struct adc_message* command_banner;  /* The default welcome message */
 	time_t tm_started;
-	int status;
+	enum hub_state status;
 	char* recvbuf; /* Global receive buffer */
 	char* sendbuf; /* Global send buffer */
 
@@ -233,6 +233,20 @@ extern void hub_set_variables(struct hub_info* hub, struct acl_handle* acl);
  */
 extern void hub_free_variables(struct hub_info* hub);
 
+
+enum notify_verbosity
+{
+	notify_error = 0,
+	notify_warn  = 1,
+	notify_info  = 2,
+	notify_debug = 3,
+};
+
+/**
+ * Send a notification message to operators.
+ */
+extern void hub_notify(struct hub_info* hub, enum notify_verbosity verbosity, const char* fmt, ...);
+
 /**
  * Returns a string for the given status_message (See enum status_message).
  */
@@ -350,6 +364,10 @@ extern void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int
  */
 extern void hub_logout_log(struct hub_info* hub, struct hub_user* user);
 
+/**
+ * Returns 1 if the hub is running, and 0 otherwise.
+ */
+extern int hub_is_running(struct hub_info* hub);
 
 #endif /* HAVE_UHUB_HUB_H */
 

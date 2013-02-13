@@ -653,6 +653,7 @@ static struct net_connection* start_listening_socket(const char* bind_addr, uint
 	if (ret == -1)
 	{
 		LOG_ERROR("hub_start_service(): Unable to bind to TCP local address. errno=%d, str=%s", net_error(), net_error_string(net_error()));
+		hub_notify(hub, notify_error, "Unable to bind to network address %s on port %d: %s (%d)", bind_addr, port, net_error_string(net_error()), net_error());
 		net_close(sd);
 		return 0;
 	}
@@ -670,6 +671,60 @@ static struct net_connection* start_listening_socket(const char* bind_addr, uint
 
 	return server;
 }
+
+
+int hub_is_running(struct hub_info* hub)
+{
+	return hub->status == hub_status_running || hub->status == hub_status_restart;
+}
+
+
+void hub_notify(struct hub_info* hub, enum notify_verbosity verbosity, const char* fmt, ...)
+{
+	struct cbuffer* buf;
+	struct adc_message* msg;
+	va_list args;
+	char temp[1024];
+
+	va_start(args, fmt);
+	vsnprintf(temp, sizeof(temp), fmt, args);
+	va_end(args);
+
+	buf = cbuf_create(strlen(temp) + 8);
+
+	switch (verbosity)
+	{
+		case notify_error:
+			cbuf_append(buf, "ERROR: ");
+			LOG_ERROR(temp);
+			break;
+		case notify_warn:
+			cbuf_append(buf, "WARN: ");
+			LOG_WARN(temp);
+			break;
+		case notify_info:
+			cbuf_append(buf, "INFO: ");
+			LOG_INFO(temp);
+			break;
+		case notify_debug:
+			cbuf_append(buf, "DEBUG: ");
+			LOG_DEBUG(temp);
+			break;
+	}
+
+	cbuf_append(buf, temp);
+
+	if (hub_is_running(hub))
+	{
+		msg = adc_msg_construct(ADC_CMD_IMSG, 5 + adc_msg_escape_length(cbuf_get(buf)) + 2);
+		adc_msg_add_argument_string(msg, cbuf_get(buf));
+		route_to_operators(hub, msg);
+		adc_msg_free(msg);
+	}
+
+	cbuf_destroy(buf);
+}
+
 
 struct server_alt_port_data
 {
