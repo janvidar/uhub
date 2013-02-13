@@ -65,6 +65,21 @@ struct hub_user* user_create(struct hub_info* hub, struct net_connection* con, s
 	return user;
 }
 
+/// generate a semi-stable CID: base32_encode(tiger({hub name} + {nick}))
+static const char* generate_bot_cid(struct hub_info* hub, const char* nick)
+{
+	static char result[MAX_CID_LEN+1];
+	char buf[(MAX_NICK_LEN*2)+1];
+	uint64_t tiger_res[3];
+
+	memset(buf, 0, sizeof(buf));
+	snprintf(buf, sizeof(buf), "%s%s", hub->config->hub_name, nick);
+	tiger((uint64_t*) buf, sizeof(buf), (uint64_t*) tiger_res);
+	base32_encode((unsigned char*) tiger_res, TIGERSIZE, result);
+	result[MAX_CID_LEN] = 0;
+	return result;
+}
+
 struct hub_user* user_create_bot(struct hub_info* hub, const char* nick, const char* description, bot_recv_msg msg_handler)
 {
 	struct hub_user* user = NULL;
@@ -92,6 +107,7 @@ struct hub_user* user_create_bot(struct hub_info* hub, const char* nick, const c
 		adc_msg_add_named_argument_string(user->info, ADC_INF_FLAG_USER_AGENT, PRODUCT_STRING);
 		adc_msg_add_named_argument_string(user->info, ADC_INF_FLAG_NICK, nick);
 		adc_msg_add_named_argument_string(user->info, ADC_INF_FLAG_DESCRIPTION, description);
+		adc_msg_add_named_argument(user->info, ADC_INF_FLAG_CLIENT_ID, generate_bot_cid(hub, nick));
 	}
 
 	user->hub = hub;

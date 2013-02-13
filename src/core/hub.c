@@ -808,14 +808,30 @@ static void unload_ssl_certificates(struct hub_info* hub)
 
 // #ifdef BOT_SUPPORT
 
+/// This receives private messages and transmits them to the connected operators.
 static void hub_bot_op_notify_handle(struct hub_user* bot, struct adc_message* msg)
 {
-	LOG_INFO("Invoked hub_bot_op_notify_handle()");
+	char* chat;
+	LOG_TRACE("Invoked hub_bot_op_notify_handle()");
+	switch (msg->cmd)
+	{
+			case ADC_CMD_EMSG:
+			case ADC_CMD_DMSG:
+				chat = adc_msg_get_argument(msg, 0);
+				LOG_DEBUG("Hub chat: \"%s\"", chat);
+				hub_notify(bot->hub, notify_info, chat);
+				hub_free(chat);
+				break;
+			default:
+				/* ignore these messages! */
+				break;
+	}
 }
 
 static void hub_bot_op_notify_create(struct hub_info* hub)
 {
 	struct hub_user* opcom = user_create_bot(hub, "Operations", "Hub operators", hub_bot_op_notify_handle);
+	uman_add(hub->users, opcom);
 }
 // #endif
 
