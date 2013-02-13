@@ -761,6 +761,9 @@ int main(int argc, char** argv)
 	exotic_add_test(&handle, &exotic_test_timer_add_5_events_1, "timer_add_5_events_1");
 	exotic_add_test(&handle, &exotic_test_timer_check_5_events_1, "timer_check_5_events_1");
 	exotic_add_test(&handle, &exotic_test_timer_process_5_events_1, "timer_process_5_events_1");
+	exotic_add_test(&handle, &exotic_test_timer_clear_1, "timer_clear_1");
+	exotic_add_test(&handle, &exotic_test_timer_bulk_1, "timer_bulk_1");
+	exotic_add_test(&handle, &exotic_test_timer_bulk_2, "timer_bulk_2");
 	exotic_add_test(&handle, &exotic_test_tokenizer_basic_0, "tokenizer_basic_0");
 	exotic_add_test(&handle, &exotic_test_tokenizer_basic_1, "tokenizer_basic_1");
 	exotic_add_test(&handle, &exotic_test_tokenizer_basic_1a, "tokenizer_basic_1a");
@@ -951,7 +954,6 @@ int exotic_initialize(struct exotic_handle* handle, int argc, char** argv)
 void exotic_add_test(struct exotic_handle* handle, exo_test_t func, const char* name)
 {
 	struct exo_test_data* test;
-
 	if (!handle)
 	{
 		fprintf(stderr, "exotic_add_test: failed, no handle!\n");
