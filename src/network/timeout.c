@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -57,14 +57,30 @@ size_t timeout_queue_process(struct timeout_queue* t, time_t now)
 	size_t pos = (size_t) t->last;
 	size_t events = 0;
 	struct timeout_evt* evt = 0;
+
+	uhub_assert(t->last <= now);
 	t->last = now;
+
+	// We can optimize in case we need to wrap around
+	// the buffer, so we only do it once
+	if (MAX(pos, now) - MIN(pos, now) > t->max)
+	{
+		// FIXME: Double check this calculation
+		pos = (now - t->max);
+	}
+
 	for (; pos <= now; pos++)
 	{
-		while ((evt = t->events[pos % t->max]))
+		evt = t->events[pos % t->max];
+		while (evt)
 		{
-			timeout_queue_remove(t, evt);
-			evt->callback(evt);
-			events++;
+			if (evt->timestamp < pos)
+			{
+				timeout_queue_remove(t, evt);
+				evt->callback(evt);
+				events++;
+			}
+			evt = evt->next;
 		}
 	}
 	return events;
@@ -85,24 +101,22 @@ size_t timeout_queue_get_next_timeout(struct timeout_queue* t, time_t now)
 
 void timeout_queue_insert(struct timeout_queue* t, struct timeout_evt* evt, size_t seconds)
 {
-	struct timeout_evt* first;
+	struct timeout_evt* it, *first;
 	size_t pos = ((t->last + seconds) % t->max);
 	evt->timestamp = t->last + seconds;
 	evt->next = 0;
-	
+
 	first = t->events[pos];
-	
 	if (first)
 	{
-		uhub_assert(first->timestamp == evt->timestamp);
-		first->prev->next = evt;
-		evt->prev = first->prev;
-		first->prev = evt;
+		for (it = first; it->next; it = it->next) { }
+		it->next = evt;
+		evt->prev = it;
 	}
 	else
 	{
 		t->events[pos] = evt;
-		evt->prev = evt;
+		evt->prev = evt; // point to self.
 	}
 	evt->next = 0;
 }
