@@ -83,7 +83,7 @@ static const char* generate_bot_cid(struct hub_info* hub, const char* nick)
 struct hub_user* user_create_bot(struct hub_info* hub, const char* nick, const char* description, bot_recv_msg msg_handler)
 {
 	struct hub_user* user = NULL;
-	LOG_TRACE("user_create_bot(), hub=%p, con[sd=%d]", hub, net_con_get_sd(con));
+	LOG_TRACE("user_create_bot(), hub=%p, nick=\"%s\"", hub, nick);
 
 	user = (struct hub_user*) hub_malloc_zero(sizeof(struct hub_user));
 	if (user == NULL)

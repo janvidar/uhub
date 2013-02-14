@@ -808,6 +808,25 @@ static void unload_ssl_certificates(struct hub_info* hub)
 
 // #ifdef BOT_SUPPORT
 
+static void route_privmsg_to_operators(struct hub_user* bot, sid_t from, const char* escaped_msg, int action)
+{
+	struct hub_info* hub = bot->hub;
+	struct hub_user* user = (struct hub_user*) list_get_first(hub->users->list);
+	while (user)
+	{
+		if (from != user->id.sid && user_flag_get(user, flag_opnotify))
+		{
+			struct adc_message* msg = adc_msg_construct_source_dest(ADC_CMD_EMSG, from, user->id.sid, strlen(escaped_msg) + (action * 4) + 7);
+			adc_msg_add_argument(msg, escaped_msg);
+			adc_msg_add_named_argument(msg, ADC_MSG_FLAG_PRIVATE, sid_to_string(bot->id.sid));
+			if (action) adc_msg_add_named_argument(msg, ADC_MSG_FLAG_ACTION, "1");
+			route_to_user(hub, user, msg);
+			adc_msg_free(msg);
+		}
+		user = (struct hub_user*) list_get_next(hub->users->list);
+	}
+}
+
 /// This receives private messages and transmits them to the connected operators.
 static void hub_bot_op_notify_handle(struct hub_user* bot, struct adc_message* msg)
 {
@@ -819,7 +838,7 @@ static void hub_bot_op_notify_handle(struct hub_user* bot, struct adc_message* m
 			case ADC_CMD_DMSG:
 				chat = adc_msg_get_argument(msg, 0);
 				LOG_DEBUG("Hub chat: \"%s\"", chat);
-				hub_notify(bot->hub, notify_info, chat);
+				route_privmsg_to_operators(bot, msg->source, chat, adc_msg_has_named_argument(msg, ADC_MSG_FLAG_ACTION) ? 1 : 0);
 				hub_free(chat);
 				break;
 			default:
