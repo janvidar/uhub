@@ -16,6 +16,7 @@ set (PROJECT_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src")
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake/Modules)
 
 option(RELEASE "Release build, debug build if disabled" ON)
+option(LOWLEVEL_DEBUG, "Enable low level debug messages." OFF)
 option(LINK_SUPPORT "Allow hub linking" OFF)
 option(SSL_SUPPORT "Enable SSL support" ON)
 option(USE_OPENSSL "Use OpenSSL's SSL support" ON )
@@ -24,6 +25,13 @@ option(ADC_STRESS "Enable the stress tester client" OFF)
 
 find_package(Git)
 find_package(Sqlite3)
+
+include(TestBigEndian)
+
+TEST_BIG_ENDIAN(BIGENDIAN)
+if (BIGENDIAN)
+	add_definitions(-DARCH_BIGENDIAN)
+endif()
 
 if (SSL_SUPPORT)
 	if (USE_OPENSSL)
@@ -200,7 +208,11 @@ if (RELEASE)
 	add_definitions(-DNDEBUG)
 else()
 	set(CMAKE_BUILD_TYPE Debug)
-	# add_definitions(-DDEBUG)
+	add_definitions(-DDEBUG)
+endif()
+
+if (LOWLEVEL_DEBUG)
+	add_definitions(-DLOWLEVEL_DEBUG)
 endif()
 
 if (UNIX)
