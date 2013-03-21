@@ -40,14 +40,11 @@ static int plugin_command_dispatch(struct command_base* cbase, struct hub_user* 
 
 	LOG_PLUGIN("plugin_command_dispatch: cmd=%s", cmd->prefix);
 
-	cmdh = (struct plugin_command_handle*) list_get_first(data->commands);
-	while (cmdh)
+	LIST_FOREACH(struct plugin_command_handle*, cmdh, data->commands,
 	{
 		if (strcmp(cmdh->prefix, cmd->prefix) == 0)
 			return cmdh->handler(plugin, puser, pcommand);
-
-		cmdh = (struct plugin_command_handle*) list_get_next(data->commands);
-	}
+	});
 	return 0;
 }
 

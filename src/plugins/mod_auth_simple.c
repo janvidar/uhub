@@ -177,16 +177,15 @@ static void unload_acl(struct acl_data* data)
 static plugin_st get_user(struct plugin_handle* plugin, const char* nickname, struct auth_info* data)
 {
 	struct acl_data* acl = (struct acl_data*) plugin->ptr;
-	struct auth_info* info = (struct auth_info*) list_get_first(acl->users);
-	while (info)
+	struct auth_info* info;
+	LIST_FOREACH(struct auth_info*, info, acl->users,
 	{
 		if (strcasecmp((char*)info->nickname, nickname) == 0)
 		{
 			memcpy(data, info, sizeof(struct auth_info));
 			return st_allow;
 		}
-		info = (struct auth_info*) list_get_next(acl->users);
-	}
+	});
 	if (acl->exclusive)
 		return st_deny;
 	return st_default;

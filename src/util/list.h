@@ -57,5 +57,9 @@ extern void* list_get_prev(struct linked_list*);
 extern struct node* list_get_first_node(struct linked_list*);
 extern struct node* list_get_last_node(struct linked_list*);
 
+#define LIST_FOREACH(TYPE, ITEM, LIST, BLOCK) \
+		for (ITEM = (TYPE) list_get_first(LIST); ITEM; ITEM = (TYPE) list_get_next(LIST)) \
+			BLOCK
+
 #endif /* HAVE_UHUB_LINKED_LIST_H */
 

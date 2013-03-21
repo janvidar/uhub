@@ -232,15 +232,12 @@ void user_support_remove(struct hub_user* user, int fourcc)
 
 int user_have_feature_cast_support(struct hub_user* user, char feature[4])
 {
-	char* tmp = list_get_first(user->feature_cast);
-	while (tmp)
+	char* tmp;
+	LIST_FOREACH(char*, tmp, user->feature_cast,
 	{
 		if (strncmp(tmp, feature, 4) == 0)
 			return 1;
-	
-		tmp = list_get_next(user->feature_cast);
-	}
-	
+	});
 	return 0;
 }
 

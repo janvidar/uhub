@@ -120,7 +120,7 @@ void net_dns_process()
 	uhub_mutex_lock(&g_dns->mutex);
 	LOG_DUMP("net_dns_process(): jobs=%d, results=%d", (int) list_size(g_dns->jobs), (int) list_size(g_dns->results));
 
-	for (result = (struct net_dns_result*) list_get_first(g_dns->results); result; result = (struct net_dns_result*) list_get_next(g_dns->results))
+	LIST_FOREACH(struct net_dns_result*, result, g_dns->results,
 	{
 		struct net_dns_job* job = result->job;
 #ifdef DEBUG_LOOKUP_TIME
@@ -146,7 +146,7 @@ void net_dns_process()
 			result->job = NULL;
 			free_job(job);
 		}
-	}
+	});
 
 	list_clear(g_dns->results, &dummy_free);
 	uhub_mutex_unlock(&g_dns->mutex);
@@ -273,14 +273,14 @@ extern struct net_dns_job* net_dns_gethostbyaddr(struct ip_addr_encap* ipaddr, n
 static struct net_dns_job* find_and_remove_job(struct net_dns_job* job)
 {
 	struct net_dns_job* it;
-	for (it = (struct net_dns_job*) list_get_first(g_dns->jobs); it; it = (struct net_dns_job*) list_get_next(g_dns->jobs))
+	LIST_FOREACH(struct net_dns_job*, it, g_dns->jobs,
 	{
 		if (it == job)
 		{
 			list_remove(g_dns->jobs, it);
 			return job;
 		}
-	}
+	});
 	return NULL;
 }
 
@@ -288,14 +288,14 @@ static struct net_dns_job* find_and_remove_job(struct net_dns_job* job)
 static struct net_dns_result* find_and_remove_result(struct net_dns_job* job)
 {
 	struct net_dns_result* it;
-	for (it = (struct net_dns_result*) list_get_first(g_dns->results); it; it = (struct net_dns_result*) list_get_next(g_dns->results))
+	LIST_FOREACH(struct net_dns_result*, it, g_dns->results,
 	{
 		if (it->job == job)
 		{
 			list_remove(g_dns->results, it);
 			return it;
 		}
-	}
+	});
 	return NULL;
 }
 

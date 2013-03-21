@@ -27,13 +27,12 @@
 	PLUGIN_DEBUG(HUB, # FUNCNAME) \
 	if (HUB->plugins && HUB->plugins->loaded) \
 	{ \
-		struct plugin_handle* plugin = (struct plugin_handle*) list_get_first(HUB->plugins->loaded); \
-		while (plugin) \
+		struct plugin_handle* plugin;\
+		LIST_FOREACH(struct plugin_handle*, plugin, HUB->plugins->loaded, \
 		{ \
 			if (plugin->funcs.FUNCNAME) \
 				CODE \
-			plugin = (struct plugin_handle*) list_get_next(HUB->plugins->loaded); \
-		} \
+		}); \
 	}
 
 #define PLUGIN_INVOKE_STATUS_1(HUB, FUNCNAME, ARG1) \

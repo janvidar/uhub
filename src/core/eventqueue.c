@@ -76,16 +76,14 @@ int event_queue_process(struct event_queue* queue)
 	
 	/* lock primary queue, and handle the primary queue messages. */
 	queue->locked = 1;
-	
-	data = (struct event_data*) list_get_first(queue->q1);
-	while (data)
+
+	LIST_FOREACH(struct event_data*, data, queue->q1,
 	{
 #ifdef EQ_DEBUG
 		eq_debug("EXEC", data);
 #endif
 		queue->callback(queue->callback_data, data);
-		data = (struct event_data*) list_get_next(queue->q1);
-	}
+	});
 	
 	list_clear(queue->q1, event_queue_cleanup_callback);
 	uhub_assert(list_size(queue->q1) == 0);

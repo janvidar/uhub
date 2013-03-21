@@ -283,23 +283,19 @@ struct adc_message* adc_msg_copy(const struct adc_message* cmd)
 	if (cmd->feature_cast_include)
 	{
 		copy->feature_cast_include = list_create();
-		tmp = list_get_first(cmd->feature_cast_include);
-		while (tmp)
+		LIST_FOREACH(char*, tmp, cmd->feature_cast_include,
 		{
 			list_append(copy->feature_cast_include, hub_strdup(tmp));
-			tmp = list_get_next(cmd->feature_cast_include);
-		}
+		});
 	}
 
 	if (cmd->feature_cast_exclude)
 	{
 		copy->feature_cast_exclude = list_create();
-		tmp = list_get_first(cmd->feature_cast_exclude);
-		while (tmp)
+		LIST_FOREACH(char*, tmp, cmd->feature_cast_exclude,
 		{
 			list_append(copy->feature_cast_exclude, hub_strdup(tmp));
-			tmp = list_get_next(cmd->feature_cast_exclude);
-		}
+		});
 	}
 
 	ADC_MSG_ASSERT(copy);

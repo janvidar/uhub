@@ -28,7 +28,7 @@ static void clear_user_list_callback(void* ptr)
 	if (ptr)
 	{
 		struct hub_user* u = (struct hub_user*) ptr;
-		
+
 		/* Mark the user as already being disconnected.
 		 * This prevents the hub from trying to send
 		 * quit messages to other users.
@@ -120,42 +120,39 @@ struct hub_user* uman_get_user_by_sid(struct hub_user_manager* users, sid_t sid)
 
 struct hub_user* uman_get_user_by_cid(struct hub_user_manager* users, const char* cid)
 {
-	struct hub_user* user = (struct hub_user*) list_get_first(users->list); /* iterate users - only on incoming INF msg */
-	while (user)
+	struct hub_user* user;
+	LIST_FOREACH(struct hub_user*, user, users->list,
 	{
 		if (strcmp(user->id.cid, cid) == 0)
 			return user;
-		user = (struct hub_user*) list_get_next(users->list);
-	}
+	});
 	return NULL;
 }
 
 
 struct hub_user* uman_get_user_by_nick(struct hub_user_manager* users, const char* nick)
 {
-	struct hub_user* user = (struct hub_user*) list_get_first(users->list); /* iterate users - only on incoming INF msg */
-	while (user)
+	struct hub_user* user;
+	LIST_FOREACH(struct hub_user*, user, users->list,
 	{
 		if (strcmp(user->id.nick, nick) == 0)
 			return user;
-		user = (struct hub_user*) list_get_next(users->list);
-	}
+	});
 	return NULL;
 }
 
 size_t uman_get_user_by_addr(struct hub_user_manager* users, struct linked_list* target, struct ip_range* range)
 {
 	size_t num = 0;
-	struct hub_user* user = (struct hub_user*) list_get_first(users->list); /* iterate users - only on incoming INF msg */
-	while (user)
+	struct hub_user* user;
+	LIST_FOREACH(struct hub_user*, user, users->list,
 	{
 		if (ip_in_range(&user->id.addr, range))
 		{
 			list_append(target, user);
 			num++;
 		}
-		user = (struct hub_user*) list_get_next(users->list);
-	}
+	});
 	return num;
 }
 
@@ -164,8 +161,8 @@ int uman_send_user_list(struct hub_info* hub, struct hub_user_manager* users, st
 	int ret = 1;
 	struct hub_user* user;
 	user_flag_set(target, flag_user_list);
-	user = (struct hub_user*) list_get_first(users->list); /* iterate users - only on INF or PAS msg */
-	while (user)
+
+	LIST_FOREACH(struct hub_user*, user, users->list,
 	{
 		if (user_is_logged_in(user))
 		{
@@ -173,8 +170,7 @@ int uman_send_user_list(struct hub_info* hub, struct hub_user_manager* users, st
 			if (!ret)
 				break;
 		}
-		user = (struct hub_user*) list_get_next(users->list);
-	}
+	});
 
 #if 0
 	FIXME: FIXME FIXME handle send queue excess

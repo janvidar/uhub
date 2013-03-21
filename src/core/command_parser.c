@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2012, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@ static void hub_command_args_free(struct hub_command* cmd)
 	if (!cmd->args)
 		return;
 
-	for (data = (struct hub_command_arg_data*) list_get_first(cmd->args); data; data = (struct hub_command_arg_data*) list_get_next(cmd->args))
+	LIST_FOREACH(struct hub_command_arg_data*, data, cmd->args,
 	{
 		switch (data->type)
 		{
@@ -39,7 +39,7 @@ static void hub_command_args_free(struct hub_command* cmd)
 			default:
 				break;
 		}
-	}
+	});
 
 	list_clear(cmd->args, hub_free);
 	list_destroy(cmd->args);
@@ -77,8 +77,7 @@ static enum command_parse_status command_extract_arguments(struct hub_info* hub,
 		if (greedy)
 		{
 			size = 1;
-			for (tmp = (char*) list_get_first(tokens); tmp; tmp = (char*) list_get_next(tokens))
-				size += (strlen(tmp) + 1);
+			LIST_FOREACH(char*, tmp, tokens, { size += (strlen(tmp) + 1); });
 			token = hub_malloc_zero(size);
 
 			while ((tmp = list_get_first(tokens)))

@@ -79,16 +79,14 @@ static size_t get_messages(struct chat_history_data* data, size_t num, struct cb
 		skiplines = total - num;
 
 	cbuf_append(outbuf, "\n");
-	message = (char*) list_get_first(messages);
-	while (message)
+	LIST_FOREACH(char*, message, messages,
 	{
 		if (--skiplines < 0)
 		{
 			cbuf_append(outbuf, message);
 			lines++;
 		}
-		message = (char*) list_get_next(messages);
-	}
+	});
 	cbuf_append(outbuf, "\n");
 	return lines;
 }

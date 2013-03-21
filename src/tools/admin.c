@@ -65,17 +65,14 @@ static void on_message(struct ADC_chat_message* chat)
 	lines = list_create();
 	ret = split_string(chat->message, "\n", lines, 1);
 
-	line = (char*) list_get_first(lines);
-
 	ret = 0;
-	while (line)
+	LIST_FOREACH(char*, line, lines,
 	{
 		if (ret > 0)
 			printf("    ");
 		printf("%s\n", line);
 		ret++;
-		line = (char*) list_get_next(lines);
-	}
+	});
 
 	list_clear(lines, &hub_free);
 	list_destroy(lines);

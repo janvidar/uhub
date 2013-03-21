@@ -330,13 +330,11 @@ struct auth_info* acl_get_access_info(struct hub_info* hub, const char* name)
 }
 
 #define STR_LIST_CONTAINS(LIST, STR) \
-		str = (char*) list_get_first(LIST); \
-		while (str) \
+		LIST_FOREACH(char*, str, LIST, \
 		{ \
 			if (strcasecmp(str, STR) == 0) \
 				return 1; \
-			str = (char*) list_get_next(LIST); \
-		} \
+		}); \
 		return 0
 
 int acl_is_cid_banned(struct acl_handle* handle, const char* data)
@@ -400,34 +398,28 @@ int acl_user_unban_cid(struct acl_handle* handle, const char* cid)
 int acl_is_ip_banned(struct acl_handle* handle, const char* ip_address)
 {
 	struct ip_addr_encap raw;
-	struct ip_range* info = (struct ip_range*) list_get_first(handle->networks);
+	struct ip_range* info;
+
 	ip_convert_to_binary(ip_address, &raw);
-	
-	while (info)
+	LIST_FOREACH(struct ip_range*, info, handle->networks,
 	{
 		if (ip_in_range(&raw, info))
-		{
 			return 1;
-		}
-		info = (struct ip_range*) list_get_next(handle->networks);
-	}
+	});
 	return 0;
 }
 
 int acl_is_ip_nat_override(struct acl_handle* handle, const char* ip_address)
 {
 	struct ip_addr_encap raw;
-	struct ip_range* info = (struct ip_range*) list_get_first(handle->nat_override);
+	struct ip_range* info;
+
 	ip_convert_to_binary(ip_address, &raw);
-	
-	while (info)
+	LIST_FOREACH(struct ip_range*, info, handle->nat_override,
 	{
 		if (ip_in_range(&raw, info))
-		{
 			return 1;
-		}
-		info = (struct ip_range*) list_get_next(handle->nat_override);
-	}
+	});
 	return 0;
 }
 
