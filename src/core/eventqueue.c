@@ -32,20 +32,20 @@ int event_queue_initialize(struct event_queue** queue, event_queue_callback call
 	*queue = (struct event_queue*) hub_malloc_zero(sizeof(struct event_queue));
 	if (!(*queue))
 		return -1;
-	
+
 	(*queue)->q1 = list_create();
 	(*queue)->q2 = list_create();
-	
+
 	if (!(*queue)->q1 || !(*queue)->q2)
 	{
 		list_destroy((*queue)->q1);
 		list_destroy((*queue)->q2);
 		return -1;
 	}
-	
+
 	(*queue)->callback = callback;
 	(*queue)->callback_data = ptr;
-	
+
 	return 0;
 }
 
@@ -73,7 +73,7 @@ int event_queue_process(struct event_queue* queue)
 	struct event_data* data;
 	if (queue->locked)
 		return 0;
-	
+
 	/* lock primary queue, and handle the primary queue messages. */
 	queue->locked = 1;
 
@@ -84,10 +84,10 @@ int event_queue_process(struct event_queue* queue)
 #endif
 		queue->callback(queue->callback_data, data);
 	});
-	
+
 	list_clear(queue->q1, event_queue_cleanup_callback);
 	uhub_assert(list_size(queue->q1) == 0);
-		
+
 	/* unlock queue */
 	queue->locked = 0;
 
@@ -106,18 +106,18 @@ void event_queue_post(struct event_queue* queue, struct event_data* message)
 {
 	struct linked_list* q = (!queue->locked) ? queue->q1 : queue->q2;
 	struct event_data* data;
-	
+
 	data = (struct event_data*) hub_malloc(sizeof(struct event_data));
 	if (data)
 	{
 		data->id    = message->id;
 		data->ptr   = message->ptr;
 		data->flags = message->flags;
-		
+
 #ifdef EQ_DEBUG
 		eq_debug("POST", data);
 #endif
-		
+
 		list_append(q, data);
 	}
 	else

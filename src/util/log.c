@@ -86,7 +86,7 @@ void hub_log_initialize(const char* file, int syslog)
 		return;
 	}
 #endif
-	
+
 #ifndef WIN32
 	if (syslog)
 	{
@@ -97,13 +97,13 @@ void hub_log_initialize(const char* file, int syslog)
 	}
 #endif
 
-	
+
 	if (!file)
 	{
 		logfile = stderr;
 		return;
 	}
-	
+
 	logfile = fopen(file, "a");
 	if (!logfile)
 	{
@@ -137,7 +137,7 @@ void hub_log_shutdown()
 		netdump = NULL;
 	}
 #endif
-	
+
 #ifndef WIN32
 	if (use_syslog)
 	{
@@ -186,7 +186,7 @@ void hub_log(int log_verbosity, const char *format, ...)
 		return;
 	}
 #endif
-	
+
 	if (log_verbosity < verbosity)
 	{
 		t = time(NULL);
@@ -195,7 +195,7 @@ void hub_log(int log_verbosity, const char *format, ...)
 		va_start(args, format);
 		vsnprintf(logmsg, 1024, format, args);
 		va_end(args);
-		
+
 		if (logfile)
 		{
 			fprintf(logfile, "%s %6s: %s\n", timestamp, prefixes[log_verbosity], logmsg);
@@ -211,14 +211,14 @@ void hub_log(int log_verbosity, const char *format, ...)
 	if (use_syslog)
 	{
 		int level = 0;
-		
+
 		if (verbosity < log_info)
 			return;
-		
+
 		va_start(args, format);
 		vsnprintf(logmsg, 1024, format, args);
 		va_end(args);
-		
+
 		switch (log_verbosity)
 		{
 			case log_fatal:    level = LOG_CRIT; break;
@@ -232,15 +232,15 @@ void hub_log(int log_verbosity, const char *format, ...)
                         #endif
 			case log_info:     level = LOG_INFO; break;
 			case log_debug:    level = LOG_DEBUG; break;
-			
+
 			default:
 				level = 0;
 				break;
 		}
-		
+
 		if (level == 0)
 			return;
-		
+
                 #ifdef SYSTEMD
 		sd_journal_print(level, "%s", logmsg);
 
@@ -250,5 +250,5 @@ void hub_log(int log_verbosity, const char *format, ...)
                 #endif
 	}
 #endif
-	
+
 }

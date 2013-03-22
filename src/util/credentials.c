@@ -71,7 +71,7 @@ const char* auth_cred_to_string(enum auth_credentials cred)
 		case auth_cred_link:         return "link";
 		case auth_cred_admin:        return "admin";
 	}
-	
+
 	return "";
 };
 

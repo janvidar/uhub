@@ -153,7 +153,7 @@ static void cbfunc_set_hub_name(struct plugin_handle* plugin, const char* str)
 	char* new_str = adc_msg_escape(str ? str : hub->config->hub_name);
 
 	adc_msg_replace_named_argument(hub->command_info, ADC_INF_FLAG_NICK, new_str);
-		
+
 	// Broadcast hub name
 	command = adc_msg_construct(ADC_CMD_IINF, (strlen(new_str) + 8));
 	adc_msg_add_named_argument(command, ADC_INF_FLAG_NICK, new_str);
@@ -170,7 +170,7 @@ static void cbfunc_set_hub_description(struct plugin_handle* plugin, const char*
 	char* new_str = adc_msg_escape(str ? str : hub->config->hub_description);
 
 	adc_msg_replace_named_argument(hub->command_info, ADC_INF_FLAG_DESCRIPTION, new_str);
-		
+
 	// Broadcast hub description
 	command = adc_msg_construct(ADC_CMD_IINF, (strlen(new_str) + 8));
 	adc_msg_add_named_argument(command, ADC_INF_FLAG_DESCRIPTION, new_str);

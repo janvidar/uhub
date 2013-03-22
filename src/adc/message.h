@@ -229,7 +229,7 @@ void adc_msg_unterminate(struct adc_message* cmd);
 /**
  * @return the offset for the first command argument in msg->cache.
  * or -1 if the command is not understood.
- * NOTE: for 'U' and 'C' commands (normally not seen by hubs), 
+ * NOTE: for 'U' and 'C' commands (normally not seen by hubs),
  * this returns 4. Should be 4 + lengthOf(cid).
  */
 int adc_msg_get_arg_offset(struct adc_message* msg);

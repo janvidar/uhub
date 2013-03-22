@@ -87,7 +87,7 @@ void setup_signal_handlers(struct hub_info* hub)
 	act.sa_mask = sig_set;
 	act.sa_flags = SA_ONSTACK | SA_RESTART;
 	act.sa_handler = hub_handle_signal;
-	
+
 	for (i = 0; signals[i]; i++)
 	{
 		if (sigaction(signals[i], &act, 0) != 0)
@@ -124,7 +124,7 @@ int main_loop()
 			hub_log_initialize(arg_log, arg_log_syslog);
 			hub_set_log_verbosity(arg_verbose);
 		}
-	
+
 		if (read_config(arg_config, &configuration, !arg_have_config) == -1)
 			return -1;
 
@@ -150,7 +150,7 @@ int main_loop()
 #if !defined(WIN32)
 			setup_signal_handlers(hub);
 #ifdef SYSTEMD
-                        /* Notify the service manager that this daemon has 
+                        /* Notify the service manager that this daemon has
                          * been successfully initalized and shall enter the
                          * main loop.
                          */
@@ -174,7 +174,7 @@ int main_loop()
 #if !defined(WIN32)
 	shutdown_signal_handlers(hub);
 #endif
-	
+
 	if (hub)
 	{
 		hub_shutdown_service(hub);
@@ -288,7 +288,7 @@ void parse_command_line(int argc, char** argv)
 				arg_dump_config = 1;
 				arg_check_config = 1;
 				break;
-				
+
 			case 'S':
 				arg_dump_config = 2;
 				arg_check_config = 1;
@@ -297,7 +297,7 @@ void parse_command_line(int argc, char** argv)
 			case 'l':
 				arg_log = optarg;
 				break;
-				
+
 			case 'L':
 				arg_log_syslog = 1;
 				break;

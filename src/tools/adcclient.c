@@ -366,7 +366,7 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 			}
 			*/
 			break;
-			
+
 		default:
 			break;
 	}

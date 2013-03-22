@@ -55,7 +55,7 @@ enum status_message
 
 	status_msg_proto_no_common_hash      = -50, /* No common hash algorithms */
 	status_msg_proto_obsolete_adc0       = -51, /* Client is using an obsolete protocol version */
-	
+
 
 };
 

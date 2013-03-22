@@ -199,7 +199,7 @@ static plugin_st get_user(struct plugin_handle* plugin, const char* nickname, st
 		sqlite3_free(errMsg);
 		return st_default;
 	}
-	
+
 	if (result.found)
 		return st_allow;
 	return st_default;
@@ -222,7 +222,7 @@ static plugin_st register_user(struct plugin_handle* plugin, struct auth_info* u
 		return st_deny;
 	}
 	return st_allow;
-	
+
 }
 
 static plugin_st update_user(struct plugin_handle* plugin, struct auth_info* user)
@@ -243,7 +243,7 @@ static plugin_st update_user(struct plugin_handle* plugin, struct auth_info* use
 		return st_deny;
 	}
 	return st_allow;
-	
+
 }
 
 static plugin_st delete_user(struct plugin_handle* plugin, struct auth_info* user)

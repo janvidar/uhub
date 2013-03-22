@@ -38,7 +38,7 @@ static const char* user_log_str(struct hub_user* user)
 struct hub_user* user_create(struct hub_info* hub, struct net_connection* con, struct ip_addr_encap* addr)
 {
 	struct hub_user* user = NULL;
-	
+
 	LOG_TRACE("user_create(), hub=%p, con[sd=%d]", hub, net_con_get_sd(con));
 
 	user = (struct hub_user*) hub_malloc_zero(sizeof(struct hub_user));
@@ -90,7 +90,7 @@ void user_set_state(struct hub_user* user, enum user_state state)
 	{
 		return;
 	}
-	
+
 	user->state = state;
 }
 
@@ -135,7 +135,7 @@ void user_update_info(struct hub_user* u, struct adc_message* cmd)
 			prefix[1] = argument[1];
 			adc_msg_replace_named_argument(cmd_new, prefix, argument+2);
 		}
-		
+
 		hub_free(argument);
 		argument = adc_msg_get_argument(cmd, n++);
 	}

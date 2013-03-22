@@ -135,7 +135,7 @@ static int command_history(struct plugin_handle* plugin, struct plugin_user* use
 		maxlines = arg->data.integer;
 	else
 		maxlines = data->history_default;
-	
+
 	buf = cbuf_create(MAX_HISTORY_SIZE);
 	cbuf_append_format(buf, "*** %s: Chat History:\n", cmd->prefix);
 	get_messages(data, maxlines, buf);

@@ -72,7 +72,7 @@ size_t ioq_recv_set(struct ioq_recv* q, void* buf, size_t bufsize)
 		q->buf = 0;
 		q->size = 0;
 	}
-	
+
 	if (!bufsize)
 	{
 		return 0;

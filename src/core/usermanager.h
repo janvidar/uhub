@@ -77,7 +77,7 @@ extern sid_t uman_get_free_sid(struct hub_user_manager* users, struct hub_user* 
  *
  * NOTE: This function will only search connected users, which means
  * that SIDs assigned to users who are not yet completely logged in,
- * or are in the process of being disconnected will result in this 
+ * or are in the process of being disconnected will result in this
  * function returning NULL even though the sid is not freely available.
  *
  * FIXME: Is that really safe / sensible ?

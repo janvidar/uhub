@@ -36,7 +36,7 @@ void flood_control_reset(struct flood_control*);
  * @param max_count Max count for flood control
  * @param window Time window for max_count to appear.
  * @param now The current time.
- * 
+ *
  * @return 0 if flood no flood detected.
  *         1 if flood detected.
  */

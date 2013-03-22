@@ -18,7 +18,7 @@
  */
 
 /*
- * This file is used for fiddling with IP-addresses, 
+ * This file is used for fiddling with IP-addresses,
  * primarily used for IP-banning in uhub.
  */
 

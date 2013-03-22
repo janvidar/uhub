@@ -28,7 +28,7 @@ int route_message(struct hub_info* hub, struct hub_user* u, struct adc_message* 
 		case 'B': /* Broadcast to all logged in clients */
 			route_to_all(hub, msg);
 			break;
-			
+
 		case 'D':
 			target = uman_get_user_by_sid(hub->users, msg->target);
 			if (target)
@@ -36,7 +36,7 @@ int route_message(struct hub_info* hub, struct hub_user* u, struct adc_message* 
 				route_to_user(hub, target, msg);
 			}
 			break;
-			
+
 		case 'E':
 			target = uman_get_user_by_sid(hub->users, msg->target);
 			if (target)
@@ -45,11 +45,11 @@ int route_message(struct hub_info* hub, struct hub_user* u, struct adc_message* 
 				route_to_user(hub, u, msg);
 			}
 			break;
-			
+
 		case 'F':
 			route_to_subscribers(hub, msg);
-			break;	
-		
+			break;
+
 		default:
 			/* Ignore the message */
 			break;
@@ -152,7 +152,7 @@ int route_to_subscribers(struct hub_info* hub, struct adc_message* command) /* i
 {
 	int do_send;
 	char* tmp;
-	
+
 	struct hub_user* user;
 	LIST_FOREACH(struct hub_user*, user, hub->users->list,
 	{
@@ -168,10 +168,10 @@ int route_to_subscribers(struct hub_info* hub, struct adc_message* command) /* i
 					break;
 				}
 			});
-			
+
 			if (!do_send)
 				continue;
-			
+
 			LIST_FOREACH(char*, tmp, command->feature_cast_exclude,
 			{
 				if (user_have_feature_cast_support(user, tmp))
@@ -180,12 +180,12 @@ int route_to_subscribers(struct hub_info* hub, struct adc_message* command) /* i
 					break;
 				}
 			});
-			
+
 			if (do_send)
 				route_to_user(hub, user, command);
 		}
 	});
-	
+
 	return 0;
 }
 
@@ -200,7 +200,7 @@ int route_info_message(struct hub_info* hub, struct hub_user* u)
 		struct adc_message* cmd = adc_msg_copy(u->info);
 		const char* address = user_get_address(u);
 		struct hub_user* user = 0;
-		
+
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
 		adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR, address);
 

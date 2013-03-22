@@ -89,9 +89,9 @@ void timeout_queue_insert(struct timeout_queue* t, struct timeout_evt* evt, size
 	size_t pos = ((t->last + seconds) % t->max);
 	evt->timestamp = t->last + seconds;
 	evt->next = 0;
-	
+
 	first = t->events[pos];
-	
+
 	if (first)
 	{
 		uhub_assert(first->timestamp == evt->timestamp);

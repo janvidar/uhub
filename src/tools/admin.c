@@ -132,7 +132,7 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 			break;
 
 		case ADC_CLIENT_USER_JOIN:
-			
+
 			user_add(data->user);
 			break;
 

@@ -109,14 +109,14 @@ static int check_cid(struct hub_info* hub, struct hub_user* user, struct adc_mes
 		hub_free(pid);
 		return status_msg_inf_error_cid_invalid;
 	}
-	
+
 	if (strlen(pid) != MAX_CID_LEN)
 	{
 		hub_free(cid);
 		hub_free(pid);
 		return status_msg_inf_error_pid_invalid;
 	}
-	
+
 	for (pos = 0; pos < MAX_CID_LEN; pos++)
 	{
 		if (!is_valid_base32_char(cid[pos]))
@@ -133,18 +133,18 @@ static int check_cid(struct hub_info* hub, struct hub_user* user, struct adc_mes
 			return status_msg_inf_error_pid_invalid;
 		}
 	}
-	
+
 	if (!check_hash_tiger(cid, pid))
 	{
 		hub_free(cid);
 		hub_free(pid);
 		return status_msg_inf_error_cid_invalid;
 	}
-	
+
 	/* Set the cid in the user object */
 	memcpy(user->id.cid, cid, MAX_CID_LEN);
 	user->id.cid[MAX_CID_LEN] = 0;
-	
+
 	hub_free(cid);
 	hub_free(pid);
 	return 0;
@@ -154,7 +154,7 @@ static int check_cid(struct hub_info* hub, struct hub_user* user, struct adc_mes
 static int check_required_login_flags(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	int num = 0;
-	
+
 	num = adc_msg_has_named_argument(cmd, ADC_INF_FLAG_CLIENT_ID);
 	if (num != 1)
 	{
@@ -162,7 +162,7 @@ static int check_required_login_flags(struct hub_info* hub, struct hub_user* use
 			return status_msg_inf_error_cid_missing;
 		return status_msg_inf_error_cid_invalid;
 	}
-	
+
 	num = adc_msg_has_named_argument(cmd, ADC_INF_FLAG_PRIVATE_ID);
 	if (num != 1)
 	{
@@ -190,7 +190,7 @@ static int check_required_login_flags(struct hub_info* hub, struct hub_user* use
 static int check_network(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	const char* address = user_get_address(user);
-	
+
 	/* Check for NAT override address */
 	if (acl_is_ip_nat_override(hub->acl, address))
 	{
@@ -236,12 +236,12 @@ static int nick_length_ok(const char* nick)
 	{
 		return nick_invalid_short;
 	}
-	
+
 	if (length > MAX_NICK_LEN)
 	{
 		return nick_invalid_long;
 	}
-	
+
 	return nick_ok;
 }
 
@@ -249,16 +249,16 @@ static int nick_length_ok(const char* nick)
 static int nick_bad_characters(const char* nick)
 {
 	const char* tmp;
-	
+
 	/* Nick must not start with a space */
 	if (nick[0] == ' ')
 		return nick_invalid_spaces;
-	
+
 	/* Check for ASCII values below 32 */
 	for (tmp = nick; *tmp; tmp++)
 		if ((*tmp < 32) && (*tmp > 0))
 			return nick_invalid_bad_ascii;
-	
+
 	return nick_ok;
 }
 
@@ -286,7 +286,7 @@ static int check_nick(struct hub_info* hub, struct hub_user* user, struct adc_me
 	nick = adc_msg_unescape(tmp);
 	free(tmp); tmp = 0;
 	if (!nick) return 0;
-	
+
 	status = nick_length_ok(nick);
 	if (status != nick_ok)
 	{
@@ -295,7 +295,7 @@ static int check_nick(struct hub_info* hub, struct hub_user* user, struct adc_me
 			return status_msg_inf_error_nick_short;
 		return status_msg_inf_error_nick_long;
 	}
-	
+
 	status = nick_bad_characters(nick);
 	if (status != nick_ok)
 	{
@@ -304,20 +304,20 @@ static int check_nick(struct hub_info* hub, struct hub_user* user, struct adc_me
 			return status_msg_inf_error_nick_spaces;
 		return status_msg_inf_error_nick_bad_chars;
 	}
-	
+
 	status = nick_is_utf8(nick);
 	if (status != nick_ok)
 	{
 		hub_free(nick);
 		return status_msg_inf_error_nick_not_utf8;
 	}
-	
+
 	if (user_is_connecting(user))
 	{
 		memcpy(user->id.nick, nick, strlen(nick));
 		user->id.nick[strlen(nick)] = 0;
 	}
-	
+
 	hub_free(nick);
 	return 0;
 }
@@ -327,12 +327,12 @@ static int check_logged_in(struct hub_info* hub, struct hub_user* user, struct a
 {
 	struct hub_user* lookup1 = uman_get_user_by_nick(hub->users, user->id.nick);
 	struct hub_user* lookup2 = uman_get_user_by_cid(hub->users, user->id.cid);
-	
+
 	if (lookup1 == user)
 	{
 		return 0;
 	}
-	
+
 	if (lookup1 || lookup2)
 	{
 		if (lookup1 == lookup2)
@@ -368,7 +368,7 @@ static int check_user_agent(struct hub_info* hub, struct hub_user* user, struct 
 {
 	char* ua_encoded = 0;
 	char* ua = 0;
-	
+
 	/* Get client user agent version */
 	ua_encoded = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_USER_AGENT);
 	if (ua_encoded)
@@ -391,7 +391,7 @@ static int check_acl(struct hub_info* hub, struct hub_user* user, struct adc_mes
 	{
 		return status_msg_ban_permanently;
 	}
-	
+
 	if (acl_is_user_banned(hub->acl, user->id.nick))
 	{
 		return status_msg_ban_permanently;
@@ -401,7 +401,7 @@ static int check_acl(struct hub_info* hub, struct hub_user* user, struct adc_mes
 	{
 		return status_msg_inf_error_nick_restricted;
 	}
-	
+
 	return 0;
 }
 
@@ -470,7 +470,7 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 		hub_free(arg);
 		arg = 0;
 	}
-	
+
 	arg = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_UPLOAD_SLOTS);
 	if (arg)
 	{
@@ -534,7 +534,7 @@ static int set_credentials(struct hub_info* hub, struct hub_user* user, struct a
 {
 	int ret = 0;
 	struct auth_info* info = acl_get_access_info(hub, user->id.nick);
-	
+
 	if (info)
 	{
 		user->credentials = info->credentials;
@@ -550,11 +550,11 @@ static int set_credentials(struct hub_info* hub, struct hub_user* user, struct a
 	{
 		case auth_cred_none:
 			break;
-			
+
 		case auth_cred_bot:
 			adc_msg_add_argument(cmd, ADC_INF_FLAG_CLIENT_TYPE ADC_CLIENT_TYPE_BOT);
 			break;
-			
+
 		case auth_cred_guest:
 			/* Nothing to be added to the info message */
 			break;
@@ -566,7 +566,7 @@ static int set_credentials(struct hub_info* hub, struct hub_user* user, struct a
 		case auth_cred_operator:
 			adc_msg_add_argument(cmd, ADC_INF_FLAG_CLIENT_TYPE ADC_CLIENT_TYPE_OPERATOR);
 			break;
-			
+
 		case auth_cred_super:
 			adc_msg_add_argument(cmd, ADC_INF_FLAG_CLIENT_TYPE ADC_CLIENT_TYPE_SUPER_USER);
 			break;
@@ -578,7 +578,7 @@ static int set_credentials(struct hub_info* hub, struct hub_user* user, struct a
 		case auth_cred_link:
 			break;
  	}
-	
+
 	return ret;
 }
 
@@ -611,10 +611,10 @@ static int hub_handle_info_common(struct hub_user* user, struct adc_message* cmd
 {
 	/* Remove server restricted flags */
 	remove_server_restricted_flags(cmd);
-	
+
 	/* Update/set the feature cast flags. */
 	set_feature_cast_supports(user, cmd);
-	
+
 	return 0;
 }
 
@@ -635,7 +635,7 @@ static int hub_handle_info_low_bandwidth(struct hub_info* hub, struct hub_user* 
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_DESCRIPTION);
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_EMAIL);
 	}
-	
+
 	return 0;
 }
 
@@ -680,20 +680,20 @@ int hub_handle_info_login(struct hub_info* hub, struct hub_user* user, struct ad
 	{
 		return status_msg_hub_full;
 	}
-	
+
 	if (check_registered_users_only(hub, user))
 	{
 		return status_msg_hub_registered_users_only;
 	}
-	
+
 	INF_CHECK(check_limits, hub, user, cmd);
-	
+
 	/* strip off stuff if low_bandwidth_mode is enabled */
 	hub_handle_info_low_bandwidth(hub, user, cmd);
-	
+
 	/* Set initial user info */
 	user_set_info(user, cmd);
-	
+
 	return code;
 }
 

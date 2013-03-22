@@ -319,7 +319,7 @@ static int pass(size_t argc, const char** argv)
 		fprintf(stderr, "Unable to change password for user \"%s\"\n", argv[0]);
 		return 1;
 	}
-	
+
 	return 0;
 }
 

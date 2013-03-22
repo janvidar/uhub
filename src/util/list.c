@@ -65,7 +65,7 @@ void list_append(struct linked_list* list, void* data_ptr)
 		return;
 	}
 	new_node->ptr = data_ptr;
-	
+
 	if (list->last)
 	{
 		list->last->next = new_node;
@@ -123,10 +123,10 @@ void list_remove(struct linked_list* list, void* data_ptr)
 		{
 			if (node->next)
 				node->next->prev = node->prev;
-			
+
 			if (node->prev)
 				node->prev->next = node->next;
-			
+
 			if (node == list->last)
 				list->last = node->prev;
 
@@ -194,7 +194,7 @@ void* list_get_first(struct linked_list* list)
 	list->iterator = list->first;
 	if (list->iterator == NULL)
 		return NULL;
-	
+
 	return list->iterator->ptr;
 }
 
@@ -203,7 +203,7 @@ struct node* list_get_first_node(struct linked_list* list)
 	list->iterator = list->first;
 	if (list->iterator == NULL)
 		return NULL;
-	
+
 	return list->iterator;
 }
 
@@ -212,7 +212,7 @@ void* list_get_last(struct linked_list* list)
 	list->iterator = list->last;
 	if (list->iterator == NULL)
 		return NULL;
-	
+
 	return list->iterator->ptr;
 }
 
@@ -221,9 +221,9 @@ struct node* list_get_last_node(struct linked_list* list)
 	list->iterator = list->last;
 	if (list->iterator == NULL)
 		return NULL;
-	
+
 	return list->iterator;
-	
+
 }
 
 void* list_get_next(struct linked_list* list)
@@ -232,7 +232,7 @@ void* list_get_next(struct linked_list* list)
 		list->iterator = list->first;
 	else
 		list->iterator = list->iterator->next;
-	
+
 	if (list->iterator == NULL)
 		return NULL;
 
@@ -244,9 +244,9 @@ void* list_get_prev(struct linked_list* list)
 {
 	if (list->iterator == NULL)
 		return NULL;
-	
+
 	list->iterator = list->iterator->prev;
-	
+
 	if (list->iterator == NULL)
 		return NULL;
 
