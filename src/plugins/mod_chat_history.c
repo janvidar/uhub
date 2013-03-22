@@ -50,9 +50,7 @@ static void history_add(struct plugin_handle* plugin, struct plugin_user* from, 
 	list_append(data->chat_history, log);
 	while (list_size(data->chat_history) > data->history_max)
 	{
-		char* msg = list_get_first(data->chat_history);
-		list_remove(data->chat_history, msg);
-		hub_free(msg);
+		list_remove_first(data->chat_history, hub_free);
 	}
 }
 

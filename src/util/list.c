@@ -80,6 +80,35 @@ void list_append(struct linked_list* list, void* data_ptr)
 	list->size++;
 }
 
+void list_append_list(struct linked_list* list, struct linked_list* other)
+{
+	/* Anything to move? */
+	if (!other->size)
+		return;
+
+	if (!list->size)
+	{
+		/* If the list is empty, just move the pointers */
+		list->size = other->size;
+		list->first = other->first;
+		list->last = other->last;
+		list->iterator = other->iterator;
+	}
+	else
+	{
+		other->first->prev = list->last;
+		list->last->next = other->first;
+		list->last = other->last;
+		list->size += other->size;
+	}
+
+	/* Make sure the original list appears empty */
+	other->size = 0;
+	other->first = NULL;
+	other->last = NULL;
+	other->iterator = NULL;
+}
+
 
 void list_remove(struct linked_list* list, void* data_ptr)
 {
@@ -111,6 +140,30 @@ void list_remove(struct linked_list* list, void* data_ptr)
 		}
 		node = node->next;
 	}
+}
+
+void list_remove_first(struct linked_list* list, void (*free_handle)(void* ptr))
+{
+	struct node* node = list->first;
+
+	list->iterator = NULL;
+
+	if (!node)
+		return;
+
+	list->first = node->next;
+
+	if (list->first)
+		list->first->prev = NULL;
+
+	if (list->last == node)
+		list->last = NULL;
+
+	list->size--;
+
+	if (free_handle)
+		free_handle(node->ptr);
+	hub_free(node);
 }
 
 

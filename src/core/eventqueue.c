@@ -90,16 +90,10 @@ int event_queue_process(struct event_queue* queue)
 		
 	/* unlock queue */
 	queue->locked = 0;
-	
+
 	/* transfer from secondary queue to the primary queue. */
-	data = (struct event_data*) list_get_first(queue->q2);
-	while (data)
-	{
-		list_remove(queue->q2, data);
-		list_append(queue->q1, data);
-		data = (struct event_data*) list_get_first(queue->q2);
-	}
-	
+	list_append_list(queue->q1, queue->q2);
+
 	/* if more events exist, schedule it */
 	if (list_size(queue->q1))
 	{

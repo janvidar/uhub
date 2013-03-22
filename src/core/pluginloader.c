@@ -229,16 +229,16 @@ int plugin_initialize(struct hub_config* config, struct hub_info* hub)
 	return 0;
 }
 
+static void plugin_unload_ptr(void* ptr)
+{
+	struct plugin_handle* plugin = (struct plugin_handle*) ptr;
+	plugin_unload(plugin);
+}
+
+
 void plugin_shutdown(struct uhub_plugins* handle)
 {
-	struct plugin_handle* plugin = (struct plugin_handle*) list_get_first(handle->loaded);
-	while (plugin)
-	{
-		list_remove(handle->loaded, plugin);
-		plugin_unload(plugin);
-		plugin = (struct plugin_handle*) list_get_first(handle->loaded);
-	}
-
+	list_clear(handle->loaded, plugin_unload_ptr);
 	list_destroy(handle->loaded);
 }
 
