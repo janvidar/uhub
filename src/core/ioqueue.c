@@ -130,7 +130,7 @@ void ioq_send_add(struct ioq_send* q, struct adc_message* msg_)
 	q->size += msg->length;
 }
 
-void ioq_send_remove(struct ioq_send* q, struct adc_message* msg)
+static void ioq_send_remove(struct ioq_send* q, struct adc_message* msg)
 {
 #ifdef DEBUG_SENDQ
 	debug_msg("ioq_send_remove", msg);
