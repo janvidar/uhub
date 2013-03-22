@@ -94,7 +94,6 @@ add_library(mod_auth_simple MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_auth_simple
 add_library(mod_chat_history MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_chat_history.c )
 add_library(mod_chat_history_sqlite MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_chat_history_sqlite.c )
 add_library(mod_chat_only MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_chat_only.c)
-add_library(mod_chat_is_privileged MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_chat_is_privileged.c)
 add_library(mod_topic MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_topic.c)
 add_library(mod_no_guest_downloads MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_no_guest_downloads.c)
 add_library(mod_auth_sqlite MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_auth_sqlite.c)
@@ -115,7 +114,6 @@ set_target_properties(
 	mod_chat_history
 	mod_chat_history_sqlite
 	mod_chat_only
-	mod_chat_is_privileged
 	mod_no_guest_downloads
 	mod_topic
 	PROPERTIES PREFIX "")
@@ -131,7 +129,6 @@ target_link_libraries(mod_chat_history utils)
 target_link_libraries(mod_chat_history_sqlite ${SQLITE3_LIBRARIES} utils)
 target_link_libraries(mod_no_guest_downloads utils)
 target_link_libraries(mod_chat_only utils)
-target_link_libraries(mod_chat_is_privileged utils)
 target_link_libraries(mod_logging utils)
 target_link_libraries(mod_topic utils)
 target_link_libraries(utils network)
@@ -223,7 +220,7 @@ endif()
 
 if (UNIX)
 	install( TARGETS uhub uhub-passwd RUNTIME DESTINATION bin )
-	install( TARGETS mod_example mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_chat_history mod_chat_history_sqlite mod_chat_only mod_chat_is_privileged mod_topic mod_no_guest_downloads DESTINATION /usr/lib/uhub/ OPTIONAL )
+	install( TARGETS mod_example mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_chat_history mod_chat_history_sqlite mod_chat_only mod_topic mod_no_guest_downloads DESTINATION /usr/lib/uhub/ OPTIONAL )
 	install( FILES ${CMAKE_SOURCE_DIR}/doc/uhub.conf ${CMAKE_SOURCE_DIR}/doc/plugins.conf ${CMAKE_SOURCE_DIR}/doc/rules.txt ${CMAKE_SOURCE_DIR}/doc/motd.txt DESTINATION /etc/uhub OPTIONAL )
 endif()
 
