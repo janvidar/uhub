@@ -38,6 +38,11 @@ static void clear_user_list_callback(void* ptr)
 	}
 }
 
+static int uman_map_compare(const void* a, const void* b)
+{
+	return strcmp((const char*) a, (const char*) b);
+}
+
 
 struct hub_user_manager* uman_init()
 {
@@ -46,14 +51,9 @@ struct hub_user_manager* uman_init()
 		return NULL;
 
 	users->list = list_create();
+	users->nickmap = rb_tree_create(uman_map_compare, NULL, NULL);
+	users->cidmap = rb_tree_create(uman_map_compare, NULL, NULL);
 	users->sids = sid_pool_create(net_get_max_sockets());
-
-	if (!users->list)
-	{
-		list_destroy(users->list);
-		hub_free(users);
-		return NULL;
-	}
 
 	return users;
 }
@@ -64,11 +64,18 @@ int uman_shutdown(struct hub_user_manager* users)
 	if (!users)
 		return -1;
 
+	if (users->nickmap)
+		rb_tree_destroy(users->nickmap);
+
+	if (users->cidmap)
+		rb_tree_destroy(users->cidmap);
+
 	if (users->list)
 	{
 		list_clear(users->list, &clear_user_list_callback);
 		list_destroy(users->list);
 	}
+
 	sid_pool_destroy(users->sids);
 
 	hub_free(users);
@@ -80,6 +87,9 @@ int uman_add(struct hub_user_manager* users, struct hub_user* user)
 {
 	if (!users || !user)
 		return -1;
+
+	rb_tree_insert(users->nickmap, user->id.nick, user);
+	rb_tree_insert(users->cidmap, user->id.cid, user);
 
 	list_append(users->list, user);
 	users->count++;
@@ -96,6 +106,8 @@ int uman_remove(struct hub_user_manager* users, struct hub_user* user)
 		return -1;
 
 	list_remove(users->list, user);
+	rb_tree_remove(users->nickmap, user->id.nick);
+	rb_tree_remove(users->cidmap, user->id.cid);
 
 	if (users->count > 0)
 	{
@@ -120,25 +132,15 @@ struct hub_user* uman_get_user_by_sid(struct hub_user_manager* users, sid_t sid)
 
 struct hub_user* uman_get_user_by_cid(struct hub_user_manager* users, const char* cid)
 {
-	struct hub_user* user;
-	LIST_FOREACH(struct hub_user*, user, users->list,
-	{
-		if (strcmp(user->id.cid, cid) == 0)
-			return user;
-	});
-	return NULL;
+	struct hub_user* user = (struct hub_user*) rb_tree_get(users->cidmap, (const void*) cid);
+	return user;
 }
 
 
 struct hub_user* uman_get_user_by_nick(struct hub_user_manager* users, const char* nick)
 {
-	struct hub_user* user;
-	LIST_FOREACH(struct hub_user*, user, users->list,
-	{
-		if (strcmp(user->id.nick, nick) == 0)
-			return user;
-	});
-	return NULL;
+	struct hub_user* user = (struct hub_user*) rb_tree_get(users->nickmap, nick);
+	return user;
 }
 
 size_t uman_get_user_by_addr(struct hub_user_manager* users, struct linked_list* target, struct ip_range* range)

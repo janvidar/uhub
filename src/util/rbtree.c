@@ -157,7 +157,7 @@ static struct rb_node* rb_tree_insert_r(struct rb_tree* tree, struct rb_node* no
 
 struct rb_tree* rb_tree_create(rb_tree_compare compare, rb_tree_alloc a, rb_tree_free f)
 {
-	struct rb_tree* tree = a(sizeof(struct rb_tree));
+	struct rb_tree* tree = a ? a(sizeof(struct rb_tree)) : hub_malloc(sizeof(struct rb_tree));
 	tree->compare = compare;
 	tree->alloc = a ? a : hub_malloc;
 	tree->free = f ? f : hub_free;

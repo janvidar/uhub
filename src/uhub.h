@@ -69,6 +69,7 @@ extern "C" {
 #include "util/misc.h"
 #include "util/tiger.h"
 #include "util/threads.h"
+#include "util/rbtree.h"
 
 #include "adc/sid.h"
 #include "adc/message.h"

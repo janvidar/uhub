@@ -24,10 +24,12 @@ struct hub_user_manager
 {
 	size_t count;                   /**<< "Number of all fully connected and logged in users" */
 	size_t count_peak;              /**<< "Peak number of users" */
-	struct sid_pool* sids;
 	uint64_t shared_size;           /**<< "The total number of shared bytes among fully connected users." */
 	uint64_t shared_files;          /**<< "The total number of shared files among fully connected users." */
+	struct sid_pool* sids;          /**<< "Maps SIDs to users (constant time)" */
 	struct linked_list* list;       /**<< "Contains all logged in users" */
+	struct rb_tree* nickmap;        /**<< "Maps nicknames to users (red black tree)" */
+	struct rb_tree* cidmap;         /**<< "Maps CIDs to users (red black tree)" */
 };
 
 /**
