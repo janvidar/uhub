@@ -43,6 +43,7 @@ struct timeout_queue
 {
 	time_t last;
 	size_t max;
+	struct timeout_evt lock;
 	struct timeout_evt** events;
 };
 
