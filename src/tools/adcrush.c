@@ -237,7 +237,6 @@ static void perf_update(struct ADC_client* client)
 static void client_disconnect(struct AdcFuzzUser* c)
 {
 		ADC_client_destroy(c->client);
-		hub_free(c->client);
 		c->client = 0;
 
 		timeout_queue_remove(net_backend_get_timeout_queue(), c->timer);
