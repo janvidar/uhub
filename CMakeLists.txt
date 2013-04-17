@@ -56,11 +56,7 @@ endif()
 
 include_directories("${PROJECT_SOURCE_DIR}")
 include_directories(${SQLITE3_INCLUDE_DIRS})
-
-if (UNIX)
-link_directories(/usr/local/lib)
-endif()
-
+link_directories(${SQLITE3_LIBRARY_DIRS})
 
 file (GLOB uhub_SOURCES ${PROJECT_SOURCE_DIR}/core/*.c)
 list (REMOVE_ITEM uhub_SOURCES
