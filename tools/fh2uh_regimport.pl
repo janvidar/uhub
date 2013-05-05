@@ -2,7 +2,7 @@
 
 # A simple tool for importing FlexHub users to uhub sqlite database
 #
-# Usage: ./fh2uhub_regimport.pl <flexhub_userlist> <uhub_database>
+# Usage: ./fh2uh_regimport.pl <flexhub_userlist> <uhub_database>
 #
 # Note: uhub database has to be created before running this script.
 
