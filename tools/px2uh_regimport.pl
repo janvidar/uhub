@@ -54,12 +54,9 @@ sub dbimport
 	$db->disconnect();
 }
 
-my @uhubaccounts;
-
 for my $account (@pxaccounts)
 {
 	$account->{'credentials'} = convertprofile $account->{'Profile'};
-	push(@uhubaccounts, $account);
 }
 
-dbimport @uhubaccounts; 
+dbimport @pxaccounts; 
