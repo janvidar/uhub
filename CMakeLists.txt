@@ -208,6 +208,7 @@ if (SYSTEMD_SUPPORT)
 endif()
 
 configure_file ("${PROJECT_SOURCE_DIR}/version.h.in" "${PROJECT_SOURCE_DIR}/version.h")
+configure_file ("${PROJECT_SOURCE_DIR}/system.h.in" "${PROJECT_SOURCE_DIR}/system.h")
 
 # mark_as_advanced(FORCE CMAKE_BUILD_TYPE)
 # if (RELEASE)
