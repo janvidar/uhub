@@ -79,13 +79,13 @@
 #include <grp.h>
 #include <pwd.h>
 #include <sys/resource.h>
-#define HAVE_STRNDUP
 #define HAVE_DLOPEN
 #define HAVE_GETOPT
 #define HAVE_SSIZE_T
 #include <dlfcn.h>
 #define HAVE_GETRLIMIT
 #endif
+#cmakedefine HAVE_STRNDUP
 #cmakedefine HAVE_MEMMEM
 
 /* printf support for size_t and uint64_t */
@@ -134,10 +134,6 @@
 #define USE_SELECT
 #ifndef WINSOCK
 #include <sys/select.h>
-#endif
-
-#if ( defined(BSD_LIKE) && !defined(__FreeBSD_kernel__) ) || defined(__sun__)
-#undef HAVE_STRNDUP
 #endif
 
 #ifdef HAVE_GETOPT

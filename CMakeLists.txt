@@ -63,6 +63,7 @@ if (MSVC)
 endif()
 
 check_symbol_exists(memmem string.h HAVE_MEMMEM)
+check_symbol_exists(strndup string.h HAVE_STRNDUP)
 
 include_directories("${PROJECT_SOURCE_DIR}")
 include_directories(${SQLITE3_INCLUDE_DIRS})
