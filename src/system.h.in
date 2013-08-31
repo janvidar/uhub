@@ -84,11 +84,9 @@
 #define HAVE_GETOPT
 #define HAVE_SSIZE_T
 #include <dlfcn.h>
-#ifndef __HAIKU__
-#define HAVE_MEMMEM
-#endif
 #define HAVE_GETRLIMIT
 #endif
+#cmakedefine HAVE_MEMMEM
 
 /* printf support for size_t and uint64_t */
 #if defined(WIN32)
@@ -140,7 +138,6 @@
 
 #if ( defined(BSD_LIKE) && !defined(__FreeBSD_kernel__) ) || defined(__sun__)
 #undef HAVE_STRNDUP
-#undef HAVE_MEMMEM
 #endif
 
 #ifdef HAVE_GETOPT

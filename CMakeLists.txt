@@ -26,6 +26,11 @@ find_package(Git)
 find_package(Sqlite3)
 
 include(TestBigEndian)
+include(CheckSymbolExists) 
+
+#Some functions need this to be found
+add_definitions(-D_GNU_SOURCE)
+set(CMAKE_REQUIRED_DEFINITIONS "${CMAKE_REQUIRED_DEFINITIONS} -D_GNU_SOURCE")
 
 TEST_BIG_ENDIAN(BIGENDIAN)
 if (BIGENDIAN)
@@ -56,6 +61,8 @@ endif()
 if (MSVC)
 	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif()
+
+check_symbol_exists(memmem string.h HAVE_MEMMEM)
 
 include_directories("${PROJECT_SOURCE_DIR}")
 include_directories(${SQLITE3_INCLUDE_DIRS})
