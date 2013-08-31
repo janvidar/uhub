@@ -64,6 +64,7 @@ if (MSVC)
 	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif()
 
+check_include_file(stdint.h HAVE_STDINT_H)
 check_include_file(sys/types.h HAVE_SYS_TYPES_H)
 if (HAVE_SYS_TYPES_H)
 set (CMAKE_EXTRA_INCLUDE_FILES ${CMAKE_EXTRA_INCLUDE_FILES} "sys/types.h")

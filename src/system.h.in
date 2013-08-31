@@ -61,7 +61,8 @@
 #include <errno.h>
 #include <fcntl.h>
 
-#ifndef __sun__
+#cmakedefine HAVE_STDINT_H
+#ifdef HAVE_STDINT_H
 #include <stdint.h>
 #endif
 
