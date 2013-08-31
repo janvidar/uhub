@@ -27,6 +27,8 @@ find_package(Sqlite3)
 
 include(TestBigEndian)
 include(CheckSymbolExists) 
+include(CheckIncludeFile)
+include(CheckTypeSize)
 
 #Some functions need this to be found
 add_definitions(-D_GNU_SOURCE)
@@ -62,6 +64,11 @@ if (MSVC)
 	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif()
 
+check_include_file(sys/types.h HAVE_SYS_TYPES_H)
+if (HAVE_SYS_TYPES_H)
+set (CMAKE_EXTRA_INCLUDE_FILES ${CMAKE_EXTRA_INCLUDE_FILES} "sys/types.h")
+endif()
+check_type_size( ssize_t SSIZE_T )
 check_symbol_exists(memmem string.h HAVE_MEMMEM)
 check_symbol_exists(strndup string.h HAVE_STRNDUP)
 

@@ -34,7 +34,6 @@
 #endif
 
 #if defined(__CYGWIN__) || defined(__MINGW32__)
-#define HAVE_SSIZE_T
 #define NEED_GETOPT
 #endif
 
@@ -69,6 +68,10 @@
 #include <string.h>
 #include <time.h>
 
+#cmakedefine HAVE_SYS_TYPES_H
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
 #if !defined(WIN32)
 #include <inttypes.h>
 #include <unistd.h>
@@ -77,10 +80,10 @@
 #include <sys/resource.h>
 #define HAVE_DLOPEN
 #define HAVE_GETOPT
-#define HAVE_SSIZE_T
 #include <dlfcn.h>
 #define HAVE_GETRLIMIT
 #endif
+#cmakedefine HAVE_SSIZE_T
 #cmakedefine HAVE_STRNDUP
 #cmakedefine HAVE_MEMMEM
 
