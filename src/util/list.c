@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -65,7 +65,7 @@ void list_append(struct linked_list* list, void* data_ptr)
 		return;
 	}
 	new_node->ptr = data_ptr;
-	
+
 	if (list->last)
 	{
 		list->last->next = new_node;
@@ -78,6 +78,35 @@ void list_append(struct linked_list* list, void* data_ptr)
 
 	list->last = new_node;
 	list->size++;
+}
+
+void list_append_list(struct linked_list* list, struct linked_list* other)
+{
+	/* Anything to move? */
+	if (!other->size)
+		return;
+
+	if (!list->size)
+	{
+		/* If the list is empty, just move the pointers */
+		list->size = other->size;
+		list->first = other->first;
+		list->last = other->last;
+		list->iterator = other->iterator;
+	}
+	else
+	{
+		other->first->prev = list->last;
+		list->last->next = other->first;
+		list->last = other->last;
+		list->size += other->size;
+	}
+
+	/* Make sure the original list appears empty */
+	other->size = 0;
+	other->first = NULL;
+	other->last = NULL;
+	other->iterator = NULL;
 }
 
 
@@ -94,10 +123,10 @@ void list_remove(struct linked_list* list, void* data_ptr)
 		{
 			if (node->next)
 				node->next->prev = node->prev;
-			
+
 			if (node->prev)
 				node->prev->next = node->next;
-			
+
 			if (node == list->last)
 				list->last = node->prev;
 
@@ -111,6 +140,30 @@ void list_remove(struct linked_list* list, void* data_ptr)
 		}
 		node = node->next;
 	}
+}
+
+void list_remove_first(struct linked_list* list, void (*free_handle)(void* ptr))
+{
+	struct node* node = list->first;
+
+	list->iterator = NULL;
+
+	if (!node)
+		return;
+
+	list->first = node->next;
+
+	if (list->first)
+		list->first->prev = NULL;
+
+	if (list->last == node)
+		list->last = NULL;
+
+	list->size--;
+
+	if (free_handle)
+		free_handle(node->ptr);
+	hub_free(node);
 }
 
 
@@ -141,7 +194,7 @@ void* list_get_first(struct linked_list* list)
 	list->iterator = list->first;
 	if (list->iterator == NULL)
 		return NULL;
-	
+
 	return list->iterator->ptr;
 }
 
@@ -150,7 +203,7 @@ struct node* list_get_first_node(struct linked_list* list)
 	list->iterator = list->first;
 	if (list->iterator == NULL)
 		return NULL;
-	
+
 	return list->iterator;
 }
 
@@ -159,7 +212,7 @@ void* list_get_last(struct linked_list* list)
 	list->iterator = list->last;
 	if (list->iterator == NULL)
 		return NULL;
-	
+
 	return list->iterator->ptr;
 }
 
@@ -168,9 +221,9 @@ struct node* list_get_last_node(struct linked_list* list)
 	list->iterator = list->last;
 	if (list->iterator == NULL)
 		return NULL;
-	
+
 	return list->iterator;
-	
+
 }
 
 void* list_get_next(struct linked_list* list)
@@ -179,7 +232,7 @@ void* list_get_next(struct linked_list* list)
 		list->iterator = list->first;
 	else
 		list->iterator = list->iterator->next;
-	
+
 	if (list->iterator == NULL)
 		return NULL;
 
@@ -191,9 +244,9 @@ void* list_get_prev(struct linked_list* list)
 {
 	if (list->iterator == NULL)
 		return NULL;
-	
+
 	list->iterator = list->iterator->prev;
-	
+
 	if (list->iterator == NULL)
 		return NULL;
 

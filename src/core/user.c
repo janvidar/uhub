@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -38,7 +38,7 @@ static const char* user_log_str(struct hub_user* user)
 struct hub_user* user_create(struct hub_info* hub, struct net_connection* con, struct ip_addr_encap* addr)
 {
 	struct hub_user* user = NULL;
-	
+
 	LOG_TRACE("user_create(), hub=%p, con[sd=%d]", hub, net_con_get_sd(con));
 
 	user = (struct hub_user*) hub_malloc_zero(sizeof(struct hub_user));
@@ -90,7 +90,7 @@ void user_set_state(struct hub_user* user, enum user_state state)
 	{
 		return;
 	}
-	
+
 	user->state = state;
 }
 
@@ -135,7 +135,7 @@ void user_update_info(struct hub_user* u, struct adc_message* cmd)
 			prefix[1] = argument[1];
 			adc_msg_replace_named_argument(cmd_new, prefix, argument+2);
 		}
-		
+
 		hub_free(argument);
 		argument = adc_msg_get_argument(cmd, n++);
 	}
@@ -232,15 +232,12 @@ void user_support_remove(struct hub_user* user, int fourcc)
 
 int user_have_feature_cast_support(struct hub_user* user, char feature[4])
 {
-	char* tmp = list_get_first(user->feature_cast);
-	while (tmp)
+	char* tmp;
+	LIST_FOREACH(char*, tmp, user->feature_cast,
 	{
 		if (strncmp(tmp, feature, 4) == 0)
 			return 1;
-	
-		tmp = list_get_next(user->feature_cast);
-	}
-	
+	});
 	return 0;
 }
 

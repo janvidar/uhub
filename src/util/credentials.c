@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -71,7 +71,7 @@ const char* auth_cred_to_string(enum auth_credentials cred)
 		case auth_cred_link:         return "link";
 		case auth_cred_admin:        return "admin";
 	}
-	
+
 	return "";
 };
 

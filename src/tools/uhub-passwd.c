@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2012, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -319,7 +319,7 @@ static int pass(size_t argc, const char** argv)
 		fprintf(stderr, "Unable to change password for user \"%s\"\n", argv[0]);
 		return 1;
 	}
-	
+
 	return 0;
 }
 

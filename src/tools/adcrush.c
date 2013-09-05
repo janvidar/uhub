@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2012, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -77,7 +77,7 @@ const char* chat_messages[MAX_CHAT_MSGS] = {
 	"can anyone help me, pls?",
 	"wtf?",
 	"bullshit",
-	"resistance is futile.", 
+	"resistance is futile.",
 	"You crossed the line first, sir. You squeezed them, you hammered them to the point of desperation. And in their desperation they turned to a man they didn't fully understand.",
 	"beam me up, scotty",
 	"morning",
@@ -87,10 +87,10 @@ const char* chat_messages[MAX_CHAT_MSGS] = {
 	"*punt*",
 	"*nudge*",
 	"that's ok",
-	"...anyway", 
+	"...anyway",
 	"hola",
 	"hey",
-	"hi", 
+	"hi",
 	"nevermind",
 	"i think so",
 	"dunno",
@@ -173,7 +173,7 @@ static void perf_chat(struct ADC_client* client, int priv)
 	else
 		cmd = adc_msg_construct_source(ADC_CMD_BMSG, ADC_client_get_sid(client), strlen(msg));
 	hub_free(msg);
-	
+
 	ADC_client_send(client, cmd);
 }
 
@@ -237,7 +237,6 @@ static void perf_update(struct ADC_client* client)
 static void client_disconnect(struct AdcFuzzUser* c)
 {
 		ADC_client_destroy(c->client);
-		hub_free(c->client);
 		c->client = 0;
 
 		timeout_queue_remove(net_backend_get_timeout_queue(), c->timer);
@@ -294,7 +293,7 @@ static void perf_normal_action(struct ADC_client* client)
 				bot_output(client, LVL_VERBOSE, "timeout -> chat");
 				if (user->logged_in)
 					perf_chat(client, 0);
-				
+
 			}
 			break;
 
@@ -486,7 +485,7 @@ int parse_address(const char* arg)
 {
 	if (!arg || strlen(arg) < 9)
 		return 0;
-	
+
 	if (strncmp(arg, "adc://", 6) && strncmp(arg, "adcs://", 7))
 		return 0;
 
@@ -537,7 +536,7 @@ int main(int argc, char** argv)
 {
 
 	parse_command_line(argc, argv);
-	
+
 	net_initialize();
 	net_stats_get(&stats_intermediate, &stats_total);
 

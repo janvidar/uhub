@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -47,7 +47,7 @@ sid_t string_to_sid(const char* sid)
 	sid_t nsid = 0;
 	sid_t n, x;
 	sid_t factors[] = { 32768, 1024, 32, 1};
-	
+
 	if (!sid || strlen(sid) != 4) return 0;
 
 	for (n = 0; n < 4; n++) {

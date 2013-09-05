@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2012, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -50,9 +50,7 @@ static void history_add(struct plugin_handle* plugin, struct plugin_user* from, 
 	list_append(data->chat_history, log);
 	while (list_size(data->chat_history) > data->history_max)
 	{
-		char* msg = list_get_first(data->chat_history);
-		list_remove(data->chat_history, msg);
-		hub_free(msg);
+		list_remove_first(data->chat_history, hub_free);
 	}
 }
 
@@ -79,16 +77,14 @@ static size_t get_messages(struct chat_history_data* data, size_t num, struct cb
 		skiplines = total - num;
 
 	cbuf_append(outbuf, "\n");
-	message = (char*) list_get_first(messages);
-	while (message)
+	LIST_FOREACH(char*, message, messages,
 	{
 		if (--skiplines < 0)
 		{
 			cbuf_append(outbuf, message);
 			lines++;
 		}
-		message = (char*) list_get_next(messages);
-	}
+	});
 	cbuf_append(outbuf, "\n");
 	return lines;
 }
@@ -139,7 +135,7 @@ static int command_history(struct plugin_handle* plugin, struct plugin_user* use
 		maxlines = arg->data.integer;
 	else
 		maxlines = data->history_default;
-	
+
 	buf = cbuf_create(MAX_HISTORY_SIZE);
 	cbuf_append_format(buf, "*** %s: Chat History:\n", cmd->prefix);
 	get_messages(data, maxlines, buf);

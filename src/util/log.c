@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,7 +21,15 @@
 #include <locale.h>
 
 #ifndef WIN32
+
+#ifdef SYSTEMD
+#define SD_JOURNAL_SUPPRESS_LOCATION
+#include <systemd/sd-journal.h>
+
+#else
 #include <syslog.h>
+#endif
+
 static int use_syslog = 0;
 #endif
 
@@ -78,22 +86,24 @@ void hub_log_initialize(const char* file, int syslog)
 		return;
 	}
 #endif
-	
+
 #ifndef WIN32
 	if (syslog)
 	{
 		use_syslog = 1;
+                #ifndef SYSTEMD
 		openlog("uhub", LOG_PID, LOG_USER);
+                #endif
 	}
 #endif
 
-	
+
 	if (!file)
 	{
 		logfile = stderr;
 		return;
 	}
-	
+
 	logfile = fopen(file, "a");
 	if (!logfile)
 	{
@@ -127,12 +137,14 @@ void hub_log_shutdown()
 		netdump = NULL;
 	}
 #endif
-	
+
 #ifndef WIN32
 	if (use_syslog)
 	{
 		use_syslog = 0;
+                #ifndef SYSTEMD
 		closelog();
+                #endif
 	}
 #endif
 }
@@ -174,7 +186,7 @@ void hub_log(int log_verbosity, const char *format, ...)
 		return;
 	}
 #endif
-	
+
 	if (log_verbosity < verbosity)
 	{
 		t = time(NULL);
@@ -183,7 +195,7 @@ void hub_log(int log_verbosity, const char *format, ...)
 		va_start(args, format);
 		vsnprintf(logmsg, 1024, format, args);
 		va_end(args);
-		
+
 		if (logfile)
 		{
 			fprintf(logfile, "%s %6s: %s\n", timestamp, prefixes[log_verbosity], logmsg);
@@ -199,34 +211,44 @@ void hub_log(int log_verbosity, const char *format, ...)
 	if (use_syslog)
 	{
 		int level = 0;
-		
+
 		if (verbosity < log_info)
 			return;
-		
+
 		va_start(args, format);
 		vsnprintf(logmsg, 1024, format, args);
 		va_end(args);
-		
+
 		switch (log_verbosity)
 		{
 			case log_fatal:    level = LOG_CRIT; break;
 			case log_error:    level = LOG_ERR; break;
 			case log_warning:  level = LOG_WARNING; break;
-			case log_user:     level = LOG_INFO | LOG_AUTH; break;
+                        #ifdef SYSTEMD
+                        case log_user:     level = LOG_INFO; break;
+
+                        #else
+                        case log_user:     level = LOG_INFO | LOG_AUTH; break;
+                        #endif
 			case log_info:     level = LOG_INFO; break;
 			case log_debug:    level = LOG_DEBUG; break;
-			
+
 			default:
 				level = 0;
 				break;
 		}
-		
+
 		if (level == 0)
 			return;
-		
+
+                #ifdef SYSTEMD
+		sd_journal_print(level, "%s", logmsg);
+
+                #else
 		level |= (LOG_USER | LOG_DAEMON);
 		syslog(level, "%s", logmsg);
+                #endif
 	}
 #endif
-	
+
 }

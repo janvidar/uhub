@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,10 +24,12 @@ struct hub_user_manager
 {
 	size_t count;                   /**<< "Number of all fully connected and logged in users" */
 	size_t count_peak;              /**<< "Peak number of users" */
-	struct sid_pool* sids;
 	uint64_t shared_size;           /**<< "The total number of shared bytes among fully connected users." */
 	uint64_t shared_files;          /**<< "The total number of shared files among fully connected users." */
+	struct sid_pool* sids;          /**<< "Maps SIDs to users (constant time)" */
 	struct linked_list* list;       /**<< "Contains all logged in users" */
+	struct rb_tree* nickmap;        /**<< "Maps nicknames to users (red black tree)" */
+	struct rb_tree* cidmap;         /**<< "Maps CIDs to users (red black tree)" */
 };
 
 /**
@@ -77,7 +79,7 @@ extern sid_t uman_get_free_sid(struct hub_user_manager* users, struct hub_user* 
  *
  * NOTE: This function will only search connected users, which means
  * that SIDs assigned to users who are not yet completely logged in,
- * or are in the process of being disconnected will result in this 
+ * or are in the process of being disconnected will result in this
  * function returning NULL even though the sid is not freely available.
  *
  * FIXME: Is that really safe / sensible ?

@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2012, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -449,7 +449,7 @@ int net_is_ipv6_supported()
 				is_ipv6_supported = 0;
 				return 0;
 			}
-			
+
 			net_error_out(ret, "net_is_ipv6_supported");
 		}
 		else
@@ -508,7 +508,7 @@ const char* net_address_to_string(int af, const void* src, char* dst, socklen_t 
 	size_t size;
 	LPSOCKADDR addr;
 	DWORD len = cnt;
-	
+
 	switch (af)
 	{
 		case AF_INET:
@@ -531,7 +531,7 @@ const char* net_address_to_string(int af, const void* src, char* dst, socklen_t 
 		default:
 			return NULL;
 	}
-	
+
 	if (WSAAddressToStringA(addr, size, NULL, dst, &len) == 0)
 	{
 		return dst;
@@ -602,15 +602,15 @@ const char* net_get_peer_address(int fd)
 	struct sockaddr_in*  name4;
 	struct sockaddr*     name;
 	socklen_t namelen;
-	
+
 	memset(address, 0, INET6_ADDRSTRLEN);
 	namelen = sizeof(struct sockaddr_storage);
 	memset(&storage, 0, namelen);
-	
+
 	name6 = (struct sockaddr_in6*) &storage;
 	name4 = (struct sockaddr_in*)  &storage;
 	name  = (struct sockaddr*)     &storage;
-	
+
 	if (getpeername(fd, (struct sockaddr*) name, &namelen) != -1)
 	{
 		int af = storage.ss_family;

@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,20 +26,20 @@
 static int check_cmd_bool(const char* cmd, struct linked_list* list, char* line, int line_count)
 {
 	char* data;
-	
+
 	if (!strncmp(line, cmd, strlen(cmd)))
 	{
 		data = &line[strlen(cmd)];
 		data[0] = '\0';
 		data++;
-		
+
 		data = strip_white_space(data);
 		if (!*data)
 		{
 			LOG_FATAL("ACL parse error on line %d", line_count);
 			return -1;
 		}
-		
+
 		list_append(list, hub_strdup(data));
 		LOG_DEBUG("ACL: Deny access for: '%s' (%s)", data, cmd);
 		return 1;
@@ -190,18 +190,18 @@ int acl_initialize(struct hub_config* config, struct acl_handle* handle)
 {
 	int ret;
 	memset(handle, 0, sizeof(struct acl_handle));
-	
+
 	handle->users        = list_create();
 	handle->users_denied = list_create();
 	handle->users_banned = list_create();
 	handle->cids         = list_create();
 	handle->networks     = list_create();
 	handle->nat_override = list_create();
-	
+
 	if (!handle->users || !handle->cids || !handle->networks || !handle->users_denied || !handle->users_banned || !handle->nat_override)
 	{
 		LOG_FATAL("acl_initialize: Out of memory");
-		
+
 		list_destroy(handle->users);
 		list_destroy(handle->users_denied);
 		list_destroy(handle->users_banned);
@@ -210,11 +210,11 @@ int acl_initialize(struct hub_config* config, struct acl_handle* handle)
 		list_destroy(handle->nat_override);
 		return -1;
 	}
-	
+
 	if (config)
 	{
 		if (!*config->file_acl) return 0;
-		
+
 		ret = file_read_lines(config->file_acl, handle, &acl_parse_line);
 		if (ret == -1)
 			return -1;
@@ -249,26 +249,26 @@ int acl_shutdown(struct acl_handle* handle)
 		list_clear(handle->users, &acl_free_access_info);
 		list_destroy(handle->users);
 	}
-	
+
 	if (handle->users_denied)
 	{
 		list_clear(handle->users_denied, &hub_free);
 		list_destroy(handle->users_denied);
 	}
-	
+
 	if (handle->users_banned)
 	{
 		list_clear(handle->users_banned, &hub_free);
 		list_destroy(handle->users_banned);
 	}
-	
-	
+
+
 	if (handle->cids)
 	{
 		list_clear(handle->cids, &hub_free);
 		list_destroy(handle->cids);
 	}
-	
+
 	if (handle->networks)
 	{
 		list_clear(handle->networks, &acl_free_ip_info);
@@ -330,13 +330,11 @@ struct auth_info* acl_get_access_info(struct hub_info* hub, const char* name)
 }
 
 #define STR_LIST_CONTAINS(LIST, STR) \
-		str = (char*) list_get_first(LIST); \
-		while (str) \
+		LIST_FOREACH(char*, str, LIST, \
 		{ \
 			if (strcasecmp(str, STR) == 0) \
 				return 1; \
-			str = (char*) list_get_next(LIST); \
-		} \
+		}); \
 		return 0
 
 int acl_is_cid_banned(struct acl_handle* handle, const char* data)
@@ -400,34 +398,28 @@ int acl_user_unban_cid(struct acl_handle* handle, const char* cid)
 int acl_is_ip_banned(struct acl_handle* handle, const char* ip_address)
 {
 	struct ip_addr_encap raw;
-	struct ip_range* info = (struct ip_range*) list_get_first(handle->networks);
+	struct ip_range* info;
+
 	ip_convert_to_binary(ip_address, &raw);
-	
-	while (info)
+	LIST_FOREACH(struct ip_range*, info, handle->networks,
 	{
 		if (ip_in_range(&raw, info))
-		{
 			return 1;
-		}
-		info = (struct ip_range*) list_get_next(handle->networks);
-	}
+	});
 	return 0;
 }
 
 int acl_is_ip_nat_override(struct acl_handle* handle, const char* ip_address)
 {
 	struct ip_addr_encap raw;
-	struct ip_range* info = (struct ip_range*) list_get_first(handle->nat_override);
+	struct ip_range* info;
+
 	ip_convert_to_binary(ip_address, &raw);
-	
-	while (info)
+	LIST_FOREACH(struct ip_range*, info, handle->nat_override,
 	{
 		if (ip_in_range(&raw, info))
-		{
 			return 1;
-		}
-		info = (struct ip_range*) list_get_next(handle->nat_override);
-	}
+	});
 	return 0;
 }
 
@@ -476,10 +468,10 @@ int acl_password_verify(struct hub_info* hub, struct hub_user* user, const char*
 	base32_decode(challenge, (unsigned char*) raw_challenge, MAX_CID_LEN);
 
 	password_len = strlen(access->password);
-	
+
 	memcpy(&buf[0], access->password, password_len);
 	memcpy(&buf[password_len], raw_challenge, TIGERSIZE);
-	
+
 	tiger((uint64_t*) buf, TIGERSIZE+password_len, (uint64_t*) tiger_res);
 	base32_encode((unsigned char*) tiger_res, TIGERSIZE, password_calc);
 	password_calc[MAX_CID_LEN] = 0;

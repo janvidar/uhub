@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -76,7 +76,7 @@ static int config_parse_line(char* line, int line_count, void* ptr_data)
 	struct hub_config* config = (struct hub_config*) ptr_data;
 
 	strip_off_ini_line_comments(line, line_count);
-	
+
 	if (!*line) return 0;
 
 	LOG_DUMP("config_parse_line(): '%s'", line);

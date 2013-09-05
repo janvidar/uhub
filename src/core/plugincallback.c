@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2011, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -40,14 +40,11 @@ static int plugin_command_dispatch(struct command_base* cbase, struct hub_user* 
 
 	LOG_PLUGIN("plugin_command_dispatch: cmd=%s", cmd->prefix);
 
-	cmdh = (struct plugin_command_handle*) list_get_first(data->commands);
-	while (cmdh)
+	LIST_FOREACH(struct plugin_command_handle*, cmdh, data->commands,
 	{
 		if (strcmp(cmdh->prefix, cmd->prefix) == 0)
 			return cmdh->handler(plugin, puser, pcommand);
-
-		cmdh = (struct plugin_command_handle*) list_get_next(data->commands);
-	}
+	});
 	return 0;
 }
 
@@ -104,7 +101,6 @@ static int cbfunc_command_add(struct plugin_handle* plugin, struct plugin_comman
 	cmdh->internal_handle = command;
 	list_append(data->commands, cmdh);
 	command_add(plugin_get_hub(plugin)->commands, command, (void*) plugin);
-	printf("*** Add plugin command: %s (%p, %p)\n", command->prefix, command, cmdh);
 	return 0;
 }
 
@@ -113,7 +109,6 @@ static int cbfunc_command_del(struct plugin_handle* plugin, struct plugin_comman
 	struct plugin_callback_data* data = get_callback_data(plugin);
 	struct command_handle* command = (struct command_handle*) cmdh->internal_handle;
 
-	printf("*** Del plugin command: %s (%p, %p)\n", command->prefix, command, cmdh);
 	list_remove(data->commands, cmdh);
 	command_del(plugin_get_hub(plugin)->commands, command);
 	hub_free(command);
@@ -158,7 +153,7 @@ static void cbfunc_set_hub_name(struct plugin_handle* plugin, const char* str)
 	char* new_str = adc_msg_escape(str ? str : hub->config->hub_name);
 
 	adc_msg_replace_named_argument(hub->command_info, ADC_INF_FLAG_NICK, new_str);
-		
+
 	// Broadcast hub name
 	command = adc_msg_construct(ADC_CMD_IINF, (strlen(new_str) + 8));
 	adc_msg_add_named_argument(command, ADC_INF_FLAG_NICK, new_str);
@@ -175,7 +170,7 @@ static void cbfunc_set_hub_description(struct plugin_handle* plugin, const char*
 	char* new_str = adc_msg_escape(str ? str : hub->config->hub_description);
 
 	adc_msg_replace_named_argument(hub->command_info, ADC_INF_FLAG_DESCRIPTION, new_str);
-		
+
 	// Broadcast hub description
 	command = adc_msg_construct(ADC_CMD_IINF, (strlen(new_str) + 8));
 	adc_msg_add_named_argument(command, ADC_INF_FLAG_DESCRIPTION, new_str);

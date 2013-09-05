@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,10 +25,10 @@ int ip_is_valid_ipv4(const char* address)
 	int o = 0; /* octet number */
 	int n = 0; /* numbers after each dot */
 	int d = 0; /* dots */
-	
+
 	if (!address || strlen(address) > 15 || strlen(address) < 7)
 		return 0;
-	
+
 	for (; i < strlen(address); i++)
 	{
 		if (is_num(address[i]))
@@ -49,9 +49,9 @@ int ip_is_valid_ipv4(const char* address)
 			return 0;
 		}
 	}
-	
+
 	if (n == 0 || n > 3 || o > 255 || d != 3) return 0;
-	
+
 	return 1;
 }
 
@@ -107,9 +107,9 @@ int ip_convert_address(const char* text_address, int port, struct sockaddr* addr
 	struct sockaddr_in addr4;
 	size_t sockaddr_size;
 	const char* taddr = 0;
-	
+
 	int ipv6sup = net_is_ipv6_supported();
-	
+
 	if (strcmp(text_address, "any") == 0)
 	{
 		if (ipv6sup)
@@ -136,8 +136,8 @@ int ip_convert_address(const char* text_address, int port, struct sockaddr* addr
 	{
 		taddr = text_address;
 	}
-	
-	
+
+
 	if (ip_is_valid_ipv6(taddr) && ipv6sup)
 	{
 		sockaddr_size = sizeof(struct sockaddr_in6);
@@ -152,7 +152,7 @@ int ip_convert_address(const char* text_address, int port, struct sockaddr* addr
 
 		memcpy(addr, &addr6, sockaddr_size);
 		*addr_len = sockaddr_size;
-	
+
 	}
 	else if (ip_is_valid_ipv4(taddr))
 	{
@@ -185,28 +185,28 @@ int ip_mask_create_left(int af, int bits, struct ip_addr_encap* result)
 
 	memset(result, 0, sizeof(struct ip_addr_encap));
 	result->af = af;
-	
+
 	if (bits < 0) bits = 0;
-	
+
 	if (af == AF_INET)
 	{
 		if (bits > 32) bits = 32;
 		mask = (0xffffffff << (32 - bits));
 		if (bits == 0) mask = 0;
-		
+
 		result->internal_ip_data.in.s_addr = (((uint8_t*) &mask)[0] << 24) | (((uint8_t*) &mask)[1] << 16) | (((uint8_t*) &mask)[2] << 8) | (((uint8_t*) &mask)[3] << 0);
 	}
 	else if (af == AF_INET6)
 	{
 		if (bits > 128) bits = 128;
-		
+
 		fill = (128-bits) / 8;
 		remain_bits = (128-bits) % 8;
 		mask = (0xff << (8 - remain_bits));
 
 		for (n = 0; n < fill; n++)
 			((uint8_t*) &result->internal_ip_data.in6)[n] = (uint8_t) 0xff;
-		
+
 		if (fill < 16)
 			((uint8_t*) &result->internal_ip_data.in6)[fill] = (uint8_t) mask;
 	}
@@ -233,32 +233,32 @@ int ip_mask_create_right(int af, int bits, struct ip_addr_encap* result)
 
 	memset(result, 0, sizeof(struct ip_addr_encap));
 	result->af = af;
-	
+
 	if (bits < 0) bits = 0;
-	
+
 	if (af == AF_INET)
 	{
 		if (bits > 32) bits = 32;
 		mask = (0xffffffff >> (32-bits));
 		if (bits == 0) mask = 0;
 		result->internal_ip_data.in.s_addr = (((uint8_t*) &mask)[0] << 24) | (((uint8_t*) &mask)[1] << 16) | (((uint8_t*) &mask)[2] << 8) | (((uint8_t*) &mask)[3] << 0);
-	
+
 	}
 	else if (af == AF_INET6)
 	{
 		if (bits > 128) bits = 128;
-		
+
 		fill = (128-bits) / 8;
 		remain_bits = (128-bits) % 8;
 		mask8 = (0xff >> (8 - remain_bits));
 		start = 16-fill;
-		
+
 		for (n = 0; n < start; n++)
 			((uint8_t*) &result->internal_ip_data.in6)[n] = (uint8_t) 0x00;
-		
+
 		for (n = start; n < 16; n++)
 			((uint8_t*) &result->internal_ip_data.in6)[n] = (uint8_t) 0xff;
-		
+
 		if (start > 0)
 			((uint8_t*) &result->internal_ip_data.in6)[start-1] = (uint8_t) mask8;
 	}
@@ -266,13 +266,13 @@ int ip_mask_create_right(int af, int bits, struct ip_addr_encap* result)
 	{
 		return -1;
 	}
-	
+
 #ifdef IP_CALC_DEBUG
 	char* r_str = hub_strdup(ip_convert_to_string(result));
 	LOG_DUMP("Created right mask: %s", r_str);
 	hub_free(r_str);
 #endif
-	
+
 	return 0;
 }
 
@@ -281,7 +281,7 @@ void ip_mask_apply_AND(struct ip_addr_encap* addr, struct ip_addr_encap* mask, s
 {
 	memset(result, 0, sizeof(struct ip_addr_encap));
 	result->af = addr->af;
-	
+
 	if (addr->af == AF_INET)
 	{
 		result->internal_ip_data.in.s_addr = addr->internal_ip_data.in.s_addr & mask->internal_ip_data.in.s_addr;
@@ -294,19 +294,19 @@ void ip_mask_apply_AND(struct ip_addr_encap* addr, struct ip_addr_encap* mask, s
 		for (n = 0; n < 4; n++)
 		{
 			offset = n * 4;
-	
+
 			A =	(((uint8_t*) &addr->internal_ip_data.in6)[offset+0] << 24) |
 				(((uint8_t*) &addr->internal_ip_data.in6)[offset+1] << 16) |
 				(((uint8_t*) &addr->internal_ip_data.in6)[offset+2] <<  8) |
 				(((uint8_t*) &addr->internal_ip_data.in6)[offset+3] <<  0);
-				
+
 			B =	(((uint8_t*) &mask->internal_ip_data.in6)[offset+0] << 24) |
 				(((uint8_t*) &mask->internal_ip_data.in6)[offset+1] << 16) |
 				(((uint8_t*) &mask->internal_ip_data.in6)[offset+2] <<  8) |
 				(((uint8_t*) &mask->internal_ip_data.in6)[offset+3] <<  0);
-			
+
 			C = A & B;
-			
+
 			D =	(((uint8_t*) &C)[0] << 24) |
 				(((uint8_t*) &C)[1] << 16) |
 				(((uint8_t*) &C)[2] <<  8) |
@@ -321,7 +321,7 @@ void ip_mask_apply_OR(struct ip_addr_encap* addr, struct ip_addr_encap* mask, st
 {
 	memset(result, 0, sizeof(struct ip_addr_encap));
 	result->af = addr->af;
-	
+
 	if (addr->af == AF_INET)
 	{
 		result->internal_ip_data.in.s_addr = addr->internal_ip_data.in.s_addr | mask->internal_ip_data.in.s_addr;
@@ -334,19 +334,19 @@ void ip_mask_apply_OR(struct ip_addr_encap* addr, struct ip_addr_encap* mask, st
 		for (n = 0; n < 4; n++)
 		{
 			offset = n * 4;
-	
+
 			A =	(((uint8_t*) &addr->internal_ip_data.in6)[offset+0] << 24) |
 				(((uint8_t*) &addr->internal_ip_data.in6)[offset+1] << 16) |
 				(((uint8_t*) &addr->internal_ip_data.in6)[offset+2] <<  8) |
 				(((uint8_t*) &addr->internal_ip_data.in6)[offset+3] <<  0);
-				
+
 			B =	(((uint8_t*) &mask->internal_ip_data.in6)[offset+0] << 24) |
 				(((uint8_t*) &mask->internal_ip_data.in6)[offset+1] << 16) |
 				(((uint8_t*) &mask->internal_ip_data.in6)[offset+2] <<  8) |
 				(((uint8_t*) &mask->internal_ip_data.in6)[offset+3] <<  0);
-			
+
 			C = A | B;
-			
+
 			D =	(((uint8_t*) &C)[0] << 24) |
 				(((uint8_t*) &C)[1] << 16) |
 				(((uint8_t*) &C)[2] <<  8) |
@@ -368,7 +368,7 @@ int ip_compare(struct ip_addr_encap* a, struct ip_addr_encap* b)
 			(((uint8_t*) &a->internal_ip_data.in.s_addr)[1] << 16) |
 			(((uint8_t*) &a->internal_ip_data.in.s_addr)[2] <<  8) |
 			(((uint8_t*) &a->internal_ip_data.in.s_addr)[3] <<  0);
-			
+
 		B =	(((uint8_t*) &b->internal_ip_data.in.s_addr)[0] << 24) |
 			(((uint8_t*) &b->internal_ip_data.in.s_addr)[1] << 16) |
 			(((uint8_t*) &b->internal_ip_data.in.s_addr)[2] <<  8) |
@@ -386,19 +386,19 @@ int ip_compare(struct ip_addr_encap* a, struct ip_addr_encap* b)
 				(((uint8_t*) &a->internal_ip_data.in6)[offset+1] << 16) |
 				(((uint8_t*) &a->internal_ip_data.in6)[offset+2] <<  8) |
 				(((uint8_t*) &a->internal_ip_data.in6)[offset+3] <<  0);
-				
+
 			B =	(((uint8_t*) &b->internal_ip_data.in6)[offset+0] << 24) |
 				(((uint8_t*) &b->internal_ip_data.in6)[offset+1] << 16) |
 				(((uint8_t*) &b->internal_ip_data.in6)[offset+2] <<  8) |
 				(((uint8_t*) &b->internal_ip_data.in6)[offset+3] <<  0);
-						 
+
 			if (A == B) continue;
-			
+
 			return A - B;
 		}
 		return 0;
 	}
-	
+
 #ifdef IP_CALC_DEBUG
 	char* a_str = hub_strdup(ip_convert_to_string(a));
 	char* b_str = hub_strdup(ip_convert_to_string(b));
@@ -406,7 +406,7 @@ int ip_compare(struct ip_addr_encap* a, struct ip_addr_encap* b)
 	hub_free(a_str);
 	hub_free(b_str);
 #endif
-	
+
 	return ret;
 }
 

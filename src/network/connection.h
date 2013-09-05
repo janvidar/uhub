@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2012, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -34,10 +34,41 @@ struct net_connection
 	NET_CON_STRUCT_COMMON
 };
 
+struct net_connect_handle;
+
+enum net_connect_status
+{
+	net_connect_status_ok = 0,
+	net_connect_status_host_not_found = -1,
+	net_connect_status_no_address = -2,
+	net_connect_status_dns_error = -3,
+	net_connect_status_refused = -4,
+	net_connect_status_unreachable = -5,
+	net_connect_status_timeout = -6,
+	net_connect_status_socket_error = -7,
+};
+
+typedef void (*net_connect_cb)(struct net_connect_handle*, enum net_connect_status status, struct net_connection* con, void* ptr);
+
 extern int   net_con_get_sd(struct net_connection* con);
 extern void* net_con_get_ptr(struct net_connection* con);
 
 extern struct net_connection* net_con_create();
+
+/**
+ * Establish an outbound TCP connection.
+ * This will resolve the IP-addresses, and connect to
+ * either an IPv4 or IPv6 address depending if it is supported,
+ * and using the happy eyeballs algorithm.
+ *
+ * @param address Hostname, IPv4 or IPv6 address
+ * @param port TCP port number
+ * @param callback A callback to be called once the connection is established, or failed.
+ * @returns a handle to the connection establishment job, or NULL if an immediate error.
+ */
+extern struct net_connect_handle* net_con_connect(const char* address, uint16_t port, net_connect_cb callback, void* ptr);
+extern void net_connect_destroy(struct net_connect_handle* handle);
+
 extern void net_con_destroy(struct net_connection*);
 extern void net_con_initialize(struct net_connection* con, int sd, net_connection_cb callback, const void* ptr, int events);
 extern void net_con_reinitialize(struct net_connection* con, net_connection_cb callback, const void* ptr, int events);

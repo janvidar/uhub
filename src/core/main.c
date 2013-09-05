@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2011, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,6 +18,10 @@
  */
 
 #include "uhub.h"
+
+#ifdef SYSTEMD
+#include <systemd/sd-daemon.h>
+#endif
 
 static int arg_verbose = 5;
 static int arg_fork    = 0;
@@ -83,7 +87,7 @@ void setup_signal_handlers(struct hub_info* hub)
 	act.sa_mask = sig_set;
 	act.sa_flags = SA_ONSTACK | SA_RESTART;
 	act.sa_handler = hub_handle_signal;
-	
+
 	for (i = 0; signals[i]; i++)
 	{
 		if (sigaction(signals[i], &act, 0) != 0)
@@ -120,7 +124,7 @@ int main_loop()
 			hub_log_initialize(arg_log, arg_log_syslog);
 			hub_set_log_verbosity(arg_verbose);
 		}
-	
+
 		if (read_config(arg_config, &configuration, !arg_have_config) == -1)
 			return -1;
 
@@ -145,7 +149,16 @@ int main_loop()
 			}
 #if !defined(WIN32)
 			setup_signal_handlers(hub);
-#endif
+#ifdef SYSTEMD
+                        /* Notify the service manager that this daemon has
+                         * been successfully initalized and shall enter the
+                         * main loop.
+                         */
+                        sd_notifyf(0, "READY=1\n"
+                                      "MAINPID=%lu", (unsigned long) getpid());
+#endif /* SYSTEMD */
+
+#endif /* ! WIN32 */
 		}
 
 		hub_set_variables(hub, &acl);
@@ -161,7 +174,7 @@ int main_loop()
 #if !defined(WIN32)
 	shutdown_signal_handlers(hub);
 #endif
-	
+
 	if (hub)
 	{
 		hub_shutdown_service(hub);
@@ -216,13 +229,17 @@ void print_usage(char* program)
 		"   -q          Quiet mode - no output\n"
 		"   -f          Fork to background\n"
 		"   -l <file>   Log messages to given file (default: stderr)\n"
-		"   -L          Log messages to syslog\n"
 		"   -c <file>   Specify configuration file (default: " SERVER_CONFIG ")\n"
 		"   -C          Check configuration and return\n"
 		"   -s          Show configuration parameters\n"
 		"   -S          Show configuration parameters, but ignore defaults\n"
 		"   -h          This message\n"
 #ifndef WIN32
+#ifdef SYSTEMD
+		"   -L          Log messages to journal\n"
+#else
+		"   -L          Log messages to syslog\n"
+#endif
 		"   -u <user>   Run as given user\n"
 		"   -g <group>  Run with given group permissions\n"
 		"   -p <file>   Store pid in file (process id)\n"
@@ -271,7 +288,7 @@ void parse_command_line(int argc, char** argv)
 				arg_dump_config = 1;
 				arg_check_config = 1;
 				break;
-				
+
 			case 'S':
 				arg_dump_config = 2;
 				arg_check_config = 1;
@@ -280,7 +297,7 @@ void parse_command_line(int argc, char** argv)
 			case 'l':
 				arg_log = optarg;
 				break;
-				
+
 			case 'L':
 				arg_log_syslog = 1;
 				break;

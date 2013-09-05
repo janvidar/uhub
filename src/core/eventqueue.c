@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -32,20 +32,20 @@ int event_queue_initialize(struct event_queue** queue, event_queue_callback call
 	*queue = (struct event_queue*) hub_malloc_zero(sizeof(struct event_queue));
 	if (!(*queue))
 		return -1;
-	
+
 	(*queue)->q1 = list_create();
 	(*queue)->q2 = list_create();
-	
+
 	if (!(*queue)->q1 || !(*queue)->q2)
 	{
 		list_destroy((*queue)->q1);
 		list_destroy((*queue)->q2);
 		return -1;
 	}
-	
+
 	(*queue)->callback = callback;
 	(*queue)->callback_data = ptr;
-	
+
 	return 0;
 }
 
@@ -73,35 +73,27 @@ int event_queue_process(struct event_queue* queue)
 	struct event_data* data;
 	if (queue->locked)
 		return 0;
-	
+
 	/* lock primary queue, and handle the primary queue messages. */
 	queue->locked = 1;
-	
-	data = (struct event_data*) list_get_first(queue->q1);
-	while (data)
+
+	LIST_FOREACH(struct event_data*, data, queue->q1,
 	{
 #ifdef EQ_DEBUG
 		eq_debug("EXEC", data);
 #endif
 		queue->callback(queue->callback_data, data);
-		data = (struct event_data*) list_get_next(queue->q1);
-	}
-	
+	});
+
 	list_clear(queue->q1, event_queue_cleanup_callback);
 	uhub_assert(list_size(queue->q1) == 0);
-		
+
 	/* unlock queue */
 	queue->locked = 0;
-	
+
 	/* transfer from secondary queue to the primary queue. */
-	data = (struct event_data*) list_get_first(queue->q2);
-	while (data)
-	{
-		list_remove(queue->q2, data);
-		list_append(queue->q1, data);
-		data = (struct event_data*) list_get_first(queue->q2);
-	}
-	
+	list_append_list(queue->q1, queue->q2);
+
 	/* if more events exist, schedule it */
 	if (list_size(queue->q1))
 	{
@@ -114,18 +106,18 @@ void event_queue_post(struct event_queue* queue, struct event_data* message)
 {
 	struct linked_list* q = (!queue->locked) ? queue->q1 : queue->q2;
 	struct event_data* data;
-	
+
 	data = (struct event_data*) hub_malloc(sizeof(struct event_data));
 	if (data)
 	{
 		data->id    = message->id;
 		data->ptr   = message->ptr;
 		data->flags = message->flags;
-		
+
 #ifdef EQ_DEBUG
 		eq_debug("POST", data);
 #endif
-		
+
 		list_append(q, data);
 	}
 	else

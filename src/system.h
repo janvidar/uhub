@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2012, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -125,6 +125,10 @@
 #define USE_KQUEUE
 #include <sys/event.h>
 */
+#endif
+
+#ifdef __GNU__
+#define POSIX_THREAD_SUPPORT
 #endif
 
 #define USE_SELECT

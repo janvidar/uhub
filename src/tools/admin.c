@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2011, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -65,17 +65,14 @@ static void on_message(struct ADC_chat_message* chat)
 	lines = list_create();
 	ret = split_string(chat->message, "\n", lines, 1);
 
-	line = (char*) list_get_first(lines);
-
 	ret = 0;
-	while (line)
+	LIST_FOREACH(char*, line, lines,
 	{
 		if (ret > 0)
 			printf("    ");
 		printf("%s\n", line);
 		ret++;
-		line = (char*) list_get_next(lines);
-	}
+	});
 
 	list_clear(lines, &hub_free);
 	list_destroy(lines);
@@ -135,7 +132,7 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 			break;
 
 		case ADC_CLIENT_USER_JOIN:
-			
+
 			user_add(data->user);
 			break;
 

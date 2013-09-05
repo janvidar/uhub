@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2012, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -73,7 +73,7 @@ int net_ssl_library_shutdown()
         ERR_free_strings();
 	EVP_cleanup();
         CRYPTO_cleanup_all_ex_data();
-	
+
 	// sk_SSL_COMP_free(SSL_COMP_get_compression_methods());
 	return 1;
 }

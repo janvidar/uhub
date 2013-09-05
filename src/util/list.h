@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,6 +43,13 @@ extern void list_clear(struct linked_list*, void (*free_handle)(void* ptr) );
 extern void list_append(struct linked_list* list, void* data_ptr);
 
 /**
+ * A special list append that moves all nodes from other_list to list.
+ * The other list will be empty.
+ */
+extern void list_append_list(struct linked_list* list, struct linked_list* other);
+
+
+/**
  * Remove data_ptr from the list. If multiple versions occur, only the first one is removed.
  */
 extern void list_remove(struct linked_list* list, void* data_ptr);
@@ -56,6 +63,16 @@ extern void* list_get_prev(struct linked_list*);
 
 extern struct node* list_get_first_node(struct linked_list*);
 extern struct node* list_get_last_node(struct linked_list*);
+
+/**
+ * Remove the first element, and call the free_handle function (if not NULL)
+ * to ensure the data is freed also.
+ */
+extern void list_remove_first(struct linked_list* list, void (*free_handle)(void* ptr));
+
+#define LIST_FOREACH(TYPE, ITEM, LIST, BLOCK) \
+		for (ITEM = (TYPE) list_get_first(LIST); ITEM; ITEM = (TYPE) list_get_next(LIST)) \
+			BLOCK
 
 #endif /* HAVE_UHUB_LINKED_LIST_H */
 

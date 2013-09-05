@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@ int route_message(struct hub_info* hub, struct hub_user* u, struct adc_message* 
 		case 'B': /* Broadcast to all logged in clients */
 			route_to_all(hub, msg);
 			break;
-			
+
 		case 'D':
 			target = uman_get_user_by_sid(hub->users, msg->target);
 			if (target)
@@ -36,7 +36,7 @@ int route_message(struct hub_info* hub, struct hub_user* u, struct adc_message* 
 				route_to_user(hub, target, msg);
 			}
 			break;
-			
+
 		case 'E':
 			target = uman_get_user_by_sid(hub->users, msg->target);
 			if (target)
@@ -45,11 +45,11 @@ int route_message(struct hub_info* hub, struct hub_user* u, struct adc_message* 
 				route_to_user(hub, u, msg);
 			}
 			break;
-			
+
 		case 'F':
 			route_to_subscribers(hub, msg);
-			break;	
-		
+			break;
+
 		default:
 			/* Ignore the message */
 			break;
@@ -139,12 +139,11 @@ int route_flush_pipeline(struct hub_info* hub, struct hub_user* u)
 
 int route_to_all(struct hub_info* hub, struct adc_message* command) /* iterate users */
 {
-	struct hub_user* user = (struct hub_user*) list_get_first(hub->users->list);
-	while (user)
+	struct hub_user* user;
+	LIST_FOREACH(struct hub_user*, user, hub->users->list,
 	{
 		route_to_user(hub, user, command);
-		user = (struct hub_user*) list_get_next(hub->users->list);
-	}
+	});
 
 	return 0;
 }
@@ -153,49 +152,40 @@ int route_to_subscribers(struct hub_info* hub, struct adc_message* command) /* i
 {
 	int do_send;
 	char* tmp;
-	
-	struct hub_user* user = (struct hub_user*) list_get_first(hub->users->list);
-	while (user)
+
+	struct hub_user* user;
+	LIST_FOREACH(struct hub_user*, user, hub->users->list,
 	{
 		if (user->feature_cast)
 		{
 			do_send = 1;
-			
-			tmp = list_get_first(command->feature_cast_include);
-			while (tmp)
+
+			LIST_FOREACH(char*, tmp, command->feature_cast_include,
 			{
 				if (!user_have_feature_cast_support(user, tmp))
 				{
 					do_send = 0;
 					break;
 				}
-				tmp = list_get_next(command->feature_cast_include);;
-			}
-			
-			if (!do_send) {
-				user = (struct hub_user*) list_get_next(hub->users->list);
+			});
+
+			if (!do_send)
 				continue;
-			}
-			
-			tmp = list_get_first(command->feature_cast_exclude);
-			while (tmp)
+
+			LIST_FOREACH(char*, tmp, command->feature_cast_exclude,
 			{
 				if (user_have_feature_cast_support(user, tmp))
 				{
 					do_send = 0;
 					break;
 				}
-				tmp = list_get_next(command->feature_cast_exclude);
-			}
-			
+			});
+
 			if (do_send)
-			{
 				route_to_user(hub, user, command);
-			}
 		}
-		user = (struct hub_user*) list_get_next(hub->users->list);
-	}
-	
+	});
+
 	return 0;
 }
 
@@ -210,20 +200,17 @@ int route_info_message(struct hub_info* hub, struct hub_user* u)
 		struct adc_message* cmd = adc_msg_copy(u->info);
 		const char* address = user_get_address(u);
 		struct hub_user* user = 0;
-		
+
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
 		adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR, address);
-	
-		user = (struct hub_user*) list_get_first(hub->users->list);
-		while (user)
+
+		LIST_FOREACH(struct hub_user*, user, hub->users->list,
 		{
 			if (user_is_nat_override(user))
 				route_to_user(hub, user, cmd);
 			else
 				route_to_user(hub, user, u->info);
-			
-			user = (struct hub_user*) list_get_next(hub->users->list);
-		}
+		});
 		adc_msg_free(cmd);
 	}
 	return 0;

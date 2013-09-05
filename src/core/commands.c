@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2012, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -98,14 +98,14 @@ struct command_handle* command_handler_lookup(struct command_base* cbase, const 
 	struct command_handle* handler = NULL;
 	size_t prefix_len = strlen(prefix);
 
-	for (handler = (struct command_handle*) list_get_first(cbase->handlers); handler; handler = (struct command_handle*) list_get_next(cbase->handlers))
+	LIST_FOREACH(struct command_handle*, handler, cbase->handlers,
 	{
 		if (prefix_len != handler->length)
 			continue;
 
 		if (!memcmp(prefix, handler->prefix, handler->length))
 			return handler;
-	}
+	});
 	return NULL;
 }
 
@@ -292,7 +292,7 @@ static int command_help(struct command_base* cbase, struct hub_user* user, struc
 	{
 		cbuf_append(buf, "Available commands:\n");
 
-		for (command = (struct command_handle*) list_get_first(cbase->handlers); command; command = (struct command_handle*) list_get_next(cbase->handlers))
+		LIST_FOREACH(struct command_handle*, command, cbase->handlers,
 		{
 			if (command_is_available(command, user->credentials))
 			{
@@ -301,7 +301,7 @@ static int command_help(struct command_base* cbase, struct hub_user* user, struc
 					cbuf_append(buf, " ");
 				cbuf_append_format(buf, " - %s\n", command->description);
 			}
-		}
+		});
 	}
 	else
 	{
@@ -432,12 +432,10 @@ static int command_whoip(struct command_base* cbase, struct hub_user* user, stru
 	buf = cbuf_create(128 + ((MAX_NICK_LEN + INET6_ADDRSTRLEN + 5) * ret));
 	cbuf_append_format(buf, "*** %s: Found %d match%s:\n", cmd->prefix, ret, ((ret != 1) ? "es" : ""));
 
-	u = (struct hub_user*) list_get_first(users);
-	while (u)
+	LIST_FOREACH(struct hub_user*, u, users,
 	{
 		cbuf_append_format(buf, "%s (%s)\n", u->id.nick, user_get_address(u));
-		u = (struct hub_user*) list_get_next(users);
-	}
+	});
 	cbuf_append(buf, "\n");
 
 	send_message(cbase, user, buf);
@@ -462,8 +460,7 @@ static int command_broadcast(struct command_base* cbase, struct hub_user* user, 
 	memcpy(from_sid, sid_to_string(user->id.sid), sizeof(from_sid));
 	memcpy(pm_flag + 2, from_sid, sizeof(from_sid));
 
-	target = (struct hub_user*) list_get_first(cbase->hub->users->list);
-	while (target)
+	LIST_FOREACH(struct hub_user*, target, cbase->hub->users->list,
 	{
 		if (target != user)
 		{
@@ -480,8 +477,7 @@ static int command_broadcast(struct command_base* cbase, struct hub_user* user, 
 			route_to_user(cbase->hub, target, command);
 			adc_msg_free(command);
 		}
-		target = (struct hub_user*) list_get_next(cbase->hub->users->list);
-	}
+	});
 
 	cbuf_append_format(buf, "*** %s: Delivered to " PRINTF_SIZE_T " user%s", cmd->prefix, recipients, (recipients != 1 ? "s" : ""));
 	send_message(cbase, user, buf);
@@ -513,8 +509,7 @@ static int command_log(struct command_base* cbase, struct hub_user* user, struct
 	command_status(cbase, user, cmd, buf);
 
 	buf = cbuf_create(MAX_HELP_LINE);
-	log = (struct hub_logout_info*) list_get_first(messages);
-	while (log)
+	LIST_FOREACH(struct hub_logout_info*, log, messages,
 	{
 		const char* address = ip_convert_to_string(&log->addr);
 		int show = 0;
@@ -538,8 +533,7 @@ static int command_log(struct command_base* cbase, struct hub_user* user, struct
 			send_message(cbase, user, buf);
 			buf = cbuf_create(MAX_HELP_LINE);
 		}
-		log = (struct hub_logout_info*) list_get_next(messages);
-	}
+	});
 
 	if (search_len)
 	{

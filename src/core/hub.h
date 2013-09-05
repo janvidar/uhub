@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2012, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -55,7 +55,7 @@ enum status_message
 
 	status_msg_proto_no_common_hash      = -50, /* No common hash algorithms */
 	status_msg_proto_obsolete_adc0       = -51, /* Client is using an obsolete protocol version */
-	
+
 
 };
 

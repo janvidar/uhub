@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2009, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -57,7 +57,7 @@ void tiger_compress(uint64_t* str, uint64_t state[3]) {
 	a = state[0];
 	b = state[1];
 	c = state[2];
-	
+
 	x0 = str[0];
 	x1 = str[1];
 	x2 = str[2];
@@ -70,7 +70,7 @@ void tiger_compress(uint64_t* str, uint64_t state[3]) {
 	aa = a;
 	bb = b;
 	cc = c;
-	
+
 	PASS(a, b, c, 5);
 
 	x0 -= x7 ^ 0xA5A5A5A5A5A5A5A5ULL;
@@ -91,7 +91,7 @@ void tiger_compress(uint64_t* str, uint64_t state[3]) {
 	x7 -= x6 ^ 0x0123456789ABCDEFULL;
 
 	PASS(c, a, b, 7);
-		
+
 	x0 -= x7 ^ 0xA5A5A5A5A5A5A5A5ULL;
 	x1 ^= x0;
 	x2 += x1;
@@ -130,9 +130,9 @@ void tiger_compress(uint64_t* str, uint64_t state[3]) {
 		x5 ^= x4;
 		x6 += x5;
 		x7 -= x6 ^ 0x0123456789ABCDEFULL;
-		
+
 		PASS(a, b, c, 9);
-		
+
 		swap = a;
 		a = c;
 		c = b;
@@ -143,7 +143,7 @@ void tiger_compress(uint64_t* str, uint64_t state[3]) {
 	a ^= aa;
 	b -= bb;
 	c += cc;
-	
+
 	state[0] = a;
 	state[1] = b;
 	state[2] = c;
@@ -207,7 +207,7 @@ void tiger(uint64_t* str, uint64_t length, uint64_t res[3]) {
 	}
 
 	for (; j < 56; j++) temp[j] = 0;
-	
+
 	((uint64_t*) (&(temp[56])))[0] = ((uint64_t) length) << 3;
 	tiger_compress(((uint64_t*) temp), res);
 

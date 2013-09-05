@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -73,7 +73,7 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 			}
 #ifdef SSL_SUPPORT
 			else if (bytes >= 11 &&
-				probe_recvbuf[0] == 22 && 
+				probe_recvbuf[0] == 22 &&
 				probe_recvbuf[1] == 3 && /* protocol major version */
 				probe_recvbuf[5] == 1 && /* message type */
 				probe_recvbuf[9] == probe_recvbuf[1])

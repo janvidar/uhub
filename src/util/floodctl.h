@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -36,7 +36,7 @@ void flood_control_reset(struct flood_control*);
  * @param max_count Max count for flood control
  * @param window Time window for max_count to appear.
  * @param now The current time.
- * 
+ *
  * @return 0 if flood no flood detected.
  *         1 if flood detected.
  */

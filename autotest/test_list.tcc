@@ -1,10 +1,16 @@
 #include <uhub.h>
 
 static struct linked_list* list = NULL;
+static struct linked_list* list2 = NULL;
 
 static char A[2] = { 'A', 0 };
 static char B[2] = { 'B', 0 };
 static char C[2] = { 'C', 0 };
+static char A2[2] = { 'a', 0 };
+static char B2[2] = { 'b', 0 };
+static char C2[2] = { 'c', 0 };
+
+
 
 static void null_free(void* ptr)
 {
@@ -122,6 +128,82 @@ EXO_TEST(list_get_last_prev_next_1, {
 EXO_TEST(list_clear, {
 	list_clear(list, &null_free);
 	return list->size == 0 && list->first == 0 && list->last == 0 && list->iterator == 0;
+});
+
+static int g_remove_flag = 0;
+static void null_free_inc_flag(void* ptr)
+{
+	(void) ptr;
+	g_remove_flag++;
+}
+
+EXO_TEST(list_remove_first_1_1,
+{
+	list_append(list, A);
+	list_append(list, B);
+	list_append(list, C);
+	return list->size == 3;
+});
+
+EXO_TEST(list_remove_first_1_2,
+{
+	g_remove_flag = 0;
+	list_remove_first(list, null_free_inc_flag);
+	return list->size == 2 && g_remove_flag == 1;
+});
+
+EXO_TEST(list_remove_first_1_3,
+{
+	list_remove_first(list, NULL);
+	return list->size == 1;
+});
+
+EXO_TEST(list_remove_first_1_4,
+{
+	list_remove_first(list, NULL);
+	return list->size == 0;
+});
+
+
+EXO_TEST(list_remove_first_1_5,
+{
+	list_remove_first(list, NULL);
+	return list->size == 0;
+});
+
+
+EXO_TEST(list_append_list_1,
+{
+	list_append(list, A);
+	list_append(list, B);
+	list_append(list, C);
+	list2 = list_create();
+	list_append(list2, A2);
+	list_append(list2, B2);
+	list_append(list2, C2);
+	return list->size == 3 && list2->size == 3;
+});
+
+EXO_TEST(list_append_list_2,
+{
+	list_append_list(list, list2);
+	return list->size == 6 && list2->size == 0;
+});
+
+EXO_TEST(list_append_list_3,
+{
+	list_destroy(list2);
+	return list_get_index(list, 0) == A &&
+			list_get_index(list, 1) == B &&
+			list_get_index(list, 2) == C &&
+			list_get_index(list, 3) == A2 &&
+			list_get_index(list, 4) == B2 &&
+			list_get_index(list, 5) == C2;
+});
+
+EXO_TEST(list_clear_list_last,
+{
+	list_clear(list, &null_free);
 });
 
 

@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2012, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -72,7 +72,7 @@ size_t ioq_recv_set(struct ioq_recv* q, void* buf, size_t bufsize)
 		q->buf = 0;
 		q->size = 0;
 	}
-	
+
 	if (!bufsize)
 	{
 		return 0;
@@ -130,7 +130,7 @@ void ioq_send_add(struct ioq_send* q, struct adc_message* msg_)
 	q->size += msg->length;
 }
 
-void ioq_send_remove(struct ioq_send* q, struct adc_message* msg)
+static void ioq_send_remove(struct ioq_send* q, struct adc_message* msg)
 {
 #ifdef DEBUG_SENDQ
 	debug_msg("ioq_send_remove", msg);

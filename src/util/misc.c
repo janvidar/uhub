@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2011, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@ static int is_printable(unsigned char c)
 {
 	if (c >= 32)
 		return 1;
-		
+
 	if (c == '\t' || c == '\r' || c == '\n')
 		return 1;
 	return 0;
@@ -59,7 +59,7 @@ char* strip_white_space(char* string)
 	/* Strip appending whitespace */
 	pos = &string[strlen(string)-1];
 	while (&string[0] < &pos[0] && is_white_space(pos[0])) { pos[0] = 0; pos--; }
-	
+
 	return string;
 }
 
@@ -68,9 +68,9 @@ static int is_valid_utf8_str(const char* string, size_t length)
 	int expect = 0;
 	char div = 0;
 	size_t pos = 0;
-	
+
 	if (length == 0) return 1;
-	
+
 	for (pos = 0; pos < length; pos++)
 	{
 		if (expect)
@@ -243,7 +243,7 @@ int file_read_lines(const char* file, void* data, file_line_handler_t handler)
 		LOG_ERROR("Unable to open file %s: %s", file, strerror(errno));
 		return -2;
 	}
-	
+
 	ret = read(fd, buf, MAX_RECV_BUF-1);
 	close(fd);
 
@@ -274,12 +274,12 @@ int uhub_atoi(const char* value) {
 	int val = 0;
 	int i = 0;
 	for (; i < len; i++)
-		if (value[i] > '9' || value[i] < '0') 
+		if (value[i] > '9' || value[i] < '0')
 			offset++;
-			
-	for (i = offset; i< len; i++) 
+
+	for (i = offset; i< len; i++)
 		val = val*10 + (value[i] - '0');
-		
+
 	return value[0] == '-' ? -val : val;
 }
 
@@ -360,7 +360,7 @@ void* memmem(const void *haystack, size_t haystacklen, const void *needle, size_
 	char* c_buf = (char*) haystack;
 	char* c_pat = (char*) needle;
 	char* ptr = memchr(c_buf, c_pat[0], haystacklen);
-	
+
 	while (ptr && ((size_t) (&ptr[0] - &c_buf[0]) < haystacklen))
 	{
 		if (!memcmp(ptr, c_pat, needlelen))
@@ -382,7 +382,7 @@ int split_string(const char* string, const char* split, struct linked_list* list
 	for (;;)
 	{
 		tmp1 = strstr(string, split);
-		
+
 		if (tmp1) tmp2 = hub_strndup(string, tmp1 - string);
 		else      tmp2 = hub_strdup(string);
 

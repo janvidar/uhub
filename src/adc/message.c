@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -168,24 +168,24 @@ int adc_msg_get_arg_offset(struct adc_message* msg)
 {
 	if (!msg || !msg->cache)
 		return -1;
-	
+
 	switch (msg->cache[0])
 	{
 		/* These *SHOULD* never be seen on a hub */
 		case 'U':
 		case 'C':
 			return 4; /* Actually: 4 + strlen(cid). */
-		
+
 		case 'I':
 		case 'H':
 			return 4;
-			
+
 		case 'B':
 			return  9;
-			
+
 		case 'F':
 			return (10 + (list_size(msg->feature_cast_include)*5) + (list_size(msg->feature_cast_exclude)*5));
-			
+
 		case 'D':
 		case 'E':
 			return 14;
@@ -200,10 +200,10 @@ int adc_msg_is_empty(struct adc_message* msg)
 
 	if (offset == -1)
 		return -1;
-	
+
 	if ((msg->length - 1) == (size_t) offset)
 		return 1;
-		
+
 	return 0;
 }
 
@@ -283,23 +283,19 @@ struct adc_message* adc_msg_copy(const struct adc_message* cmd)
 	if (cmd->feature_cast_include)
 	{
 		copy->feature_cast_include = list_create();
-		tmp = list_get_first(cmd->feature_cast_include);
-		while (tmp)
+		LIST_FOREACH(char*, tmp, cmd->feature_cast_include,
 		{
 			list_append(copy->feature_cast_include, hub_strdup(tmp));
-			tmp = list_get_next(cmd->feature_cast_include);
-		}
+		});
 	}
 
 	if (cmd->feature_cast_exclude)
 	{
 		copy->feature_cast_exclude = list_create();
-		tmp = list_get_first(cmd->feature_cast_exclude);
-		while (tmp)
+		LIST_FOREACH(char*, tmp, cmd->feature_cast_exclude,
 		{
 			list_append(copy->feature_cast_exclude, hub_strdup(tmp));
-			tmp = list_get_next(cmd->feature_cast_exclude);
-		}
+		});
 	}
 
 	ADC_MSG_ASSERT(copy);
@@ -311,17 +307,17 @@ struct adc_message* adc_msg_copy(const struct adc_message* cmd)
 struct adc_message* adc_msg_parse_verify(struct hub_user* u, const char* line, size_t length)
 {
 	struct adc_message* command = adc_msg_parse(line, length);
-	
+
 	if (!command)
 		return 0;
-	
+
 	if (command->source && (!u || command->source != u->id.sid))
 	{
 		LOG_DEBUG("Command does not match user's SID (command->source=%d, user->id.sid=%d)", command->source, (u ? u->id.sid : 0));
 		adc_msg_free(command);
 		return 0;
 	}
-	
+
 	return command;
 }
 
@@ -335,7 +331,7 @@ struct adc_message* adc_msg_parse(const char* line, size_t length)
 	int ok = 1;
 	int need_terminate = 0;
 	struct linked_list* feature_cast_list;
-	
+
 	if (command == NULL)
 		return NULL; /* OOM */
 
@@ -599,14 +595,14 @@ int adc_msg_remove_named_argument(struct adc_message* cmd, const char prefix_[2]
 	int found = 0;
 	int arg_offset = adc_msg_get_arg_offset(cmd);
 	size_t temp_len = 0;
-	
+
 	adc_msg_unterminate(cmd);
-	
+
 	start = memmem(&cmd->cache[arg_offset], (cmd->length - arg_offset), prefix, 3);
 	while (start)
 	{
 		endInfo = &cmd->cache[cmd->length];
-	
+
 		if  (&start[0] < &endInfo[0])
 		{
 			end = memchr(&start[1], ' ', &endInfo[0]-&start[1]);
@@ -615,13 +611,13 @@ int adc_msg_remove_named_argument(struct adc_message* cmd, const char prefix_[2]
 		{
 			end = NULL;
 		}
-		
+
 		if (end)
 		{
-			
+
 			temp_len = &end[0] - &start[0]; // strlen(start);
 			endlen = strlen(end);
-			
+
 			memmove(start, end, endlen);
 			start[endlen] = '\0';
 			found++;
@@ -636,9 +632,9 @@ int adc_msg_remove_named_argument(struct adc_message* cmd, const char prefix_[2]
 		}
 		start = memmem(&cmd->cache[arg_offset], (cmd->length - arg_offset), prefix, 3);
 	}
-	
+
 	adc_msg_terminate(cmd);
-	
+
 	return found;
 }
 
@@ -687,7 +683,7 @@ char* adc_msg_get_named_argument(struct adc_message* cmd, const char prefix_[2])
 	length = &end[0] - &start[0];
 
 	argument = hub_strndup(start, length);
-	
+
 	if (length > 0 && argument[length-1] == '\n')
 	{
 		argument[length-1] = 0;

@@ -516,6 +516,15 @@ int main(int argc, char** argv)
 	exotic_add_test(&handle, &exotic_test_list_get_last_prev_2, "list_get_last_prev_2");
 	exotic_add_test(&handle, &exotic_test_list_get_last_prev_next_1, "list_get_last_prev_next_1");
 	exotic_add_test(&handle, &exotic_test_list_clear, "list_clear");
+	exotic_add_test(&handle, &exotic_test_list_remove_first_1_1, "list_remove_first_1_1");
+	exotic_add_test(&handle, &exotic_test_list_remove_first_1_2, "list_remove_first_1_2");
+	exotic_add_test(&handle, &exotic_test_list_remove_first_1_3, "list_remove_first_1_3");
+	exotic_add_test(&handle, &exotic_test_list_remove_first_1_4, "list_remove_first_1_4");
+	exotic_add_test(&handle, &exotic_test_list_remove_first_1_5, "list_remove_first_1_5");
+	exotic_add_test(&handle, &exotic_test_list_append_list_1, "list_append_list_1");
+	exotic_add_test(&handle, &exotic_test_list_append_list_2, "list_append_list_2");
+	exotic_add_test(&handle, &exotic_test_list_append_list_3, "list_append_list_3");
+	exotic_add_test(&handle, &exotic_test_list_clear_list_last, "list_clear_list_last");
 	exotic_add_test(&handle, &exotic_test_list_destroy_1, "list_destroy_1");
 	exotic_add_test(&handle, &exotic_test_list_destroy_2, "list_destroy_2");
 	exotic_add_test(&handle, &exotic_test_test_message_refc_1, "test_message_refc_1");
@@ -951,7 +960,6 @@ int exotic_initialize(struct exotic_handle* handle, int argc, char** argv)
 void exotic_add_test(struct exotic_handle* handle, exo_test_t func, const char* name)
 {
 	struct exo_test_data* test;
-
 	if (!handle)
 	{
 		fprintf(stderr, "exotic_add_test: failed, no handle!\n");

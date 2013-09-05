@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2010, Jan Vidar Krey
+ * Copyright (C) 2007-2013, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -51,7 +51,7 @@ enum user_flags
 	flag_muted      = 0x00800000, /** User is muted (cannot chat) */
 	flag_ignore     = 0x01000000, /** Ignore further reads */
 	flag_maxbuf     = 0x02000000, /** Hit max buf read, ignore msg */
-	flag_choke      = 0x04000000, /** Choked: Cannot send, waiting for write event */ 
+	flag_choke      = 0x04000000, /** Choked: Cannot send, waiting for write event */
 	flag_want_read  = 0x08000000, /** Need to read (SSL) */
 	flag_want_write = 0x10000000, /** Need to write (SSL) */
 	flag_user_list  = 0x20000000, /** Send queue bypass (when receiving the send queue) */
@@ -150,7 +150,7 @@ extern void user_destroy(struct hub_user* user);
  * This associates a INF message to the user.
  * If the user already has a INF message associated, then this is
  * released before setting the new one.
- * 
+ *
  * @param info new inf message (can be NULL)
  */
 extern void user_set_info(struct hub_user* user, struct adc_message* info);
@@ -244,7 +244,7 @@ extern int user_flag_get(struct hub_user* user, enum user_flags flag);
  * Check if a user supports 'feature' for feature casting (basis for 'Fxxx' messages)
  * The feature cast is specified as the 'SU' argument to the user's
  * INF-message.
- * 
+ *
  * @param feature a feature to lookup (example: 'TCP4' or 'UDP4')
  * @return 1 if 'feature' supported, or 0 otherwise
  */
