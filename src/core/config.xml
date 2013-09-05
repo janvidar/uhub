@@ -432,7 +432,7 @@
 	<option name="tls_certificate" type="file" default="">
 		<short>Certificate file</short>
 		<description><![CDATA[
-			Path to a TLS/SSL certificate (PEM format).
+			Path to a TLS/SSL certificate or certificate chain (PEM format).
 		]]></description>
 		<since>0.3.0</since>
 	</option>
