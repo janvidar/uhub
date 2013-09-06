@@ -302,6 +302,7 @@ void net_ssl_destroy(struct net_connection* con)
 {
 	struct net_ssl_openssl* handle = get_handle(con);
 	SSL_free(handle->ssl);
+	hub_free(handle);
 }
 
 void net_ssl_callback(struct net_connection* con, int events)
