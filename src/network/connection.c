@@ -178,7 +178,7 @@ static int net_connect_job_check(struct net_connect_job* job)
 	int af = job->addr.ss_family;
 	enum net_connect_status status;
 
-	int ret = net_connect(net_con_get_sd(con), (struct sockaddr*) &job->addr, af == AF_INET ? sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in));
+	int ret = net_connect(net_con_get_sd(con), (struct sockaddr*) &job->addr, af == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6));
 	if (ret == 0 || (ret == -1 && net_error() == EISCONN))
 	{
 		LOG_TRACE("net_connect_job_check(): Socket connected!");

@@ -127,7 +127,7 @@ extern void net_ssl_context_destroy(struct ssl_context_handle* ctx_)
 int ssl_load_certificate(struct ssl_context_handle* ctx_, const char* pem_file)
 {
 	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
-	if (SSL_CTX_use_certificate_file(ctx->ssl_ctx, pem_file, SSL_FILETYPE_PEM) < 0)
+	if (SSL_CTX_use_certificate_chain_file(ctx->ssl_ctx, pem_file) < 0)
 	{
 		LOG_ERROR("SSL_CTX_use_certificate_file: %s", ERR_error_string(ERR_get_error(), NULL));
 		return 0;
@@ -302,6 +302,7 @@ void net_ssl_destroy(struct net_connection* con)
 {
 	struct net_ssl_openssl* handle = get_handle(con);
 	SSL_free(handle->ssl);
+	hub_free(handle);
 }
 
 void net_ssl_callback(struct net_connection* con, int events)
