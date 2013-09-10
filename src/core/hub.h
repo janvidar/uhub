@@ -27,7 +27,7 @@ enum status_message
 	status_msg_hub_registered_users_only = -3,  /* hub is for registered users only */
 	status_msg_inf_error_nick_missing    = -4,  /* no nickname given */
 	status_msg_inf_error_nick_multiple   = -5,  /* multiple nicknames given */
-	status_msg_inf_error_nick_invalid    = -6,  /* generic/unkown */
+	status_msg_inf_error_nick_invalid    = -6,  /* generic/unknown */
 	status_msg_inf_error_nick_long       = -7,  /* nickname too long */
 	status_msg_inf_error_nick_short      = -8,  /* nickname too short */
 	status_msg_inf_error_nick_spaces     = -9,  /* nickname cannot start with spaces */
@@ -50,8 +50,8 @@ enum status_message
 	status_msg_user_share_size_high      = -41, /* User is sharing too much. */
 	status_msg_user_slots_low            = -42, /* User has too few slots open. */
 	status_msg_user_slots_high           = -43, /* User has too many slots open. */
-	status_msg_user_hub_limit_low        = -44, /* Use is on too few hubs. */
-	status_msg_user_hub_limit_high       = -45, /* Use is on too many hubs. */
+	status_msg_user_hub_limit_low        = -44, /* User is on too few hubs. */
+	status_msg_user_hub_limit_high       = -45, /* User is on too many hubs. */
 
 	status_msg_proto_no_common_hash      = -50, /* No common hash algorithms */
 	status_msg_proto_obsolete_adc0       = -51, /* Client is using an obsolete protocol version */
