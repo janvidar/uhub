@@ -33,9 +33,10 @@ static int command_topic_handler(struct plugin_handle* plugin, struct plugin_use
 {
 	struct cbuffer* buf = cbuf_create(128);
 	struct plugin_command_arg_data* arg = plugin->hub.command_arg_next(plugin, cmd, plugin_cmd_arg_type_string);
+	char* topic = arg ? arg->data.string : "";
 
-	plugin->hub.set_description(plugin, arg->data.string);
-	cbuf_append_format(buf, "*** %s: Topic set to \"%s\"", cmd->prefix, arg->data.string);
+	plugin->hub.set_description(plugin, topic);
+	cbuf_append_format(buf, "*** %s: Topic set to \"%s\"", cmd->prefix, topic);
 	plugin->hub.send_message(plugin, user, cbuf_get(buf));
 	cbuf_destroy(buf);
 	return 0;
