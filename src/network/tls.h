@@ -32,8 +32,6 @@ enum ssl_state
 	tls_st_accepting,
 	tls_st_connecting,
 	tls_st_connected,
-	tls_st_need_read,  /* special case of connected */
-	tls_st_need_write, /* special case of connected */
 	tls_st_disconnecting,
 };
 
@@ -89,6 +87,15 @@ extern ssize_t net_con_ssl_connect(struct net_connection*);
 
 extern ssize_t net_ssl_send(struct net_connection* con, const void* buf, size_t len);
 extern ssize_t net_ssl_recv(struct net_connection* con, void* buf, size_t len);
+
+/**
+ * Update the event mask. Additional events may be requested depending on the
+ * needs of the TLS layer.
+ *
+ * @param con Connection handle.
+ * @param events Event mask (NET_EVENT_*)
+ */
+extern void net_ssl_update(struct net_connection* con, int events);
 
 extern void net_ssl_shutdown(struct net_connection* con);
 extern void net_ssl_destroy(struct net_connection* con);

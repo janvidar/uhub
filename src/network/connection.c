@@ -19,6 +19,7 @@
 
 #include "uhub.h"
 #include "network/common.h"
+#include "network/backend.h"
 
 static int is_blocked_or_interrupted()
 {
@@ -114,6 +115,23 @@ int net_con_get_sd(struct net_connection* con)
 void* net_con_get_ptr(struct net_connection* con)
 {
 	return con->ptr;
+}
+
+void net_con_update(struct net_connection* con, int events)
+{
+#ifdef SSL_SUPPORT
+	if (con->ssl)
+		net_ssl_update(con, events);
+	else
+#endif
+		net_backend_update(con, events);
+}
+
+void net_con_reinitialize(struct net_connection* con, net_connection_cb callback, const void* ptr, int events)
+{
+	con->callback = callback;
+	con->ptr = (void*) ptr;
+	net_con_update(con, events);
 }
 
 void net_con_destroy(struct net_connection* con)

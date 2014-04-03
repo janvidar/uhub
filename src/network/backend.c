@@ -102,14 +102,7 @@ void net_backend_shutdown()
 }
 
 
-void net_con_reinitialize(struct net_connection* con, net_connection_cb callback, const void* ptr, int events)
-{
-	con->callback = callback;
-	con->ptr = (void*) ptr;
-	net_con_update(con, events);
-}
-
-void net_con_update(struct net_connection* con, int events)
+void net_backend_update(struct net_connection* con, int events)
 {
 	g_backend->handler.con_mod(g_backend->data, con, events);
 }

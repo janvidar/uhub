@@ -20,6 +20,7 @@
 #include "uhub.h"
 #include "network/common.h"
 #include "network/tls.h"
+#include "network/backend.h"
 
 #ifdef SSL_SUPPORT
 #ifdef SSL_USE_OPENSSL
@@ -32,6 +33,9 @@ struct net_ssl_openssl
 	SSL* ssl;
 	BIO* bio;
 	enum ssl_state state;
+	int events;
+	int ssl_read_events;
+	int ssl_write_events;
 	uint32_t flags;
 	size_t bytes_rx;
 	size_t bytes_tx;
@@ -158,7 +162,7 @@ int ssl_check_private_key(struct ssl_context_handle* ctx_)
 	return 1;
 }
 
-static int handle_openssl_error(struct net_connection* con, int ret, enum ssl_state forced_rwstate)
+static int handle_openssl_error(struct net_connection* con, int ret, int read)
 {
 	struct net_ssl_openssl* handle = get_handle(con);
 	int err = SSL_get_error(handle->ssl, ret);
@@ -169,13 +173,17 @@ static int handle_openssl_error(struct net_connection* con, int ret, enum ssl_st
 			return -1;
 
 		case SSL_ERROR_WANT_READ:
-			handle->state = forced_rwstate;
-			net_con_update(con, NET_EVENT_READ);
+			if (read)
+				handle->ssl_read_events = NET_EVENT_READ;
+			else
+				handle->ssl_write_events = NET_EVENT_READ;
 			return 0;
 
 		case SSL_ERROR_WANT_WRITE:
-			handle->state = forced_rwstate;
-			net_con_update(con, NET_EVENT_WRITE);
+			if (read)
+				handle->ssl_read_events = NET_EVENT_WRITE;
+			else
+				handle->ssl_write_events = NET_EVENT_WRITE;
 			return 0;
 
 		case SSL_ERROR_SYSCALL:
@@ -249,25 +257,25 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode 
 		con->ssl = (struct ssl_handle*) handle;
 		return net_con_ssl_connect(con);
 	}
-
 }
 
 ssize_t net_ssl_send(struct net_connection* con, const void* buf, size_t len)
 {
 	struct net_ssl_openssl* handle = get_handle(con);
 
-	uhub_assert(handle->state == tls_st_connected || handle->state == tls_st_need_write);
+	uhub_assert(handle->state == tls_st_connected);
 
 	ERR_clear_error();
 	ssize_t ret = SSL_write(handle->ssl, buf, len);
 	add_io_stats(handle);
 	LOG_PROTO("SSL_write(con=%p, buf=%p, len=" PRINTF_SIZE_T ") => %d", con, buf, len, ret);
 	if (ret > 0)
-	{
-		handle->state = tls_st_connected;
-		return ret;
-	}
-	return handle_openssl_error(con, ret, tls_st_need_write);
+		handle->ssl_write_events = 0;
+	else
+		ret = handle_openssl_error(con, ret, 0);
+
+	net_ssl_update(con, handle->events);  // Update backend only
+	return ret;
 }
 
 ssize_t net_ssl_recv(struct net_connection* con, void* buf, size_t len)
@@ -278,7 +286,7 @@ ssize_t net_ssl_recv(struct net_connection* con, void* buf, size_t len)
 	if (handle->state == tls_st_error)
 		return -2;
 
-	uhub_assert(handle->state == tls_st_connected || handle->state == tls_st_need_read);
+	uhub_assert(handle->state == tls_st_connected);
 
 	ERR_clear_error();
 
@@ -286,11 +294,19 @@ ssize_t net_ssl_recv(struct net_connection* con, void* buf, size_t len)
 	add_io_stats(handle);
 	LOG_PROTO("SSL_read(con=%p, buf=%p, len=" PRINTF_SIZE_T ") => %d", con, buf, len, ret);
 	if (ret > 0)
-	{
-		handle->state = tls_st_connected;
-		return ret;
-	}
-	return handle_openssl_error(con, ret, tls_st_need_read);
+		handle->ssl_read_events = 0;
+	else
+		ret = handle_openssl_error(con, ret, 1);
+
+	net_ssl_update(con, handle->events);  // Update backend only
+	return ret;
+}
+
+void net_ssl_update(struct net_connection* con, int events)
+{
+	struct net_ssl_openssl* handle = get_handle(con);
+	handle->events = events;
+	net_backend_update(con, handle->events | handle->ssl_read_events | handle->ssl_write_events);
 }
 
 void net_ssl_shutdown(struct net_connection* con)
@@ -331,15 +347,11 @@ void net_ssl_callback(struct net_connection* con, int events)
 				con->callback(con, NET_EVENT_READ, con->ptr);
 			break;
 
-		case tls_st_need_read:
-			con->callback(con, NET_EVENT_READ, con->ptr);
-			break;
-
-		case tls_st_need_write:
-			con->callback(con, NET_EVENT_WRITE, con->ptr);
-			break;
-
 		case tls_st_connected:
+			if (handle->ssl_read_events & events)
+				events |= NET_EVENT_READ;
+			if (handle->ssl_write_events & events)
+				events |= NET_EVENT_WRITE;
 			con->callback(con, events, con->ptr);
 			break;
 
