@@ -101,7 +101,19 @@ static const char* validate_cred(const char* cred_str)
 	if (!strcmp(cred_str, "user"))
 		return "user";
 
-	fprintf(stderr, "Invalid user credentials. Must be one of: 'admin', 'super', 'op' or 'user'\n");
+	if (!strcmp(cred_str, "bot"))
+		return "bot";
+
+	if (!strcmp(cred_str, "ubot"))
+		return "ubot";
+
+	if (!strcmp(cred_str, "opbot"))
+		return "opbot";
+
+	if (!strcmp(cred_str, "opubot"))
+		return "opubot";
+
+	fprintf(stderr, "Invalid user credentials. Must be one of: 'bot', 'ubot', 'opbot', 'opubot', 'admin', 'super', 'op' or 'user'\n");
 	exit(1);
 }
 
