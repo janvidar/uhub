@@ -571,6 +571,10 @@ static int set_credentials(struct hub_info* hub, struct hub_user* user, struct a
 			adc_msg_add_argument(cmd, ADC_INF_FLAG_CLIENT_TYPE ADC_CLIENT_TYPE_BOT);
 			break;
 
+		case auth_cred_ubot:
+			adc_msg_add_argument(cmd, ADC_INF_FLAG_CLIENT_TYPE ADC_CLIENT_TYPE_BOT);
+			break;
+
 		case auth_cred_guest:
 			/* Nothing to be added to the info message */
 			break;
@@ -581,6 +585,14 @@ static int set_credentials(struct hub_info* hub, struct hub_user* user, struct a
 
 		case auth_cred_operator:
 			adc_msg_add_argument(cmd, ADC_INF_FLAG_CLIENT_TYPE ADC_CLIENT_TYPE_OPERATOR);
+			break;
+
+		case auth_cred_opbot:
+			adc_msg_add_argument(cmd, ADC_INF_FLAG_CLIENT_TYPE ADC_CLIENT_TYPE_HUBBOT);
+			break;
+
+		case auth_cred_opubot:
+			adc_msg_add_argument(cmd, ADC_INF_FLAG_CLIENT_TYPE ADC_CLIENT_TYPE_HUBBOT);
 			break;
 
 		case auth_cred_super:

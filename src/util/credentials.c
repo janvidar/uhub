@@ -24,6 +24,9 @@ int auth_cred_is_protected(enum auth_credentials cred)
 	switch (cred)
 	{
 		case auth_cred_bot:
+		case auth_cred_ubot:
+		case auth_cred_opbot:
+		case auth_cred_opubot:
 		case auth_cred_operator:
 		case auth_cred_super:
 		case auth_cred_admin:
@@ -45,6 +48,9 @@ int auth_cred_is_registered(enum auth_credentials cred)
 	switch (cred)
 	{
 		case auth_cred_bot:
+		case auth_cred_ubot:
+		case auth_cred_opbot:
+		case auth_cred_opubot:
 		case auth_cred_user:
 		case auth_cred_operator:
 		case auth_cred_super:
@@ -64,6 +70,9 @@ const char* auth_cred_to_string(enum auth_credentials cred)
 	{
 		case auth_cred_none:         return "none";
 		case auth_cred_bot:          return "bot";
+		case auth_cred_ubot:         return "ubot";
+		case auth_cred_opbot:        return "opbot";
+		case auth_cred_opubot:       return "opubot";
 		case auth_cred_guest:        return "guest";
 		case auth_cred_user:         return "user";
 		case auth_cred_operator:     return "operator";
@@ -95,12 +104,18 @@ int auth_string_to_cred(const char* str, enum auth_credentials* out)
 			if (!strcasecmp(str, "none")) { *out = auth_cred_none; return 1; }
 			if (!strcasecmp(str, "user")) { *out = auth_cred_user; return 1; }
 			if (!strcasecmp(str, "link")) { *out = auth_cred_link; return 1; }
+			if (!strcasecmp(str, "ubot")) { *out = auth_cred_ubot; return 1; }
 			return 0;
 
 		case 5:
 			if (!strcasecmp(str, "admin")) { *out = auth_cred_admin; return 1; }
 			if (!strcasecmp(str, "super")) { *out = auth_cred_super; return 1; }
+			if (!strcasecmp(str, "opbot")) { *out = auth_cred_opbot; return 1; }
 			if (!strcasecmp(str, "guest")) { *out = auth_cred_guest; return 1; }
+			return 0;
+
+		case 6:
+			if (!strcasecmp(str, "opubot")) { *out = auth_cred_opubot; return 1; }
 			return 0;
 
 		case 8:
