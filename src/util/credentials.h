@@ -36,6 +36,12 @@ enum auth_credentials
 };
 
 /**
+ * Returns 1 if the credentials means that a user is unrestricted.
+ * Returns 0 otherwise.
+ */
+int auth_cred_is_unrestricted(enum auth_credentials cred);
+
+/**
  * Returns 1 if the credentials means that a user is protected.
  * Returns 0 otherwise.
  */

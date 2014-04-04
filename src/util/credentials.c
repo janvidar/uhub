@@ -19,6 +19,25 @@
 
 #include "uhub.h"
 
+/**
+ * Returns 1 if a user is unrestricted.
+ * Unrestricted users override the limits of flood and can send messages in
+ * the name of other users.
+ * This is useful for amongst other external chatrooms.
+ */
+int auth_cred_is_unrestricted(enum auth_credentials cred)
+{
+	switch (cred)
+	{
+		case auth_cred_ubot:
+		case auth_cred_opubot:
+			return 1;
+		default:
+			break;
+	}
+	return 0;
+}
+
 int auth_cred_is_protected(enum auth_credentials cred)
 {
 	switch (cred)
