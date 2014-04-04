@@ -23,7 +23,7 @@ struct hub_info* g_hub = 0;
 
 /* FIXME: Flood control should be done in a plugin! */
 #define CHECK_FLOOD(TYPE, WARN) \
-	if (flood_control_check(&u->flood_ ## TYPE , hub->config->flood_ctl_  ## TYPE, hub->config->flood_ctl_interval, net_get_time())) \
+	if (flood_control_check(&u->flood_ ## TYPE , hub->config->flood_ctl_  ## TYPE, hub->config->flood_ctl_interval, net_get_time()) &&  !auth_cred_is_unrestricted(u->credentials)) \
 	{ \
 		if (WARN) \
 		{ \

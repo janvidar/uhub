@@ -311,7 +311,7 @@ struct adc_message* adc_msg_parse_verify(struct hub_user* u, const char* line, s
 	if (!command)
 		return 0;
 
-	if (command->source && (!u || command->source != u->id.sid))
+	if (command->source && (!u || command->source != u->id.sid || auth_cred_is_unrestricted(u->credentials)))
 	{
 		LOG_DEBUG("Command does not match user's SID (command->source=%d, user->id.sid=%d)", command->source, (u ? u->id.sid : 0));
 		adc_msg_free(command);
