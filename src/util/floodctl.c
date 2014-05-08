@@ -30,26 +30,25 @@ int  flood_control_check(struct flood_control* data, size_t max_count, size_t ti
 	if (!time_delay || !max_count)
 		return 0;
 
-	if (!data->time)
+	// No previous message, or a long time since
+	// the last message. We allow the message.
+	if (!data->time || ((now - data->time) > time_delay))
 	{
 		data->time = now;
-		data->count = 0;
+		data->count = 1;
 		return 0;
 	}
 
-	if ((now - data->time) > time_delay)
-	{
-		data->time = now;
-		data->count = 0;
-		return 0;
-	}
+	// increase hit count
+	data->count++;
 
-	if (data->count <= max_count)
-	{
-		data->count++;
+	// did we overflow the limits yet?
+	if (data->count < max_count)
 		return 0;
-	}
 
+	// if we continue sending spam messages we extend the flood interval
+	// based on the last message.
+	data->time = now;
 	return 1;
 }
 
