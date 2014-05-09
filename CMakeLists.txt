@@ -76,7 +76,7 @@ set (adcclient_SOURCES
 add_library(adc       STATIC ${adc_SOURCES})
 add_library(network   STATIC ${network_SOURCES})
 add_library(utils     STATIC ${utils_SOURCES})
-if(CMAKE_COMPILER_IS_GNUCC)
+if ("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
 	set_target_properties(utils PROPERTIES COMPILE_FLAGS -fPIC)
 	set_target_properties(network PROPERTIES COMPILE_FLAGS -fPIC)
 endif()
