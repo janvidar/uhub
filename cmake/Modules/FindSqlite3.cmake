@@ -44,7 +44,7 @@ IF ( NOT SQLITE3_FOUND AND NOT PKG_CONFIG_FOUND )
 		/opt/local/lib
 		/sw/lib
 		/usr/lib
-		/usr/lib/x86_64-gnu-linux
+		/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
 		/usr/local/lib
 		/usr/lib64
 		/usr/local/lib64
