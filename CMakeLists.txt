@@ -39,7 +39,7 @@ if (SSL_SUPPORT)
 		find_package(GnuTLS)
 	endif()
 	if (NOT GNUTLS_FOUND AND NOT OPENSSL_FOUND)
-		message(FATAL_ERROR "Neither OpenSSL nor GnuTLS are not found!")
+		message(FATAL_ERROR "Neither OpenSSL nor GnuTLS were found!")
 	endif()
 endif()
 
