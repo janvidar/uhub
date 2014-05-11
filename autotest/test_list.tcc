@@ -204,6 +204,7 @@ EXO_TEST(list_append_list_3,
 EXO_TEST(list_clear_list_last,
 {
 	list_clear(list, &null_free);
+	return 1;
 });
 
 
