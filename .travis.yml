@@ -1,0 +1,11 @@
+language: cpp
+compiler:
+  - gcc
+  - clang
+env:
+  - CONFIG=minimal
+  - CONFIG=full
+install:
+  - autotest/travis/install-build-depends.sh
+script:
+  - autotest/travis/build-and-test.sh
