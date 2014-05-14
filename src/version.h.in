@@ -32,5 +32,5 @@
 #define PRODUCT_STRING PRODUCT "/" GIT_VERSION
 
 #ifndef COPYRIGHT
-#define COPYRIGHT "Copyright (c) 2007-2013, Jan Vidar Krey <janvidar@extatic.org>"
+#define COPYRIGHT "Copyright (c) 2007-2014, Jan Vidar Krey <janvidar@extatic.org>"
 #endif
