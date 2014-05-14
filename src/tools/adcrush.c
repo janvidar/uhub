@@ -156,7 +156,7 @@ static size_t get_next_timeout_evt()
 		case 2: return get_wait_rand(15);
 		case 3: return get_wait_rand(5);
 	}
-
+	return 0;
 }
 
 

@@ -103,6 +103,8 @@
 #ifdef SSL_USE_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <openssl/engine.h>
+#include <openssl/conf.h>
 #endif /* SSL_USE_OPENSSL */
 #ifdef SSL_USE_GNUTLS
 #include <gnutls/gnutls.h>
