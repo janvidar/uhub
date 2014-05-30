@@ -307,7 +307,7 @@ static void net_connect_job_internal_cb(struct net_connection* con, int event, v
 }
 
 
-static int net_connect_cancel(struct net_connect_handle* handle)
+static void net_connect_cancel(struct net_connect_handle* handle)
 {
 	struct net_connect_job* job;
 
@@ -363,6 +363,7 @@ static int net_connect_process(struct net_connect_handle* handle)
 		return 1; // Connected - cool!
 
 	net_connect_process_queue(handle, handle->job4);
+	return 0;
 }
 
 

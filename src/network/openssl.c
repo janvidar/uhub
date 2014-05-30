@@ -182,6 +182,8 @@ static int handle_openssl_error(struct net_connection* con, int ret, enum ssl_st
 			handle->state = tls_st_error;
 			return -2;
 	}
+
+	return -2;
 }
 
 ssize_t net_con_ssl_accept(struct net_connection* con)
