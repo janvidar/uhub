@@ -159,6 +159,9 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 static int running = 1;
 
 #if !defined(WIN32)
+static int adm_pipes[2] = { -1, -1 };
+static struct net_connection* adm_con = 0;
+
 void adm_handle_signal(int sig)
 {
 	switch (sig)
@@ -195,6 +198,10 @@ static int signals[] =
 	0
 };
 
+void adm_callback(struct net_connection* con, int event, void* ptr)
+{
+}
+
 void adm_setup_signal_handlers()
 {
 	sigset_t sig_set;
@@ -215,6 +222,26 @@ void adm_setup_signal_handlers()
 	}
 }
 
+void adm_setup_control_pipe()
+{
+	int ret = pipe(adm_pipes);
+	if (ret == -1)
+	{
+		LOG_ERROR("Unable to setup control pipes.");
+	}
+	adm_con = net_con_create();
+	net_con_initialize(adm_con, adm_pipes[0], adm_callback, 0, NET_EVENT_READ);
+}
+
+void adm_shutdown_control_pipe()
+{
+	net_con_destroy(adm_con);
+	close(adm_pipes[0]);
+	close(adm_pipes[1]);
+	adm_pipes[0] = -1;
+	adm_pipes[0] = -1;
+}
+
 void adm_shutdown_signal_handlers()
 {
 }
@@ -233,6 +260,7 @@ int main(int argc, char** argv)
 
 	struct ADC_client* client;
 	net_initialize();
+	adm_setup_control_pipe();
 
 	memset(g_usermap, 0, sizeof(g_usermap));
 
@@ -241,6 +269,8 @@ int main(int argc, char** argv)
 	ADC_client_connect(client, argv[1]);
 
 	while (running && net_backend_process()) { }
+
+	adm_shutdown_control_pipe();
 
 	ADC_client_destroy(client);
 	net_destroy();

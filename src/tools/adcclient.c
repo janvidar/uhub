@@ -600,6 +600,17 @@ int ADC_client_connect(struct ADC_client* client, const char* address)
 	return 1;
 }
 
+static void ADC_client_send_handshake(struct ADC_client* client)
+{
+	ADC_TRACE;
+	struct adc_message* handshake = adc_msg_create(ADC_HANDSHAKE);
+
+	client->callback(client, ADC_CLIENT_CONNECTED, 0);
+	net_con_update(client->con, NET_EVENT_READ);
+	ADC_client_send(client, handshake);
+	ADC_client_set_state(client, ps_protocol);
+	adc_msg_free(handshake);
+}
 
 static void ADC_client_on_connected(struct ADC_client* client)
 {
@@ -610,32 +621,20 @@ static void ADC_client_on_connected(struct ADC_client* client)
 		net_con_update(client->con, NET_EVENT_READ | NET_EVENT_WRITE);
 		client->callback(client, ADC_CLIENT_SSL_HANDSHAKE, 0);
 		ADC_client_set_state(client, ps_conn_ssl);
-
 		net_con_ssl_handshake(client->con, net_con_ssl_mode_client, NULL);
 	}
 	else
 #endif
-	{
-		struct adc_message* handshake = adc_msg_create(ADC_HANDSHAKE);
-		net_con_update(client->con, NET_EVENT_READ);
-		client->callback(client, ADC_CLIENT_CONNECTED, 0);
-		ADC_client_send(client, handshake);
-		ADC_client_set_state(client, ps_protocol);
-		adc_msg_free(handshake);
-	}
+	ADC_client_send_handshake(client);
+	
 }
 
 #ifdef SSL_SUPPORT
 static void ADC_client_on_connected_ssl(struct ADC_client* client)
 {
 	ADC_TRACE;
-	struct adc_message* handshake = adc_msg_create(ADC_HANDSHAKE);
 	client->callback(client, ADC_CLIENT_SSL_OK, 0);
-	client->callback(client, ADC_CLIENT_CONNECTED, 0);
-	net_con_update(client->con, NET_EVENT_READ);
-	ADC_client_send(client, handshake);
-	ADC_client_set_state(client, ps_protocol);
-	adc_msg_free(handshake);
+	ADC_client_send_handshake(client);
 }
 #endif
 
