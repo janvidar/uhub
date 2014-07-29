@@ -428,7 +428,6 @@
 		<since>0.3.3</since>
 	</option>
 
-
 	<option name="tls_certificate" type="file" default="">
 		<short>Certificate file</short>
 		<description><![CDATA[
@@ -443,6 +442,40 @@
 			Path to a TLS/SSL private key (PEM format).
 		]]></description>
 		<since>0.3.0</since>
+	</option>
+
+	<option name="tls_ciphersuite" type="string" default="ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:ECDH+3DES:DH+3DES:RSA+AESGCM:RSA+AES:RSA+3DES:!aNULL:!MD5:!DSS">
+		<short>List of TLS ciphers to use</short>
+		<description><![CDATA[
+			This is a colon separated list of preferred ciphers in the OpenSSL format.
+		]]></description>
+		<since>0.5.0</since>
+		<example><![CDATA[
+			<p>
+			High security with emphasis on forward secrecy:<br />
+			tls_ciphersuite = "ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:ECDH+3DES:DH+3DES:RSA+AESGCM:RSA+AES:RSA+3DES:!aNULL:!MD5:!DSS"
+			</p>
+			<p>
+			Allow ChaCha20/Poly1305 which are secure, yet generally faster:<br />
+			tls_ciphersuite = "ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:DHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA"
+			</p>
+		]]></example>
+	</option>
+
+	<option name="tls_version" type="string" default="1.2">
+		<short>Specify minimum TLS version supported.</short>
+		<description><![CDATA[
+			<p>
+			This allows you to specify the minimum TLS version the hub requires from connecting clients in order to
+			connect to the hub.
+			</p>
+			<p>
+			TLS version 1.2 is recommended and enabled by default.
+			TLS version 1.1 is acceptable without any known flaws, and allows for older clients to connect.
+			TLS version 1.0 should be avoided, even though it is the most compatible with older ADC clients.
+			</p>
+		]]></description>
+		<since>0.5.0</since>
 	</option>
 
 	<option name="file_acl" type="file" default="">

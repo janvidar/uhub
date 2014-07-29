@@ -731,7 +731,11 @@ static int load_ssl_certificates(struct hub_info* hub, struct hub_config* config
 {
 	if (config->tls_enable)
 	{
-		hub->ctx = net_ssl_context_create();
+		hub->ctx = net_ssl_context_create(config->tls_version, config->tls_ciphersuite);
+
+		if (!hub->ctx)
+		  return 0;
+
 		if (ssl_load_certificate(hub->ctx, config->tls_certificate) &&
 			ssl_load_private_key(hub->ctx, config->tls_private_key) &&
 			ssl_check_private_key(hub->ctx))

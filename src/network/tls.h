@@ -56,8 +56,9 @@ extern int net_ssl_library_shutdown();
 
 /**
  * Create a new SSL context.
+ * Specify a TLS version as a string: "1.2" for TLS 1.2.
  */
-extern struct ssl_context_handle* net_ssl_context_create();
+extern struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const char* tls_ciphersuite);
 extern void net_ssl_context_destroy(struct ssl_context_handle* ctx);
 
 /**

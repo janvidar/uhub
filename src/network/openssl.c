@@ -43,8 +43,7 @@ struct net_ssl_openssl
 
 struct net_context_openssl
 {
-	SSL_METHOD* ssl_method;
-	SSL_CTX* ssl_ctx;
+	SSL_CTX* ssl;
 };
 
 static struct net_ssl_openssl* get_handle(struct net_connection* con)
@@ -97,26 +96,61 @@ static void add_io_stats(struct net_ssl_openssl* handle)
 	}
 }
 
+static const SSL_METHOD* get_ssl_method(const char* tls_version)
+{
+	if (!tls_version || !*tls_version)
+	{
+		LOG_ERROR("tls_version is not set.");
+		return 0;
+	}
+
+	if (!strcmp(tls_version, "1.0"))
+	  return TLSv1_method();
+	if (!strcmp(tls_version, "1.1"))
+	  return TLSv1_1_method();
+	if (!strcmp(tls_version, "1.2"))
+	  return TLSv1_2_method();
+
+	LOG_ERROR("Unable to recognize tls_version.");
+	return 0;
+}
+
 /**
  * Create a new SSL context.
  */
-struct ssl_context_handle* net_ssl_context_create()
+struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const char* tls_ciphersuite)
 {
-
 	struct net_context_openssl* ctx = (struct net_context_openssl*) hub_malloc_zero(sizeof(struct net_context_openssl));
-	ctx->ssl_method = (SSL_METHOD*) SSLv23_method(); /* TLSv1_method() */
-	ctx->ssl_ctx = SSL_CTX_new(ctx->ssl_method);
+	const SSL_METHOD* ssl_method = get_ssl_method(tls_version);
+
+	if (!ssl_method)
+	{
+		hub_free(ctx);
+		return 0;
+	}
+
+	ctx->ssl = SSL_CTX_new(ssl_method);
 
 	/* Disable SSLv2 */
-	SSL_CTX_set_options(ctx->ssl_ctx, SSL_OP_NO_SSLv2);
+	SSL_CTX_set_options(ctx->ssl, SSL_OP_NO_SSLv2);
+
+	// FIXME: Why did we need this again?
+	SSL_CTX_set_quiet_shutdown(ctx->ssl, 1);
 
 #ifdef SSL_OP_NO_COMPRESSION
-	/* Disable compression? */
+	/* Disable compression */
 	LOG_TRACE("Disabling SSL compression."); /* "CRIME" attack */
-	SSL_CTX_set_options(ctx->ssl_ctx, SSL_OP_NO_COMPRESSION);
+	SSL_CTX_set_options(ctx->ssl, SSL_OP_NO_COMPRESSION);
 #endif
 
-	SSL_CTX_set_quiet_shutdown(ctx->ssl_ctx, 1);
+	/* Set preferred cipher suite */
+	if (SSL_CTX_set_cipher_list(ctx->ssl, tls_ciphersuite) != 1)
+	{
+		LOG_ERROR("Unable to set cipher suite.");
+		SSL_CTX_free(ctx->ssl);
+		hub_free(ctx);
+		return 0;
+	}
 
 	return (struct ssl_context_handle*) ctx;
 }
@@ -124,16 +158,16 @@ struct ssl_context_handle* net_ssl_context_create()
 extern void net_ssl_context_destroy(struct ssl_context_handle* ctx_)
 {
 	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
-	SSL_CTX_free(ctx->ssl_ctx);
+	SSL_CTX_free(ctx->ssl);
 	hub_free(ctx);
 }
 
 int ssl_load_certificate(struct ssl_context_handle* ctx_, const char* pem_file)
 {
 	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
-	if (SSL_CTX_use_certificate_chain_file(ctx->ssl_ctx, pem_file) < 0)
+	if (SSL_CTX_use_certificate_chain_file(ctx->ssl, pem_file) < 0)
 	{
-		LOG_ERROR("SSL_CTX_use_certificate_file: %s", ERR_error_string(ERR_get_error(), NULL));
+		LOG_ERROR("SSL_CTX_use_certificate_chain_file: %s", ERR_error_string(ERR_get_error(), NULL));
 		return 0;
 	}
 
@@ -143,7 +177,7 @@ int ssl_load_certificate(struct ssl_context_handle* ctx_, const char* pem_file)
 int ssl_load_private_key(struct ssl_context_handle* ctx_, const char* pem_file)
 {
 	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
-	if (SSL_CTX_use_PrivateKey_file(ctx->ssl_ctx, pem_file, SSL_FILETYPE_PEM) < 0)
+	if (SSL_CTX_use_PrivateKey_file(ctx->ssl, pem_file, SSL_FILETYPE_PEM) < 0)
 	{
 		LOG_ERROR("SSL_CTX_use_PrivateKey_file: %s", ERR_error_string(ERR_get_error(), NULL));
 		return 0;
@@ -154,7 +188,7 @@ int ssl_load_private_key(struct ssl_context_handle* ctx_, const char* pem_file)
 int ssl_check_private_key(struct ssl_context_handle* ctx_)
 {
 	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
-	if (SSL_CTX_check_private_key(ctx->ssl_ctx) != 1)
+	if (SSL_CTX_check_private_key(ctx->ssl) != 1)
 	{
 		LOG_FATAL("SSL_CTX_check_private_key: Private key does not match the certificate public key: %s", ERR_error_string(ERR_get_error(), NULL));
 		return 0;
@@ -238,7 +272,7 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode 
 
 	if (ssl_mode == net_con_ssl_mode_server)
 	{
-		handle->ssl = SSL_new(ctx->ssl_ctx);
+		handle->ssl = SSL_new(ctx->ssl);
 		if (!handle->ssl)
 		{
 			LOG_ERROR("Unable to create new SSL stream\n");
