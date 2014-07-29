@@ -137,7 +137,7 @@ void net_con_reinitialize(struct net_connection* con, net_connection_cb callback
 void net_con_destroy(struct net_connection* con)
 {
 #ifdef SSL_SUPPORT
-	if (con->ssl)
+	if (con && con->ssl)
 		net_ssl_destroy(con);
 #endif
 	hub_free(con);
