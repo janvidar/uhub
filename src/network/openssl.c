@@ -20,6 +20,7 @@
 #include "uhub.h"
 #include "network/common.h"
 #include "network/tls.h"
+#include "network/backend.h"
 
 #ifdef SSL_SUPPORT
 #ifdef SSL_USE_OPENSSL
@@ -32,6 +33,9 @@ struct net_ssl_openssl
 	SSL* ssl;
 	BIO* bio;
 	enum ssl_state state;
+	int events;
+	int ssl_read_events;
+	int ssl_write_events;
 	uint32_t flags;
 	size_t bytes_rx;
 	size_t bytes_tx;
@@ -39,8 +43,7 @@ struct net_ssl_openssl
 
 struct net_context_openssl
 {
-	SSL_METHOD* ssl_method;
-	SSL_CTX* ssl_ctx;
+	SSL_CTX* ssl;
 };
 
 static struct net_ssl_openssl* get_handle(struct net_connection* con)
@@ -93,26 +96,61 @@ static void add_io_stats(struct net_ssl_openssl* handle)
 	}
 }
 
+static const SSL_METHOD* get_ssl_method(const char* tls_version)
+{
+	if (!tls_version || !*tls_version)
+	{
+		LOG_ERROR("tls_version is not set.");
+		return 0;
+	}
+
+	if (!strcmp(tls_version, "1.0"))
+	  return TLSv1_method();
+	if (!strcmp(tls_version, "1.1"))
+	  return TLSv1_1_method();
+	if (!strcmp(tls_version, "1.2"))
+	  return TLSv1_2_method();
+
+	LOG_ERROR("Unable to recognize tls_version.");
+	return 0;
+}
+
 /**
  * Create a new SSL context.
  */
-struct ssl_context_handle* net_ssl_context_create()
+struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const char* tls_ciphersuite)
 {
-
 	struct net_context_openssl* ctx = (struct net_context_openssl*) hub_malloc_zero(sizeof(struct net_context_openssl));
-	ctx->ssl_method = (SSL_METHOD*) SSLv23_method(); /* TLSv1_method() */
-	ctx->ssl_ctx = SSL_CTX_new(ctx->ssl_method);
+	const SSL_METHOD* ssl_method = get_ssl_method(tls_version);
+
+	if (!ssl_method)
+	{
+		hub_free(ctx);
+		return 0;
+	}
+
+	ctx->ssl = SSL_CTX_new(ssl_method);
 
 	/* Disable SSLv2 */
-	SSL_CTX_set_options(ctx->ssl_ctx, SSL_OP_NO_SSLv2);
+	SSL_CTX_set_options(ctx->ssl, SSL_OP_NO_SSLv2);
+
+	// FIXME: Why did we need this again?
+	SSL_CTX_set_quiet_shutdown(ctx->ssl, 1);
 
 #ifdef SSL_OP_NO_COMPRESSION
-	/* Disable compression? */
+	/* Disable compression */
 	LOG_TRACE("Disabling SSL compression."); /* "CRIME" attack */
-	SSL_CTX_set_options(ctx->ssl_ctx, SSL_OP_NO_COMPRESSION);
+	SSL_CTX_set_options(ctx->ssl, SSL_OP_NO_COMPRESSION);
 #endif
 
-	SSL_CTX_set_quiet_shutdown(ctx->ssl_ctx, 1);
+	/* Set preferred cipher suite */
+	if (SSL_CTX_set_cipher_list(ctx->ssl, tls_ciphersuite) != 1)
+	{
+		LOG_ERROR("Unable to set cipher suite.");
+		SSL_CTX_free(ctx->ssl);
+		hub_free(ctx);
+		return 0;
+	}
 
 	return (struct ssl_context_handle*) ctx;
 }
@@ -120,16 +158,16 @@ struct ssl_context_handle* net_ssl_context_create()
 extern void net_ssl_context_destroy(struct ssl_context_handle* ctx_)
 {
 	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
-	SSL_CTX_free(ctx->ssl_ctx);
+	SSL_CTX_free(ctx->ssl);
 	hub_free(ctx);
 }
 
 int ssl_load_certificate(struct ssl_context_handle* ctx_, const char* pem_file)
 {
 	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
-	if (SSL_CTX_use_certificate_chain_file(ctx->ssl_ctx, pem_file) < 0)
+	if (SSL_CTX_use_certificate_chain_file(ctx->ssl, pem_file) < 0)
 	{
-		LOG_ERROR("SSL_CTX_use_certificate_file: %s", ERR_error_string(ERR_get_error(), NULL));
+		LOG_ERROR("SSL_CTX_use_certificate_chain_file: %s", ERR_error_string(ERR_get_error(), NULL));
 		return 0;
 	}
 
@@ -139,7 +177,7 @@ int ssl_load_certificate(struct ssl_context_handle* ctx_, const char* pem_file)
 int ssl_load_private_key(struct ssl_context_handle* ctx_, const char* pem_file)
 {
 	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
-	if (SSL_CTX_use_PrivateKey_file(ctx->ssl_ctx, pem_file, SSL_FILETYPE_PEM) < 0)
+	if (SSL_CTX_use_PrivateKey_file(ctx->ssl, pem_file, SSL_FILETYPE_PEM) < 0)
 	{
 		LOG_ERROR("SSL_CTX_use_PrivateKey_file: %s", ERR_error_string(ERR_get_error(), NULL));
 		return 0;
@@ -150,7 +188,7 @@ int ssl_load_private_key(struct ssl_context_handle* ctx_, const char* pem_file)
 int ssl_check_private_key(struct ssl_context_handle* ctx_)
 {
 	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
-	if (SSL_CTX_check_private_key(ctx->ssl_ctx) != 1)
+	if (SSL_CTX_check_private_key(ctx->ssl) != 1)
 	{
 		LOG_FATAL("SSL_CTX_check_private_key: Private key does not match the certificate public key: %s", ERR_error_string(ERR_get_error(), NULL));
 		return 0;
@@ -158,7 +196,7 @@ int ssl_check_private_key(struct ssl_context_handle* ctx_)
 	return 1;
 }
 
-static int handle_openssl_error(struct net_connection* con, int ret, enum ssl_state forced_rwstate)
+static int handle_openssl_error(struct net_connection* con, int ret, int read)
 {
 	struct net_ssl_openssl* handle = get_handle(con);
 	int err = SSL_get_error(handle->ssl, ret);
@@ -169,13 +207,17 @@ static int handle_openssl_error(struct net_connection* con, int ret, enum ssl_st
 			return -1;
 
 		case SSL_ERROR_WANT_READ:
-			handle->state = forced_rwstate;
-			net_con_update(con, NET_EVENT_READ);
+			if (read)
+				handle->ssl_read_events = NET_EVENT_READ;
+			else
+				handle->ssl_write_events = NET_EVENT_READ;
 			return 0;
 
 		case SSL_ERROR_WANT_WRITE:
-			handle->state = forced_rwstate;
-			net_con_update(con, NET_EVENT_WRITE);
+			if (read)
+				handle->ssl_read_events = NET_EVENT_WRITE;
+			else
+				handle->ssl_write_events = NET_EVENT_WRITE;
 			return 0;
 
 		case SSL_ERROR_SYSCALL:
@@ -230,7 +272,7 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode 
 
 	if (ssl_mode == net_con_ssl_mode_server)
 	{
-		handle->ssl = SSL_new(ctx->ssl_ctx);
+		handle->ssl = SSL_new(ctx->ssl);
 		if (!handle->ssl)
 		{
 			LOG_ERROR("Unable to create new SSL stream\n");
@@ -249,25 +291,25 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode 
 		con->ssl = (struct ssl_handle*) handle;
 		return net_con_ssl_connect(con);
 	}
-
 }
 
 ssize_t net_ssl_send(struct net_connection* con, const void* buf, size_t len)
 {
 	struct net_ssl_openssl* handle = get_handle(con);
 
-	uhub_assert(handle->state == tls_st_connected || handle->state == tls_st_need_write);
+	uhub_assert(handle->state == tls_st_connected);
 
 	ERR_clear_error();
 	ssize_t ret = SSL_write(handle->ssl, buf, len);
 	add_io_stats(handle);
 	LOG_PROTO("SSL_write(con=%p, buf=%p, len=" PRINTF_SIZE_T ") => %d", con, buf, len, ret);
 	if (ret > 0)
-	{
-		handle->state = tls_st_connected;
-		return ret;
-	}
-	return handle_openssl_error(con, ret, tls_st_need_write);
+		handle->ssl_write_events = 0;
+	else
+		ret = handle_openssl_error(con, ret, 0);
+
+	net_ssl_update(con, handle->events);  // Update backend only
+	return ret;
 }
 
 ssize_t net_ssl_recv(struct net_connection* con, void* buf, size_t len)
@@ -278,7 +320,7 @@ ssize_t net_ssl_recv(struct net_connection* con, void* buf, size_t len)
 	if (handle->state == tls_st_error)
 		return -2;
 
-	uhub_assert(handle->state == tls_st_connected || handle->state == tls_st_need_read);
+	uhub_assert(handle->state == tls_st_connected);
 
 	ERR_clear_error();
 
@@ -286,11 +328,19 @@ ssize_t net_ssl_recv(struct net_connection* con, void* buf, size_t len)
 	add_io_stats(handle);
 	LOG_PROTO("SSL_read(con=%p, buf=%p, len=" PRINTF_SIZE_T ") => %d", con, buf, len, ret);
 	if (ret > 0)
-	{
-		handle->state = tls_st_connected;
-		return ret;
-	}
-	return handle_openssl_error(con, ret, tls_st_need_read);
+		handle->ssl_read_events = 0;
+	else
+		ret = handle_openssl_error(con, ret, 1);
+
+	net_ssl_update(con, handle->events);  // Update backend only
+	return ret;
+}
+
+void net_ssl_update(struct net_connection* con, int events)
+{
+	struct net_ssl_openssl* handle = get_handle(con);
+	handle->events = events;
+	net_backend_update(con, handle->events | handle->ssl_read_events | handle->ssl_write_events);
 }
 
 void net_ssl_shutdown(struct net_connection* con)
@@ -331,15 +381,11 @@ void net_ssl_callback(struct net_connection* con, int events)
 				con->callback(con, NET_EVENT_READ, con->ptr);
 			break;
 
-		case tls_st_need_read:
-			con->callback(con, NET_EVENT_READ, con->ptr);
-			break;
-
-		case tls_st_need_write:
-			con->callback(con, NET_EVENT_WRITE, con->ptr);
-			break;
-
 		case tls_st_connected:
+			if (handle->ssl_read_events & events)
+				events |= NET_EVENT_READ;
+			if (handle->ssl_write_events & events)
+				events |= NET_EVENT_WRITE;
 			con->callback(con, events, con->ptr);
 			break;
 

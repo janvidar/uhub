@@ -76,6 +76,14 @@ extern void net_backend_shutdown();
 extern int net_backend_process();
 
 /**
+ * Update the event mask.
+ *
+ * @param con Connection handle.
+ * @param events Event mask (NET_EVENT_*)
+ */
+extern void net_backend_update(struct net_connection* con, int events);
+
+/**
  * Get the current time.
  */
 time_t net_get_time();
