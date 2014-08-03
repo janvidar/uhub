@@ -366,21 +366,37 @@ static int check_logged_in(struct hub_info* hub, struct hub_user* user, struct a
  */
 static int check_user_agent(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
-	char* ua_encoded = 0;
-	char* ua = 0;
+	char* ua_name_encoded = 0;
+	char* ua_version_encoded = 0;
+	char* str = 0;
+	size_t offset = 0;
 
 	/* Get client user agent version */
-	ua_encoded = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_USER_AGENT);
-	if (ua_encoded)
+	ua_name_encoded = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_USER_AGENT_PRODUCT);
+	ua_version_encoded = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_USER_AGENT_VERSION);
+	if (ua_name_encoded)
 	{
-		ua = adc_msg_unescape(ua_encoded);
-		if (ua)
+		str = adc_msg_unescape(ua_name_encoded);
+		if (str)
 		{
-			memcpy(user->id.user_agent, ua, MIN(strlen(ua), MAX_UA_LEN));
-			hub_free(ua);
+			offset = strlen(str);
+			memcpy(user->id.user_agent, str, MIN(offset, MAX_UA_LEN));
+			hub_free(str);
 		}
 	}
-	hub_free(ua_encoded);
+
+	if (ua_version_encoded)
+	{
+		str = adc_msg_unescape(ua_version_encoded);
+		if (str)
+		{
+			memcpy(user->id.user_agent + offset, str, MIN(strlen(str), MAX_UA_LEN) - offset);
+			hub_free(str);
+		}
+	}
+
+	hub_free(ua_name_encoded);
+	hub_free(ua_version_encoded);
 	return 0;
 }
 
@@ -622,7 +638,8 @@ static int hub_handle_info_low_bandwidth(struct hub_info* hub, struct hub_user* 
 {
 	if (hub->config->low_bandwidth_mode)
 	{
-		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_USER_AGENT);
+		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_USER_AGENT_VERSION);
+		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_USER_AGENT_PRODUCT);
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_SHARED_FILES);
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_COUNT_HUB_NORMAL);
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_COUNT_HUB_REGISTER);

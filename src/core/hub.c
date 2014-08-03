@@ -909,7 +909,8 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 	if (hub->command_info)
 	{
 		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_CLIENT_TYPE, ADC_CLIENT_TYPE_HUB);
-		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_USER_AGENT, server);
+		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_USER_AGENT_PRODUCT, PRODUCT);
+		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_USER_AGENT_VERSION, GIT_VERSION);
 
 		tmp = adc_msg_escape(hub->config->hub_name);
 		adc_msg_add_named_argument(hub->command_info, ADC_INF_FLAG_NICK, tmp);

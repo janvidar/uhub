@@ -508,7 +508,8 @@ void ADC_client_send_info(struct ADC_client* client)
 		adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_DESCRIPTION, client->desc);
 	}
 
-	adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_USER_AGENT, PRODUCT " " VERSION);
+	adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_USER_AGENT_PRODUCT, PRODUCT);
+	adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_USER_AGENT_VERSION, VERSION);
 	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_UPLOAD_SLOTS, 0);
 	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_SHARED_SIZE, 0);
 	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_SHARED_FILES, 0);
