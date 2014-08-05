@@ -109,11 +109,6 @@ void net_dns_destroy()
 	g_dns = NULL;
 }
 
-static void dummy_free(void* ptr)
-{
-}
-
-
 void net_dns_process()
 {
 	struct net_dns_result* result;
@@ -148,7 +143,7 @@ void net_dns_process()
 		}
 	});
 
-	list_clear(g_dns->results, &dummy_free);
+	list_clear(g_dns->results, NULL);
 	uhub_mutex_unlock(&g_dns->mutex);
 }
 

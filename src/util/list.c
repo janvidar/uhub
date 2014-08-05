@@ -40,11 +40,16 @@ void list_destroy(struct linked_list* list)
 	}
 }
 
+static void dummy_free(void* ptr)
+{
+}
 
 void list_clear(struct linked_list* list, void (*free_handle)(void* ptr))
 {
 	struct node* node = list->first;
 	struct node* tmp = NULL;
+	if (free_handle == NULL)
+		free_handle = &dummy_free;
 	while (node)
 	{
 		tmp = node->next;

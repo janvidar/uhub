@@ -31,8 +31,6 @@ static int send_command_not_found(struct command_base* cbase, struct hub_user* u
 static int send_command_syntax_error(struct command_base* cbase, struct hub_user* user);
 static int send_command_missing_arguments(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd);
 
-static void null_free(void* ptr) { }
-
 struct command_base
 {
 	struct hub_info* hub;
@@ -424,7 +422,7 @@ static int command_whoip(struct command_base* cbase, struct hub_user* user, stru
 	ret = uman_get_user_by_addr(cbase->hub->users, users, arg->data.range);
 	if (!ret)
 	{
-		list_clear(users, &null_free);
+		list_clear(users, NULL);
 		list_destroy(users);
 		return command_status(cbase, user, cmd, cbuf_create_const("No users found."));
 	}
@@ -439,7 +437,7 @@ static int command_whoip(struct command_base* cbase, struct hub_user* user, stru
 	cbuf_append(buf, "\n");
 
 	send_message(cbase, user, buf);
-	list_clear(users, &null_free);
+	list_clear(users, NULL);
 	list_destroy(users);
 	return 0;
 }
