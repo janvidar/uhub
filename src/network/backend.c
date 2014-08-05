@@ -141,7 +141,7 @@ int net_backend_process()
 	}
 
 	// Process pending DNS results
-	net_dns_process();
+	// net_dns_process();
 
 	g_backend->handler.backend_process(g_backend->data, res);
 

@@ -68,6 +68,11 @@ static void shutdown_free_results(void* ptr)
 	net_dns_result_free(result);
 }
 
+static void notify_callback(struct uhub_notify_handle* handle, void* ptr)
+{
+	net_dns_process();
+}
+
 
 // NOTE: Any job manipulating the members of this
 // struct must lock the mutex!
@@ -76,6 +81,8 @@ struct net_dns_subsystem
 	struct linked_list* jobs;    // currently running jobs
 	struct linked_list* results; // queue of results that are awaiting being delivered to callback.
 	uhub_mutex_t mutex;
+
+	struct uhub_notify_handle* notify_handle; // used to signal back to the event loop that there is something to process.
 };
 
 static struct net_dns_subsystem* g_dns = NULL;
@@ -87,6 +94,7 @@ void net_dns_initialize()
 	g_dns->jobs = list_create();
 	g_dns->results = list_create();
 	uhub_mutex_init(&g_dns->mutex);
+	g_dns->notify_handle = net_notify_create(notify_callback, g_dns);
 }
 
 void net_dns_destroy()
@@ -105,6 +113,7 @@ void net_dns_destroy()
 	list_destroy(g_dns->jobs);
 	list_destroy(g_dns->results);
 	uhub_mutex_destroy(&g_dns->mutex);
+	net_notify_destroy(g_dns->notify_handle);
 	hub_free(g_dns);
 	g_dns = NULL;
 }
@@ -113,7 +122,7 @@ void net_dns_process()
 {
 	struct net_dns_result* result;
 	uhub_mutex_lock(&g_dns->mutex);
-	LOG_DUMP("net_dns_process(): jobs=%d, results=%d", (int) list_size(g_dns->jobs), (int) list_size(g_dns->results));
+	LOG_TRACE("net_dns_process(): jobs=%d, results=%d", (int) list_size(g_dns->jobs), (int) list_size(g_dns->results));
 
 	LIST_FOREACH(struct net_dns_result*, result, g_dns->results,
 	{
@@ -210,6 +219,7 @@ static void* job_thread_resolve_name(void* ptr)
 	uhub_mutex_lock(&g_dns->mutex);
 	list_remove(g_dns->jobs, job);
 	list_append(g_dns->results, dns_results);
+	net_notify_signal(g_dns->notify_handle, 1);
 	uhub_mutex_unlock(&g_dns->mutex);
 
 	return dns_results;

@@ -75,6 +75,7 @@ extern "C" {
 #include "adc/message.h"
 
 #include "network/network.h"
+#include "network/notify.h"
 #include "network/connection.h"
 #include "network/dnsresolver.h"
 #include "network/ipcalc.h"
