@@ -103,9 +103,11 @@ extern void net_ssl_destroy(struct net_connection* con);
 extern void net_ssl_callback(struct net_connection* con, int events);
 
 
-
 extern ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode, struct ssl_context_handle* ssl_ctx);
 extern int   net_con_is_ssl(struct net_connection* con);
+
+extern const char* net_ssl_get_tls_version(struct net_connection* con);
+extern const char* net_ssl_get_tls_cipher(struct net_connection* con);
 
 #endif /* SSL_SUPPORT */
 #endif /* HAVE_UHUB_NETWORK_TLS_H */

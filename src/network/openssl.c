@@ -394,6 +394,18 @@ void net_ssl_callback(struct net_connection* con, int events)
 	}
 }
 
+const char* net_ssl_get_tls_version(struct net_connection* con)
+{
+	struct net_ssl_openssl* handle = get_handle(con);
+	return SSL_get_version(handle->ssl);
+}
+
+const char* net_ssl_get_tls_cipher(struct net_connection* con)
+{
+	struct net_ssl_openssl* handle = get_handle(con);
+	const SSL_CIPHER *cipher = SSL_get_current_cipher(handle->ssl);
+	return SSL_CIPHER_get_name(cipher);
+}
 
 #endif /* SSL_USE_OPENSSL */
 #endif /* SSL_SUPPORT */
