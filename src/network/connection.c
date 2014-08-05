@@ -201,6 +201,7 @@ static int net_connect_job_check(struct net_connect_job* job)
 	{
 		LOG_TRACE("net_connect_job_check(): Socket connected!");
 		job->con = NULL;
+		net_con_clear_timeout(con);
 		net_connect_callback(job->handle, net_connect_status_ok, con);
 		return 1;
 	}
