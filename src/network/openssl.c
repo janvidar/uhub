@@ -285,7 +285,7 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode 
 	}
 	else
 	{
-		handle->ssl = SSL_new(SSL_CTX_new(TLSv1_method()));
+		handle->ssl = SSL_new(SSL_CTX_new(TLSv1_2_method()));
 		SSL_set_fd(handle->ssl, con->sd);
 		handle->bio = SSL_get_rbio(handle->ssl);
 		con->ssl = (struct ssl_handle*) handle;
