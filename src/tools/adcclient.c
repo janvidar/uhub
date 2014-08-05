@@ -634,7 +634,14 @@ static void ADC_client_on_connected(struct ADC_client* client)
 static void ADC_client_on_connected_ssl(struct ADC_client* client)
 {
 	ADC_TRACE;
-	client->callback(client, ADC_CLIENT_SSL_OK, 0);
+	struct ADC_client_callback_data data;
+	struct ADC_client_tls_info tls_info;
+	data.tls_info = &tls_info;
+
+	tls_info.version = net_ssl_get_tls_version(client->con);
+	tls_info.cipher = net_ssl_get_tls_cipher(client->con);
+
+	client->callback(client, ADC_CLIENT_SSL_OK, &data);
 	ADC_client_send_handshake(client);
 }
 #endif

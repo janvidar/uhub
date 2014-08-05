@@ -108,6 +108,7 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 			break;
 
 		case ADC_CLIENT_SSL_OK:
+			printf("*** SSL connected (%s/%s).\n", data->tls_info->version, data->tls_info->cipher);
 			break;
 
 		case ADC_CLIENT_LOGGING_IN:

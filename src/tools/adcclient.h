@@ -95,6 +95,11 @@ struct ADC_client_quit_reason
 	int flags;
 };
 
+struct ADC_client_tls_info
+{
+	const char* cipher;
+	const char* version;
+};
 
 struct ADC_client_callback_data
 {
@@ -103,6 +108,7 @@ struct ADC_client_callback_data
 		struct ADC_chat_message* chat;
 		struct ADC_user* user;
 		struct ADC_client_quit_reason* quit;
+		struct ADC_client_tls_info* tls_info;
 	};
 };
 
