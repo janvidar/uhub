@@ -155,7 +155,7 @@ struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const
 	return (struct ssl_context_handle*) ctx;
 }
 
-extern void net_ssl_context_destroy(struct ssl_context_handle* ctx_)
+void net_ssl_context_destroy(struct ssl_context_handle* ctx_)
 {
 	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
 	SSL_CTX_free(ctx->ssl);
@@ -266,6 +266,7 @@ ssize_t net_con_ssl_connect(struct net_connection* con)
 ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode ssl_mode, struct ssl_context_handle* ssl_ctx)
 {
 	uhub_assert(con);
+	uhub_assert(ssl_ctx);
 
 	struct net_context_openssl* ctx = (struct net_context_openssl*) ssl_ctx;
 	struct net_ssl_openssl* handle = (struct net_ssl_openssl*) hub_malloc_zero(sizeof(struct net_ssl_openssl));
@@ -285,7 +286,7 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode 
 	}
 	else
 	{
-		handle->ssl = SSL_new(SSL_CTX_new(TLSv1_2_method()));
+		handle->ssl = SSL_new(ctx->ssl);
 		SSL_set_fd(handle->ssl, con->sd);
 		handle->bio = SSL_get_rbio(handle->ssl);
 		con->ssl = (struct ssl_handle*) handle;
@@ -353,6 +354,7 @@ void net_ssl_shutdown(struct net_connection* con)
 void net_ssl_destroy(struct net_connection* con)
 {
 	struct net_ssl_openssl* handle = get_handle(con);
+	LOG_TRACE("net_ssl_destroy: %p", con);
 	SSL_free(handle->ssl);
 	hub_free(handle);
 }

@@ -27,6 +27,18 @@
 
 // #define ADCC_DEBUG
 // #define ADC_CLIENT_DEBUG_PROTO
+
+struct ADC_client_global
+{
+	size_t references;
+#ifdef SSL_SUPPORT
+	struct ssl_context_handle* ctx;
+#endif
+};
+
+static struct ADC_client_global* g_adc_client = NULL;
+
+
 enum ADC_client_state
 {
 	ps_none, /* Not connected */
@@ -541,6 +553,17 @@ struct ADC_client* ADC_client_create(const char* nickname, const char* descripti
 	client->recv_queue = ioq_recv_create();
 
 	client->ptr = ptr;
+
+	if (!g_adc_client)
+	{
+		g_adc_client = (struct ADC_client_global*) hub_malloc_zero(sizeof(struct ADC_client_global));
+#ifdef SSL_SUPPORT
+		g_adc_client->ctx = net_ssl_context_create("1.2", "HIGH");
+
+#endif
+	}
+	g_adc_client->references++;
+
 	return client;
 }
 
@@ -556,6 +579,20 @@ void ADC_client_destroy(struct ADC_client* client)
 	hub_free(client->desc);
 	hub_free(client->address.hostname);
 	hub_free(client);
+
+	if (g_adc_client && g_adc_client->references > 0)
+	{
+		g_adc_client->references--;
+		if (!g_adc_client->references)
+		{
+#ifdef SSL_SUPPORT
+			net_ssl_context_destroy(g_adc_client->ctx);
+			g_adc_client->ctx = NULL;
+#endif
+			hub_free(g_adc_client);
+			g_adc_client = NULL;
+		}
+	}
 }
 
 static void connect_callback(struct net_connect_handle* handle, enum net_connect_status status, struct net_connection* con, void* ptr)
@@ -622,7 +659,7 @@ static void ADC_client_on_connected(struct ADC_client* client)
 		net_con_update(client->con, NET_EVENT_READ | NET_EVENT_WRITE);
 		client->callback(client, ADC_CLIENT_SSL_HANDSHAKE, 0);
 		ADC_client_set_state(client, ps_conn_ssl);
-		net_con_ssl_handshake(client->con, net_con_ssl_mode_client, NULL);
+		net_con_ssl_handshake(client->con, net_con_ssl_mode_client, g_adc_client->ctx);
 	}
 	else
 #endif
