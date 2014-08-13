@@ -200,6 +200,9 @@ static int handle_openssl_error(struct net_connection* con, int ret, int read)
 {
 	struct net_ssl_openssl* handle = get_handle(con);
 	int err = SSL_get_error(handle->ssl, ret);
+
+	LOG_TRACE("handle_openssl_error: ret=%d, err=%d", ret, err);
+
 	switch (err)
 	{
 		case SSL_ERROR_ZERO_RETURN:
@@ -222,10 +225,18 @@ static int handle_openssl_error(struct net_connection* con, int ret, int read)
 
 		case SSL_ERROR_SYSCALL:
 			handle->state = tls_st_error;
-			return -2;
+			return -1;
+
+		case SSL_ERROR_SSL:
+			handle->state = tls_st_error;
+			return -1;
+		  
+		default:
+		  LOG_ERROR("Unable to determine SSL error: %d", err);
+		  
 	}
 
-	return -2;
+	return -1;
 }
 
 ssize_t net_con_ssl_accept(struct net_connection* con)
@@ -270,9 +281,12 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode 
 
 	struct net_context_openssl* ctx = (struct net_context_openssl*) ssl_ctx;
 	struct net_ssl_openssl* handle = (struct net_ssl_openssl*) hub_malloc_zero(sizeof(struct net_ssl_openssl));
+	
 
 	if (ssl_mode == net_con_ssl_mode_server)
 	{
+		LOG_TRACE("net_con_ssl_handshake: %p, mode=SERVER\n", con);
+
 		handle->ssl = SSL_new(ctx->ssl);
 		if (!handle->ssl)
 		{
@@ -286,6 +300,7 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode 
 	}
 	else
 	{
+		LOG_TRACE("net_con_ssl_handshake: %p, mode=CLIENT", con);
 		handle->ssl = SSL_new(ctx->ssl);
 		SSL_set_fd(handle->ssl, con->sd);
 		handle->bio = SSL_get_rbio(handle->ssl);
@@ -297,6 +312,9 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode 
 ssize_t net_ssl_send(struct net_connection* con, const void* buf, size_t len)
 {
 	struct net_ssl_openssl* handle = get_handle(con);
+
+	if (handle->state == tls_st_error)
+		return -1;
 
 	uhub_assert(handle->state == tls_st_connected);
 
@@ -319,7 +337,7 @@ ssize_t net_ssl_recv(struct net_connection* con, void* buf, size_t len)
 	ssize_t ret;
 
 	if (handle->state == tls_st_error)
-		return -2;
+		return -1;
 
 	uhub_assert(handle->state == tls_st_connected);
 
@@ -362,6 +380,7 @@ void net_ssl_destroy(struct net_connection* con)
 void net_ssl_callback(struct net_connection* con, int events)
 {
 	struct net_ssl_openssl* handle = get_handle(con);
+	int ret = 0;
 
 	switch (handle->state)
 	{
@@ -374,13 +393,19 @@ void net_ssl_callback(struct net_connection* con, int events)
 			break;
 
 		case tls_st_accepting:
-			if (net_con_ssl_accept(con) != 0)
+			ret = net_con_ssl_accept(con);
+			if (ret > 0)
 				con->callback(con, NET_EVENT_READ, con->ptr);
+			else if (ret < 0)
+				con->callback(con, NET_EVENT_ERROR, con->ptr);
 			break;
 
 		case tls_st_connecting:
-			if (net_con_ssl_connect(con) != 0)
+			ret = net_con_ssl_connect(con);
+			if (ret > 0)
 				con->callback(con, NET_EVENT_READ, con->ptr);
+			else if (ret < 0)
+				con->callback(con, NET_EVENT_ERROR, con->ptr);
 			break;
 
 		case tls_st_connected:
@@ -408,6 +433,23 @@ const char* net_ssl_get_tls_cipher(struct net_connection* con)
 	const SSL_CIPHER *cipher = SSL_get_current_cipher(handle->ssl);
 	return SSL_CIPHER_get_name(cipher);
 }
+
+int net_ssl_error(struct net_connection* con)
+{
+	struct net_ssl_openssl* handle = get_handle(con);
+	if (handle->state == tls_st_error)
+		return -1;
+
+// 	if (ssl->con)
+// 	{
+// 		if (SSL_get_error
+// 	  
+// 	}
+	
+	
+	return 0;
+}
+
 
 #endif /* SSL_USE_OPENSSL */
 #endif /* SSL_SUPPORT */

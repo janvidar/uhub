@@ -89,6 +89,8 @@ extern ssize_t net_con_ssl_connect(struct net_connection*);
 extern ssize_t net_ssl_send(struct net_connection* con, const void* buf, size_t len);
 extern ssize_t net_ssl_recv(struct net_connection* con, void* buf, size_t len);
 
+extern int net_ssl_error(struct net_connection*);
+
 /**
  * Update the event mask. Additional events may be requested depending on the
  * needs of the TLS layer.

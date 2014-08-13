@@ -34,6 +34,7 @@ enum ADC_client_callback_type
 	ADC_CLIENT_DISCONNECTED     = 1003,
 	ADC_CLIENT_SSL_HANDSHAKE    = 1101,
 	ADC_CLIENT_SSL_OK           = 1102,
+	ADC_CLIENT_SSL_ERROR        = 1103,
 
 	ADC_CLIENT_LOGGING_IN       = 2001,
 	ADC_CLIENT_PASSWORD_REQ     = 2002,
@@ -124,7 +125,7 @@ void ADC_client_set_callback(struct ADC_client* client, adc_client_cb);
 void ADC_client_destroy(struct ADC_client* client);
 int ADC_client_connect(struct ADC_client* client, const char* address);
 void ADC_client_disconnect(struct ADC_client* client);
-void ADC_client_send(struct ADC_client* client, struct adc_message* msg);
+int ADC_client_send(struct ADC_client* client, struct adc_message* msg);
 
 #endif /* HAVE_UHUB_ADC_CLIENT_H */
 

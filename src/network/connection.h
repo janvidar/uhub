@@ -28,6 +28,7 @@
 #define NET_EVENT_TIMEOUT         0x0001
 #define NET_EVENT_READ            0x0002
 #define NET_EVENT_WRITE           0x0004
+#define NET_EVENT_ERROR           0x0008
 
 struct net_connection
 {
@@ -81,6 +82,11 @@ extern void net_con_callback(struct net_connection* con, int events);
  * that the con can safely be deleted (or set to NULL).
  */
 extern void net_con_close(struct net_connection* con);
+
+/**
+ * @return -1 if an error is known for the connection, or 0 if no error is known.
+ */
+extern int net_con_error(struct net_connection* con);
 
 /**
  * Send data

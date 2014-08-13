@@ -89,7 +89,7 @@ struct ADC_client
 
 
 static ssize_t ADC_client_recv(struct ADC_client* client);
-static void ADC_client_send_info(struct ADC_client* client);
+static int ADC_client_send_info(struct ADC_client* client);
 static void ADC_client_on_connected(struct ADC_client* client);
 #ifdef SSL_SUPPORT
 static void ADC_client_on_connected_ssl(struct ADC_client* client);
@@ -132,12 +132,9 @@ static const char* ADC_client_state_string[] =
 
 static void ADC_client_set_state(struct ADC_client* client, enum ADC_client_state state)
 {
-	ADC_TRACE;
 	if (client->state != state)
 	{
-#ifdef ADCC_DEBUG
-		ADC_client_debug(client, "Set state %s (was %s)", ADC_client_state_string[(int) state], ADC_client_state_string[(int) client->state]);
-#endif
+		fprintf(stderr, "TRACE: %s: Set state %s (was %s)\n", __PRETTY_FUNCTION__, ADC_client_state_string[(int) state], ADC_client_state_string[(int) client->state]);
 		client->state = state;
 	}
 }
@@ -169,8 +166,8 @@ static void adc_cid_pid(struct ADC_client* client)
 
 static void event_callback(struct net_connection* con, int events, void *arg)
 {
-	ADC_TRACE;
 	struct ADC_client* client = (struct ADC_client*) net_con_get_ptr(con);
+	fprintf(stderr, "TRACE: %s: Event callback %p, events: %d\n", __PRETTY_FUNCTION__, con, events);
 
 	switch (client->state)
 	{
@@ -187,10 +184,27 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 			if (events == NET_EVENT_TIMEOUT)
 			{
 				client->callback(client, ADC_CLIENT_DISCONNECTED, 0);
+				ADC_client_on_disconnected(client);
 				return;
 			}
 
-			ADC_client_on_connected_ssl(client);
+			if (events == NET_EVENT_ERROR)
+			{
+				client->callback(client, ADC_CLIENT_SSL_ERROR, 0);
+				ADC_client_on_disconnected(client);
+				return;
+			}
+
+			if (net_con_error(con) == 0)
+			{
+				ADC_client_on_connected_ssl(client);
+			}
+			else
+			{
+				client->callback(client, ADC_CLIENT_SSL_ERROR, 0);
+				ADC_client_on_disconnected(client);
+				return;
+			}
 			break;
 #endif
 
@@ -199,13 +213,18 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 			{
 				if (ADC_client_recv(client) == -1)
 				{
+					client->callback(client, ADC_CLIENT_DISCONNECTED, 0);
 					ADC_client_on_disconnected(client);
 				}
 			}
 
 			if (events & NET_EVENT_WRITE)
 			{
-				ADC_client_send_queue(client);
+				if (ADC_client_send_queue(client) == -1)
+				{
+					client->callback(client, ADC_CLIENT_DISCONNECTED, 0);
+					ADC_client_on_disconnected(client);
+				}
 			}
 	}
 }
@@ -278,7 +297,10 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 				client->sid = string_to_sid(&line[5]);
 				client->callback(client, ADC_CLIENT_LOGGING_IN, 0);
 				ADC_client_set_state(client, ps_identify);
-				ADC_client_send_info(client);
+				if (ADC_client_send_info(client) == -1)
+				{
+					ADC_client_disconnect(client);
+				}
 			}
 			break;
 
@@ -472,7 +494,10 @@ static int ADC_client_send_queue(struct ADC_client* client)
 	}
 
 	if (ret < 0)
-		return quit_socket_error;
+	{
+		ADC_client_on_disconnected(client);
+		return -1;
+	}
 
 	if (ioq_send_get_bytes(client->send_queue))
 	{
@@ -486,7 +511,7 @@ static int ADC_client_send_queue(struct ADC_client* client)
 }
 
 
-void ADC_client_send(struct ADC_client* client, struct adc_message* msg)
+int ADC_client_send(struct ADC_client* client, struct adc_message* msg)
 {
 	ADC_TRACE;
 
@@ -497,17 +522,18 @@ void ADC_client_send(struct ADC_client* client, struct adc_message* msg)
 	{
 		/* Perform oportunistic write */
 		ioq_send_add(client->send_queue, msg);
-		ADC_client_send_queue(client);
+		return ADC_client_send_queue(client);
 	}
 	else
 	{
 		ioq_send_add(client->send_queue, msg);
 		if (!(client->flags & cflag_pipe))
 			net_con_update(client->con, NET_EVENT_READ | NET_EVENT_WRITE);
+		return 0;
 	}
 }
 
-void ADC_client_send_info(struct ADC_client* client)
+int ADC_client_send_info(struct ADC_client* client)
 {
 	ADC_TRACE;
 	client->info = adc_msg_construct_source(ADC_CMD_BINF, client->sid, 96);
@@ -535,7 +561,7 @@ void ADC_client_send_info(struct ADC_client* client)
 
 	adc_cid_pid(client);
 
-	ADC_client_send(client, client->info);
+	return ADC_client_send(client, client->info);
 }
 
 
@@ -638,16 +664,22 @@ int ADC_client_connect(struct ADC_client* client, const char* address)
 	return 1;
 }
 
-static void ADC_client_send_handshake(struct ADC_client* client)
+static int ADC_client_send_handshake(struct ADC_client* client)
 {
 	ADC_TRACE;
+	int ret;
 	struct adc_message* handshake = adc_msg_create(ADC_HANDSHAKE);
 
 	client->callback(client, ADC_CLIENT_CONNECTED, 0);
 	net_con_update(client->con, NET_EVENT_READ);
-	ADC_client_send(client, handshake);
-	ADC_client_set_state(client, ps_protocol);
+	ret = ADC_client_send(client, handshake);
+
+	if (ret != -1)
+		ADC_client_set_state(client, ps_protocol);
+	else
+		ADC_client_on_disconnected(client);
 	adc_msg_free(handshake);
+	return ret;
 }
 
 static void ADC_client_on_connected(struct ADC_client* client)
@@ -686,9 +718,12 @@ static void ADC_client_on_connected_ssl(struct ADC_client* client)
 static void ADC_client_on_disconnected(struct ADC_client* client)
 {
 	ADC_TRACE;
-	net_con_close(client->con);
-	client->con = 0;
-	ADC_client_set_state(client, ps_none);
+	if (client->con)
+	{
+		net_con_close(client->con);
+		client->con = 0;
+		ADC_client_set_state(client, ps_none);
+	}
 }
 
 static void ADC_client_on_login(struct ADC_client* client)

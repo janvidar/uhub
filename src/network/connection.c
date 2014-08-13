@@ -163,6 +163,15 @@ void net_con_callback(struct net_connection* con, int events)
 		con->callback(con, events, con->ptr);
 }
 
+int net_con_error(struct net_connection* con)
+{
+#ifdef SSL_SUPPORT
+	if (con->ssl)
+		net_ssl_error(con);    
+#endif
+	return 0;
+}
+
 struct net_connect_job
 {
 	struct net_connection* con;

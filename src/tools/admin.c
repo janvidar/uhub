@@ -19,6 +19,7 @@
 
 #include "adcclient.h"
 
+static int running = 1;
 static struct ADC_user g_usermap[SID_MAX];
 
 static void user_add(const struct ADC_user* user)
@@ -101,6 +102,7 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 
 		case ADC_CLIENT_DISCONNECTED:
 			status("Disconnected.");
+			running = 0;
 			break;
 
 		case ADC_CLIENT_SSL_HANDSHAKE:
@@ -109,6 +111,11 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 
 		case ADC_CLIENT_SSL_OK:
 			printf("*** SSL connected (%s/%s).\n", data->tls_info->version, data->tls_info->cipher);
+			break;
+
+		case ADC_CLIENT_SSL_ERROR:
+			status("SSL error.");
+			running = 0;
 			break;
 
 		case ADC_CLIENT_LOGGING_IN:
@@ -156,8 +163,6 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 	}
 	return 1;
 }
-
-static int running = 1;
 
 #if !defined(WIN32)
 static struct uhub_notify_handle* notify_handle;
