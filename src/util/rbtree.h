@@ -62,8 +62,8 @@ struct rb_tree
 extern struct rb_tree* rb_tree_create(rb_tree_compare compare, rb_tree_alloc alloc, rb_tree_free dealloc);
 
 /**
- * Deletes the tree and all the nodes.
- * But not the content inside the nodes.
+ * Delete the tree.
+ * Assumes that the tree is empty.
  */
 extern void rb_tree_destroy(struct rb_tree*);
 

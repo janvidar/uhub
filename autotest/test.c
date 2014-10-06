@@ -732,7 +732,8 @@ int main(int argc, char** argv)
 	exotic_add_test(&handle, &exotic_test_rbtree_size_4, "rbtree_size_4");
 	exotic_add_test(&handle, &exotic_test_rbtree_check_10000, "rbtree_check_10000");
 	exotic_add_test(&handle, &exotic_test_rbtree_iterate_10000, "rbtree_iterate_10000");
-	exotic_add_test(&handle, &exotic_test_rbtree_remove_5000, "rbtree_remove_5000");
+	exotic_add_test(&handle, &exotic_test_rbtree_remove_10000, "rbtree_remove_10000");
+	exotic_add_test(&handle, &exotic_test_rbtree_destroy_1, "rbtree_destroy_1");
 	exotic_add_test(&handle, &exotic_test_sid_create_pool, "sid_create_pool");
 	exotic_add_test(&handle, &exotic_test_sid_check_0a, "sid_check_0a");
 	exotic_add_test(&handle, &exotic_test_sid_check_0b, "sid_check_0b");
@@ -770,6 +771,7 @@ int main(int argc, char** argv)
 	exotic_add_test(&handle, &exotic_test_timer_add_5_events_1, "timer_add_5_events_1");
 	exotic_add_test(&handle, &exotic_test_timer_check_5_events_1, "timer_check_5_events_1");
 	exotic_add_test(&handle, &exotic_test_timer_process_5_events_1, "timer_process_5_events_1");
+	exotic_add_test(&handle, &exotic_test_timer_shutdown, "timer_shutdown");
 	exotic_add_test(&handle, &exotic_test_tokenizer_basic_0, "tokenizer_basic_0");
 	exotic_add_test(&handle, &exotic_test_tokenizer_basic_1, "tokenizer_basic_1");
 	exotic_add_test(&handle, &exotic_test_tokenizer_basic_1a, "tokenizer_basic_1a");
