@@ -116,7 +116,6 @@ EXO_TEST(rbtree_iterate_10000, {
 	struct rb_node* n = (struct rb_node*) rb_tree_first(tree);
 	while (n)
 	{
-		struct rb_node* p = n;
 		n = (struct rb_node*) rb_tree_next(tree);
 		i++;
 	}
@@ -132,7 +131,6 @@ static void free_node(struct rb_node* n)
 
 EXO_TEST(rbtree_remove_5000, {
 	int i = 0;
-	struct rb_node* n = (struct rb_node*) rb_tree_first(tree);
 	for (i = 0; i < MAX_NODES ; i += 2)
 	{
 		const char* key = uhub_itoa(i);

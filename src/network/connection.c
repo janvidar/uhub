@@ -283,7 +283,6 @@ static int net_connect_job_process(struct net_connect_job* job)
  */
 static void net_connect_job_internal_cb(struct net_connection* con, int event, void* ptr)
 {
-	int ret;
 	struct net_connect_job* job = net_con_get_ptr(con);
 	struct net_connect_job* next_job = job->next;
 	struct net_connect_handle* handle = job->handle;
@@ -441,7 +440,6 @@ static int net_con_connect_dns_callback(struct net_dns_job* job, const struct ne
 	struct net_connect_handle* handle = (struct net_connect_handle*) net_dns_job_get_ptr(job);
 	handle->dns = NULL;
 	size_t usable = 0;
-	int ret;
 
 	LOG_TRACE("net_con_connect(): async - Got DNS results");
 	if (!result)

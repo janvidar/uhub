@@ -99,9 +99,6 @@ void net_dns_initialize()
 
 void net_dns_destroy()
 {
-	struct net_dns_job* job;
-	struct net_dns_result* result;
-
 	uhub_mutex_lock(&g_dns->mutex);
 	LOG_TRACE("net_dns_destroy(): jobs=%d", (int) list_size(g_dns->jobs));
 	list_clear(g_dns->jobs, &shutdown_free_jobs);
