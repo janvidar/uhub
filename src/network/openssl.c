@@ -52,6 +52,7 @@ static struct net_ssl_openssl* get_handle(struct net_connection* con)
 	return (struct net_ssl_openssl*) con->ssl;
 }
 
+#ifdef DEBUG
 static const char* get_state_str(enum ssl_state state)
 {
 	switch (state)
@@ -66,10 +67,11 @@ static const char* get_state_str(enum ssl_state state)
 	uhub_assert(!"This should not happen - invalid state!");
 	return "(UNKNOWN STATE)";
 }
+#endif
 
 static void net_ssl_set_state(struct net_ssl_openssl* handle, enum ssl_state new_state)
 {
-	LOG_ERROR("net_ssl_set_state(): prev_state=%s, new_state=%s", get_state_str(handle->state), get_state_str(new_state));
+	LOG_DEBUG("net_ssl_set_state(): prev_state=%s, new_state=%s", get_state_str(handle->state), get_state_str(new_state));
 	handle->state = new_state;
 }
 
@@ -255,8 +257,6 @@ static int handle_openssl_error(struct net_connection* con, int ret, int read)
 			return -2;
 	}
 
-	LOG_ERROR("WTF?: err=%d, ret=%d", err, ret);
-
 	return -2;
 }
 
@@ -433,12 +433,12 @@ void net_ssl_callback(struct net_connection* con, int events)
 
 			if (ret > 0)
 			{
-				LOG_ERROR("%p SSL connected!", con);
+				LOG_DEBUG("%p SSL connected!", con);
 				con->callback(con, NET_EVENT_READ, con->ptr);
 			}
 			else
 			{
-				LOG_ERROR("%p SSL handshake failed!");
+				LOG_DEBUG("%p SSL handshake failed!", con);
 				con->callback(con, NET_EVENT_ERROR, con->ptr);
 			}
 			break;
