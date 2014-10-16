@@ -155,6 +155,11 @@ struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const
 	/* Disable SSLv2 */
 	SSL_CTX_set_options(ctx->ssl, SSL_OP_NO_SSLv2);
 
+// #ifdef SSL_OP_NO_SSLv3
+	/* Disable SSLv3 */
+	SSL_CTX_set_options(ctx->ssl, SSL_OP_NO_SSLv3);
+// #endif
+
 	// FIXME: Why did we need this again?
 	SSL_CTX_set_quiet_shutdown(ctx->ssl, 1);
 
