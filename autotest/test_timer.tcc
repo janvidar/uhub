@@ -117,3 +117,9 @@ EXO_TEST(timer_process_5_events_1,{
 	g_now = 4;
 	return timeout_queue_process(g_queue, g_now) == g_triggered;
 });
+
+EXO_TEST(timer_shutdown,{
+	timeout_queue_shutdown(g_queue);
+	hub_free(g_queue);
+	return 1;
+});

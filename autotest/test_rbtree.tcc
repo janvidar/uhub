@@ -86,7 +86,7 @@ EXO_TEST(rbtree_size_3, { return rb_tree_size(tree) == 0; });
 
 EXO_TEST(rbtree_insert_10000, {
 	int i;
-	for (i = 0; i < MAX_NODES ; i++)
+	for (i = 0; i < MAX_NODES; i++)
 	{
 		const char* key = strdup(uhub_itoa(i));
 		const char* val = strdup(uhub_itoa(i + 16384));
@@ -96,11 +96,11 @@ EXO_TEST(rbtree_insert_10000, {
 	return 1;
 });
 
-EXO_TEST(rbtree_size_4, { return rb_tree_size(tree) == MAX_NODES ; });
+EXO_TEST(rbtree_size_4, { return rb_tree_size(tree) == MAX_NODES; });
 
 EXO_TEST(rbtree_check_10000, {
 	int i;
-	for (i = 0; i < MAX_NODES ; i++)
+	for (i = 0; i < MAX_NODES; i++)
 	{
 		char* key = strdup(uhub_itoa(i));
 		const char* expect = uhub_itoa(i + 16384);
@@ -116,29 +116,35 @@ EXO_TEST(rbtree_iterate_10000, {
 	struct rb_node* n = (struct rb_node*) rb_tree_first(tree);
 	while (n)
 	{
-		struct rb_node* p = n;
 		n = (struct rb_node*) rb_tree_next(tree);
 		i++;
 	}
-	return i == MAX_NODES ;
+	return i == MAX_NODES;
 });
 
-
+static int freed_nodes = 0;
 static void free_node(struct rb_node* n)
 {
 	hub_free((void*) n->key);
 	hub_free((void*) n->value);
+	freed_nodes += 1;
 }
 
-EXO_TEST(rbtree_remove_5000, {
-	int i = 0;
-	struct rb_node* n = (struct rb_node*) rb_tree_first(tree);
-	for (i = 0; i < MAX_NODES ; i += 2)
+EXO_TEST(rbtree_remove_10000, {
+	int i;
+	int j;
+	for (j = 0; j < 2; j++)
 	{
-		const char* key = uhub_itoa(i);
-		rb_tree_remove_node(tree, key, &free_node);
+		for (i = j; i < MAX_NODES; i += 2)
+		{
+			const char* key = uhub_itoa(i);
+			rb_tree_remove_node(tree, key, &free_node);
+		}
 	}
-	return 1;
+	return freed_nodes == MAX_NODES;
 });
 
-
+EXO_TEST(rbtree_destroy_1, {
+	rb_tree_destroy(tree);
+	return 1;
+});
