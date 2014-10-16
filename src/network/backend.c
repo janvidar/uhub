@@ -159,8 +159,8 @@ void net_con_initialize(struct net_connection* con, int sd, net_connection_cb ca
 {
 	g_backend->handler.con_init(g_backend->data, con, sd, callback, ptr);
 
-	net_set_nonblocking(con->sd, 1);
-	net_set_nosigpipe(con->sd, 1);
+	net_set_nonblocking(net_con_get_sd(con), 1);
+	net_set_nosigpipe(net_con_get_sd(con), 1);
 
 	g_backend->handler.con_add(g_backend->data, con, events);
 	g_backend->common.num++;
