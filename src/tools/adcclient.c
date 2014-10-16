@@ -190,7 +190,16 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 				return;
 			}
 
-			ADC_client_on_connected_ssl(client);
+			if (events == NET_EVENT_ERROR)
+			{
+				ADC_client_on_disconnected(client);
+				client->callback(client, ADC_CLIENT_DISCONNECTED, 0);
+				return;
+			}
+			else
+			{
+				ADC_client_on_connected_ssl(client);
+			}
 			break;
 #endif
 
