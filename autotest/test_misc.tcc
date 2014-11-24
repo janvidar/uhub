@@ -107,6 +107,7 @@ static const char test_utf_seq_6[] = { 0xE2, 0x82, 0xAC, 0x00}; // valid
 static const char test_utf_seq_7[] = { 0xC2, 0x32, 0x00}; // invalid
 static const char test_utf_seq_8[] = { 0xE2, 0x82, 0x32, 0x00}; // invalid
 static const char test_utf_seq_9[] = { 0xE2, 0x32, 0x82, 0x00}; // invalid
+static const char test_utf_seq_10[] = { 0xF0, 0x9F, 0x98, 0x81, 0x00}; // valid
 
 EXO_TEST(utf8_valid_4, { return is_valid_utf8(test_utf_seq_1); });
 EXO_TEST(utf8_valid_5, { return !is_valid_utf8(test_utf_seq_2); });
@@ -117,5 +118,61 @@ EXO_TEST(utf8_valid_9, { return is_valid_utf8(test_utf_seq_6); });
 EXO_TEST(utf8_valid_10, { return !is_valid_utf8(test_utf_seq_7); });
 EXO_TEST(utf8_valid_11, { return !is_valid_utf8(test_utf_seq_8); });
 EXO_TEST(utf8_valid_12, { return !is_valid_utf8(test_utf_seq_9); });
+EXO_TEST(utf8_valid_13, { return is_valid_utf8(test_utf_seq_10); });
 
+// Limits of utf-8
+static const char test_utf_seq_11[] = { 0x7F, 0x00 }; // valid last 7-bit character
+static const char test_utf_seq_12[] = { 0x80, 0x00 }; // invalid truncated string
+static const char test_utf_seq_13[] = { 0xBF, 0x00 }; // invalid truncated string
+static const char test_utf_seq_14[] = { 0xC0, 0x80, 0x00 }; // invalid out of 2 bytes range
+static const char test_utf_seq_15[] = { 0xC1, 0x7F, 0x00 }; // invalid out of 2 bytes range
+static const char test_utf_seq_16[] = { 0xC2, 0x00 }; // invalid truncated string
+static const char test_utf_seq_17[] = { 0xC2, 0x80, 0x00 }; // valid
+static const char test_utf_seq_18[] = { 0xDF, 0xBF, 0x00 }; // valid
+static const char test_utf_seq_19[] = { 0xE0, 0x80, 0x80, 0x00 }; // invalid out of 3 bytes range
+static const char test_utf_seq_20[] = { 0xE0, 0x9F, 0xBF, 0x00 }; // invalid out of 3 bytes range
+static const char test_utf_seq_21[] = { 0xE0, 0x00 }; // invalid truncated string
+static const char test_utf_seq_22[] = { 0xE0, 0xA0, 0x00 }; // invalid truncated string
+static const char test_utf_seq_23[] = { 0xE0, 0xA0, 0x80, 0x00 }; // valid
+static const char test_utf_seq_24[] = { 0xEC, 0x9F, 0xBF, 0x00 }; // valid
+static const char test_utf_seq_25[] = { 0xED, 0xA0, 0x80, 0x00 }; // invalid surrogate
+static const char test_utf_seq_26[] = { 0xED, 0xBF, 0xBF, 0x00 }; // invalid surrogate
+static const char test_utf_seq_27[] = { 0xEF, 0x80, 0x80, 0x00 }; // valid
+static const char test_utf_seq_28[] = { 0xEF, 0xBF, 0xBF, 0x00 }; // valid
+static const char test_utf_seq_29[] = { 0xF0, 0x80, 0x80, 0x80, 0x00 }; // invalid out of 4 bytes range
+static const char test_utf_seq_30[] = { 0xF0, 0x8F, 0xBF, 0xBF, 0x00 }; // invalid out of 4 bytes range
+static const char test_utf_seq_31[] = { 0xF0, 0x00 }; // invalid truncated string
+static const char test_utf_seq_32[] = { 0xF0, 0x90, 0x00 }; // invalid truncated string
+static const char test_utf_seq_33[] = { 0xF0, 0x90, 0x80, 0x00 }; // invalid truncated string
+static const char test_utf_seq_34[] = { 0xF0, 0x90, 0x80, 0x80, 0x00 }; // valid
+static const char test_utf_seq_35[] = { 0xF4, 0x8F, 0xBF, 0xBF, 0x00 }; // valid
+static const char test_utf_seq_36[] = { 0xF4, 0x90, 0x80, 0x80, 0x00 }; // invalid out of 4 bytes range
+static const char test_utf_seq_37[] = { 0xFF, 0xBF, 0xBF, 0xBF, 0x00 }; // invalid out of 4 bytes range
 
+EXO_TEST(utf8_valid_14, { return is_valid_utf8(test_utf_seq_11); });
+EXO_TEST(utf8_valid_15, { return !is_valid_utf8(test_utf_seq_12); });
+EXO_TEST(utf8_valid_16, { return !is_valid_utf8(test_utf_seq_13); });
+EXO_TEST(utf8_valid_17, { return !is_valid_utf8(test_utf_seq_14); });
+EXO_TEST(utf8_valid_18, { return !is_valid_utf8(test_utf_seq_15); });
+EXO_TEST(utf8_valid_19, { return !is_valid_utf8(test_utf_seq_16); });
+EXO_TEST(utf8_valid_20, { return is_valid_utf8(test_utf_seq_17); });
+EXO_TEST(utf8_valid_21, { return is_valid_utf8(test_utf_seq_18); });
+EXO_TEST(utf8_valid_22, { return !is_valid_utf8(test_utf_seq_19); });
+EXO_TEST(utf8_valid_23, { return !is_valid_utf8(test_utf_seq_20); });
+EXO_TEST(utf8_valid_24, { return !is_valid_utf8(test_utf_seq_21); });
+EXO_TEST(utf8_valid_25, { return !is_valid_utf8(test_utf_seq_22); });
+EXO_TEST(utf8_valid_26, { return is_valid_utf8(test_utf_seq_23); });
+EXO_TEST(utf8_valid_27, { return is_valid_utf8(test_utf_seq_24); });
+EXO_TEST(utf8_valid_28, { return !is_valid_utf8(test_utf_seq_25); });
+EXO_TEST(utf8_valid_29, { return !is_valid_utf8(test_utf_seq_26); });
+EXO_TEST(utf8_valid_30, { return is_valid_utf8(test_utf_seq_27); });
+EXO_TEST(utf8_valid_31, { return is_valid_utf8(test_utf_seq_28); });
+EXO_TEST(utf8_valid_32, { return !is_valid_utf8(test_utf_seq_29); });
+EXO_TEST(utf8_valid_33, { return !is_valid_utf8(test_utf_seq_30); });
+EXO_TEST(utf8_valid_34, { return !is_valid_utf8(test_utf_seq_31); });
+EXO_TEST(utf8_valid_35, { return !is_valid_utf8(test_utf_seq_32); });
+EXO_TEST(utf8_valid_36, { return !is_valid_utf8(test_utf_seq_33); });
+EXO_TEST(utf8_valid_37, { return is_valid_utf8(test_utf_seq_34); });
+EXO_TEST(utf8_valid_38, { return is_valid_utf8(test_utf_seq_35); });
+EXO_TEST(utf8_valid_39, { return !is_valid_utf8(test_utf_seq_36); });
+EXO_TEST(utf8_valid_40, { return !is_valid_utf8(test_utf_seq_37); });
