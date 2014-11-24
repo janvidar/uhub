@@ -24,7 +24,6 @@
 	uhub_assert(X); \
 	uhub_assert(X->cache); \
 	uhub_assert(X->capacity); \
-	uhub_assert(X->length); \
 	uhub_assert(X->length <= X->capacity); \
 	uhub_assert(X->references > 0); \
 	uhub_assert(X->length == strlen(X->cache));
