@@ -156,9 +156,10 @@ typedef uint32_t fourcc_t;
 #define ADC_SUP_FLAG_ADD                "AD"
 #define ADC_SUP_FLAG_REMOVE             "RM"
 
-#define ADC_CLIENT_TYPE_BOT             "1"
-#define ADC_CLIENT_TYPE_REGISTERED_USER "2"
-#define ADC_CLIENT_TYPE_OPERATOR        "4"
+#define ADC_CLIENT_TYPE_BOT              "1"
+#define ADC_CLIENT_TYPE_REGISTERED_USER  "2"
+#define ADC_CLIENT_TYPE_OPERATOR         "4"
+#define ADC_CLIENT_TYPE_HUBBOT           "5"  /* 1 + 4 */
 #define ADC_CLIENT_TYPE_SUPER_USER      "12"  /* 8 + 4 */
 #define ADC_CLIENT_TYPE_ADMIN           "20"  /* 16 + 4 = hub owner */
 #define ADC_CLIENT_TYPE_HUB             "32"  /* the hub itself */
