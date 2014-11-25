@@ -84,7 +84,7 @@ class Option(object):
 
 class SourceGenerator(object):
 	def __init__(self, filename, cppStyle = True):
-		print "Generating %s..." % filename
+		print ("Generating %s..." % filename)
 		self.f = open(filename, 'w');
 
 	def write_header(self, Comment = True):
