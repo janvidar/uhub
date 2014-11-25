@@ -34,6 +34,10 @@ cmake ${CMAKEOPTS} \
 make VERBOSE=1
 
 
+make VERBOSE=1 test
+./test
+
+
 sudo make install
 du -shc /etc/uhub/ /usr/bin/uhub* /usr/lib/uhub/
 
