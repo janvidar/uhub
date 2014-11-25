@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -x
+set -e
 
 export CFLAGS="$(dpkg-buildflags --get CFLAGS) $(dpkg-buildflags --get CPPFLAGS)"
 export LDFLAGS="$(dpkg-buildflags --get LDFLAGS) -Wl,--as-needed"
