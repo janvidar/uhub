@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -x
+set -e
 
 export CFLAGS="$(dpkg-buildflags --get CFLAGS) $(dpkg-buildflags --get CPPFLAGS)"
 export LDFLAGS="$(dpkg-buildflags --get LDFLAGS) -Wl,--as-needed"
@@ -31,6 +32,10 @@ cmake ${CMAKEOPTS} \
       -DCMAKE_C_FLAGS="${CFLAGS}" \
       -DCMAKE_EXE_LINKER_FLAGS="${LDFLAGS}"
 make VERBOSE=1
+
+
+make VERBOSE=1 test
+./test
 
 
 sudo make install
