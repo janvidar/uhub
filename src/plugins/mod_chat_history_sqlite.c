@@ -49,7 +49,7 @@ static int null_callback(void* ptr, int argc, char **argv, char **colName) { ret
 
 static const char* sql_escape_string(const char* str)
 {
-	static char out[1024];
+	static char out[MAX_HISTORY_SIZE];
 	size_t i = 0;
 	size_t n = 0;
 	for (; n < strlen(str); n++)
@@ -65,7 +65,7 @@ static const char* sql_escape_string(const char* str)
 static int sql_execute(struct chat_history_data* sql, int (*callback)(void* ptr, int argc, char **argv, char **colName), void* ptr, const char* sql_fmt, ...)
 {
 	va_list args;
-	char query[1024];
+	char query[MAX_HISTORY_SIZE];
 	char* errMsg;
 	int rc;
 
@@ -225,6 +225,8 @@ static int command_historycleanup(struct plugin_handle* plugin, struct plugin_us
 
 	plugin->hub.send_message(plugin, user, cbuf_get(buf));
 	cbuf_destroy(buf);
+
+	sql_execute(data, null_callback, NULL, "VACUUM;");
 
 	return 0;
 }
