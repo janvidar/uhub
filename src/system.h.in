@@ -88,6 +88,11 @@
 #cmakedefine HAVE_STRNDUP
 #cmakedefine HAVE_MEMMEM
 
+#cmakedefine HAVE_SYS_UIO_H
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/uio.h>
+#endif
+
 /* printf support for size_t and uint64_t */
 #if defined(WIN32)
 #define PRINTF_SIZE_T "%Iu"
