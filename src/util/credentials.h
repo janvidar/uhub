@@ -23,14 +23,23 @@
 enum auth_credentials
 {
 	auth_cred_none,                 /**<<< "User has no credentials (not yet logged in)" */
-	auth_cred_bot,                  /**<<< "User is a robot" */
 	auth_cred_guest,                /**<<< "User is a guest (unregistered user)" */
 	auth_cred_user,                 /**<<< "User is identified as a registered user" */
+	auth_cred_bot,                  /**<<< "User is a robot" */
+	auth_cred_ubot,                 /**<<< "User is an unrestricted robot" */
 	auth_cred_operator,             /**<<< "User is identified as a hub operator" */
+	auth_cred_opbot,                /**<<< "User is a operator robot" */
+	auth_cred_opubot,               /**<<< "User is an unrestricted operator robot" */
 	auth_cred_super,                /**<<< "User is a super user" (not used) */
 	auth_cred_link,                 /**<<< "User is a link (not used currently)" */
 	auth_cred_admin,                /**<<< "User is identified as a hub administrator/owner" */
 };
+
+/**
+ * Returns 1 if the credentials means that a user is unrestricted.
+ * Returns 0 otherwise.
+ */
+int auth_cred_is_unrestricted(enum auth_credentials cred);
 
 /**
  * Returns 1 if the credentials means that a user is protected.

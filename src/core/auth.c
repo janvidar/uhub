@@ -170,6 +170,9 @@ static int acl_parse_line(char* line, int line_count, void* ptr_data)
 	LOG_DEBUG("acl_parse_line: '%s'", line);
 
 	ACL_ADD_USER("bot",        handle->users, auth_cred_bot);
+	ACL_ADD_USER("ubot",        handle->users, auth_cred_ubot);
+	ACL_ADD_USER("opbot",        handle->users, auth_cred_opbot);
+	ACL_ADD_USER("opubot",        handle->users, auth_cred_opubot);
 	ACL_ADD_USER("user_admin", handle->users, auth_cred_admin);
 	ACL_ADD_USER("user_super", handle->users, auth_cred_super);
 	ACL_ADD_USER("user_op",    handle->users, auth_cred_operator);
