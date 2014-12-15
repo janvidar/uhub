@@ -160,10 +160,46 @@ static void ioq_send_remove(struct ioq_send* q, struct adc_message* msg)
 
 int ioq_send_send(struct ioq_send* q, struct net_connection* con)
 {
-	int ret;
-	struct adc_message* msg = list_get_first(q->queue);
-	if (!msg) return 0;
-	uhub_assert(msg->cache && *msg->cache);
+  int ret;
+  struct adc_message* msg = list_get_first(q->queue);
+  if (!msg) return 0;
+  uhub_assert(msg->cache && *msg->cache);
+
+#ifdef HAVE_FUNC_WRITEV
+#define MAX_IOVEC 32
+  struct iovec vec[MAX_IOVEC];
+  size_t n = 0;
+  vec[0].iov_base = msg->cache + q->offset;
+  vec[0].iov_len = msg->length - q->offset;
+
+  for (struct adc_message* tmp = (struct adc_message*) list_get_next(q->queue), n = 1; tmp && n < MAX_IOVEC; tmp = (struct adc_message*) list_get_next(q->queue), n++)
+  {
+    vec[n].iov_base = msg->cache;
+    vec[n].iov_len = msg->length;
+  }
+
+  ret = net_con_writev(con, &iovec, n);
+
+  if (ret > 0)
+  {
+    while (ret > 0)
+    {
+      if (ret >= (msg->length - q->offset))
+      {
+        ret -= (msg->length - q->offset);
+        q->offset = 0;
+        ioq_send_remove(q, msg);
+      }
+      else
+      {
+        q->offset += ret;
+        return 0;
+      }
+    }
+    return 1;
+  }
+  return ret;
+#else
 	ret = net_con_send(con, msg->cache + q->offset, msg->length - q->offset);
 
 	if (ret > 0)
@@ -176,7 +212,9 @@ int ioq_send_send(struct ioq_send* q, struct net_connection* con)
 		return 1;
 	}
 	return ret;
+#endif
 }
+
 
 int ioq_send_is_empty(struct ioq_send* q)
 {

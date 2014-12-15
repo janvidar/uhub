@@ -92,6 +92,11 @@ extern void net_con_close(struct net_connection* con);
  */
 extern ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len);
 
+
+#ifdef HAVE_FUNC_WRITEV
+extern ssize_t net_con_writev(struct net_connection* con, const struct iovec* iov, size_t iocnt);
+#endif
+
 /**
  * Receive data
  *

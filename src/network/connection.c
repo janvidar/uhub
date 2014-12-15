@@ -57,6 +57,48 @@ ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 	return ret;
 }
 
+#ifdef HAVE_FUNC_WRITEV
+ssize_t net_con_writev(struct net_connection* con, const struct iovec* iov, size_t iocnt)
+{
+  int ret;
+#ifdef SSL_SUPPORT
+  if (!con->ssl)
+  {
+#endif
+    ret = writev(con->sd, iovec, (int) iocnt);
+    if (ret == -1)
+    {
+      if (is_blocked_or_interrupted())
+        return 0;
+      return -1;
+    }
+#ifdef SSL_SUPPORT
+  }
+  else
+  {
+    ssize_t total = 0;
+    ret = 0;
+    while (iocnt--)
+    {
+      ret = net_ssl_send(con, buf, len);
+      if (ret >= 0)
+        total += ret;
+      else
+      {
+        break;
+      }
+    }
+
+    if (total == 0 && !is_blocked_or_interrupted())
+        return -1;
+
+    return total;
+  }
+#endif /* SSL_SUPPORT */
+  return ret;
+}
+#endif
+
 ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 {
 	int ret;
