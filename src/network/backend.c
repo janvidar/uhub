@@ -177,12 +177,12 @@ void net_con_close(struct net_connection* con)
 	g_backend->handler.con_del(g_backend->data, con);
 
 #ifdef SSL_SUPPORT
-	if (con->ssl)
+	if (net_con_is_ssl(con))
 		net_ssl_shutdown(con);
 #endif /* SSL_SUPPORT */
 
-	net_close(con->sd);
-	con->sd = -1;
+	net_close(net_con_get_sd(con));
+	// con->sd = -1; // FIXME
 
 	net_cleanup_delayed_free(g_backend->cleaner, con);
 }

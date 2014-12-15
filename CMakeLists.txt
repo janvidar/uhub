@@ -7,6 +7,7 @@ cmake_minimum_required (VERSION 2.8.2)
 
 project (uhub NONE)
 enable_language(C)
+enable_language(CXX)
 
 set (UHUB_VERSION_MAJOR 0)
 set (UHUB_VERSION_MINOR 5)
@@ -84,7 +85,7 @@ list (REMOVE_ITEM uhub_SOURCES
 )
 
 file (GLOB adc_SOURCES ${PROJECT_SOURCE_DIR}/adc/*.c)
-file (GLOB network_SOURCES ${PROJECT_SOURCE_DIR}/network/*.c)
+file (GLOB network_SOURCES ${PROJECT_SOURCE_DIR}/network/*.c ${PROJECT_SOURCE_DIR}/network/*.cpp)
 file (GLOB utils_SOURCES ${PROJECT_SOURCE_DIR}/util/*.c)
 
 set (adcclient_SOURCES
