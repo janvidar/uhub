@@ -21,25 +21,8 @@
 #define HAVE_UHUB_IO_QUEUE_H
 
 struct adc_message;
-struct linked_list;
-typedef int (*ioq_write)(void* desc, const void* buf, size_t len);
-typedef int (*ioq_read)(void* desc, void* buf, size_t len);
-
-struct ioq_send
-{
-	size_t               size;      /** Size of send queue (in bytes, not messages) */
-	size_t               offset;    /** Queue byte offset in the first message. Should be 0 unless a partial write. */
-#ifdef SSL_SUPPORT
-	size_t               last_send; /** When using SSL, one have to send the exact same buffer and length if a write cannot complete. */
-#endif
-	struct linked_list*  queue;     /** List of queued messages (struct adc_message) */
-};
-
-struct ioq_recv
-{
-	char* buf;
-	size_t size;
-};
+struct ioq_send;
+struct ioq_recv;
 
 /**
  * Create a send queue

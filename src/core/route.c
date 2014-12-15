@@ -80,13 +80,13 @@ static int check_send_queue(struct hub_info* hub, struct hub_user* user, struct 
 	if (user_flag_get(user, flag_user_list))
 		return 1;
 
-	if ((user->send_queue->size + msg->length) > get_max_send_queue(hub))
+	if ((ioq_send_get_bytes(user->send_queue) + msg->length) > get_max_send_queue(hub))
 	{
 		LOG_WARN("send queue overflowed, message discarded.");
 		return -1;
 	}
 
-	if (user->send_queue->size > get_max_send_queue_soft(hub))
+	if (ioq_send_get_bytes(user->send_queue) > get_max_send_queue_soft(hub))
 	{
 		LOG_WARN("send queue soft overflowed.");
 		return 0;

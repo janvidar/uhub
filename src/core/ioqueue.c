@@ -19,6 +19,23 @@
 
 #include "uhub.h"
 
+struct ioq_send
+{
+  size_t               size;      /** Size of send queue (in bytes, not messages) */
+  size_t               offset;    /** Queue byte offset in the first message. Should be 0 unless a partial write. */
+#ifdef SSL_SUPPORT
+  size_t               last_send; /** When using SSL, one have to send the exact same buffer and length if a write cannot complete. */
+#endif
+  struct linked_list*  queue;     /** List of queued messages (struct adc_message) */
+};
+
+struct ioq_recv
+{
+  char* buf;
+  size_t size;
+};
+
+
 #ifdef DEBUG_SENDQ
 static void debug_msg(const char* prefix, struct adc_message* msg)
 {
