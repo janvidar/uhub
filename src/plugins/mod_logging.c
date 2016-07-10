@@ -102,7 +102,7 @@ static struct log_data* parse_config(const char* line, struct plugin_handle* plu
 		else if (strcmp(cfg_settings_get_key(setting), "syslog") == 0)
 		{
 			int use_syslog = 0;
-			if (!string_to_boolean(cfg_settings_get_value(setting), &use_syslog))
+			if (string_to_boolean(cfg_settings_get_value(setting), &use_syslog))
 			{
 				data->logmode = (use_syslog) ? mode_syslog : mode_file;
 			}
