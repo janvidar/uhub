@@ -14,6 +14,10 @@ set (UHUB_VERSION_PATCH 0)
 
 set (PROJECT_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src")
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake/Modules)
+set (SYSCONFDIR "${SYSCONFDIR}" CACHE PATH "The system configuration directory")
+set (LIB_SUFFIX "" CACHE STRING "The suffix of the libraries directory name (32/64)")
+set (BIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin" CACHE PATH "The directory to install binaries")
+set (LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}" CACHE PATH "The directory to install libraries")
 
 option(RELEASE "Release build, debug build if disabled" ON)
 option(LOWLEVEL_DEBUG, "Enable low level debug messages." OFF)
@@ -26,7 +30,7 @@ find_package(Git)
 find_package(Sqlite3)
 
 include(TestBigEndian)
-include(CheckSymbolExists) 
+include(CheckSymbolExists)
 include(CheckIncludeFile)
 include(CheckTypeSize)
 
@@ -236,9 +240,9 @@ if (LOWLEVEL_DEBUG)
 endif()
 
 if (UNIX)
-	install( TARGETS uhub uhub-passwd RUNTIME DESTINATION bin )
-	install( TARGETS mod_example mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_chat_history mod_chat_history_sqlite mod_chat_only mod_topic mod_no_guest_downloads DESTINATION /usr/lib/uhub/ OPTIONAL )
-	install( FILES ${CMAKE_SOURCE_DIR}/doc/uhub.conf ${CMAKE_SOURCE_DIR}/doc/plugins.conf ${CMAKE_SOURCE_DIR}/doc/rules.txt ${CMAKE_SOURCE_DIR}/doc/motd.txt DESTINATION /etc/uhub OPTIONAL )
+	install( TARGETS uhub uhub-passwd RUNTIME DESTINATION ${BIN_INSTALL_DIR} )
+	install( TARGETS mod_example mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_chat_history mod_chat_history_sqlite mod_chat_only mod_topic mod_no_guest_downloads DESTINATION ${LIB_INSTALL_DIR}/uhub/ OPTIONAL )
+	install( FILES ${CMAKE_SOURCE_DIR}/doc/uhub.conf ${CMAKE_SOURCE_DIR}/doc/plugins.conf ${CMAKE_SOURCE_DIR}/doc/rules.txt ${CMAKE_SOURCE_DIR}/doc/motd.txt DESTINATION ${SYSCONFDIR}/uhub/ OPTIONAL )
 endif()
 
 
