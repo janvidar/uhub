@@ -333,7 +333,7 @@ ssize_t net_ssl_send(struct net_connection* con, const void* buf, size_t len)
 {
 	struct net_ssl_openssl* handle = get_handle(con);
 
-	LOG_ERROR("net_ssl_send(), state=%d", (int) handle->state);
+	LOG_TRACE("net_ssl_send(), state=%d", (int) handle->state);
 
 	if (handle->state == tls_st_error)
 		return -2;
