@@ -54,6 +54,10 @@ if (SSL_SUPPORT)
 	endif()
 endif()
 
+if (NOT SQLITE3_FOUND)
+    message(FATAL_ERROR "SQLite3 is not found!")
+endif()
+
 if (SYSTEMD_SUPPORT)
         INCLUDE(FindPkgConfig)
         pkg_search_module(SD REQUIRED libsystemd)
