@@ -34,8 +34,8 @@ cmake ${CMAKEOPTS} \
 make VERBOSE=1
 
 
-make VERBOSE=1 test
-./test
+make VERBOSE=1 autotest-bin
+./autotest-bin
 
 
 sudo make install
