@@ -91,7 +91,9 @@ int net_ssl_library_init()
 int net_ssl_library_shutdown()
 {
 	ERR_clear_error();
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 	ERR_remove_state(0);
+#endif
 
 	ENGINE_cleanup();
 	CONF_modules_unload(1);
@@ -106,16 +108,24 @@ int net_ssl_library_shutdown()
 
 static void add_io_stats(struct net_ssl_openssl* handle)
 {
-	if (handle->bio->num_read > handle->bytes_rx)
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+	unsigned long num_read = handle->bio->num_read;
+	unsigned long num_write = handle->bio->num_write;
+#else
+	unsigned long num_read = BIO_number_read(handle->bio);
+	unsigned long num_write = BIO_number_written(handle->bio);
+#endif
+
+	if (num_read > handle->bytes_rx)
 	{
-		net_stats_add_rx(handle->bio->num_read - handle->bytes_rx);
-		handle->bytes_rx = handle->bio->num_read;
+		net_stats_add_rx(num_read - handle->bytes_rx);
+		handle->bytes_rx = num_read;
 	}
 
-	if (handle->bio->num_write > handle->bytes_tx)
+	if (num_write > handle->bytes_tx)
 	{
-		net_stats_add_tx(handle->bio->num_write - handle->bytes_tx);
-		handle->bytes_tx = handle->bio->num_write;
+		net_stats_add_tx(num_write - handle->bytes_tx);
+		handle->bytes_tx = num_write;
 	}
 }
 
@@ -127,6 +137,7 @@ static const SSL_METHOD* get_ssl_method(const char* tls_version)
 		return 0;
 	}
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 	if (!strcmp(tls_version, "1.0"))
 	  return TLSv1_method();
 	if (!strcmp(tls_version, "1.1"))
@@ -136,6 +147,10 @@ static const SSL_METHOD* get_ssl_method(const char* tls_version)
 
 	LOG_ERROR("Unable to recognize tls_version.");
 	return 0;
+#else
+	LOG_WARN("tls_version is obsolete, and should not be used.");
+	return TLS_method();
+#endif
 }
 
 /**
