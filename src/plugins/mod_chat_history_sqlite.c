@@ -142,7 +142,7 @@ void user_login(struct plugin_handle* plugin, struct plugin_user* user)
 	struct cbuffer* buf = NULL;
 	struct linked_list* found = (struct linked_list*) list_create();
 	
-	sql_execute(data, get_messages_callback, found, "SELECT * FROM chat_history ORDER BY time DESC LIMIT 0,%d;", (int) data->history_connect);
+	sql_execute(data, get_messages_callback, found, "SELECT from_nick,message, datetime(time, 'localtime') as time FROM chat_history ORDER BY time DESC LIMIT 0,%d;", (int) data->history_connect);
 
 	if (data->history_connect > 0 && list_size(found) > 0)
 	{
@@ -180,7 +180,7 @@ static int command_history(struct plugin_handle* plugin, struct plugin_user* use
 	else
 		maxlines = data->history_default;
 
-	sql_execute(data, get_messages_callback, found, "SELECT * FROM chat_history ORDER BY time DESC LIMIT 0,%d;", maxlines);
+	sql_execute(data, get_messages_callback, found, "SELECT from_nick,message, datetime(time, 'localtime') as time FROM chat_history ORDER BY time DESC LIMIT 0,%d;", maxlines);
 
 	size_t linecount = list_size(found);
 
