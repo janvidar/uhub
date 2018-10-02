@@ -26,7 +26,7 @@
 #include "util/list.h"
 #include "util/cbuffer.h"
 
-#define MAX_HISTORY_SIZE 16384
+#define MAX_HISTORY_SIZE 614400
 
 struct chat_history_data
 {
