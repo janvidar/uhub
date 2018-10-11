@@ -197,6 +197,10 @@
 #define CPUINFO "ARM"
 #endif
 
+#if defined(__aarch64__)
+#define CPUINFO "AArch64"
+#endif
+
 #if defined(__i386__) || defined(__i386) || defined(i386) || defined(_M_IX86) || defined(__X86__) || defined(_X86_) || defined(__I86__) || defined(__INTEL__) || defined(__THW_INTEL__)
 #define CPUINFO "i386"
 #endif
