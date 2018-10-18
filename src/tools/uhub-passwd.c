@@ -375,7 +375,7 @@ void main_usage(const char* binary)
 			"  'filename' is a database file\n"
 			"  'username' is a nickname (UTF-8, up to %i bytes)\n"
 			"  'password' is a password (UTF-8, up to %i bytes)\n"
-			"  'credentials' is one of 'admin', 'super', 'op', 'user'\n"
+			"  'credentials' is one of 'bot', 'ubot', 'opbot', 'opubot', 'admin', 'super', 'op' or 'user'\n"
 			"\n"
 		, binary, MAX_NICK_LEN, MAX_PASS_LEN);
 }
@@ -403,5 +403,3 @@ int main(int argc, char** argv)
 	main_usage(argv[0]);
 	return 1;
 }
-
-
