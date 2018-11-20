@@ -111,7 +111,7 @@
    <option name="register_self" type="boolean" default="0">
 	   <short>Allow users to register themselves on the hub.</short>
 		<description><![CDATA[
-			If this is enabled guests can register their nickname on the hub.
+			If this is enabled guests can register their nickname on the hub using !register command.
 			Otherwise only operators can register users.
 		]]></description>
 		<since>0.4.0</since>
