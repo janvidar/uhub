@@ -17,6 +17,8 @@ static int result = 0;
 
 EXO_TEST(setup, {
 	hub = hub_malloc_zero(sizeof(struct hub_info));
+	hub->config = hub_malloc_zero(sizeof(struct hub_config));
+	config_defaults(hub->config);
 	cbase = command_initialize(hub);
 	hub->commands = cbase;
 	hub->users = uman_init();
@@ -246,6 +248,8 @@ EXO_TEST(command_destroy, {
 EXO_TEST(cleanup, {
 	uman_shutdown(hub->users);
 	command_shutdown(hub->commands);
+	free_config(hub->config);
+	hub_free(hub->config);
 	hub_free(hub);
 	return 1;
 });
