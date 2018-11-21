@@ -574,6 +574,33 @@ static int command_stats(struct command_base* cbase, struct hub_user* user, stru
 	return command_status(cbase, user, cmd, buf);
 }
 
+static int command_register_self(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
+{
+	if (user_is_registered(user))
+		return command_status(cbase, user, cmd, cbuf_create_const("You are already registered!"));
+
+	struct hub_command_arg_data* arg = hub_command_arg_next(cmd, type_string);
+	char* password = arg->data.string;
+
+	if (!*password || strlen(password) > MAX_PASS_LEN)
+		return command_status(cbase, user, cmd, cbuf_create_const("Invalid password!"));
+
+	struct auth_info info;
+	memset(&info, 0, sizeof(info));
+	memcpy(&info.nickname, user->id.nick, MAX_NICK_LEN);
+	memcpy(&info.password, password, MAX_PASS_LEN);
+	info.credentials = auth_cred_user;
+
+
+	if (acl_register_user(cbase->hub, &info))
+	{
+		return command_status(cbase, user, cmd, cbuf_create_const("You are now registered."));
+	}
+
+	// NOTE: No good reason for this can be given here!
+	return command_status(cbase, user, cmd, cbuf_create_const("Unable to register user."));
+}
+
 static struct command_handle* add_builtin(struct command_base* cbase, const char* prefix, const char* args, enum auth_credentials cred, command_handler handler, const char* description)
 {
 	struct command_handle* handle = (struct command_handle*) hub_malloc_zero(sizeof(struct command_handle));
@@ -601,6 +628,10 @@ void commands_builtin_add(struct command_base* cbase)
 	ADD_COMMAND("myip",       4, "",  auth_cred_guest,     command_myip,     "Show your own IP."            );
 	ADD_COMMAND("reload",     6, "",  auth_cred_admin,     command_reload,   "Reload configuration files."  );
 	ADD_COMMAND("shutdown",   8, "",  auth_cred_admin,     command_shutdown_hub, "Shutdown hub."            );
+
+	if (cbase->hub->config->register_self)
+		ADD_COMMAND("register",   8, "p",  auth_cred_guest, command_register_self,    "Register yourself."  );
+
 	ADD_COMMAND("stats",      5, "",  auth_cred_super,     command_stats,    "Show hub statistics."         );
 	ADD_COMMAND("uptime",     6, "",  auth_cred_guest,     command_uptime,   "Display hub uptime info."     );
 	ADD_COMMAND("version",    7, "",  auth_cred_guest,     command_version,  "Show hub version info."       );
