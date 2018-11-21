@@ -102,7 +102,6 @@ struct plugin_handle* plugin_load(const char* filename, const char* config, stru
 	int ret;
 	struct plugin_handle* handle = (struct plugin_handle*) hub_malloc_zero(sizeof(struct plugin_handle));
 	struct uhub_plugin* plugin = plugin_open(filename);
-	struct plugin_hub_internals* internals = (struct plugin_hub_internals*) plugin->internals;
 
 	if (!plugin)
 		return NULL;
@@ -118,6 +117,7 @@ struct plugin_handle* plugin_load(const char* filename, const char* config, stru
 	unregister_f = plugin_lookup_symbol(plugin, "plugin_unregister");
 
 	// register hub internals
+	struct plugin_hub_internals* internals = (struct plugin_hub_internals*) plugin->internals;
 	internals->unregister = unregister_f;
 	internals->hub = hub;
 	internals->callback_data = plugin_callback_data_create();
