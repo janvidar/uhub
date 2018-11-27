@@ -35,6 +35,16 @@ struct plugin_command
 	struct linked_list* args;
 };
 
+enum plugin_command_arg_type
+{
+	plugin_cmd_arg_type_integer,
+	plugin_cmd_arg_type_string,
+	plugin_cmd_arg_type_user,
+	plugin_cmd_arg_type_address,
+	plugin_cmd_arg_type_range,
+	plugin_cmd_arg_type_credentials,
+};
+
 struct plugin_command_arg_data
 {
 	enum plugin_command_arg_type type;

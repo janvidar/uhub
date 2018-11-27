@@ -93,15 +93,6 @@ struct ban_info
 	time_t expiry;                      /* Time when the ban record expires */
 };
 
-enum plugin_command_arg_type
-{
-	plugin_cmd_arg_type_integer,
-	plugin_cmd_arg_type_string,
-	plugin_cmd_arg_type_user,
-	plugin_cmd_arg_type_address,
-	plugin_cmd_arg_type_range,
-	plugin_cmd_arg_type_credentials,
-};
 
 
 #endif /* HAVE_UHUB_PLUGIN_TYPES_H */

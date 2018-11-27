@@ -28,6 +28,7 @@
 #include "util/credentials.h"
 #include "network/ipcalc.h"
 #include "plugin_api/types.h"
+#include "plugin_api/command_api.h"
 
 typedef void (*on_connection_accepted_t)(struct plugin_handle*, struct ip_addr_encap*);
 typedef void (*on_connection_refused_t)(struct plugin_handle*, struct ip_addr_encap*);
