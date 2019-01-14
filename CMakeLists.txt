@@ -77,6 +77,7 @@ check_symbol_exists(memmem string.h HAVE_MEMMEM)
 check_symbol_exists(strndup string.h HAVE_STRNDUP)
 
 include_directories("${PROJECT_SOURCE_DIR}")
+include_directories("${PROJECT_BINARY_DIR}")
 include_directories(${SQLITE3_INCLUDE_DIRS})
 link_directories(${SQLITE3_LIBRARY_DIRS})
 
@@ -220,8 +221,8 @@ if (SYSTEMD_SUPPORT)
         add_definitions(-DSYSTEMD)
 endif()
 
-configure_file ("${PROJECT_SOURCE_DIR}/version.h.in" "${PROJECT_SOURCE_DIR}/version.h")
-configure_file ("${PROJECT_SOURCE_DIR}/system.h.in" "${PROJECT_SOURCE_DIR}/system.h")
+configure_file ("${PROJECT_SOURCE_DIR}/version.h.in" "${PROJECT_BINARY_DIR}/version.h")
+configure_file ("${PROJECT_SOURCE_DIR}/system.h.in" "${PROJECT_BINARY_DIR}/system.h")
 
 # mark_as_advanced(FORCE CMAKE_BUILD_TYPE)
 # if (RELEASE)
