@@ -67,7 +67,7 @@ Accepting new users
  |            |                           |
  |            V                           |
  |  ---------------------         ---------------------
- |  |   Send password   | ------> | Reveive and check |
+ |  |   Send password   | ------> | Receive and check |
  |  | request, if needed|         | password.         |
  |  ---------------------         ---------------------
  |                                         |

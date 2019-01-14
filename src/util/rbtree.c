@@ -356,7 +356,7 @@ static struct rb_node* rb_tree_traverse(struct rb_tree* tree, int dir)
 		if (p->link[!dir] == n)
 			return rb_it_set(tree, p);
 
-		// walk up in hte current direction
+		// walk up in the current direction
 		while (p->link[dir] == n)
 		{
 			n = p;

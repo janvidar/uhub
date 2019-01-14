@@ -109,7 +109,7 @@ extern ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len);
 extern ssize_t net_con_peek(struct net_connection* con, void* buf, size_t len);
 
 /**
- * Set timeout for connetion.
+ * Set timeout for connection.
  *
  * @param seconds the number of seconds into the future.
  */
