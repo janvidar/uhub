@@ -567,7 +567,7 @@
 	</option>
 
 	<option name="msg_inf_error_nick_taken" type="message" default="Nickname is already in use">
-		<description><![CDATA[This message will be sent to clients if their provided nickname is alredy in use on the hub.]]></description>
+		<description><![CDATA[This message will be sent to clients if their provided nickname is already in use on the hub.]]></description>
 		<since>0.2.0</since>
 	</option>
 

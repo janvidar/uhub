@@ -28,7 +28,7 @@ The UDP packet SHOULD be echoed by the hub.
 This UDP packet should contain simply 'HECH {cid} {token}' (Hub echo).
 
 The hub should send a packet containing the token back:
-'IECH {token} {host:port}', aswell as the same message via TCP.
+'IECH {token} {host:port}', as well as the same message via TCP.
 
 If the client receives the message via UDP, it should now be able to determine the type of NAT.
 If the client receives the message via TCP only it knows it has a firewall blocking incoming communication.

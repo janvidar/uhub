@@ -53,7 +53,7 @@ extern int net_initialize();
 extern int net_destroy();
 
 /**
- * @return the number of sockets currrently being monitored.
+ * @return the number of sockets currently being monitored.
  */
 extern int net_monitor_count();
 
