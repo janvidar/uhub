@@ -1,7 +1,7 @@
 How to compile:
 ---------------
 
-See the official compiling howto: http://www.uhub.org/compile.php
+See the official compiling howto: https://www.uhub.org/compile.php
 
 Prerequisites
 
@@ -12,7 +12,7 @@ Before you try to compile µHub, please make sure the following prerequisites ar
   * openssl > 0.9.8 (or use  "make USE_SSL=NO")
   * sqlite > 3.x
 
-or read  http://www.uhub.org/compile.php for more info.
+or read  https://www.uhub.org/compile.php for more info.
 
 
 Linux, Mac OSX, FreeBSD, NetBSD and OpenBSD

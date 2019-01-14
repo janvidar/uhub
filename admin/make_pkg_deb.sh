@@ -78,7 +78,7 @@ Description: a high performance hub for the ADC peer-to-peer network
  Its low memory footprint allows it to handle several thousand users
  on high-end servers, or a small private hub on embedded hardware.
  .
-Homepage: http://www.extatic.org/uhub/
+Homepage: https://www.uhub.org/
 EOF
 cd ..
 

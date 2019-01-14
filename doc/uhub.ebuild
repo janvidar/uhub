@@ -4,7 +4,7 @@
 inherit eutils
 
 if [ "$PV" != "9999" ]; then
-        SRC_URI="http://www.extatic.org/downloads/uhub/${P}-src.tar.bz2"
+        SRC_URI="https://www.extatic.org/downloads/uhub/${P}-src.tar.bz2"
         KEYWORDS="~amd64 ~x86"
 else
         inherit git
@@ -16,7 +16,7 @@ fi
 EAPI="2"
 
 DESCRIPTION="High performance ADC hub"
-HOMEPAGE="http://www.uhub.org/"
+HOMEPAGE="https://www.uhub.org/"
 
 LICENSE="GPL-3"
 SLOT="0"

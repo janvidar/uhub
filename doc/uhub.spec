@@ -5,7 +5,7 @@ Release: 2
 License: GPLv3
 Group: Networking/File transfer
 Source: uhub-%{version}.tar.gz
-URL: http://www.uhub.org
+URL: https://www.uhub.org
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
 BuildRequires: sqlite-devel
