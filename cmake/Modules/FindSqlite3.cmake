@@ -3,7 +3,7 @@
 #
 #  SQLITE3_FOUND               True if sqlite3 got found
 #  SQLITE3_INCLUDEDIR          Location of sqlite3 headers
-#  SQLITE3_LIBRARIES           List of libaries to use sqlite3
+#  SQLITE3_LIBRARIES           List of libraries to use sqlite3
 #  SQLITE3_DEFINITIONS         Definitions to compile sqlite3
 #
 # Copyright (c) 2007 Juha Tuomala <tuju@iki.fi>

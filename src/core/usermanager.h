@@ -42,7 +42,7 @@ extern struct hub_user_manager* uman_init();
  * Shuts down the user manager.
  * All users will be disconnected and deleted as part of this.
  *
- * @return 0 on success, or -1 in an error occured (invalid pointer).
+ * @return 0 on success, or -1 in an error occurred (invalid pointer).
  */
 extern int uman_shutdown(struct hub_user_manager* users);
 
@@ -106,7 +106,7 @@ extern struct hub_user* uman_get_user_by_nick(struct hub_user_manager* users, co
  *
  * @param[out] target the list of users matching the address
  * @param range the IP range of users to match
- * @return The number of users matching the addressess, or -1 on error (mask is wrong).
+ * @return The number of users matching the addresses, or -1 on error (mask is wrong).
  */
 extern size_t uman_get_user_by_addr(struct hub_user_manager* users, struct linked_list* target, struct ip_range* range);
 

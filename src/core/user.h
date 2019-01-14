@@ -68,7 +68,7 @@ enum user_quit_reason
 	quit_timeout        = 4,     /** User timed out (no data for a while) */
 	quit_send_queue     = 5,     /** User's send queue was overflowed */
 	quit_memory_error   = 6,     /** Not enough memory available */
-	quit_socket_error   = 7,     /** A socket error occured */
+	quit_socket_error   = 7,     /** A socket error occurred */
 	quit_protocol_error = 8,     /** Fatal protocol error */
 	quit_logon_error    = 9,     /** Unable to login (wrong password, CID/PID, etc) */
 	quit_update_error   = 10,    /** Update error. INF update changed share/slot info and no longer satisfies the hub limits. */
@@ -76,7 +76,7 @@ enum user_quit_reason
 	quit_ghost_timeout  = 12,    /** The user is a ghost, and trying to login from another connection */
 };
 
-/** Returns an apropriate string for the given quit reason */
+/** Returns an appropriate string for the given quit reason */
 extern const char* user_get_quit_reason_string(enum user_quit_reason);
 
 struct hub_user_info

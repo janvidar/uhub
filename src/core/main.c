@@ -151,7 +151,7 @@ int main_loop()
 			setup_signal_handlers(hub);
 #ifdef SYSTEMD
                         /* Notify the service manager that this daemon has
-                         * been successfully initalized and shall enter the
+                         * been successfully initialized and shall enter the
                          * main loop.
                          */
                         sd_notifyf(0, "READY=1\n"
@@ -471,7 +471,7 @@ int main(int argc, char** argv)
 		}
 		else if (ret == 0)
 		{
-			/* child process - detatch from TTY */
+			/* child process - detach from TTY */
 			fclose(stdin);
 			fclose(stdout);
 			fclose(stderr);

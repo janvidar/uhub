@@ -30,7 +30,7 @@ enum Warnings
 struct user_info
 {
 	sid_t sid;      // The SID of the user
-	int warnings;   // The number of denies (used to track wether or not a warning should be sent). @see enum Warnings.
+	int warnings;   // The number of denies (used to track whether or not a warning should be sent). @see enum Warnings.
 };
 
 struct chat_only_data

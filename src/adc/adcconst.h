@@ -118,8 +118,8 @@ typedef uint32_t fourcc_t;
 #define ADC_INF_FLAG_SUPPORT            "SU" /* support (extensions, feature cast) */
 #define ADC_INF_FLAG_SHARED_SIZE        "SS" /* size of total files shared in bytes */
 #define ADC_INF_FLAG_SHARED_FILES       "SF" /* number of files shared */
-#define ADC_INF_FLAG_UPLOAD_SPEED       "US" /* maximum upload speed acheived in bytes/sec */
-#define ADC_INF_FLAG_DOWNLOAD_SPEED     "DS" /* maximum download speed acheived in bytes/sec */
+#define ADC_INF_FLAG_UPLOAD_SPEED       "US" /* maximum upload speed achieved in bytes/sec */
+#define ADC_INF_FLAG_DOWNLOAD_SPEED     "DS" /* maximum download speed achieved in bytes/sec */
 #define ADC_INF_FLAG_UPLOAD_SLOTS       "SL" /* maximum upload slots (concurrent uploads) */
 #define ADC_INF_FLAG_AUTO_SLOTS         "AS" /* automatic slot if upload speed is less than this in bytes/sec */
 #define ADC_INF_FLAG_AUTO_SLOTS_MAX     "AM" /* maximum number of automatic slots */
@@ -134,7 +134,7 @@ typedef uint32_t fourcc_t;
 #define ADC_MSG_FLAG_PRIVATE            "PM" /* message is a private message */
 
 #define ADC_SCH_FLAG_INCLUDE            "AN" /* include given search term */
-#define ADC_SCH_FLAG_EXCLUDE            "NO" /* exclude given serach term */
+#define ADC_SCH_FLAG_EXCLUDE            "NO" /* exclude given search term */
 #define ADC_SCH_FLAG_FILE_EXTENSION     "EX" /* search only for files with the given file extension */
 #define ADC_SCH_FLAG_FILE_TYPE          "TY" /* search only for files with this file type (separate type) */
 #define ADC_SCH_FLAG_LESS_THAN          "LE" /* search for files with this size or less */

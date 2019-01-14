@@ -86,7 +86,7 @@ void* memmem(const void *haystack, size_t haystacklen, const void *needle, size_
 
 /**
  * Split the string based on split, and place the different parts into list.
- * @return the number of items in the list after split, or -1 if an error occured.
+ * @return the number of items in the list after split, or -1 if an error occurred.
  */
 struct linked_list;
 extern int split_string(const char* string, const char* split, struct linked_list* list, int allow_empty);

@@ -51,7 +51,7 @@ enum msg_status_level
 extern struct adc_message* adc_msg_incref(struct adc_message* msg);
 
 /**
- * Decrease the reference counter, and free the memory when apropriate.
+ * Decrease the reference counter, and free the memory when appropriate.
  */
 extern void adc_msg_free(struct adc_message* msg);
 
@@ -159,7 +159,7 @@ extern char* adc_msg_get_argument(struct adc_message* cmd, int offset);
  *
  * @arg prefix a 2 character argument prefix
  * @arg string must be escaped (see adc_msg_escape).
- * @return  0 if successful, or -1 if an error occured.
+ * @return  0 if successful, or -1 if an error occurred.
  */
 extern int adc_msg_replace_named_argument(struct adc_message* cmd, const char prefix[2], const char* string);
 
@@ -167,7 +167,7 @@ extern int adc_msg_replace_named_argument(struct adc_message* cmd, const char pr
  * Append an argument
  *
  * @arg string must be escaped (see adc_msg_escape).
- * @return  0 if successful, or -1 if an error occured (out of memory).
+ * @return  0 if successful, or -1 if an error occurred (out of memory).
  */
 extern int adc_msg_add_argument(struct adc_message* cmd, const char* string);
 
@@ -176,7 +176,7 @@ extern int adc_msg_add_argument(struct adc_message* cmd, const char* string);
  *
  * @arg prefix a 2 character argument prefix
  * @arg string must be escaped (see adc_msg_escape).
- * @return  0 if successful, or -1 if an error occured (out of memory).
+ * @return  0 if successful, or -1 if an error occurred (out of memory).
  */
 extern int adc_msg_add_named_argument(struct adc_message* cmd, const char prefix[2], const char* string);
 
@@ -186,7 +186,7 @@ extern int adc_msg_add_named_argument(struct adc_message* cmd, const char prefix
  *
  * @arg prefix a 2 character argument prefix
  * @arg string must NOT be escaped
- * @return  0 if successful, or -1 if an error occured (out of memory).
+ * @return  0 if successful, or -1 if an error occurred (out of memory).
  */
 extern int adc_msg_add_named_argument_string(struct adc_message* cmd, const char prefix[2], const char* string);
 
