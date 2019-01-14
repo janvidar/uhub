@@ -49,7 +49,7 @@ Example:
 If you are planning to more than 1024 users on hub, you must increase the max number of file descriptors allowed.
 This limit needs to be higher than the configured max_users in uhub.conf.
 
-In linux can add the following lines to /etc/security/limits.conf (allows for ~4000 users)
+In Linux can add the following lines to /etc/security/limits.conf (allows for ~4000 users)
       *     soft nofile 4096
       *     hard nofile 4096
 

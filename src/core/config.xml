@@ -170,7 +170,7 @@
 		<check min="1024" max="1048576" />
 		<short>Max read buffer before parse, per user</short>
 		<description><![CDATA[
-			Maximum receive buffer allowed before commands are procesed. If a single ADC message exceeds this limit, it will be discarded by the hub. Use with caution.
+			Maximum receive buffer allowed before commands are processed. If a single ADC message exceeds this limit, it will be discarded by the hub. Use with caution.
 		]]></description>
 		<since>0.1.3</since>
 	</option>
