@@ -1,6 +1,6 @@
  ##
 ## Makefile for uhub
-## Copyright (C) 2007-2013, Jan Vidar Krey <janvidar@extatic.org>
+## Copyright (C) 2007-2019, Jan Vidar Krey <janvidar@extatic.org>
  #
 
 cmake_minimum_required (VERSION 2.8.2)
@@ -120,6 +120,7 @@ add_library(mod_chat_only MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_chat_only.c)
 add_library(mod_topic MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_topic.c)
 add_library(mod_no_guest_downloads MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_no_guest_downloads.c)
 add_library(mod_auth_sqlite MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_auth_sqlite.c)
+add_library(mod_require_tls MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_require_tls.c)
 
 if(WIN32)
 	target_link_libraries(uhub ws2_32)
@@ -139,6 +140,7 @@ set_target_properties(
 	mod_chat_only
 	mod_no_guest_downloads
 	mod_topic
+	mod_require_tls
 	PROPERTIES PREFIX "")
 
 target_link_libraries(uhub ${CMAKE_DL_LIBS} adc network utils)
@@ -154,6 +156,7 @@ target_link_libraries(mod_no_guest_downloads utils)
 target_link_libraries(mod_chat_only utils)
 target_link_libraries(mod_logging utils)
 target_link_libraries(mod_topic utils)
+target_link_libraries(mod_require_tls utils)
 target_link_libraries(utils network)
 target_link_libraries(mod_welcome network)
 target_link_libraries(mod_logging network)

@@ -114,6 +114,8 @@ typedef int (*hfunc_send_message)(struct plugin_handle*, struct plugin_user* use
 typedef int (*hfunc_send_broadcast_message)(struct plugin_handle*, const char* message);
 typedef int (*hfunc_send_status)(struct plugin_handle*, struct plugin_user* to, int code, const char* message);
 typedef int (*hfunc_user_disconnect)(struct plugin_handle*, struct plugin_user* user);
+typedef int (*hfunc_user_redirect)(struct plugin_handle*, struct plugin_user* user, const char* address);
+typedef int (*hfunc_user_is_tls_connected)(struct plugin_handle*, struct plugin_user* user);
 typedef int (*hfunc_command_add)(struct plugin_handle*, struct plugin_command_handle*);
 typedef int (*hfunc_command_del)(struct plugin_handle*, struct plugin_command_handle*);
 
@@ -137,6 +139,8 @@ struct plugin_hub_funcs
 	hfunc_send_broadcast_message send_broadcast_message;
 	hfunc_send_status send_status_message;
 	hfunc_user_disconnect user_disconnect;
+	hfunc_user_redirect user_redirect;
+	hfunc_user_is_tls_connected user_is_tls_connected;
 	hfunc_command_add command_add;
 	hfunc_command_del command_del;
 	hfunc_command_arg_reset command_arg_reset;

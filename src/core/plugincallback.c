@@ -96,6 +96,29 @@ static int cbfunc_user_disconnect(struct plugin_handle* plugin, struct plugin_us
 	return 0;
 }
 
+static int cbfunc_user_redirect(struct plugin_handle* plugin, struct plugin_user* user, const char* address)
+{
+	char* buffer = adc_msg_escape(address);
+	struct adc_message* command = adc_msg_construct(ADC_CMD_IQUI, strlen(buffer) + 10);
+	adc_msg_add_named_argument(command, ADC_QUI_FLAG_REDIRECT, buffer);
+	route_to_user(plugin_get_hub(plugin), convert_user_type(user), command);
+	adc_msg_free(command);
+	hub_free(buffer);
+	hub_disconnect_user(plugin_get_hub(plugin), convert_user_type(user), quit_disconnected);
+	return 0;
+}
+
+static int cbfunc_user_is_tls_connected(struct plugin_handle* plugin, struct plugin_user* user)
+{
+#ifdef SSL_SUPPORT
+	struct hub_user* u = convert_user_type(user);
+	return net_con_is_ssl(u->connection);
+#else
+	return 0;
+#endif
+}
+
+
 static int cbfunc_command_add(struct plugin_handle* plugin, struct plugin_command_handle* cmdh)
 {
 	struct plugin_callback_data* data = get_callback_data(plugin);
@@ -203,6 +226,8 @@ void plugin_register_callback_functions(struct plugin_handle* handle)
 	handle->hub.send_broadcast_message = cbfunc_send_broadcast;
 	handle->hub.send_status_message = cbfunc_send_status;
 	handle->hub.user_disconnect = cbfunc_user_disconnect;
+	handle->hub.user_redirect = cbfunc_user_redirect;
+	handle->hub.user_is_tls_connected = cbfunc_user_is_tls_connected;
 	handle->hub.command_add = cbfunc_command_add;
 	handle->hub.command_del = cbfunc_command_del;
 	handle->hub.command_arg_reset = cbfunc_command_arg_reset;
