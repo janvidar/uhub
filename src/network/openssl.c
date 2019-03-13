@@ -154,6 +154,32 @@ static const SSL_METHOD* get_ssl_method(const char* tls_version)
 }
 
 /**
+ * List of supported protocols for ALPN.
+ * We only support "adc" protocol.
+ */
+unsigned char alpn_protocols[] = {
+     3, 'a', 'd', 'c',
+};
+
+/**
+ * Callback for the server to select a protocol from the list
+ * sent by the client via ALPN.
+ */
+int alpn_server_select_protocol(SSL *ssl, const unsigned char **out, unsigned char *outlen,
+                                 const unsigned char *in, unsigned int inlen, void *arg)
+{
+    int res = SSL_select_next_proto((unsigned char **)out, outlen,
+                    alpn_protocols, sizeof(alpn_protocols), in, inlen);
+    if (res == OPENSSL_NPN_NO_OVERLAP)
+    {
+        // set default protocol
+        *out = alpn_protocols;
+        *outlen = 1+alpn_protocols[0];
+    }
+    return SSL_TLSEXT_ERR_OK;
+}
+
+/**
  * Create a new SSL context.
  */
 struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const char* tls_ciphersuite)
@@ -194,6 +220,8 @@ struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const
 		hub_free(ctx);
 		return 0;
 	}
+
+	SSL_CTX_set_alpn_select_cb(ctx->ssl, alpn_server_select_protocol, NULL);
 
 	return (struct ssl_context_handle*) ctx;
 }
