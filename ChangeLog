@@ -47,8 +47,8 @@
 - marked plugin callbacks that are not called yet
 - add on_change_nick() to struct plugin_funcs
 - minimal changes
-- Updated init script in debian package.
-- Updated list of man pages in debian package.
+- Updated init script in Debian package.
+- Updated list of man pages in Debian package.
 - Added man page for uhub-passwd.
 - Merge branch 'master' of https://github.com/Tilka/uhub
 - Fix issue with QUI messages being allowed through the hub
@@ -78,7 +78,7 @@
 - minimal documentation fixes
 - update client software link
 - update compile howto link
-- fix debian changelog
+- fix Debian changelog
 - Fix bug #158 - Added plugin for setting topic (hub description).
 - Command arguments handling + cleanups
 

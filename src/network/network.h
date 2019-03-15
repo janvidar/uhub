@@ -53,7 +53,7 @@ extern int net_initialize();
 extern int net_destroy();
 
 /**
- * @return the number of sockets currrently being monitored.
+ * @return the number of sockets currently being monitored.
  */
 extern int net_monitor_count();
 
@@ -63,7 +63,7 @@ extern int net_monitor_count();
 extern int net_monitor_capacity();
 
 /**
- * @return the last error code occured.
+ * @return the last error code occurred.
  *
  * NOTE: On Windows this is the last error code from the socket library, but
  *       on UNIX this is the errno variable that can be overwritten by any

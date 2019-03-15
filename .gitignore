@@ -21,5 +21,3 @@ debian/uhub.postrm.debhelper
 debian/uhub.prerm.debhelper
 debian/uhub.substvars
 uhub-passwd
-src/version.h
-src/system.h

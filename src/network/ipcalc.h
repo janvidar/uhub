@@ -92,7 +92,7 @@ extern int ip_is_valid_ipv6(const char* address);
  *
  * @param text_addr is an ipaddress either ipv6 or ipv4.
  *                  Special magic addresses called "any" and "loopback" exist,
- *                  and will work accross IPv6/IPv4.
+ *                  and will work across IPv6/IPv4.
  * @param port      Fill the struct sockaddr* with the given port, can safely be ignored.
  */
 extern int ip_convert_address(const char* text_address, int port, struct sockaddr* addr, socklen_t* addr_len);

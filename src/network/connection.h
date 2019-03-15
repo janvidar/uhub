@@ -88,7 +88,7 @@ extern void net_con_close(struct net_connection* con);
  *
  * @return returns the number of bytes sent.
  *         0 if no data is sent, and this function should be called again (EWOULDBLOCK/EINTR)
- *        <0 if an error occured, the negative number contains the error code.
+ *        <0 if an error occurred, the negative number contains the error code.
  */
 extern ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len);
 
@@ -97,7 +97,7 @@ extern ssize_t net_con_send(struct net_connection* con, const void* buf, size_t 
  *
  * @return returns the number of bytes sent.
  *         0 if no data is sent, and this function should be called again (EWOULDBLOCK/EINTR)
- *        <0 if an error occured, the negative number contains the error code.
+ *        <0 if an error occurred, the negative number contains the error code.
  */
 extern ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len);
 
@@ -109,7 +109,7 @@ extern ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len);
 extern ssize_t net_con_peek(struct net_connection* con, void* buf, size_t len);
 
 /**
- * Set timeout for connetion.
+ * Set timeout for connection.
  *
  * @param seconds the number of seconds into the future.
  */

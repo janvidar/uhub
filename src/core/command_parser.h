@@ -30,7 +30,7 @@ struct command_base;
  *
  * @param cbase Command base pointer.
  * @param user User who invoked the command.
- * @param message The message that is to be interpreted as a command (including the invokation prefix '!' or '+')
+ * @param message The message that is to be interpreted as a command (including the invocation prefix '!' or '+')
  *
  * @return a hub_command that must be freed with command_free(). @See struct hub_command.
  */
