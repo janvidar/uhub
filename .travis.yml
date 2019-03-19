@@ -9,3 +9,5 @@ install:
   - autotest/travis/install-build-depends.sh
 script:
   - autotest/travis/build-and-test.sh
+dist: xenial
+
