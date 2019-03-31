@@ -165,7 +165,7 @@ unsigned char alpn_protocols[] = {
  * Callback for the server to select a protocol from the list
  * sent by the client via ALPN.
  */
-int alpn_server_select_protocol(SSL *ssl, const unsigned char **out, unsigned char *outlen,
+static int alpn_server_select_protocol(SSL *ssl, const unsigned char **out, unsigned char *outlen,
                                  const unsigned char *in, unsigned int inlen, void *arg)
 {
     int res = SSL_select_next_proto((unsigned char **)out, outlen,
