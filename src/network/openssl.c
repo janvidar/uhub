@@ -129,13 +129,19 @@ static void add_io_stats(struct net_ssl_openssl* handle)
 	}
 }
 
-static const SSL_METHOD* get_ssl_method(const char* tls_version)
+static const SSL_METHOD* get_ssl_method(const struct net_context_openssl* ctx, const char* tls_version)
 {
 	if (!tls_version || !*tls_version)
 	{
 		LOG_ERROR("tls_version is not set.");
 		return 0;
 	}
+
+	/* Disable SSLv2 */
+	SSL_CTX_set_options(ctx->ssl, SSL_OP_NO_SSLv2);
+
+	/* Disable SSLv3 */
+	SSL_CTX_set_options(ctx->ssl, SSL_OP_NO_SSLv3);
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
 	if (!strcmp(tls_version, "1.0"))
@@ -148,7 +154,24 @@ static const SSL_METHOD* get_ssl_method(const char* tls_version)
 	LOG_ERROR("Unable to recognize tls_version.");
 	return 0;
 #else
-	LOG_WARN("tls_version is obsolete, and should not be used.");
+        if (!strcmp(tls_version, "1.0"))
+        {
+            // Not much to do - allow TLS 1.0 and above.
+        }
+
+        if (!strcmp(tls_version, "1.1"))
+        {
+            // Disable anything below TLS 1.1
+            SSL_CTX_set_options(ctx->ssl, SSL_OP_NO_TLSv1);
+        }
+
+        if (!strcmp(tls_version, "1.2"))
+        {
+            // Disable anything below TLS 1.2
+            SSL_CTX_set_options(ctx->ssl, SSL_OP_NO_TLSv1);
+            SSL_CTX_set_options(ctx->ssl, SSL_OP_NO_TLSv1_1);
+        }
+
 	return TLS_method();
 #endif
 }
@@ -185,7 +208,7 @@ static int alpn_server_select_protocol(SSL *ssl, const unsigned char **out, unsi
 struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const char* tls_ciphersuite)
 {
 	struct net_context_openssl* ctx = (struct net_context_openssl*) hub_malloc_zero(sizeof(struct net_context_openssl));
-	const SSL_METHOD* ssl_method = get_ssl_method(tls_version);
+	const SSL_METHOD* ssl_method = get_ssl_method(ctx, tls_version);
 
 	if (!ssl_method)
 	{
@@ -194,14 +217,6 @@ struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const
 	}
 
 	ctx->ssl = SSL_CTX_new(ssl_method);
-
-	/* Disable SSLv2 */
-	SSL_CTX_set_options(ctx->ssl, SSL_OP_NO_SSLv2);
-
-// #ifdef SSL_OP_NO_SSLv3
-	/* Disable SSLv3 */
-	SSL_CTX_set_options(ctx->ssl, SSL_OP_NO_SSLv3);
-// #endif
 
 	// FIXME: Why did we need this again?
 	SSL_CTX_set_quiet_shutdown(ctx->ssl, 1);
