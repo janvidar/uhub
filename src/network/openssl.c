@@ -129,51 +129,49 @@ static void add_io_stats(struct net_ssl_openssl* handle)
 	}
 }
 
-static const SSL_METHOD* get_ssl_method(const struct net_context_openssl* ctx, const char* tls_version)
+static const SSL_METHOD* get_ssl_method(const char* tls_version, long* flags)
 {
+        if (!flags)
+        {
+            LOG_ERROR("flags is null");
+            return 0;
+        }
+
 	if (!tls_version || !*tls_version)
 	{
-		LOG_ERROR("tls_version is not set.");
-		return 0;
+            LOG_ERROR("tls_version is not set.");
+            return 0;
 	}
 
-	/* Disable SSLv2 */
-	SSL_CTX_set_options(ctx->ssl, SSL_OP_NO_SSLv2);
+	*flags = 0;
+	*flags |= SSL_OP_NO_SSLv2;
+        *flags |= SSL_OP_NO_SSLv3;
 
-	/* Disable SSLv3 */
-	SSL_CTX_set_options(ctx->ssl, SSL_OP_NO_SSLv3);
-
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
 	if (!strcmp(tls_version, "1.0"))
-	  return TLSv1_method();
-	if (!strcmp(tls_version, "1.1"))
-	  return TLSv1_1_method();
-	if (!strcmp(tls_version, "1.2"))
-	  return TLSv1_2_method();
-
-	LOG_ERROR("Unable to recognize tls_version.");
-	return 0;
-#else
-        if (!strcmp(tls_version, "1.0"))
         {
-            // Not much to do - allow TLS 1.0 and above.
+            // not much to do.
         }
-
-        if (!strcmp(tls_version, "1.1"))
+        else if (!strcmp(tls_version, "1.1"))
         {
-            // Disable anything below TLS 1.1
-            SSL_CTX_set_options(ctx->ssl, SSL_OP_NO_TLSv1);
+            *flags |= SSL_OP_NO_TLSv1;
         }
-
-        if (!strcmp(tls_version, "1.2"))
+        else if (!strcmp(tls_version, "1.2"))
         {
-            // Disable anything below TLS 1.2
-            SSL_CTX_set_options(ctx->ssl, SSL_OP_NO_TLSv1);
-            SSL_CTX_set_options(ctx->ssl, SSL_OP_NO_TLSv1_1);
+            *flags |= SSL_OP_NO_TLSv1;
+            *flags |= SSL_OP_NO_TLSv1_1;
         }
-
+        else if (!strcmp(tls_version, "1.3"))
+        {
+            *flags |= SSL_OP_NO_TLSv1;
+            *flags |= SSL_OP_NO_TLSv1_1;
+            *flags |= SSL_OP_NO_TLSv1_2;
+        }
+        else
+        {
+            LOG_ERROR("Unable to recognize tls_version: %s", tls_version);
+            return 0;
+        }
 	return TLS_method();
-#endif
 }
 
 /**
@@ -208,7 +206,8 @@ static int alpn_server_select_protocol(SSL *ssl, const unsigned char **out, unsi
 struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const char* tls_ciphersuite)
 {
 	struct net_context_openssl* ctx = (struct net_context_openssl*) hub_malloc_zero(sizeof(struct net_context_openssl));
-	const SSL_METHOD* ssl_method = get_ssl_method(ctx, tls_version);
+        long flags = 0;
+	const SSL_METHOD* ssl_method = get_ssl_method(tls_version, &flags);
 
 	if (!ssl_method)
 	{
@@ -224,8 +223,11 @@ struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const
 #ifdef SSL_OP_NO_COMPRESSION
 	/* Disable compression */
 	LOG_TRACE("Disabling SSL compression."); /* "CRIME" attack */
-	SSL_CTX_set_options(ctx->ssl, SSL_OP_NO_COMPRESSION);
+	flags |= SSL_OP_NO_COMPRESSION;
 #endif
+
+        // Set flags
+        SSL_CTX_set_options(ctx->ssl, flags);
 
 	/* Set preferred cipher suite */
 	if (SSL_CTX_set_cipher_list(ctx->ssl, tls_ciphersuite) != 1)
@@ -352,7 +354,9 @@ ssize_t net_con_ssl_connect(struct net_connection* con)
 	}
 	
 	ret = handle_openssl_error(con, ret, tls_st_connecting);
-	LOG_ERROR("net_con_ssl_connect: ret=%d", ret);
+	
+        if (ret != 0)
+            LOG_ERROR("net_con_ssl_connect: ret=%d", ret);
 	return ret;
 }
 
