@@ -186,10 +186,10 @@ static const SSL_METHOD* get_ssl_method(const char* tls_version, long* flags)
             LOG_ERROR("Unable to recognize tls_version: %s", tls_version);
             return 0;
         }
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-	return TLS_method();
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+        // never gets here!
 #else
-#error "Unknown OpenSSL version!" # OPENSSL_VERSION_NUMBER 
+	return TLS_method();
 #endif
 }
 
