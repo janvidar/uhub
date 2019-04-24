@@ -149,29 +149,48 @@ static const SSL_METHOD* get_ssl_method(const char* tls_version, long* flags)
 
 	if (!strcmp(tls_version, "1.0"))
         {
-            // not much to do.
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+            return TLSv1_method();
+#endif
         }
         else if (!strcmp(tls_version, "1.1"))
         {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+            return TLSv1_1_method();
+#else
             *flags |= SSL_OP_NO_TLSv1;
+#endif
         }
         else if (!strcmp(tls_version, "1.2"))
         {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+            return TLSv1_2_method();
+#else
             *flags |= SSL_OP_NO_TLSv1;
             *flags |= SSL_OP_NO_TLSv1_1;
+#endif
         }
         else if (!strcmp(tls_version, "1.3"))
         {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+            LOG_ERROR("TLS 1.3 is not supported by this version of OpenSSL");
+            return 0;
+#else
             *flags |= SSL_OP_NO_TLSv1;
             *flags |= SSL_OP_NO_TLSv1_1;
             *flags |= SSL_OP_NO_TLSv1_2;
+#endif
         }
         else
         {
             LOG_ERROR("Unable to recognize tls_version: %s", tls_version);
             return 0;
         }
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
 	return TLS_method();
+#else
+#error "Unknown OpenSSL version!"
+#endif
 }
 
 /**
