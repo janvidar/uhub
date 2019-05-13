@@ -1,8 +1,51 @@
-Welcome and thanks for downloading uHub, a high performance ADC p2p hub.
+# Uhub
 
-For the official documentation, bugs and other information, please visit:
-https://www.uhub.org/
+Uhub is a high performance peer-to-peer hub for the ADC network. Its low memory footprint allows it to handle several thousand users on high-end servers, or a small private hub on embedded hardware.  
+Uhub uses the ADC protocol, and is compatible with DC++, jUCy and other ADC clients.
+
+## Key features
+
+ - High performance and low memory usage
+ - IPv4 and IPv6 support
+ - Experimental SSL support (optional)
+ - Advanced access control support
+ - Easy configuration
+
+## Download
+
+### Zip files
+
+The latest version is 0.5.0, released Friday 17, October 2014.  
+You can find zip / tar.gz file on https://github.com/janvidar/uhub/releases
+
+### Git
+
+You can also use git to use the last up-to-date version: 
+ $ git clone https://github.com/janvidar/uhub.git
+ 
+### Ubuntu and Debian packages
+
+Tehnick has provided an up to date uhub PPA for Debian and Ubuntu based distributions: https://tehnick.github.io/uhub/
+
+## Documentation
+
+### Compile
+
+See doc/compile.txt document.
+
+### Getting started
+
+See doc/getstarted.txt document.
+
+### Use SSL
+
+See doc/ssl-documentation.txt document.
+
+## Compatible clients
 
 For a list of compatible ADC clients, see:
 https://en.wikipedia.org/wiki/Comparison_of_ADC_software#Client_software
 
+## License
+
+Uhub is free and open source software, licensed under the GNU General Public License 3 (see COPYING file).
