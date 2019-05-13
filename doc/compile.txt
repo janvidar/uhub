@@ -1,9 +1,6 @@
-How to compile:
----------------
+# How to compile:
 
-See the official compiling howto: https://www.uhub.org/compile.php
-
-Prerequisites
+## Prerequisites
 
 Before you try to compile µHub, please make sure the following prerequisites are met.
   * GNU make
@@ -12,15 +9,22 @@ Before you try to compile µHub, please make sure the following prerequisites ar
   * openssl > 0.9.8 (or use  "make USE_SSL=NO")
   * sqlite > 3.x
 
-or read  https://www.uhub.org/compile.php for more info.
+For Ubuntu / Debian:
 
+ $ sudo apt-get install cmake make gcc git libsqlite3-dev libssl-dev
 
-Linux, Mac OSX, FreeBSD, NetBSD and OpenBSD
--------------------------------------------
-Simply, run:
-  % make 
+## Linux, Mac OSX, FreeBSD, NetBSD and OpenBSD
 
+ $ cmake .
+ $ make
+ % make install
+ 
 If you have an old gcc compiler, try disabling pre-compiled headers like this:
 gmake USE_PCH=NO
 
+### Default install directories:
 
+Binaries 	/usr/local/bin/
+Configuration files 	/etc/uhub/
+Plugins 	/usr/lib/uhub/
+Manual pages 	/usr/share/man/man1/
