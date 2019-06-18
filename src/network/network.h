@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2014, Jan Vidar Krey
+ * Copyright (C) 2007-2019, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,6 +28,10 @@ struct net_statistics
 	size_t accept;
 	size_t closed;
 	size_t errors;
+	size_t tls_accept;
+	size_t tls_connect;
+	size_t tls_error;
+	size_t tls_close;
 };
 
 struct net_socket_t;
@@ -247,9 +251,14 @@ extern void net_stats_report();
 extern void net_stats_reset();
 extern void net_stats_add_tx(size_t bytes);
 extern void net_stats_add_rx(size_t bytes);
+extern void net_stats_tls_add_accept();
+extern void net_stats_tls_add_connect();
+extern void net_stats_tls_add_error();
+extern void net_stats_tls_add_close();
 extern void net_stats_add_accept();
 extern void net_stats_add_error();
 extern void net_stats_add_close();
+extern void net_stats_add_connect();
 extern int net_stats_timeout();
 extern void net_stats_get(struct net_statistics** intermediate, struct net_statistics** total);
 

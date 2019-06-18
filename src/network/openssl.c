@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2014, Jan Vidar Krey
+ * Copyright (C) 2007-2019, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,6 +27,10 @@
 
 void net_stats_add_tx(size_t bytes);
 void net_stats_add_rx(size_t bytes);
+void net_stats_tls_add_accept();
+void net_stats_tls_add_errors();
+void net_stats_tls_add_accept();
+
 
 struct net_ssl_openssl
 {
@@ -329,13 +333,16 @@ static int handle_openssl_error(struct net_connection* con, int ret, int read)
 
 		case SSL_ERROR_SSL:
 			net_ssl_set_state(handle, tls_st_error);
+			net_stats_tls_add_error();
 			return -2;
 
 		case SSL_ERROR_SYSCALL:
 			net_ssl_set_state(handle, tls_st_error);
+			net_stats_tls_add_error();
 			return -2;
 	}
 
+	net_stats_tls_add_error();
 	return -2;
 }
 
@@ -351,6 +358,7 @@ ssize_t net_con_ssl_accept(struct net_connection* con)
 	{
 		net_con_update(con, NET_EVENT_READ);
 		net_ssl_set_state(handle, tls_st_connected);
+                net_stats_tls_add_accept();
 		return ret;
 	}
 	return handle_openssl_error(con, ret, tls_st_accepting);
@@ -369,6 +377,7 @@ ssize_t net_con_ssl_connect(struct net_connection* con)
 	{
 		net_con_update(con, NET_EVENT_READ);
 		net_ssl_set_state(handle, tls_st_connected);
+                net_stats_tls_add_connect();
 		return ret;
 	}
 	

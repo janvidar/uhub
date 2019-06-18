@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2014, Jan Vidar Krey
+ * Copyright (C) 2007-2019, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -805,4 +805,22 @@ void net_stats_add_close()
 	stats.closed++;
 }
 
+void net_stats_tls_add_accept()
+{
+	stats.tls_accept++;
+}
 
+void net_stats_tls_add_connect()
+{
+	stats.tls_connect++;
+}
+
+void net_stats_tls_add_error()
+{
+	stats.tls_error++;
+}
+
+void net_stats_tls_add_close()
+{
+	stats.tls_close++;
+}
