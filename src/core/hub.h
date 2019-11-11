@@ -324,6 +324,7 @@ extern size_t hub_get_min_hubs_op(struct hub_info* hub);
  * be logged in to simultaneously regardless of the type of user.
  */
 extern size_t hub_get_max_hubs_total(struct hub_info* hub);
+extern size_t hub_get_min_hubs_total(struct hub_info* hub);
 
 /**
  * Schedule runslice.
