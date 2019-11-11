@@ -297,11 +297,11 @@
 		<check min="0" />
 		<short>Minimum total hub connections allowed, user/reg/op combined.</short>
 		<description><![CDATA[
-		Limit the number of hubs a user _should_ be logged into in total regardless of registrations or privileges.
-		If this number is insufficient, the user will not be allowed to enter the hub.
+		Only allow users that are logged into at least the configured number
+		of hubs as a user (guest), registered user or opeator.
 		]]></description>
 		<syntax>0 = off</syntax>
-		<since>0.5.1</since>
+		<since>0.5.2</since>
 	</option>
 
 	<option name="limit_min_share" type="int" default="0">
