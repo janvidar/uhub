@@ -337,9 +337,19 @@ static int check_logged_in(struct hub_info* hub, struct hub_user* user, struct a
 	{
 		if (lookup1 == lookup2)
 		{
-			LOG_DEBUG("check_logged_in: exact same user is logged in: %s", user->id.nick);
-			hub_disconnect_user(hub, lookup1, quit_ghost_timeout);
-			return 0;
+			if (user_flag_get(lookup1, flag_choke))
+			{
+				LOG_DEBUG("check_logged_in: exact same user is already logged in, but likely ghost: %s", user->id.nick);
+
+				// Old user unable to swallow data.
+				// Disconnect the existing user, and allow new user to enter.
+				hub_disconnect_user(hub, lookup1, quit_ghost_timeout);
+			}
+			else
+			{
+				LOG_DEBUG("check_logged_in: exact same user is already logged in: %s", user->id.nick);
+				return status_msg_inf_error_cid_taken;
+			}
 		}
 		else
 		{
