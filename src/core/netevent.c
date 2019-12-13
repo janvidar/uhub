@@ -137,6 +137,12 @@ void net_event(struct net_connection* con, int event, void *arg)
 	LOG_TRACE("net_event() : fd=%d, ev=%d, arg=%p", con->sd, (int) event, arg);
 #endif
 
+	if (event == NET_EVENT_ERROR)
+	{
+		hub_disconnect_user(user->hub, user, quit_socket_error);
+		return;
+	}
+
 	if (event == NET_EVENT_TIMEOUT)
 	{
 		if (user_is_connecting(user))
