@@ -532,7 +532,8 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 
 		if ((user->limits.hub_count_user           < hub_get_min_hubs_user(hub)  && hub_get_min_hubs_user(hub)) ||
 			(user->limits.hub_count_registered < hub_get_min_hubs_reg(hub)   && hub_get_min_hubs_reg(hub))  ||
-			(user->limits.hub_count_operator   < hub_get_min_hubs_op(hub)    && hub_get_min_hubs_op(hub)))
+			(user->limits.hub_count_operator   < hub_get_min_hubs_op(hub)    && hub_get_min_hubs_op(hub))   ||
+			(user->limits.hub_count_total      < hub_get_min_hubs_total(hub) && hub_get_min_hubs_total(hub)))
 		{
 			return status_msg_user_hub_limit_low;
 		}
