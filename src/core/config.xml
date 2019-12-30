@@ -293,6 +293,17 @@
 		<since>0.2.0</since>
 	</option>
 
+	<option name="limit_min_hubs" type="int" default="0">
+		<check min="0" />
+		<short>Minimum total hub connections allowed, user/reg/op combined.</short>
+		<description><![CDATA[
+		Limit the number of hubs a user _should_ be logged into in total regardless of registrations or privileges.
+		If this number is insufficient, the user will not be allowed to enter the hub.
+		]]></description>
+		<syntax>0 = off</syntax>
+		<since>0.5.1</since>
+	</option>
+
 	<option name="limit_min_share" type="int" default="0">
 		<check min="0" />
 		<short>Limit minimum share size in megabytes</short>
