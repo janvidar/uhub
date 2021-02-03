@@ -67,4 +67,4 @@ Find it by using this commandline:
  
 And give your full uhub address:
 
-adc://localhost:1511?kp=SHA256/THE_VALUE_RETURNED_BY_COMMANDLINE_ABOVE
+adcs://localhost:1511?kp=SHA256/THE_VALUE_RETURNED_BY_COMMANDLINE_ABOVE
