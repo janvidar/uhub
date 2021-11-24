@@ -237,6 +237,10 @@
 #define CPUINFO "s390"
 #endif
 
+#if defined(__loongarch__)
+#define CPUINFO "LoongArch"
+#endif
+
 /* Misc */
 #ifdef MSG_NOSIGNAL
 #define UHUB_SEND_SIGNAL MSG_NOSIGNAL
