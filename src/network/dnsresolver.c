@@ -226,7 +226,16 @@ static void* job_thread_resolve_name(void* ptr)
 extern struct net_dns_job* net_dns_gethostbyname(const char* host, int af, net_dns_job_cb callback, void* ptr)
 {
 	struct net_dns_job* job = (struct net_dns_job*) hub_malloc_zero(sizeof(struct net_dns_job));
+	if (!job)
+		return NULL;
+
 	job->host = strdup(host);
+	if (!job->host)
+	{
+		hub_free(job);
+		return NULL;
+	}
+
 	job->af = af;
 	job->callback = callback;
 	job->ptr = ptr;
