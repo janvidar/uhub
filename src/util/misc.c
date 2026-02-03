@@ -57,7 +57,10 @@ char* strip_white_space(char* string)
 		return string;
 
 	/* Strip appending whitespace */
-	pos = &string[strlen(string)-1];
+	size_t len = strlen(string);
+	if (len == 0)
+		return string;
+	pos = &string[len - 1];
 	while (&string[0] < &pos[0] && is_white_space(pos[0])) { pos[0] = 0; pos--; }
 
 	return string;
