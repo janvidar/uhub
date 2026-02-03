@@ -167,8 +167,17 @@ static enum command_parse_status command_extract_arguments(struct hub_info* hub,
 			case 'm':
 			case 'p':
 				data = hub_malloc(sizeof(*data));
-				data->type = type_string;
-				data->data.string = strdup(token);
+				if (data)
+				{
+					data->type = type_string;
+					data->data.string = strdup(token);
+					if (!data->data.string)
+					{
+						hub_free(data);
+						data = NULL;
+						status = cmd_status_syntax_error;
+					}
+				}
 				break;
 
 			case 'c':
@@ -281,6 +290,11 @@ struct hub_command* command_parse(struct command_base* cbase, struct hub_info* h
 
 	// Setup hub command.
 	cmd->prefix = strdup(((char*) list_get_first(tokens)) + 1);
+	if (!cmd->prefix)
+	{
+		cmd->status = cmd_status_syntax_error;
+		goto command_parse_cleanup;
+	}
 
 	// Find a matching command handler
 	handle = command_get_handler(cbase, list_get_first(tokens), user, cmd);

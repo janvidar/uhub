@@ -200,6 +200,9 @@ int string_split(const char* string, const char* split, void* data, string_split
 	char* pos;
 	int count = 0;
 
+	if (!buf)
+		return -1;
+
 	start = buf;
 	while ((pos = strstr(start, split)))
 	{

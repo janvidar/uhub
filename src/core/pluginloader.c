@@ -60,7 +60,32 @@ struct uhub_plugin* plugin_open(const char* filename)
 	}
 
 	plugin->filename = strdup(filename);
+	if (!plugin->filename)
+	{
+		LOG_ERROR("Unable to allocate memory for plugin filename");
+#ifdef HAVE_DLOPEN
+		dlclose(plugin->handle);
+#else
+		FreeLibrary((HMODULE) plugin->handle);
+#endif
+		hub_free(plugin);
+		return 0;
+	}
+
 	plugin->internals = hub_malloc_zero(sizeof(struct plugin_hub_internals));
+	if (!plugin->internals)
+	{
+		LOG_ERROR("Unable to allocate memory for plugin internals");
+#ifdef HAVE_DLOPEN
+		dlclose(plugin->handle);
+#else
+		FreeLibrary((HMODULE) plugin->handle);
+#endif
+		hub_free(plugin->filename);
+		hub_free(plugin);
+		return 0;
+	}
+
 	return plugin;
 }
 
