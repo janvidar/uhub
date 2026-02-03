@@ -52,16 +52,23 @@ static int set_feature_cast_supports(struct hub_user* u, struct adc_message* cmd
 		user_clear_feature_cast_support(u);
 
 		it = tmp;
-		while (strlen(it) > 4)
+		size_t len = strlen(it);
+		while (len >= 4)
 		{
-			it[4] = 0; /* FIXME: Not really needed */
-			user_set_feature_cast_support(u, it);
-			it = &it[5];
-		}
-
-		if (*it)
-		{
-			user_set_feature_cast_support(u, it);
+			char feature[5];
+			memcpy(feature, it, 4);
+			feature[4] = '\0';
+			user_set_feature_cast_support(u, feature);
+			/* Skip 4 chars plus optional separator */
+			if (len > 4)
+			{
+				it += 5;
+				len -= 5;
+			}
+			else
+			{
+				break;
+			}
 		}
 		hub_free(tmp);
 	}
