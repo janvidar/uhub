@@ -507,7 +507,11 @@ struct adc_message* adc_msg_parse(const char* line, size_t length)
 
 	/* At this point the arg_offset should point to a space, or the end of message */
 	n = adc_msg_get_arg_offset(command);
-	if (command->cache[n] == ' ')
+	if (n < 0 || (size_t)n >= command->length)
+	{
+		ok = 0;
+	}
+	else if (command->cache[n] == ' ')
 	{
 		if (command->cache[n+1] == ' ') ok = 0;
 	}
