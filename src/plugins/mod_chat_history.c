@@ -41,12 +41,16 @@ struct chat_history_data
  */
 static void history_add(struct plugin_handle* plugin, struct plugin_user* from, const char* message, int flags)
 {
-	size_t loglen = strlen(message) + strlen(from->nick) + 13;
 	struct chat_history_data* data = (struct chat_history_data*) plugin->ptr;
+	const char* ts = get_timestamp(time(NULL));
+	/* Format: "%s <%s> %s\n" = timestamp + " <" + nick + "> " + message + "\n" */
+	size_t loglen = strlen(ts) + strlen(from->nick) + strlen(message) + 6;
 	char* log = hub_malloc(loglen + 1);
 
-	snprintf(log, loglen, "%s <%s> %s\n", get_timestamp(time(NULL)), from->nick, message);
-	log[loglen] = '\0';
+	if (!log)
+		return;
+
+	snprintf(log, loglen + 1, "%s <%s> %s\n", ts, from->nick, message);
 	list_append(data->chat_history, log);
 	while (list_size(data->chat_history) > data->history_max)
 	{
