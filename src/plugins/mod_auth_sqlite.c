@@ -132,75 +132,54 @@ static struct sql_data* parse_config(const char* line, struct plugin_handle* plu
 	return data;
 }
 
-static const char* sql_escape_string(const char* str)
-{
-	static char out[1024];
-	size_t i = 0;
-	size_t n = 0;
-	for (; n < strlen(str); n++)
-	{
-		if (str[n] == '\'')
-			out[i++] = '\'';
-		out[i++] = str[n];
-	}
-	out[i++] = '\0';
-	return out;
-}
-
-struct data_record {
-	struct auth_info* data;
-	int found;
-};
-
-static int get_user_callback(void* ptr, int argc, char **argv, char **colName){
-	struct data_record* data = (struct data_record*) ptr;
-	int i = 0;
-	for (; i < argc; i++) {
-		if (strcmp(colName[i], "nickname") == 0)
-			strncpy(data->data->nickname, argv[i], MAX_NICK_LEN);
-		else if (strcmp(colName[i], "password") == 0)
-			strncpy(data->data->password, argv[i], MAX_PASS_LEN);
-		else if (strcmp(colName[i], "credentials") == 0)
-		{
-			auth_string_to_cred(argv[i], &data->data->credentials);
-			data->found = 1;
-		}
-	}
-
-#ifdef DEBUG_SQL
-	printf("SQL: nickname=%s, password=%s, credentials=%s\n", data->data->nickname, data->data->password, auth_cred_to_string(data->data->credentials));
-#endif
-	return 0;
-}
-
 static plugin_st get_user(struct plugin_handle* plugin, const char* nickname, struct auth_info* data)
 {
 	struct sql_data* sql = (struct sql_data*) plugin->ptr;
-	struct data_record result;
-	char query[1024];
-	char* errMsg;
+	sqlite3_stmt* stmt;
 	int rc;
+	int found = 0;
 
-	snprintf(query, sizeof(query), "SELECT * FROM users WHERE nickname='%s';", sql_escape_string(nickname));
 	memset(data, 0, sizeof(struct auth_info));
 
-	result.data = data;
-	result.found = 0;
-
 #ifdef DEBUG_SQL
-	printf("SQL: %s\n", query);
+	printf("SQL: SELECT * FROM users WHERE nickname=?\n");
 #endif
 
-	rc = sqlite3_exec(sql->db, query , get_user_callback, &result, &errMsg);
-	if (rc != SQLITE_OK) {
+	rc = sqlite3_prepare_v2(sql->db, "SELECT nickname, password, credentials FROM users WHERE nickname=?;", -1, &stmt, NULL);
+	if (rc != SQLITE_OK)
+	{
 #ifdef DEBUG_SQL
-		fprintf(stderr, "SQL: ERROR: %s\n", errMsg);
+		fprintf(stderr, "SQL: ERROR: %s\n", sqlite3_errmsg(sql->db));
 #endif
-		sqlite3_free(errMsg);
 		return st_default;
 	}
 
-	if (result.found)
+	sqlite3_bind_text(stmt, 1, nickname, -1, SQLITE_STATIC);
+
+	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW)
+	{
+		const char* nick = (const char*) sqlite3_column_text(stmt, 0);
+		const char* pass = (const char*) sqlite3_column_text(stmt, 1);
+		const char* cred = (const char*) sqlite3_column_text(stmt, 2);
+
+		if (nick)
+			strncpy(data->nickname, nick, MAX_NICK_LEN);
+		if (pass)
+			strncpy(data->password, pass, MAX_PASS_LEN);
+		if (cred)
+		{
+			auth_string_to_cred(cred, &data->credentials);
+			found = 1;
+		}
+
+#ifdef DEBUG_SQL
+		printf("SQL: nickname=%s, password=%s, credentials=%s\n", data->nickname, data->password, auth_cred_to_string(data->credentials));
+#endif
+	}
+
+	sqlite3_finalize(stmt);
+
+	if (found)
 		return st_allow;
 	return st_default;
 }
@@ -208,42 +187,59 @@ static plugin_st get_user(struct plugin_handle* plugin, const char* nickname, st
 static plugin_st register_user(struct plugin_handle* plugin, struct auth_info* user)
 {
 	struct sql_data* sql = (struct sql_data*) plugin->ptr;
-	char* nick = strdup(sql_escape_string(user->nickname));
-	char* pass = strdup(sql_escape_string(user->password));
+	sqlite3_stmt* stmt;
 	const char* cred = auth_cred_to_string(user->credentials);
-	int rc = sql_execute(sql, null_callback, NULL, "INSERT INTO users (nickname, password, credentials) VALUES('%s', '%s', '%s');", nick, pass, cred);
+	int rc;
 
-	free(nick);
-	free(pass);
+	rc = sqlite3_prepare_v2(sql->db, "INSERT INTO users (nickname, password, credentials) VALUES(?, ?, ?);", -1, &stmt, NULL);
+	if (rc != SQLITE_OK)
+	{
+		fprintf(stderr, "Unable to add user \"%s\": %s\n", user->nickname, sqlite3_errmsg(sql->db));
+		return st_deny;
+	}
 
-	if (rc <= 0)
+	sqlite3_bind_text(stmt, 1, user->nickname, -1, SQLITE_STATIC);
+	sqlite3_bind_text(stmt, 2, user->password, -1, SQLITE_STATIC);
+	sqlite3_bind_text(stmt, 3, cred, -1, SQLITE_STATIC);
+
+	rc = sqlite3_step(stmt);
+	sqlite3_finalize(stmt);
+
+	if (rc != SQLITE_DONE)
 	{
 		fprintf(stderr, "Unable to add user \"%s\"\n", user->nickname);
 		return st_deny;
 	}
 	return st_allow;
-
 }
 
 static plugin_st update_user(struct plugin_handle* plugin, struct auth_info* user)
 {
 	struct sql_data* sql = (struct sql_data*) plugin->ptr;
-
-	char* nick = strdup(sql_escape_string(user->nickname));
-	char* pass = strdup(sql_escape_string(user->password));
+	sqlite3_stmt* stmt;
 	const char* cred = auth_cred_to_string(user->credentials);
-	int rc = sql_execute(sql, null_callback, NULL, "INSERT INTO users (nickname, password, credentials) VALUES('%s', '%s', '%s');", nick, pass, cred);
+	int rc;
 
-	free(nick);
-	free(pass);
-
-	if (rc <= 0)
+	rc = sqlite3_prepare_v2(sql->db, "UPDATE users SET password=?, credentials=? WHERE nickname=?;", -1, &stmt, NULL);
+	if (rc != SQLITE_OK)
 	{
-		fprintf(stderr, "Unable to add user \"%s\"\n", user->nickname);
+		fprintf(stderr, "Unable to update user \"%s\": %s\n", user->nickname, sqlite3_errmsg(sql->db));
+		return st_deny;
+	}
+
+	sqlite3_bind_text(stmt, 1, user->password, -1, SQLITE_STATIC);
+	sqlite3_bind_text(stmt, 2, cred, -1, SQLITE_STATIC);
+	sqlite3_bind_text(stmt, 3, user->nickname, -1, SQLITE_STATIC);
+
+	rc = sqlite3_step(stmt);
+	sqlite3_finalize(stmt);
+
+	if (rc != SQLITE_DONE)
+	{
+		fprintf(stderr, "Unable to update user \"%s\"\n", user->nickname);
 		return st_deny;
 	}
 	return st_allow;
-
 }
 
 static plugin_st delete_user(struct plugin_handle* plugin, struct auth_info* user)
