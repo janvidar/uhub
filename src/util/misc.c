@@ -382,15 +382,27 @@ void* memmem(const void *haystack, size_t haystacklen, const void *needle, size_
 {
 	char* c_buf = (char*) haystack;
 	char* c_pat = (char*) needle;
-	char* ptr = memchr(c_buf, c_pat[0], haystacklen);
+	char* ptr;
+	size_t offset = 0;
 
-	while (ptr && ((size_t) (&ptr[0] - &c_buf[0]) < haystacklen))
+	if (needlelen == 0 || needlelen > haystacklen)
+		return needlelen == 0 ? (void*)haystack : NULL;
+
+	ptr = memchr(c_buf, c_pat[0], haystacklen);
+
+	while (ptr)
 	{
+		offset = ptr - c_buf;
+		if (offset + needlelen > haystacklen)
+			return NULL;
 		if (!memcmp(ptr, c_pat, needlelen))
 			return ptr;
-		ptr = memchr(&ptr[1], c_pat[0], &c_buf[haystacklen] - &ptr[0]);
+		offset++;
+		if (offset >= haystacklen)
+			return NULL;
+		ptr = memchr(c_buf + offset, c_pat[0], haystacklen - offset);
 	}
-	return 0;
+	return NULL;
 }
 #endif
 
