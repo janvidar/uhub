@@ -899,10 +899,10 @@ size_t adc_msg_escape_length(const char* str)
 }
 
 
-int adc_msg_unescape_length(const char* str)
+size_t adc_msg_unescape_length(const char* str)
 {
-	int add = 0;
-	int n = 0;
+	size_t sub = 0;
+	size_t n = 0;
 	int escape = 0;
 	for (; str[n]; n++)
 	{
@@ -915,11 +915,11 @@ int adc_msg_unescape_length(const char* str)
 			if (str[n] == '\\')
 			{
 				escape = 1;
-				add++;
+				sub++;
 			}
 		}
 	}
-	return n - add;
+	return n - sub;
 }
 
 
