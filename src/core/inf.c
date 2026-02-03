@@ -441,10 +441,11 @@ static int check_acl(struct hub_info* hub, struct hub_user* user, struct adc_mes
 static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	char* arg = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_SHARED_SIZE);
+	char* endptr;
 	if (arg)
 	{
-		int64_t shared_size = atoll(arg);
-		if (shared_size < 0)
+		int64_t shared_size = strtoll(arg, &endptr, 10);
+		if (endptr == arg || shared_size < 0)
 			shared_size = 0;
 
 		if (user_is_logged_in(user))
@@ -460,16 +461,16 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 	arg = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_SHARED_FILES);
 	if (arg)
 	{
-		int shared_files = atoi(arg);
-		if (shared_files < 0)
+		long shared_files = strtol(arg, &endptr, 10);
+		if (endptr == arg || shared_files < 0 || shared_files > INT_MAX)
 			shared_files = 0;
 
 		if (user_is_logged_in(user))
 		{
 			hub->users->shared_files -= user->limits.shared_files;
-			hub->users->shared_files += shared_files;
+			hub->users->shared_files += (int)shared_files;
 		}
-		user->limits.shared_files = shared_files;
+		user->limits.shared_files = (int)shared_files;
 		hub_free(arg);
 		arg = 0;
 	}
@@ -477,9 +478,9 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 	arg = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_COUNT_HUB_NORMAL);
 	if (arg)
 	{
-		int num = atoi(arg);
-		if (num < 0) num = 0;
-		user->limits.hub_count_user = num;
+		long num = strtol(arg, &endptr, 10);
+		if (endptr == arg || num < 0 || num > INT_MAX) num = 0;
+		user->limits.hub_count_user = (int)num;
 		hub_free(arg);
 		arg = 0;
 	}
@@ -487,9 +488,9 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 	arg = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_COUNT_HUB_REGISTER);
 	if (arg)
 	{
-		int num = atoi(arg);
-		if (num < 0) num = 0;
-		user->limits.hub_count_registered = num;
+		long num = strtol(arg, &endptr, 10);
+		if (endptr == arg || num < 0 || num > INT_MAX) num = 0;
+		user->limits.hub_count_registered = (int)num;
 		hub_free(arg);
 		arg = 0;
 	}
@@ -497,9 +498,9 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 	arg = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_COUNT_HUB_OPERATOR);
 	if (arg)
 	{
-		int num = atoi(arg);
-		if (num < 0) num = 0;
-		user->limits.hub_count_operator = num;
+		long num = strtol(arg, &endptr, 10);
+		if (endptr == arg || num < 0 || num > INT_MAX) num = 0;
+		user->limits.hub_count_operator = (int)num;
 		hub_free(arg);
 		arg = 0;
 	}
@@ -507,9 +508,9 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 	arg = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_UPLOAD_SLOTS);
 	if (arg)
 	{
-		int num = atoi(arg);
-		if (num < 0) num = 0;
-		user->limits.upload_slots = num;
+		long num = strtol(arg, &endptr, 10);
+		if (endptr == arg || num < 0 || num > INT_MAX) num = 0;
+		user->limits.upload_slots = (int)num;
 		hub_free(arg);
 		arg = 0;
 	}
