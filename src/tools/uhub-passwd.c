@@ -59,32 +59,6 @@ static void print_usage(const char* str)
 
 
 /**
- * Escape an SQL statement and return a pointer to the string.
- * NOTE: The returned value needs to be free'd.
- *
- * @return an escaped string.
- */
-static char* sql_escape_string(const char* str)
-{
-	size_t i, n, size;
-	char* buf;
-
-	for (n = 0, size = strlen(str); n < strlen(str); n++)
-		if (str[n] == '\'')
-			size++;
-
-	buf = malloc(size+1);
-	for (n = 0, i = 0; n < strlen(str); n++)
-	{
-		if (str[n] == '\'')
-			buf[i++] = '\'';
-		buf[i++] = str[n];
-	}
-	buf[i++] = '\0';
-	return buf;
-}
-
-/**
  * Validate credentials.
  */
 static const char* validate_cred(const char* cred_str)
@@ -182,34 +156,6 @@ static void open_database()
 	}
 }
 
-static int sql_callback(void* ptr, int argc, char **argv, char **colName) { return 0; }
-
-static int sql_execute(const char* sql, ...)
-{
-	va_list args;
-	char query[1024];
-	char* errMsg;
-	int rc;
-
-	va_start(args, sql);
-	vsnprintf(query, sizeof(query), sql, args);
-
-#ifdef DEBUG_SQL
-	printf("SQL: %s\n", query);
-#endif
-
-	open_database();
-
-	rc = sqlite3_exec(db, query, sql_callback, NULL, &errMsg);
-	if (rc != SQLITE_OK) {
-		fprintf(stderr, "ERROR: %s\n", errMsg);
-		sqlite3_free(errMsg);
-	}
-
-	rc = sqlite3_changes(db);
-	sqlite3_close(db);
-	return rc;
-}
 
 static int create(size_t argc, const char** argv)
 {
@@ -221,8 +167,21 @@ static int create(size_t argc, const char** argv)
 			"created TIMESTAMP DEFAULT (DATETIME('NOW')),"
 			"activity TIMESTAMP DEFAULT (DATETIME('NOW'))"
 		");";
+	char* errMsg;
+	int rc;
 
-	sql_execute(sql);
+	open_database();
+
+	rc = sqlite3_exec(db, sql, NULL, NULL, &errMsg);
+	if (rc != SQLITE_OK)
+	{
+		fprintf(stderr, "ERROR: %s\n", errMsg);
+		sqlite3_free(errMsg);
+		sqlite3_close(db);
+		return 1;
+	}
+
+	sqlite3_close(db);
 	return 0;
 }
 
@@ -260,101 +219,162 @@ static int list(size_t argc, const char** argv)
 
 static int add(size_t argc, const char** argv)
 {
-	char* user = NULL;
-	char* pass = NULL;
-	const char* cred = NULL;
+	const char* user;
+	const char* pass;
+	const char* cred;
+	sqlite3_stmt* stmt;
 	int rc;
 
 	if (argc < 2)
 		print_usage("username password [credentials = user]");
 
-	user = sql_escape_string(validate_username(argv[0]));
-	pass = sql_escape_string(validate_password(argv[1]));
+	user = validate_username(argv[0]);
+	pass = validate_password(argv[1]);
 	cred = validate_cred(argv[2] ? argv[2] : "user");
 
-	rc = sql_execute("INSERT INTO users (nickname, password, credentials) VALUES('%s', '%s', '%s');", user, pass, cred);
+	open_database();
 
-	free(user);
-	free(pass);
-
-	if (rc != 1)
+	rc = sqlite3_prepare_v2(db, "INSERT INTO users (nickname, password, credentials) VALUES(?, ?, ?);", -1, &stmt, NULL);
+	if (rc != SQLITE_OK)
 	{
-		fprintf(stderr, "Unable to add user \"%s\"\n", argv[0]);
+		fprintf(stderr, "Unable to add user \"%s\": %s\n", user, sqlite3_errmsg(db));
+		sqlite3_close(db);
 		return 1;
 	}
+
+	sqlite3_bind_text(stmt, 1, user, -1, SQLITE_STATIC);
+	sqlite3_bind_text(stmt, 2, pass, -1, SQLITE_STATIC);
+	sqlite3_bind_text(stmt, 3, cred, -1, SQLITE_STATIC);
+
+	rc = sqlite3_step(stmt);
+	sqlite3_finalize(stmt);
+
+	if (rc != SQLITE_DONE)
+	{
+		fprintf(stderr, "Unable to add user \"%s\"\n", user);
+		sqlite3_close(db);
+		return 1;
+	}
+
+	sqlite3_close(db);
 	return 0;
 }
 
 static int mod(size_t argc, const char** argv)
 {
-	char* user = NULL;
-	const char* cred = NULL;
+	const char* user;
+	const char* cred;
+	sqlite3_stmt* stmt;
 	int rc;
 
 	if (argc < 2)
 		print_usage("username credentials");
 
-	user = sql_escape_string(argv[0]);
+	user = argv[0];
 	cred = validate_cred(argv[1]);
 
-	rc = sql_execute("UPDATE users SET credentials = '%s' WHERE nickname = '%s';", cred, user);
+	open_database();
 
-	free(user);
-
-	if (rc != 1)
+	rc = sqlite3_prepare_v2(db, "UPDATE users SET credentials = ? WHERE nickname = ?;", -1, &stmt, NULL);
+	if (rc != SQLITE_OK)
 	{
-		fprintf(stderr, "Unable to set credentials for user \"%s\"\n", argv[0]);
+		fprintf(stderr, "Unable to set credentials for user \"%s\": %s\n", user, sqlite3_errmsg(db));
+		sqlite3_close(db);
 		return 1;
 	}
+
+	sqlite3_bind_text(stmt, 1, cred, -1, SQLITE_STATIC);
+	sqlite3_bind_text(stmt, 2, user, -1, SQLITE_STATIC);
+
+	rc = sqlite3_step(stmt);
+	sqlite3_finalize(stmt);
+
+	if (rc != SQLITE_DONE || sqlite3_changes(db) != 1)
+	{
+		fprintf(stderr, "Unable to set credentials for user \"%s\"\n", user);
+		sqlite3_close(db);
+		return 1;
+	}
+
+	sqlite3_close(db);
 	return 0;
 }
 
 static int pass(size_t argc, const char** argv)
 {
-	char* user = NULL;
-	char* pass = NULL;
+	const char* user;
+	const char* password;
+	sqlite3_stmt* stmt;
 	int rc;
 
 	if (argc < 2)
 		print_usage("username password");
 
-	user = sql_escape_string(argv[0]);
-	pass = sql_escape_string(validate_password(argv[1]));
+	user = argv[0];
+	password = validate_password(argv[1]);
 
-	rc = sql_execute("UPDATE users SET password = '%s' WHERE nickname = '%s';", pass, user);
+	open_database();
 
-	free(user);
-	free(pass);
-
-	if (rc != 1)
+	rc = sqlite3_prepare_v2(db, "UPDATE users SET password = ? WHERE nickname = ?;", -1, &stmt, NULL);
+	if (rc != SQLITE_OK)
 	{
-		fprintf(stderr, "Unable to change password for user \"%s\"\n", argv[0]);
+		fprintf(stderr, "Unable to change password for user \"%s\": %s\n", user, sqlite3_errmsg(db));
+		sqlite3_close(db);
 		return 1;
 	}
 
+	sqlite3_bind_text(stmt, 1, password, -1, SQLITE_STATIC);
+	sqlite3_bind_text(stmt, 2, user, -1, SQLITE_STATIC);
+
+	rc = sqlite3_step(stmt);
+	sqlite3_finalize(stmt);
+
+	if (rc != SQLITE_DONE || sqlite3_changes(db) != 1)
+	{
+		fprintf(stderr, "Unable to change password for user \"%s\"\n", user);
+		sqlite3_close(db);
+		return 1;
+	}
+
+	sqlite3_close(db);
 	return 0;
 }
 
 
 static int del(size_t argc, const char** argv)
 {
-	char* user = NULL;
+	const char* user;
+	sqlite3_stmt* stmt;
 	int rc;
 
 	if (argc < 1)
 		print_usage("username");
 
-	user = sql_escape_string(argv[0]);
+	user = argv[0];
 
-	rc = sql_execute("DELETE FROM users WHERE nickname = '%s';", user);
-	free(user);
+	open_database();
 
-	if (rc != 1)
+	rc = sqlite3_prepare_v2(db, "DELETE FROM users WHERE nickname = ?;", -1, &stmt, NULL);
+	if (rc != SQLITE_OK)
 	{
-		fprintf(stderr, "Unable to delete user \"%s\".\n", argv[0]);
+		fprintf(stderr, "Unable to delete user \"%s\": %s\n", user, sqlite3_errmsg(db));
+		sqlite3_close(db);
 		return 1;
 	}
 
+	sqlite3_bind_text(stmt, 1, user, -1, SQLITE_STATIC);
+
+	rc = sqlite3_step(stmt);
+	sqlite3_finalize(stmt);
+
+	if (rc != SQLITE_DONE || sqlite3_changes(db) != 1)
+	{
+		fprintf(stderr, "Unable to delete user \"%s\".\n", user);
+		sqlite3_close(db);
+		return 1;
+	}
+
+	sqlite3_close(db);
 	return 0;
 }
 
