@@ -47,30 +47,16 @@ struct chat_history_line
 
 static int null_callback(void* ptr, int argc, char **argv, char **colName) { return 0; }
 
-static const char* sql_escape_string(const char* str)
-{
-	static char out[MAX_HISTORY_SIZE];
-	size_t i = 0;
-	size_t n = 0;
-	for (; n < strlen(str); n++)
-	{
-		if (str[n] == '\'')
-			out[i++] = '\'';
-		out[i++] = str[n];
-	}
-	out[i++] = '\0';
-	return out;
-}
-
 static int sql_execute(struct chat_history_data* sql, int (*callback)(void* ptr, int argc, char **argv, char **colName), void* ptr, const char* sql_fmt, ...)
 {
 	va_list args;
-	char query[MAX_HISTORY_SIZE];
+	char query[1024];
 	char* errMsg;
 	int rc;
 
 	va_start(args, sql_fmt);
 	vsnprintf(query, sizeof(query), sql_fmt, args);
+	va_end(args);
 
 	rc = sqlite3_exec(sql->db, query, callback, ptr, &errMsg);
 	if (rc != SQLITE_OK)
@@ -101,13 +87,27 @@ static void create_tables(struct plugin_handle* plugin)
 static void history_add(struct plugin_handle* plugin, struct plugin_user* from, const char* message, int flags)
 {
 	struct chat_history_data* data = (struct chat_history_data*) plugin->ptr;
-	char* history_line = strdup(sql_escape_string(message));
-	char* history_nick = strdup(sql_escape_string(from->nick));
+	sqlite3_stmt* stmt;
+	int rc;
 
-	sql_execute(data, null_callback, NULL, "INSERT INTO chat_history (from_nick, message) VALUES('%s', '%s');DELETE FROM chat_history WHERE time <= (SELECT time FROM chat_history ORDER BY time DESC LIMIT %d,1);", history_nick, history_line, data->history_max);
+	/* Insert new message using prepared statement */
+	rc = sqlite3_prepare_v2(data->db, "INSERT INTO chat_history (from_nick, message) VALUES(?, ?);", -1, &stmt, NULL);
+	if (rc == SQLITE_OK)
+	{
+		sqlite3_bind_text(stmt, 1, from->nick, -1, SQLITE_STATIC);
+		sqlite3_bind_text(stmt, 2, message, -1, SQLITE_STATIC);
+		sqlite3_step(stmt);
+		sqlite3_finalize(stmt);
+	}
 
-	hub_free(history_line);
-	hub_free(history_nick);
+	/* Delete old messages beyond history_max using prepared statement */
+	rc = sqlite3_prepare_v2(data->db, "DELETE FROM chat_history WHERE time <= (SELECT time FROM chat_history ORDER BY time DESC LIMIT ?,1);", -1, &stmt, NULL);
+	if (rc == SQLITE_OK)
+	{
+		sqlite3_bind_int(stmt, 1, (int)data->history_max);
+		sqlite3_step(stmt);
+		sqlite3_finalize(stmt);
+	}
 }
 
 /**
