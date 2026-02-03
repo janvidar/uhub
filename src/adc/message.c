@@ -848,8 +848,19 @@ int adc_msg_get_argument_index(struct adc_message* cmd, const char prefix[2])
 	start = strchr(&cmd->cache[adc_msg_get_arg_offset(cmd)-1], ' ');
 	while (start)
 	{
+		size_t arg_len;
 		end = strchr(&start[1], ' ');
-		if (((&end[0] - &start[1]) > 2) && ((start[1] == prefix[0]) && (start[2] == prefix[1])))
+		if (end)
+		{
+			arg_len = &end[0] - &start[1];
+		}
+		else
+		{
+			arg_len = strlen(&start[1]);
+			if (arg_len > 0 && start[1 + arg_len - 1] == '\n')
+				arg_len--;
+		}
+		if ((arg_len > 2) && ((start[1] == prefix[0]) && (start[2] == prefix[1])))
 		{
 			adc_msg_terminate(cmd);
 			return count;
