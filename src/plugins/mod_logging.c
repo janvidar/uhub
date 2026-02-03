@@ -183,7 +183,10 @@ static void log_message(struct log_data* data, const char *format, ...)
 	{
 		t = time(NULL);
 		tmp = localtime(&t);
-		strftime(logmsg, 32, "%Y-%m-%d %H:%M:%S ", tmp);
+		if (tmp)
+			strftime(logmsg, 32, "%Y-%m-%d %H:%M:%S ", tmp);
+		else
+			memset(logmsg, ' ', 20);
 
 		va_start(args, format);
 		size = vsnprintf(logmsg + 20, 1004, format, args);

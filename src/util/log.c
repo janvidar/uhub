@@ -191,7 +191,10 @@ void hub_log(int log_verbosity, const char *format, ...)
 	{
 		t = time(NULL);
 		tmp = localtime(&t);
-		strftime(timestamp, 32, "%Y-%m-%d %H:%M:%S", tmp);
+		if (tmp)
+			strftime(timestamp, 32, "%Y-%m-%d %H:%M:%S", tmp);
+		else
+			timestamp[0] = '\0';
 		va_start(args, format);
 		vsnprintf(logmsg, 1024, format, args);
 		va_end(args);
