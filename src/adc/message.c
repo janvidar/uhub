@@ -203,7 +203,7 @@ int adc_msg_is_empty(struct adc_message* msg)
 	if (offset == -1)
 		return -1;
 
-	if ((msg->length - 1) == (size_t) offset)
+	if (msg->length > 0 && (msg->length - 1) == (size_t) offset)
 		return 1;
 
 	return 0;
