@@ -124,11 +124,20 @@ static int get_messages_callback(void* ptr, int argc, char **argv, char **colNam
 	
 	for (; i < argc; i++) {
 		if (strcmp(colName[i], "from_nick") == 0)
-			strncpy(line->from, argv[i], MAX_NICK_LEN);
+		{
+			strncpy(line->from, argv[i], MAX_NICK_LEN - 1);
+			line->from[MAX_NICK_LEN - 1] = '\0';
+		}
 		else if (strcmp(colName[i], "message") == 0)
-			strncpy(line->message, argv[i], MAX_HISTORY_SIZE);
+		{
+			strncpy(line->message, argv[i], MAX_HISTORY_SIZE - 1);
+			line->message[MAX_HISTORY_SIZE - 1] = '\0';
+		}
 		else if (strcmp(colName[i], "time") == 0)
-			strncpy(line->time, argv[i], 20);
+		{
+			strncpy(line->time, argv[i], 19);
+			line->time[19] = '\0';
+		}
 	}
 	
 	list_append(messages, line);
