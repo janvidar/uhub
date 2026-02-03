@@ -627,12 +627,15 @@ int adc_msg_remove_named_argument(struct adc_message* cmd, const char prefix_[2]
 			memmove(start, end, endlen);
 			start[endlen] = '\0';
 			found++;
-			adc_msg_set_length(cmd, cmd->length - temp_len);
+			if (temp_len <= cmd->length)
+				adc_msg_set_length(cmd, cmd->length - temp_len);
 		}
 		else
 		{
+			size_t start_len = strlen(start);
 			found++;
-			adc_msg_set_length(cmd, cmd->length - strlen(start));
+			if (start_len <= cmd->length)
+				adc_msg_set_length(cmd, cmd->length - start_len);
 			start[0] = '\0';
 			break;
 		}
