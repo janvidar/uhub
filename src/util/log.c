@@ -157,8 +157,8 @@ void hub_set_log_verbosity(int verb)
 
 void hub_log(int log_verbosity, const char *format, ...)
 {
-	static char logmsg[1024];
-	static char timestamp[32];
+	char logmsg[1024];
+	char timestamp[32];
 	struct tm *tmp;
 	time_t t;
 	va_list args;
