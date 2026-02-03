@@ -889,10 +889,10 @@ int adc_msg_get_argument_index(struct adc_message* cmd, const char prefix[2])
 
 
 
-int adc_msg_escape_length(const char* str)
+size_t adc_msg_escape_length(const char* str)
 {
-	int add = 0;
-	int n = 0;
+	size_t add = 0;
+	size_t n = 0;
 	for (; str[n]; n++)
 		if (str[n] == ' ' || str[n] == '\n' || str[n] == '\\') add++;
 	return n + add;
