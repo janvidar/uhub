@@ -62,19 +62,40 @@ void cbuf_destroy(struct cbuffer* buf)
 
 void cbuf_resize(struct cbuffer* buf, size_t capacity)
 {
+	char* new_buf;
 	uhub_assert(buf->flags == 0);
-	buf->capacity = capacity;
-	buf->buf = hub_realloc(buf->buf, capacity + 1);
+
+	/* Check for overflow: capacity + 1 */
+	if (capacity >= SIZE_MAX)
+		return;
+
+	new_buf = hub_realloc(buf->buf, capacity + 1);
+	if (new_buf)
+	{
+		buf->buf = new_buf;
+		buf->capacity = capacity;
+	}
 }
 
 void cbuf_append_bytes(struct cbuffer* buf, const char* msg, size_t len)
 {
+	size_t new_size;
 	uhub_assert(buf->flags == 0);
-	if (buf->size + len >= buf->capacity)
-		cbuf_resize(buf, buf->size + len);
+
+	/* Check for overflow: buf->size + len */
+	if (len > SIZE_MAX - buf->size)
+		return;
+
+	new_size = buf->size + len;
+	if (new_size >= buf->capacity)
+		cbuf_resize(buf, new_size);
+
+	/* Verify resize succeeded */
+	if (new_size >= buf->capacity)
+		return;
 
 	memcpy(buf->buf + buf->size, msg, len);
-	buf->size += len;
+	buf->size = new_size;
 	buf->buf[buf->size] = '\0';
 }
 
