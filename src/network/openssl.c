@@ -230,7 +230,12 @@ struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const
 {
 	struct net_context_openssl* ctx = (struct net_context_openssl*) hub_malloc_zero(sizeof(struct net_context_openssl));
         long flags = 0;
-	const SSL_METHOD* ssl_method = get_ssl_method(tls_version, &flags);
+	const SSL_METHOD* ssl_method;
+
+	if (!ctx)
+		return 0;
+
+	ssl_method = get_ssl_method(tls_version, &flags);
 
 	if (!ssl_method)
 	{
@@ -239,8 +244,13 @@ struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const
 	}
 
 	ctx->ssl = SSL_CTX_new(ssl_method);
+	if (!ctx->ssl)
+	{
+		LOG_ERROR("Unable to create SSL context");
+		hub_free(ctx);
+		return 0;
+	}
 
-	// FIXME: Why did we need this again?
 	SSL_CTX_set_quiet_shutdown(ctx->ssl, 1);
 
 #ifdef SSL_OP_NO_COMPRESSION
@@ -396,25 +406,30 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode 
 	struct net_context_openssl* ctx = (struct net_context_openssl*) ssl_ctx;
 	struct net_ssl_openssl* handle = (struct net_ssl_openssl*) hub_malloc_zero(sizeof(struct net_ssl_openssl));
 
+	if (!handle)
+	{
+		LOG_ERROR("Unable to allocate memory for SSL handle");
+		return -1;
+	}
+
+	handle->ssl = SSL_new(ctx->ssl);
+	if (!handle->ssl)
+	{
+		LOG_ERROR("Unable to create new SSL stream");
+		hub_free(handle);
+		return -1;
+	}
+
+	SSL_set_fd(handle->ssl, con->sd);
+	handle->bio = SSL_get_rbio(handle->ssl);
+	con->ssl = (struct ssl_handle*) handle;
+
 	if (ssl_mode == net_con_ssl_mode_server)
 	{
-		handle->ssl = SSL_new(ctx->ssl);
-		if (!handle->ssl)
-		{
-			LOG_ERROR("Unable to create new SSL stream\n");
-			return -1;
-		}
-		SSL_set_fd(handle->ssl, con->sd);
-		handle->bio = SSL_get_rbio(handle->ssl);
-		con->ssl = (struct ssl_handle*) handle;
 		return net_con_ssl_accept(con);
 	}
 	else
 	{
-		handle->ssl = SSL_new(ctx->ssl);
-		SSL_set_fd(handle->ssl, con->sd);
-		handle->bio = SSL_get_rbio(handle->ssl);
-		con->ssl = (struct ssl_handle*) handle;
 		return net_con_ssl_connect(con);
 	}
 }
