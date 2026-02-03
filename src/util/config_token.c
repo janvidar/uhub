@@ -210,6 +210,12 @@ struct cfg_settings* cfg_settings_split(const char* line)
 
 		s->key = strdup(key);
 		s->value = strdup(strip_white_space(pos+1));
+		if (!s->key || !s->value)
+		{
+			cfg_tokens_free(tok);
+			cfg_settings_free(s);
+			return NULL;
+		}
 	}
 	else if (cfg_token_count(tok) == 2)
 	{
@@ -241,11 +247,23 @@ struct cfg_settings* cfg_settings_split(const char* line)
 
 		s->key = strdup(key);
 		s->value = strdup(val);
+		if (!s->key || !s->value)
+		{
+			cfg_tokens_free(tok);
+			cfg_settings_free(s);
+			return NULL;
+		}
 	}
 	else
 	{
 		s->key = strdup(strip_white_space(cfg_token_get(tok, 0)));
 		s->value = strdup(strip_white_space(cfg_token_get(tok, 2)));
+		if (!s->key || !s->value)
+		{
+			cfg_tokens_free(tok);
+			cfg_settings_free(s);
+			return NULL;
+		}
 	}
 	cfg_tokens_free(tok);
 	return s;
