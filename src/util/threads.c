@@ -141,7 +141,7 @@ void* uhub_thread_join(uhub_thread_t* thread)
 	DWORD exitCode;
 	WaitForSingleObject(thread->handle, INFINITE);
 	GetExitCodeThread(thread->handle, &exitCode);
-	ret = &exitCode;
+	ret = (void*)(intptr_t)exitCode;
 	CloseHandle(thread->handle);
 	hub_free(thread);
 	return ret;
