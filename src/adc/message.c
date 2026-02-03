@@ -141,13 +141,16 @@ static int adc_msg_grow(struct adc_message* msg, size_t size)
 	return 1;
 }
 
-/* NOTE: msg must be unterminated here */
+/*
+ * Append string to message cache.
+ * NOTE: msg must be unterminated here.
+ * Returns 1 on success, 0 on failure (OOM).
+ */
 static int adc_msg_cache_append(struct adc_message* msg, const char* string, size_t len)
 {
 	if (!adc_msg_grow(msg, msg->length + len))
 	{
-		/* FIXME: OOM! */
-		return 0;
+		return 0; /* OOM */
 	}
 
 	memcpy(&msg->cache[msg->length], string, len);
@@ -735,18 +738,20 @@ void adc_msg_unterminate(struct adc_message* cmd)
 
 int adc_msg_add_named_argument(struct adc_message* cmd, const char prefix[2], const char* string)
 {
-	int ret = 0;
 	if (!string)
 		return -1;
 
 	ADC_MSG_ASSERT(cmd);
 
 	adc_msg_unterminate(cmd);
-	adc_msg_cache_append(cmd, " ", 1);
-	adc_msg_cache_append(cmd, prefix, 2);
-	adc_msg_cache_append(cmd, string, strlen(string));
+	if (!adc_msg_cache_append(cmd, " ", 1) ||
+	    !adc_msg_cache_append(cmd, prefix, 2) ||
+	    !adc_msg_cache_append(cmd, string, strlen(string)))
+	{
+		return -1;
+	}
 	adc_msg_terminate(cmd);
-	return ret;
+	return 0;
 }
 
 int adc_msg_add_named_argument_string(struct adc_message* cmd, const char prefix[2], const char* string)
@@ -776,8 +781,11 @@ int adc_msg_add_argument(struct adc_message* cmd, const char* string)
 	ADC_MSG_ASSERT(cmd);
 
 	adc_msg_unterminate(cmd);
-	adc_msg_cache_append(cmd, " ", 1);
-	adc_msg_cache_append(cmd, string, strlen(string));
+	if (!adc_msg_cache_append(cmd, " ", 1) ||
+	    !adc_msg_cache_append(cmd, string, strlen(string)))
+	{
+		return -1;
+	}
 	adc_msg_terminate(cmd);
 	return 0;
 }
