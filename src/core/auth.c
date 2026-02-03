@@ -86,8 +86,12 @@ static int check_cmd_user(const char* cmd, int status, struct linked_list* list,
 		}
 
 		strncpy(info->nickname, data, MAX_NICK_LEN);
+		info->nickname[MAX_NICK_LEN] = '\0';
 		if (data_extra)
+		{
 			strncpy(info->password, data_extra, MAX_PASS_LEN);
+			info->password[MAX_PASS_LEN] = '\0';
+		}
 		info->credentials = status;
 		list_append(list, info);
 		LOG_DEBUG("ACL: Added user '%s' (%s)", info->nickname, auth_cred_to_string(info->credentials));

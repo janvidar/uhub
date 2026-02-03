@@ -163,9 +163,15 @@ static plugin_st get_user(struct plugin_handle* plugin, const char* nickname, st
 		const char* cred = (const char*) sqlite3_column_text(stmt, 2);
 
 		if (nick)
+		{
 			strncpy(data->nickname, nick, MAX_NICK_LEN);
+			data->nickname[MAX_NICK_LEN] = '\0';
+		}
 		if (pass)
+		{
 			strncpy(data->password, pass, MAX_PASS_LEN);
+			data->password[MAX_PASS_LEN] = '\0';
+		}
 		if (cred)
 		{
 			auth_string_to_cred(cred, &data->credentials);
