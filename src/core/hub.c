@@ -1032,6 +1032,12 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 #undef STATUS
 
 	escaped_text = adc_msg_escape(text);
+	if (!escaped_text)
+	{
+		adc_msg_free(cmd);
+		adc_msg_free(qui);
+		return;
+	}
 
 	adc_msg_add_argument(cmd, code);
 	adc_msg_add_argument(cmd, escaped_text);
