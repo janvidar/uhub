@@ -63,8 +63,13 @@ pub fn build(b: *std.Build) void {
             "-pedantic",
             "-Wall",
             "-W",
+            "-DSSL_SUPPORT",
+            "-DSSL_USE_OPENSSL",
         },
     });
+
+    exe_mod.linkSystemLibrary("ssl", .{});
+    exe_mod.linkSystemLibrary("crypto", .{});
 
     const exe = b.addExecutable(.{
         .name = "uhub",
