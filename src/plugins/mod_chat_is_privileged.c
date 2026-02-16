@@ -19,6 +19,7 @@
 
 #include "plugin_api/handle.h"
 #include "util/memory.h"
+#include "util/config_token.h"
 
 struct user_info
 {
@@ -36,6 +37,11 @@ struct chat_data
 	enum auth_credentials allow_op_contact; // minimum credentials to allow private chat to operators (including super and admins).
 	enum auth_credentials allow_mainchat;	// minimum credentials to allow using main chat
 };
+
+static void set_error_message(struct plugin_handle *plugin, const char *msg)
+{
+	plugin->error_msg = msg;
+}
 
 static struct chat_data *parse_config(struct plugin_handle *plugin, const char *line)
 {
@@ -65,8 +71,8 @@ static struct chat_data *parse_config(struct plugin_handle *plugin, const char *
 
 		if (strcmp(cfg_settings_get_key(setting), "allow_privchat") == 0)
 		{
-			if (!string_to_boolean(cfg_settings_get_value(setting), &data->allow_privchat))
-				data->allow_privchat = 0;
+			if (!auth_string_to_cred(cfg_settings_get_value(setting), &data->allow_privchat))
+				data->allow_privchat = auth_cred_guest;
 		}
 		else if (strcmp(cfg_settings_get_key(setting), "minimum_access") == 0)
 		{
@@ -151,7 +157,7 @@ plugin_st on_private_msg(struct plugin_handle *plugin, struct plugin_user *from,
 int plugin_register(struct plugin_handle *plugin, const char *config)
 {
 	PLUGIN_INITIALIZE(plugin, "Privileged chat hub", "1.0", "Only registered users can send messages on the main chat.");
-	plugin->ptr = cip_initialize();
+	plugin->ptr = parse_config(plugin, config);
 
 	plugin->funcs.on_user_login = on_user_login;
 	plugin->funcs.on_user_logout = on_user_logout;

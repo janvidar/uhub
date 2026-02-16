@@ -77,7 +77,7 @@ pub fn build(b: *std.Build) void {
         "mod_auth_simple",
         "mod_auth_sqlite",
         "mod_chat_history",
-        //"mod_chat_is_privileged",
+        "mod_chat_is_privileged",
         "mod_logging",
         "mod_no_guest_downloads",
         "mod_topic",
