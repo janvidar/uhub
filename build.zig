@@ -91,6 +91,14 @@ pub fn build(b: *std.Build) void {
         mod.addIncludePath(b.path("src"));
         mod.addCSourceFiles(.{ .files = &.{"src/plugins/" ++ plugin_name ++ ".c"} });
 
+        if (std.mem.eql(u8, plugin_name, "mod_auth_sqlite")) {
+            mod.addIncludePath(b.path("third_party/sqlite3"));
+            mod.addCSourceFiles(.{
+                .files = &.{"third_party/sqlite3/sqlite3.c"},
+                .flags = &.{"-DSQLITE_THREADSAFE=1"},
+            });
+        }
+
         const lib = b.addLibrary(.{
             .linkage = .dynamic,
             .name = plugin_name,

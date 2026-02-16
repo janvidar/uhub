@@ -21,3 +21,20 @@ debian/uhub.postrm.debhelper
 debian/uhub.prerm.debhelper
 debian/uhub.substvars
 uhub-passwd
+
+# Zig
+.zig-cache/
+zig-out/
+
+# Ninja
+.ninja_deps
+.ninja_log
+build.ninja
+rules.ninja
+
+# Build output
+build/
+
+# IDE
+.vscode/
+.cache/
