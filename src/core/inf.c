@@ -99,6 +99,7 @@ static int check_hash_tiger(const char* cid, const char* pid)
  */
 static int check_cid(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
+    (void) hub;
 	size_t pos;
 	char* cid = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_CLIENT_ID);
 	char* pid = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_PRIVATE_ID);
@@ -160,7 +161,9 @@ static int check_cid(struct hub_info* hub, struct hub_user* user, struct adc_mes
 
 static int check_required_login_flags(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
-	int num = 0;
+    (void) hub;
+    (void) user;
+    int num = 0;
 
 	num = adc_msg_has_named_argument(cmd, ADC_INF_FLAG_CLIENT_ID);
 	if (num != 1)
@@ -232,6 +235,7 @@ static int check_network(struct hub_info* hub, struct hub_user* user, struct adc
 
 static void strip_network(struct hub_user* user, struct adc_message* cmd)
 {
+    (void) user;
 	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
 	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
 }
@@ -284,6 +288,7 @@ static int nick_is_utf8(const char* nick)
 
 static int check_nick(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
+    (void) hub;
 	char* nick;
 	char* tmp;
 	enum nick_status status;
@@ -332,6 +337,7 @@ static int check_nick(struct hub_info* hub, struct hub_user* user, struct adc_me
 
 static int check_logged_in(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
+    (void) cmd;
 	struct hub_user* lookup1 = uman_get_user_by_nick(hub->users, user->id.nick);
 	struct hub_user* lookup2 = uman_get_user_by_cid(hub->users, user->id.cid);
 
@@ -383,6 +389,7 @@ static int check_logged_in(struct hub_info* hub, struct hub_user* user, struct a
  */
 static int check_user_agent(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
+    (void) hub;
 	char* ua_name_encoded = 0;
 	char* ua_version_encoded = 0;
 	char* str = 0;
@@ -420,6 +427,7 @@ static int check_user_agent(struct hub_info* hub, struct hub_user* user, struct 
 
 static int check_acl(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
+    (void) cmd;
 	if (acl_is_cid_banned(hub->acl, user->id.cid))
 	{
 		return status_msg_ban_permanently;
@@ -666,6 +674,8 @@ static int hub_handle_info_common(struct hub_user* user, struct adc_message* cmd
 
 static int hub_handle_info_low_bandwidth(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
+    (void) user;
+
 	if (hub->config->low_bandwidth_mode)
 	{
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_USER_AGENT_VERSION);
@@ -843,5 +853,3 @@ int hub_handle_info(struct hub_info* hub, struct hub_user* user, const struct ad
 
 	return 0;
 }
-
-

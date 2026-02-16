@@ -4,15 +4,14 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const exe = b.addExecutable(.{
-        .name = "uhub",
+    const exe_mod = b.createModule(.{
         .target = target,
         .optimize = optimize,
+        .link_libc = true,
     });
 
-    exe.addIncludePath(.{ .cwd_relative = "src" });
-
-    exe.addCSourceFiles(.{
+    exe_mod.addIncludePath(b.path("src"));
+    exe_mod.addCSourceFiles(.{
         .files = &.{
             "src/adc/message.c",
             "src/adc/sid.c",
@@ -67,56 +66,38 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    exe.linkLibC();
+    const exe = b.addExecutable(.{
+        .name = "uhub",
+        .root_module = exe_mod,
+    });
+
     b.installArtifact(exe);
 
-    const mod_auth_simple = b.addSharedLibrary(.{ .name = "mod_auth_simple", .target = target, .optimize = optimize });
-    mod_auth_simple.addCSourceFiles(.{ .files = &.{"src/plugins/mod_auth_simple.c"} });
-    mod_auth_simple.addIncludePath(.{ .cwd_relative = "src" });
-    mod_auth_simple.linkLibC();
-    b.installArtifact(mod_auth_simple);
+    inline for (.{
+        "mod_auth_simple",
+        "mod_auth_sqlite",
+        "mod_chat_history",
+        //"mod_chat_is_privileged",
+        "mod_logging",
+        "mod_no_guest_downloads",
+        "mod_topic",
+        "mod_welcome",
+    }) |plugin_name| {
+        const mod = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        });
+        mod.addIncludePath(b.path("src"));
+        mod.addCSourceFiles(.{ .files = &.{"src/plugins/" ++ plugin_name ++ ".c"} });
 
-    const mod_auth_sqlite = b.addSharedLibrary(.{ .name = "mod_auth_sqlite", .target = target, .optimize = optimize });
-    mod_auth_sqlite.addCSourceFiles(.{ .files = &.{"src/plugins/mod_auth_sqlite.c"} });
-    mod_auth_sqlite.addIncludePath(.{ .cwd_relative = "src" });
-    mod_auth_sqlite.linkLibC();
-    b.installArtifact(mod_auth_sqlite);
-
-    const mod_chat_history = b.addSharedLibrary(.{ .name = "mod_chat_history", .target = target, .optimize = optimize });
-    mod_chat_history.addCSourceFiles(.{ .files = &.{"src/plugins/mod_chat_history.c"} });
-    mod_chat_history.addIncludePath(.{ .cwd_relative = "src" });
-    mod_chat_history.linkLibC();
-    b.installArtifact(mod_chat_history);
-
-    //const mod_chat_is_privileged = b.addSharedLibrary(.{ .name = "mod_chat_is_privileged", .target = target, .optimize = optimize });
-    //mod_chat_is_privileged.addCSourceFiles(.{ .files = &.{"src/plugins/mod_chat_is_privileged.c"} });
-    //mod_chat_is_privileged.addIncludePath(.{ .cwd_relative = "src" });
-    //mod_chat_is_privileged.linkLibC();
-    //b.installArtifact(mod_chat_is_privileged);
-
-    const mod_logging = b.addSharedLibrary(.{ .name = "mod_logging", .target = target, .optimize = optimize });
-    mod_logging.addCSourceFiles(.{ .files = &.{"src/plugins/mod_logging.c"} });
-    mod_logging.addIncludePath(.{ .cwd_relative = "src" });
-    mod_logging.linkLibC();
-    b.installArtifact(mod_logging);
-
-    const mod_no_guest_downloads = b.addSharedLibrary(.{ .name = "mod_no_guest_downloads", .target = target, .optimize = optimize });
-    mod_no_guest_downloads.addCSourceFiles(.{ .files = &.{"src/plugins/mod_no_guest_downloads.c"} });
-    mod_no_guest_downloads.addIncludePath(.{ .cwd_relative = "src" });
-    mod_no_guest_downloads.linkLibC();
-    b.installArtifact(mod_no_guest_downloads);
-
-    const mod_topic = b.addSharedLibrary(.{ .name = "mod_topic", .target = target, .optimize = optimize });
-    mod_topic.addCSourceFiles(.{ .files = &.{"src/plugins/mod_topic.c"} });
-    mod_topic.addIncludePath(.{ .cwd_relative = "src" });
-    mod_topic.linkLibC();
-    b.installArtifact(mod_topic);
-
-    const mod_welcome = b.addSharedLibrary(.{ .name = "mod_welcome", .target = target, .optimize = optimize });
-    mod_welcome.addCSourceFiles(.{ .files = &.{"src/plugins/mod_welcome.c"} });
-    mod_welcome.addIncludePath(.{ .cwd_relative = "src" });
-    mod_welcome.linkLibC();
-    b.installArtifact(mod_welcome);
+        const lib = b.addLibrary(.{
+            .linkage = .dynamic,
+            .name = plugin_name,
+            .root_module = mod,
+        });
+        b.installArtifact(lib);
+    }
 
     const run_step = b.addRunArtifact(exe);
     if (b.args) |args| {

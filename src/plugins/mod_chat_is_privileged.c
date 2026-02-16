@@ -26,22 +26,22 @@ struct user_info
 	int warnings;
 };
 
-struct chat_restrictions_data
+struct chat_data
 {
-	size_t num_users;        // number of users tracked.
-	size_t max_users;        // max users (hard limit max 1M users due to limitations in the SID (20 bits)).
-	struct user_info* users; // array of max_users
+	size_t num_users;		 // number of users tracked.
+	size_t max_users;		 // max users (hard limit max 1M users due to limitations in the SID (20 bits)).
+	struct user_info *users; // array of max_users
 
-	enum auth_credentials allow_privchat;   // minimum credentials to allow using private chat
+	enum auth_credentials allow_privchat;	// minimum credentials to allow using private chat
 	enum auth_credentials allow_op_contact; // minimum credentials to allow private chat to operators (including super and admins).
-	enum auth_credentials allow_mainchat;   // minimum credentials to allow using main chat
+	enum auth_credentials allow_mainchat;	// minimum credentials to allow using main chat
 };
 
-static struct chat_data* parse_config(struct plugin_handle* plugin, const char* line)
+static struct chat_data *parse_config(struct plugin_handle *plugin, const char *line)
 {
-	struct chat_data* data = (struct chat_data*) hub_malloc(sizeof(struct chat_data));
-	struct cfg_tokens* tokens = cfg_tokenize(line);
-	char* token = cfg_token_get_first(tokens);
+	struct chat_data *data = (struct chat_data *)hub_malloc(sizeof(struct chat_data));
+	struct cfg_tokens *tokens = cfg_tokenize(line);
+	char *token = cfg_token_get_first(tokens);
 
 	// defaults
 	data->num_users = 0;
@@ -53,7 +53,7 @@ static struct chat_data* parse_config(struct plugin_handle* plugin, const char* 
 
 	while (token)
 	{
-		struct cfg_settings* setting = cfg_settings_split(token);
+		struct cfg_settings *setting = cfg_settings_split(token);
 
 		if (!setting)
 		{
@@ -88,9 +88,9 @@ static struct chat_data* parse_config(struct plugin_handle* plugin, const char* 
 	return data;
 }
 
-static struct user_info* get_user_info(struct chat_data* data, sid_t sid)
+static struct user_info *get_user_info(struct chat_data *data, sid_t sid)
 {
-	struct user_info* u;
+	struct user_info *u;
 
 	// resize buffer if needed.
 	if (sid >= data->max_users)
@@ -115,37 +115,40 @@ static struct user_info* get_user_info(struct chat_data* data, sid_t sid)
 	return u;
 }
 
-static void on_user_login(struct plugin_handle* plugin, struct plugin_user* user)
+static void on_user_login(struct plugin_handle *plugin, struct plugin_user *user)
 {
-	struct chat_data* data = (struct chat_data*) plugin->ptr;
+	struct chat_data *data = (struct chat_data *)plugin->ptr;
 	/*struct user_info* info = */
 	get_user_info(data, user->sid);
 }
 
-static void on_user_logout(struct plugin_handle* plugin, struct plugin_user* user, const char* reason)
+static void on_user_logout(struct plugin_handle *plugin, struct plugin_user *user, const char *reason)
 {
-	struct chat_data* data = (struct chat_data*) plugin->ptr;
-	struct user_info* info = get_user_info(data, user->sid);
+	struct chat_data *data = (struct chat_data *)plugin->ptr;
+	struct user_info *info = get_user_info(data, user->sid);
 	if (info->sid)
 		data->num_users--;
 	info->warnings = 0;
 	info->sid = 0;
 }
 
-plugin_st on_chat_msg(struct plugin_handle* plugin, struct plugin_user* from, const char* message)
+plugin_st on_chat_msg(struct plugin_handle *plugin, struct plugin_user *from, const char *message)
 {
-	struct chat_data* data = (struct chat_data*) plugin->ptr;
-	if (from->credentials >=
-	return st_default;
+	struct chat_data *data = (struct chat_data *)plugin->ptr;
+	if (from->credentials >= data->allow_mainchat)
+		return st_default;
+	return st_deny;
 }
 
-plugin_st on_private_msg(struct plugin_handle* plugin, struct plugin_user* from, struct plugin_user* to, const char* message)
+plugin_st on_private_msg(struct plugin_handle *plugin, struct plugin_user *from, struct plugin_user *to, const char *message)
 {
-	return st_default;
+	struct chat_data *data = (struct chat_data *)plugin->ptr;
+	if (from->credentials >= data->allow_privchat)
+		return st_default;
+	return st_deny;
 }
 
-
-int plugin_register(struct plugin_handle* plugin, const char* config)
+int plugin_register(struct plugin_handle *plugin, const char *config)
 {
 	PLUGIN_INITIALIZE(plugin, "Privileged chat hub", "1.0", "Only registered users can send messages on the main chat.");
 	plugin->ptr = cip_initialize();
@@ -158,9 +161,9 @@ int plugin_register(struct plugin_handle* plugin, const char* config)
 	return 0;
 }
 
-int plugin_unregister(struct plugin_handle* plugin)
+int plugin_unregister(struct plugin_handle *plugin)
 {
-	struct chat_data* data = (struct chat_data*) plugin->ptr;
+	struct chat_data *data = (struct chat_data *)plugin->ptr;
 	if (data)
 	{
 		hub_free(data->users);
@@ -168,4 +171,3 @@ int plugin_unregister(struct plugin_handle* plugin)
 	}
 	return 0;
 }
-

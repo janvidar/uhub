@@ -25,9 +25,9 @@
 #include "util/log.h"
 #include "util/config_token.h"
 
-// #define DEBUG_SQL
+#define DEBUG_SQL
 
-static void set_error_message(struct plugin_handle* plugin, const char* msg)
+static void set_error_message(struct plugin_handle *plugin, const char *msg)
 {
 	plugin->error_msg = msg;
 }
@@ -35,16 +35,16 @@ static void set_error_message(struct plugin_handle* plugin, const char* msg)
 struct sql_data
 {
 	int exclusive;
-	sqlite3* db;
+	sqlite3 *db;
 };
 
-static int null_callback(void* ptr, int argc, char **argv, char **colName) { return 0; }
+static int null_callback(void *ptr, int argc, char **argv, char **colName) { return 0; }
 
-static int sql_execute(struct sql_data* sql, int (*callback)(void* ptr, int argc, char **argv, char **colName), void* ptr, const char* sql_fmt, ...)
+static int sql_execute(struct sql_data *sql, int (*callback)(void *ptr, int argc, char **argv, char **colName), void *ptr, const char *sql_fmt, ...)
 {
 	va_list args;
 	char query[1024];
-	char* errMsg;
+	char *errMsg;
 	int rc;
 
 	va_start(args, sql_fmt);
@@ -68,19 +68,18 @@ static int sql_execute(struct sql_data* sql, int (*callback)(void* ptr, int argc
 	return rc;
 }
 
-
-static struct sql_data* parse_config(const char* line, struct plugin_handle* plugin)
+static struct sql_data *parse_config(const char *line, struct plugin_handle *plugin)
 {
-	struct sql_data* data = (struct sql_data*) hub_malloc_zero(sizeof(struct sql_data));
-	struct cfg_tokens* tokens = cfg_tokenize(line);
-	char* token = cfg_token_get_first(tokens);
+	struct sql_data *data = (struct sql_data *)hub_malloc_zero(sizeof(struct sql_data));
+	struct cfg_tokens *tokens = cfg_tokenize(line);
+	char *token = cfg_token_get_first(tokens);
 
 	if (!data)
 		return 0;
 
 	while (token)
 	{
-		struct cfg_settings* setting = cfg_settings_split(token);
+		struct cfg_settings *setting = cfg_settings_split(token);
 
 		if (!setting)
 		{
@@ -125,9 +124,9 @@ static struct sql_data* parse_config(const char* line, struct plugin_handle* plu
 
 	if (!data->db)
 	{
-	      set_error_message(plugin, "No database file is given, use file=<database>");
-	      hub_free(data);
-	      return 0;
+		set_error_message(plugin, "No database file is given, use file=<database>");
+		hub_free(data);
+		return 0;
 	}
 	return data;
 }
@@ -190,7 +189,7 @@ static plugin_st get_user(struct plugin_handle* plugin, const char* nickname, st
 	return st_default;
 }
 
-static plugin_st register_user(struct plugin_handle* plugin, struct auth_info* user)
+static plugin_st register_user(struct plugin_handle *plugin, struct auth_info *user)
 {
 	struct sql_data* sql = (struct sql_data*) plugin->ptr;
 	sqlite3_stmt* stmt;
@@ -219,7 +218,7 @@ static plugin_st register_user(struct plugin_handle* plugin, struct auth_info* u
 	return st_allow;
 }
 
-static plugin_st update_user(struct plugin_handle* plugin, struct auth_info* user)
+static plugin_st update_user(struct plugin_handle *plugin, struct auth_info *user)
 {
 	struct sql_data* sql = (struct sql_data*) plugin->ptr;
 	sqlite3_stmt* stmt;
@@ -248,15 +247,15 @@ static plugin_st update_user(struct plugin_handle* plugin, struct auth_info* use
 	return st_allow;
 }
 
-static plugin_st delete_user(struct plugin_handle* plugin, struct auth_info* user)
+static plugin_st delete_user(struct plugin_handle *plugin, struct auth_info *user)
 {
-	struct sql_data* sql = (struct sql_data*) plugin->ptr;
+	struct sql_data *sql = (struct sql_data *)plugin->ptr;
 	if (sql->exclusive)
 		return st_deny;
 	return st_default;
 }
 
-int plugin_register(struct plugin_handle* plugin, const char* config)
+int plugin_register(struct plugin_handle *plugin, const char *config)
 {
 	PLUGIN_INITIALIZE(plugin, "SQLite authentication plugin", "1.0", "Authenticate users based on a SQLite database.");
 
@@ -272,13 +271,12 @@ int plugin_register(struct plugin_handle* plugin, const char* config)
 	return -1;
 }
 
-int plugin_unregister(struct plugin_handle* plugin)
+int plugin_unregister(struct plugin_handle *plugin)
 {
-	struct sql_data* sql;
+	struct sql_data *sql;
 	set_error_message(plugin, 0);
-	sql = (struct sql_data*) plugin->ptr;
+	sql = (struct sql_data *)plugin->ptr;
 	sqlite3_close(sql->db);
 	hub_free(sql);
 	return 0;
 }
-
