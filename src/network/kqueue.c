@@ -268,7 +268,7 @@ static size_t create_change_list(struct net_backend_kqueue* backend)
 		else
 		{
 			EV_SET(&backend->changes[changes++], sd, EVFILT_READ, EV_DELETE, 0, 0, 0);
-			EV_SET(&backend->changes[changes++], sd, EVFILT_READ, EV_DELETE, 0, 0, 0);
+			EV_SET(&backend->changes[changes++], sd, EVFILT_WRITE, EV_DELETE, 0, 0, 0);
 		}
 	}
 	backend->change_list_len = 0;
