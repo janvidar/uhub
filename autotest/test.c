@@ -472,6 +472,17 @@ int main(int argc, char** argv)
 	exotic_add_test(&handle, &exotic_test_check_ban_ipv6_6, "check_ban_ipv6_6");
 	exotic_add_test(&handle, &exotic_test_check_ban_afmix_1, "check_ban_afmix_1");
 	exotic_add_test(&handle, &exotic_test_check_ban_afmix_2, "check_ban_afmix_2");
+	exotic_add_test(&handle, &exotic_test_acl_ipban_setup, "acl_ipban_setup");
+	exotic_add_test(&handle, &exotic_test_acl_ipban_ipv4_in_range, "acl_ipban_ipv4_in_range");
+	exotic_add_test(&handle, &exotic_test_acl_ipban_ipv4_range_low, "acl_ipban_ipv4_range_low");
+	exotic_add_test(&handle, &exotic_test_acl_ipban_ipv4_range_high, "acl_ipban_ipv4_range_high");
+	exotic_add_test(&handle, &exotic_test_acl_ipban_ipv4_just_outside, "acl_ipban_ipv4_just_outside");
+	exotic_add_test(&handle, &exotic_test_acl_ipban_ipv4_single, "acl_ipban_ipv4_single");
+	exotic_add_test(&handle, &exotic_test_acl_ipban_ipv4_not_banned, "acl_ipban_ipv4_not_banned");
+	exotic_add_test(&handle, &exotic_test_acl_ipban_ipv6_in_range, "acl_ipban_ipv6_in_range");
+	exotic_add_test(&handle, &exotic_test_acl_ipban_ipv6_not_banned, "acl_ipban_ipv6_not_banned");
+	exotic_add_test(&handle, &exotic_test_acl_ipban_empty_list, "acl_ipban_empty_list");
+	exotic_add_test(&handle, &exotic_test_acl_ipban_shutdown, "acl_ipban_shutdown");
 	exotic_add_test(&handle, &exotic_test_ip4_bitwise_AND_1, "ip4_bitwise_AND_1");
 	exotic_add_test(&handle, &exotic_test_ip4_bitwise_AND_2, "ip4_bitwise_AND_2");
 	exotic_add_test(&handle, &exotic_test_ip4_bitwise_AND_3, "ip4_bitwise_AND_3");

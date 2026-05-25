@@ -428,6 +428,11 @@ static int check_user_agent(struct hub_info* hub, struct hub_user* user, struct 
 static int check_acl(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
     (void) cmd;
+	if (acl_is_ip_banned(hub->acl, user_get_address(user)))
+	{
+		return status_msg_ban_permanently;
+	}
+
 	if (acl_is_cid_banned(hub->acl, user->id.cid))
 	{
 		return status_msg_ban_permanently;

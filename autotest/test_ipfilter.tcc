@@ -482,6 +482,94 @@ EXO_TEST(check_ban_afmix_2, {
 	return !ip_in_range(&addr, &ban6);
 });
 
+/*
+ * Regression tests for deny_ip enforcement (acl_is_ip_banned).
+ * The function used to be defined but never called from check_acl(),
+ * so deny_ip entries had no effect at login time.
+ */
+static struct acl_handle g_acl_ipban;
+
+static void ipban_free_range(void* ptr)
+{
+	hub_free(ptr);
+}
+
+EXO_TEST(acl_ipban_setup, {
+	struct ip_range* r4;
+	struct ip_range* r4_single;
+	struct ip_range* r6;
+	memset(&g_acl_ipban, 0, sizeof(g_acl_ipban));
+	g_acl_ipban.networks = list_create();
+	if (!g_acl_ipban.networks) return 0;
+
+	r4 = (struct ip_range*) hub_malloc_zero(sizeof(struct ip_range));
+	if (!ip_convert_address_to_range("192.168.1.0/24", r4)) return 0;
+	list_append(g_acl_ipban.networks, r4);
+
+	r4_single = (struct ip_range*) hub_malloc_zero(sizeof(struct ip_range));
+	if (!ip_convert_address_to_range("10.0.0.5", r4_single)) return 0;
+	list_append(g_acl_ipban.networks, r4_single);
+
+	if (ipv6)
+	{
+		r6 = (struct ip_range*) hub_malloc_zero(sizeof(struct ip_range));
+		if (!ip_convert_address_to_range("2001:db8::-2001:db8::ffff", r6)) return 0;
+		list_append(g_acl_ipban.networks, r6);
+	}
+	return 1;
+});
+
+EXO_TEST(acl_ipban_ipv4_in_range, {
+	return acl_is_ip_banned(&g_acl_ipban, "192.168.1.100") == 1;
+});
+
+EXO_TEST(acl_ipban_ipv4_range_low, {
+	return acl_is_ip_banned(&g_acl_ipban, "192.168.1.0") == 1;
+});
+
+EXO_TEST(acl_ipban_ipv4_range_high, {
+	return acl_is_ip_banned(&g_acl_ipban, "192.168.1.255") == 1;
+});
+
+EXO_TEST(acl_ipban_ipv4_just_outside, {
+	return acl_is_ip_banned(&g_acl_ipban, "192.168.2.0") == 0;
+});
+
+EXO_TEST(acl_ipban_ipv4_single, {
+	return acl_is_ip_banned(&g_acl_ipban, "10.0.0.5") == 1;
+});
+
+EXO_TEST(acl_ipban_ipv4_not_banned, {
+	return acl_is_ip_banned(&g_acl_ipban, "8.8.8.8") == 0;
+});
+
+EXO_TEST(acl_ipban_ipv6_in_range, {
+	if (!ipv6) return 1;
+	return acl_is_ip_banned(&g_acl_ipban, "2001:db8::1") == 1;
+});
+
+EXO_TEST(acl_ipban_ipv6_not_banned, {
+	if (!ipv6) return 1;
+	return acl_is_ip_banned(&g_acl_ipban, "2001:db8::1:0") == 0;
+});
+
+EXO_TEST(acl_ipban_empty_list, {
+	struct acl_handle empty;
+	int result;
+	memset(&empty, 0, sizeof(empty));
+	empty.networks = list_create();
+	result = acl_is_ip_banned(&empty, "192.168.1.100");
+	list_destroy(empty.networks);
+	return result == 0;
+});
+
+EXO_TEST(acl_ipban_shutdown, {
+	list_clear(g_acl_ipban.networks, &ipban_free_range);
+	list_destroy(g_acl_ipban.networks);
+	g_acl_ipban.networks = NULL;
+	return 1;
+});
+
 EXO_TEST(ip4_bitwise_AND_1, {
 	ip_convert_to_binary("255.255.255.255", &ip4_a);
 	ip_convert_to_binary("255.255.255.0",   &ip4_b);
