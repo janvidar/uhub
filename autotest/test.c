@@ -480,7 +480,9 @@ int main(int argc, char** argv)
 	exotic_add_test(&handle, &exotic_test_acl_ipban_ipv4_single, "acl_ipban_ipv4_single");
 	exotic_add_test(&handle, &exotic_test_acl_ipban_ipv4_not_banned, "acl_ipban_ipv4_not_banned");
 	exotic_add_test(&handle, &exotic_test_acl_ipban_ipv6_in_range, "acl_ipban_ipv6_in_range");
+	exotic_add_test(&handle, &exotic_test_acl_ipban_ipv6_cidr_far_in_range, "acl_ipban_ipv6_cidr_far_in_range");
 	exotic_add_test(&handle, &exotic_test_acl_ipban_ipv6_not_banned, "acl_ipban_ipv6_not_banned");
+	exotic_add_test(&handle, &exotic_test_acl_ipban_ipv6_just_outside, "acl_ipban_ipv6_just_outside");
 	exotic_add_test(&handle, &exotic_test_acl_ipban_empty_list, "acl_ipban_empty_list");
 	exotic_add_test(&handle, &exotic_test_acl_ipban_shutdown, "acl_ipban_shutdown");
 	exotic_add_test(&handle, &exotic_test_ip4_bitwise_AND_1, "ip4_bitwise_AND_1");
@@ -503,6 +505,11 @@ int main(int argc, char** argv)
 	exotic_add_test(&handle, &exotic_test_ip_range_2, "ip_range_2");
 	exotic_add_test(&handle, &exotic_test_ip_range_3, "ip_range_3");
 	exotic_add_test(&handle, &exotic_test_ip_range_4, "ip_range_4");
+	exotic_add_test(&handle, &exotic_test_ip_range_ipv6_cidr_32_lo, "ip_range_ipv6_cidr_32_lo");
+	exotic_add_test(&handle, &exotic_test_ip_range_ipv6_cidr_32_hi, "ip_range_ipv6_cidr_32_hi");
+	exotic_add_test(&handle, &exotic_test_ip_range_ipv6_cidr_64, "ip_range_ipv6_cidr_64");
+	exotic_add_test(&handle, &exotic_test_ip_range_ipv6_cidr_128, "ip_range_ipv6_cidr_128");
+	exotic_add_test(&handle, &exotic_test_ip_range_ipv6_cidr_0, "ip_range_ipv6_cidr_0");
 	exotic_add_test(&handle, &exotic_test_shutdown_network, "shutdown_network");
 	exotic_add_test(&handle, &exotic_test_list_create_destroy, "list_create_destroy");
 	exotic_add_test(&handle, &exotic_test_list_create, "list_create");

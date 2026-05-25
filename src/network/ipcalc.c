@@ -373,7 +373,7 @@ int ip_compare(struct ip_addr_encap* a, struct ip_addr_encap* b)
 			(((uint8_t*) &b->internal_ip_data.in.s_addr)[1] << 16) |
 			(((uint8_t*) &b->internal_ip_data.in.s_addr)[2] <<  8) |
 			(((uint8_t*) &b->internal_ip_data.in.s_addr)[3] <<  0);
-		ret = A - B;
+		ret = (A < B) ? -1 : (A > B) ? 1 : 0;
 	}
 	else if (a->af == AF_INET6)
 	{
@@ -394,7 +394,7 @@ int ip_compare(struct ip_addr_encap* a, struct ip_addr_encap* b)
 
 			if (A == B) continue;
 
-			return A - B;
+			return (A < B) ? -1 : 1;
 		}
 		return 0;
 	}
@@ -420,8 +420,23 @@ static int check_ip_mask(const char* text_addr, int bits, struct ip_range* range
 		int af = ip_convert_to_binary(text_addr, &addr);  /* 192.168.1.2 */
 		int maxbits = (af == AF_INET6 ? 128 : 32);
 		bits = MIN(MAX(bits, 0), maxbits);
-		ip_mask_create_left(af, bits, &mask1);            /* 255.255.255.0 */
-		ip_mask_create_right(af, maxbits - bits, &mask2); /* 0.0.0.255 */
+		/*
+		 * The IPv6 mask helpers count *trailing zero bits*, not leading
+		 * one bits, so the argument is the complement of the IPv4 case.
+		 * Without this branch, CIDR parsing produced a mask of the wrong
+		 * width and matched the wrong range (e.g. 2001:db8::/32 became
+		 * effectively /96).
+		 */
+		if (af == AF_INET6)
+		{
+			ip_mask_create_left(af, maxbits - bits, &mask1); /* network mask: first `bits` bits set */
+			ip_mask_create_right(af, bits, &mask2);          /* host mask:    last `maxbits - bits` bits set */
+		}
+		else
+		{
+			ip_mask_create_left(af, bits, &mask1);            /* 255.255.255.0 */
+			ip_mask_create_right(af, maxbits - bits, &mask2); /* 0.0.0.255 */
+		}
 		ip_mask_apply_AND(&addr, &mask1, &range->lo);     /* 192.168.1.0 */
 		ip_mask_apply_OR(&range->lo, &mask2, &range->hi); /* 192.168.1.255 */
 		return 1;

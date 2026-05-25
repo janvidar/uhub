@@ -513,7 +513,7 @@ EXO_TEST(acl_ipban_setup, {
 	if (ipv6)
 	{
 		r6 = (struct ip_range*) hub_malloc_zero(sizeof(struct ip_range));
-		if (!ip_convert_address_to_range("2001:db8::-2001:db8::ffff", r6)) return 0;
+		if (!ip_convert_address_to_range("2001:db8::/32", r6)) return 0;
 		list_append(g_acl_ipban.networks, r6);
 	}
 	return 1;
@@ -548,9 +548,19 @@ EXO_TEST(acl_ipban_ipv6_in_range, {
 	return acl_is_ip_banned(&g_acl_ipban, "2001:db8::1") == 1;
 });
 
+EXO_TEST(acl_ipban_ipv6_cidr_far_in_range, {
+	if (!ipv6) return 1;
+	return acl_is_ip_banned(&g_acl_ipban, "2001:db8:ffff:ffff:ffff:ffff:ffff:ffff") == 1;
+});
+
 EXO_TEST(acl_ipban_ipv6_not_banned, {
 	if (!ipv6) return 1;
-	return acl_is_ip_banned(&g_acl_ipban, "2001:db8::1:0") == 0;
+	return acl_is_ip_banned(&g_acl_ipban, "2001:db9::1") == 0;
+});
+
+EXO_TEST(acl_ipban_ipv6_just_outside, {
+	if (!ipv6) return 1;
+	return acl_is_ip_banned(&g_acl_ipban, "2001:db7:ffff:ffff:ffff:ffff:ffff:ffff") == 0;
 });
 
 EXO_TEST(acl_ipban_empty_list, {
@@ -710,6 +720,58 @@ EXO_TEST(ip_range_4, {
 	memset(&range1, 0, sizeof(range1));
 	memset(&range2, 0, sizeof(range2));
 	return ip_convert_address_to_range("192.168.0.0/16", &range1) && ip_convert_address_to_range("192.168.0.0-192.168.255.255", &range2) && memcmp(&range1, &range2, sizeof(struct ip_range)) == 0;
+});
+
+/*
+ * IPv6 CIDR parsing used to produce a range of the wrong width because
+ * check_ip_mask() called the IPv6 mask helpers as if they took
+ * "leading-one-bit count" semantics, but they actually count trailing
+ * zero bits. 2001:db8::/32 silently became roughly /96, so addresses
+ * a few hextets in (e.g. 2001:db8::1) were not matched.
+ */
+EXO_TEST(ip_range_ipv6_cidr_32_lo, {
+	struct ip_range range;
+	if (!ipv6) return 1;
+	memset(&range, 0, sizeof(range));
+	if (!ip_convert_address_to_range("2001:db8::/32", &range)) return 0;
+	return strcmp(ip_convert_to_string(&range.lo), "2001:db8::") == 0;
+});
+
+EXO_TEST(ip_range_ipv6_cidr_32_hi, {
+	struct ip_range range;
+	if (!ipv6) return 1;
+	memset(&range, 0, sizeof(range));
+	if (!ip_convert_address_to_range("2001:db8::/32", &range)) return 0;
+	return strcmp(ip_convert_to_string(&range.hi), "2001:db8:ffff:ffff:ffff:ffff:ffff:ffff") == 0;
+});
+
+EXO_TEST(ip_range_ipv6_cidr_64, {
+	struct ip_range range;
+	struct ip_addr_encap addr;
+	if (!ipv6) return 1;
+	memset(&range, 0, sizeof(range));
+	if (!ip_convert_address_to_range("fe80::/64", &range)) return 0;
+	ip_convert_to_binary("fe80::abcd", &addr);
+	return ip_in_range(&addr, &range);
+});
+
+EXO_TEST(ip_range_ipv6_cidr_128, {
+	struct ip_range range;
+	if (!ipv6) return 1;
+	memset(&range, 0, sizeof(range));
+	if (!ip_convert_address_to_range("2001:db8::1/128", &range)) return 0;
+	return strcmp(ip_convert_to_string(&range.lo), "2001:db8::1") == 0
+		&& strcmp(ip_convert_to_string(&range.hi), "2001:db8::1") == 0;
+});
+
+EXO_TEST(ip_range_ipv6_cidr_0, {
+	struct ip_range range;
+	struct ip_addr_encap addr;
+	if (!ipv6) return 1;
+	memset(&range, 0, sizeof(range));
+	if (!ip_convert_address_to_range("::/0", &range)) return 0;
+	ip_convert_to_binary("2001:db8::1", &addr);
+	return ip_in_range(&addr, &range);
 });
 
 
