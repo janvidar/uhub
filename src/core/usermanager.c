@@ -88,8 +88,14 @@ int uman_add(struct hub_user_manager* users, struct hub_user* user)
 	if (!users || !user)
 		return -1;
 
-	rb_tree_insert(users->nickmap, user->id.nick, user);
-	rb_tree_insert(users->cidmap, user->id.cid, user);
+	if (!rb_tree_insert(users->nickmap, user->id.nick, user))
+		return -1;
+
+	if (!rb_tree_insert(users->cidmap, user->id.cid, user))
+	{
+		rb_tree_remove(users->nickmap, user->id.nick);
+		return -1;
+	}
 
 	list_append(users->list, user);
 	users->count++;

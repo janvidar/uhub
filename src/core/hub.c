@@ -252,6 +252,8 @@ int hub_handle_support(struct hub_info* hub, struct hub_user* u, struct adc_mess
 }
 
 
+static int check_duplicate_logins_ok(struct hub_info* hub, struct hub_user* user);
+
 int hub_handle_password(struct hub_info* hub, struct hub_user* u, struct adc_message* cmd)
 {
 	char* password = adc_msg_get_argument(cmd, 0);
@@ -261,7 +263,18 @@ int hub_handle_password(struct hub_info* hub, struct hub_user* u, struct adc_mes
 	{
 		if (acl_password_verify(hub, u, password))
 		{
-			on_login_success(hub, u);
+			/* Another login may have claimed this CID/nick while we were
+			   waiting for the password response. */
+			int status = check_duplicate_logins_ok(hub, u);
+			if (!status)
+			{
+				on_login_success(hub, u);
+			}
+			else
+			{
+				on_login_failure(hub, u, (enum status_message) status);
+				ret = -1;
+			}
 		}
 		else
 		{

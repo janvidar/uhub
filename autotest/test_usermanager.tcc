@@ -8,11 +8,13 @@ static struct hub_user um_user[MAX_USERS];
 EXO_TEST(um_init_1, {
 	sid_t s;
 	uman = uman_init();
-	
+
 	for (s = 0; s < MAX_USERS; s++)
 	{
 		memset(&um_user[s], 0, sizeof(struct hub_user));
 		um_user[s].id.sid = s;
+		snprintf(um_user[s].id.nick, sizeof(um_user[s].id.nick), "u%u", (unsigned) s);
+		snprintf(um_user[s].id.cid,  sizeof(um_user[s].id.cid),  "cid%u", (unsigned) s);
 	}
 	return !!uman;
 });
@@ -60,6 +62,16 @@ EXO_TEST(um_add_2, {
 
 EXO_TEST(um_size_3, {
 	return uman->count == MAX_USERS;
+});
+
+/* Re-adding any user with the same nick/CID must fail and must not
+   change the user count. Regression guard for the silent rb_tree
+   duplicate-insert that previously corrupted the lookup maps. */
+EXO_TEST(um_add_duplicate, {
+	size_t before = uman->count;
+	if (uman_add(uman, &um_user[0]) == 0)
+		return 0;
+	return uman->count == before;
 });
 
 EXO_TEST(um_remove_2, {

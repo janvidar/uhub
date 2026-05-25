@@ -850,6 +850,7 @@ int main(int argc, char** argv)
 	exotic_add_test(&handle, &exotic_test_um_size_2, "um_size_2");
 	exotic_add_test(&handle, &exotic_test_um_add_2, "um_add_2");
 	exotic_add_test(&handle, &exotic_test_um_size_3, "um_size_3");
+	exotic_add_test(&handle, &exotic_test_um_add_duplicate, "um_add_duplicate");
 	exotic_add_test(&handle, &exotic_test_um_remove_2, "um_remove_2");
 	exotic_add_test(&handle, &exotic_test_um_shutdown_4, "um_shutdown_4");
 
