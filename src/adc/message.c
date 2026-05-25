@@ -326,16 +326,22 @@ struct adc_message* adc_msg_parse_verify(struct hub_user* u, const char* line, s
 
 struct adc_message* adc_msg_parse(const char* line, size_t length)
 {
-	struct adc_message* command = (struct adc_message*) msg_malloc_zero(sizeof(struct adc_message));
-	char prefix = line[0];
+	struct adc_message* command;
+	char prefix;
 	size_t n = 0;
 	char temp_sid[5];
 	int ok = 1;
 	int need_terminate = 0;
 	struct linked_list* feature_cast_list;
 
+	if (length == 0)
+		return NULL;
+
+	command = (struct adc_message*) msg_malloc_zero(sizeof(struct adc_message));
 	if (command == NULL)
 		return NULL; /* OOM */
+
+	prefix = line[0];
 
 	if (!is_printable_utf8(line, length))
 	{
@@ -437,12 +443,18 @@ struct adc_message* adc_msg_parse(const char* line, size_t length)
 			}
 
 			n = 10;
-			while (line[n] == '+' || line[n] == '-')
+			while (n < length && (line[n] == '+' || line[n] == '-'))
 			{
 				if (line[n++] == '+')
 					feature_cast_list = command->feature_cast_include;
 				else
 					feature_cast_list = command->feature_cast_exclude;
+
+				if (n + 4 > length)
+				{
+					ok = 0;
+					break;
+				}
 
 				temp_sid[0] = line[n++];
 				temp_sid[1] = line[n++];

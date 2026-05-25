@@ -559,6 +559,8 @@ int main(int argc, char** argv)
 	exotic_add_test(&handle, &exotic_test_adc_message_parse_22, "adc_message_parse_22");
 	exotic_add_test(&handle, &exotic_test_adc_message_parse_23, "adc_message_parse_23");
 	exotic_add_test(&handle, &exotic_test_adc_message_parse_24, "adc_message_parse_24");
+	exotic_add_test(&handle, &exotic_test_adc_message_parse_25, "adc_message_parse_25");
+	exotic_add_test(&handle, &exotic_test_adc_message_parse_26, "adc_message_parse_26");
 	exotic_add_test(&handle, &exotic_test_adc_message_add_arg_1, "adc_message_add_arg_1");
 	exotic_add_test(&handle, &exotic_test_adc_message_add_arg_2, "adc_message_add_arg_2");
 	exotic_add_test(&handle, &exotic_test_adc_message_remove_arg_1, "adc_message_remove_arg_1");

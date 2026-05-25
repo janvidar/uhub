@@ -170,6 +170,18 @@ EXO_TEST(adc_message_parse_24, {
         return msg == NULL;
 });
 
+/* Truncated F-type message ending on a feature cast sign byte must not OOB-read. */
+EXO_TEST(adc_message_parse_25, {
+        struct adc_message* msg = adc_msg_parse_verify(g_user, "FMSG AAAB +TCP4+", 16);
+        return msg == NULL;
+});
+
+/* Truncated F-type message with partial 4-byte feature must not OOB-read. */
+EXO_TEST(adc_message_parse_26, {
+        struct adc_message* msg = adc_msg_parse_verify(g_user, "FMSG AAAB +TCP", 14);
+        return msg == NULL;
+});
+
 
 
 
