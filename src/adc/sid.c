@@ -134,6 +134,7 @@ sid_t sid_alloc(struct sid_pool* pool, struct hub_user* user)
 #ifdef DEBUG_SID
 	LOG_DUMP("SID_ALLOC: %d, user=%p", (int) n, user);
 #endif
+	n = n % pool->max;
 	pool->map[n] = user;
 	return n;
 }
