@@ -182,6 +182,12 @@ EXO_TEST(adc_message_parse_26, {
         return msg == NULL;
 });
 
+/* A line shorter than a 4-byte prefix+command must not OOB-read on FOURCC. */
+EXO_TEST(adc_message_parse_27, {
+        struct adc_message* msg = adc_msg_parse_verify(g_user, "EMS", 3);
+        return msg == NULL;
+});
+
 
 
 

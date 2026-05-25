@@ -334,7 +334,7 @@ struct adc_message* adc_msg_parse(const char* line, size_t length)
 	int need_terminate = 0;
 	struct linked_list* feature_cast_list;
 
-	if (length == 0)
+	if (length < 4)
 		return NULL;
 
 	command = (struct adc_message*) msg_malloc_zero(sizeof(struct adc_message));
