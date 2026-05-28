@@ -23,81 +23,93 @@
 #define ACL_ADD_BOOL(S, L)    do { ret = check_cmd_bool(S,    L, line, line_count); if (ret != 0) return ret; } while(0)
 #define ACL_ADD_ADDR(S, L)    do { ret = check_cmd_addr(S,    L, line, line_count); if (ret != 0) return ret; } while(0)
 
-static int check_cmd_bool(const char* cmd, struct linked_list* list, char* line, int line_count)
+/*
+ * If `line` starts with `cmd` followed by whitespace or end-of-string,
+ * NUL-terminate the keyword in place and return a pointer to the
+ * trimmed argument. Returns NULL on no match. Sets *err to -1 if the
+ * keyword matches but has no argument; otherwise leaves *err alone.
+ */
+static char* acl_match_keyword(const char* cmd, char* line, int line_count, int* err)
 {
+	size_t cmd_len = strlen(cmd);
 	char* data;
 
-	if (!strncmp(line, cmd, strlen(cmd)))
+	if (strncmp(line, cmd, cmd_len) != 0)
+		return NULL;
+
+	/* Keyword must be a whole token, not a prefix of a longer one. */
+	if (line[cmd_len] != ' ' && line[cmd_len] != '\t' && line[cmd_len] != '\0')
+		return NULL;
+
+	if (line[cmd_len] == '\0')
 	{
-		data = &line[strlen(cmd)];
-		data[0] = '\0';
-		data++;
-
-		data = strip_white_space(data);
-		if (!*data)
-		{
-			LOG_FATAL("ACL parse error on line %d", line_count);
-			return -1;
-		}
-
-		list_append(list, hub_strdup(data));
-		LOG_DEBUG("ACL: Deny access for: '%s' (%s)", data, cmd);
-		return 1;
+		LOG_FATAL("ACL parse error on line %d", line_count);
+		*err = -1;
+		return NULL;
 	}
-	return 0;
+
+	line[cmd_len] = '\0';
+	data = strip_white_space(&line[cmd_len + 1]);
+	if (!*data)
+	{
+		LOG_FATAL("ACL parse error on line %d", line_count);
+		*err = -1;
+		return NULL;
+	}
+	return data;
+}
+
+static int check_cmd_bool(const char* cmd, struct linked_list* list, char* line, int line_count)
+{
+	int err = 0;
+	char* data = acl_match_keyword(cmd, line, line_count, &err);
+	if (err) return err;
+	if (!data) return 0;
+
+	list_append(list, hub_strdup(data));
+	LOG_DEBUG("ACL: Deny access for: '%s' (%s)", data, cmd);
+	return 1;
 }
 
 static int check_cmd_user(const char* cmd, int status, struct linked_list* list, char* line, int line_count)
 {
 	char* data;
-	char* data_extra;
+	char* data_extra = 0;
 	struct auth_info* info = 0;
+	int err = 0;
 
-	if (!strncmp(line, cmd, strlen(cmd)))
+	data = acl_match_keyword(cmd, line, line_count, &err);
+	if (err) return err;
+	if (!data) return 0;
+
+	info = hub_malloc_zero(sizeof(struct auth_info));
+	if (!info)
 	{
-		data = &line[strlen(cmd)];
-		data_extra = 0;
-		data[0] = '\0';
-		data++;
+		LOG_ERROR("ACL parse error. Out of memory!");
+		return -1;
+	}
 
-		data = strip_white_space(data);
-		if (!*data)
-		{
-			LOG_FATAL("ACL parse error on line %d", line_count);
-			return -1;
-		}
-
-		info = hub_malloc_zero(sizeof(struct auth_info));
-
-		if (!info)
-		{
-			LOG_ERROR("ACL parse error. Out of memory!");
-			return -1;
-		}
-
-		if (strncmp(cmd, "user_", 5) == 0)
-		{
-			data_extra = strrchr(data, ':');
-			if (data_extra)
-			{
-				data_extra[0] = 0;
-				data_extra++;
-			}
-		}
-
-		strncpy(info->nickname, data, MAX_NICK_LEN);
-		info->nickname[MAX_NICK_LEN] = '\0';
+	if (strncmp(cmd, "user_", 5) == 0)
+	{
+		data_extra = strrchr(data, ':');
 		if (data_extra)
 		{
-			strncpy(info->password, data_extra, MAX_PASS_LEN);
-			info->password[MAX_PASS_LEN] = '\0';
+			data_extra[0] = 0;
+			data_extra++;
 		}
-		info->credentials = status;
-		list_append(list, info);
-		LOG_DEBUG("ACL: Added user '%s' (%s)", info->nickname, auth_cred_to_string(info->credentials));
-		return 1;
 	}
-	return 0;
+
+	strncpy(info->nickname, data, MAX_NICK_LEN);
+	info->nickname[MAX_NICK_LEN] = '\0';
+	if (data_extra)
+	{
+		strncpy(info->password, data_extra, MAX_PASS_LEN);
+		info->password[MAX_PASS_LEN] = '\0';
+	}
+	info->credentials = status;
+	list_append(list, info);
+	LOG_DEBUG("ACL: Added user '%s' (%s)", info->nickname, auth_cred_to_string(info->credentials));
+	return 1;
 }
 
 
@@ -126,35 +138,25 @@ static int check_cmd_addr(const char* cmd, struct linked_list* list, char* line,
 {
 	char* data;
 	struct ip_range* range = 0;
+	int err = 0;
 
-	if (!strncmp(line, cmd, strlen(cmd)))
+	data = acl_match_keyword(cmd, line, line_count, &err);
+	if (err) return err;
+	if (!data) return 0;
+
+	range = hub_malloc_zero(sizeof(struct ip_range));
+	if (!range)
 	{
-		data = &line[strlen(cmd)];
-		data[0] = '\0';
-		data++;
-
-		data = strip_white_space(data);
-		if (!*data)
-		{
-			LOG_FATAL("ACL parse error on line %d", line_count);
-			return -1;
-		}
-
-		range = hub_malloc_zero(sizeof(struct ip_range));
-
-		if (!range)
-		{
-			LOG_ERROR("ACL parse error. Out of memory!");
-			return -1;
-		}
-
-		if (ip_convert_address_to_range(data, range))
-		{
-			add_ip_range(list, range);
-			return 1;
-		}
-		hub_free(range);
+		LOG_ERROR("ACL parse error. Out of memory!");
+		return -1;
 	}
+
+	if (ip_convert_address_to_range(data, range))
+	{
+		add_ip_range(list, range);
+		return 1;
+	}
+	hub_free(range);
 	return 0;
 }
 
