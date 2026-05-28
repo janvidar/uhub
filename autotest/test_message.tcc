@@ -188,6 +188,20 @@ EXO_TEST(adc_message_parse_27, {
         return msg == NULL;
 });
 
+/*
+ * adc_msg_terminate() used to dereference cache[length - 1] without
+ * checking length, so calling terminate on a zero-length message read
+ * one byte before the heap allocation. Construct one and terminate it.
+ */
+EXO_TEST(adc_message_terminate_empty, {
+        struct adc_message* msg = adc_msg_construct(0, 0);
+        if (!msg) return 0;
+        adc_msg_terminate(msg);
+        int ok = msg->length == 1 && msg->cache[0] == '\n';
+        adc_msg_free(msg);
+        return ok;
+});
+
 
 
 

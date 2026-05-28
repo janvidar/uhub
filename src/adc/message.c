@@ -736,7 +736,7 @@ int adc_msg_replace_named_argument(struct adc_message* cmd, const char prefix[2]
 
 void adc_msg_terminate(struct adc_message* cmd)
 {
-	if (cmd->cache[cmd->length - 1] != '\n')
+	if (cmd->length == 0 || cmd->cache[cmd->length - 1] != '\n')
 	{
 		adc_msg_cache_append(cmd, "\n", 1);
 	}

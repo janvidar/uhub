@@ -580,6 +580,7 @@ int main(int argc, char** argv)
 	exotic_add_test(&handle, &exotic_test_adc_message_parse_25, "adc_message_parse_25");
 	exotic_add_test(&handle, &exotic_test_adc_message_parse_26, "adc_message_parse_26");
 	exotic_add_test(&handle, &exotic_test_adc_message_parse_27, "adc_message_parse_27");
+	exotic_add_test(&handle, &exotic_test_adc_message_terminate_empty, "adc_message_terminate_empty");
 	exotic_add_test(&handle, &exotic_test_adc_message_add_arg_1, "adc_message_add_arg_1");
 	exotic_add_test(&handle, &exotic_test_adc_message_add_arg_2, "adc_message_add_arg_2");
 	exotic_add_test(&handle, &exotic_test_adc_message_remove_arg_1, "adc_message_remove_arg_1");
