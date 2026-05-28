@@ -80,6 +80,11 @@ static enum command_parse_status command_extract_arguments(struct hub_info* hub,
 			size = 1;
 			LIST_FOREACH(char*, tmp, tokens, { size += (strlen(tmp) + 1); });
 			token = hub_malloc_zero(size);
+			if (!token)
+			{
+				status = cmd_status_syntax_error;
+				break;
+			}
 
 			while ((tmp = list_get_first(tokens)))
 			{
@@ -117,6 +122,7 @@ static enum command_parse_status command_extract_arguments(struct hub_info* hub,
 
 			case 'u':
 				data = hub_malloc(sizeof(*data));
+				if (!data) { status = cmd_status_syntax_error; break; }
 				data->type = type_user;
 				data->data.user = uman_get_user_by_nick(hub->users, token);
 				if (!data->data.user)
@@ -129,6 +135,7 @@ static enum command_parse_status command_extract_arguments(struct hub_info* hub,
 
 			case 'i':
 				data = hub_malloc(sizeof(*data));
+				if (!data) { status = cmd_status_syntax_error; break; }
 				data->type = type_user;
 				data->data.user = uman_get_user_by_cid(hub->users, token);
 				if (!data->data.user)
@@ -141,6 +148,7 @@ static enum command_parse_status command_extract_arguments(struct hub_info* hub,
 
 			case 'a':
 				data = hub_malloc(sizeof(*data));
+				if (!data) { status = cmd_status_syntax_error; break; }
 				data->type = type_address;
 				if (ip_convert_to_binary(token, data->data.address) == -1)
 				{
@@ -152,8 +160,16 @@ static enum command_parse_status command_extract_arguments(struct hub_info* hub,
 
 			case 'r':
 				data = hub_malloc(sizeof(*data));
+				if (!data) { status = cmd_status_syntax_error; break; }
 				data->type = type_range;
 				data->data.range = hub_malloc_zero(sizeof(struct ip_range));
+				if (!data->data.range)
+				{
+					hub_free(data);
+					data = NULL;
+					status = cmd_status_syntax_error;
+					break;
+				}
 				if (!ip_convert_address_to_range(token, data->data.range))
 				{
 					hub_free(data->data.range);
@@ -178,10 +194,15 @@ static enum command_parse_status command_extract_arguments(struct hub_info* hub,
 						status = cmd_status_syntax_error;
 					}
 				}
+				else
+				{
+					status = cmd_status_syntax_error;
+				}
 				break;
 
 			case 'c':
 				data = hub_malloc(sizeof(*data));
+				if (!data) { status = cmd_status_syntax_error; break; }
 				data->type = type_command;
 				data->data.command = command_handler_lookup(hub->commands, token);
 				if (!data->data.command)
@@ -194,6 +215,7 @@ static enum command_parse_status command_extract_arguments(struct hub_info* hub,
 
 			case 'C':
 				data = hub_malloc(sizeof(*data));
+				if (!data) { status = cmd_status_syntax_error; break; }
 				data->type = type_credentials;
 				if (!auth_string_to_cred(token, &data->data.credentials))
 				{
@@ -205,6 +227,7 @@ static enum command_parse_status command_extract_arguments(struct hub_info* hub,
 
 			case 'N':
 				data = hub_malloc(sizeof(*data));
+				if (!data) { status = cmd_status_syntax_error; break; }
 				data->type = type_integer;
 				if (!is_number(token, &data->data.integer))
 				{
@@ -276,11 +299,22 @@ struct hub_command* command_parse(struct command_base* cbase, struct hub_info* h
 	struct command_handle* handle = NULL;
 
 	cmd = hub_malloc_zero(sizeof(struct hub_command));
+	if (!cmd)
+	{
+		if (tokens) list_destroy(tokens);
+		return NULL;
+	}
 	cmd->status = cmd_status_ok;
 	cmd->message = message;
 	cmd->prefix = NULL;
 	cmd->args = list_create();
 	cmd->user = user;
+
+	if (!tokens || !cmd->args)
+	{
+		cmd->status = cmd_status_syntax_error;
+		goto command_parse_cleanup;
+	}
 
 	if (split_string(message, " ", tokens, 0) <= 0)
 	{
@@ -306,8 +340,11 @@ struct hub_command* command_parse(struct command_base* cbase, struct hub_info* h
 	goto command_parse_cleanup;
 
 command_parse_cleanup:
-	list_clear(tokens, &hub_free);
-	list_destroy(tokens);
+	if (tokens)
+	{
+		list_clear(tokens, &hub_free);
+		list_destroy(tokens);
+	}
 	return cmd;
 }
 
