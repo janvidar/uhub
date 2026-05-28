@@ -614,6 +614,9 @@ int adc_msg_remove_named_argument(struct adc_message* cmd, const char prefix_[2]
 	int arg_offset = adc_msg_get_arg_offset(cmd);
 	size_t temp_len = 0;
 
+	if (arg_offset < 0 || (size_t) arg_offset >= cmd->length)
+		return 0;
+
 	adc_msg_unterminate(cmd);
 
 	start = memmem(&cmd->cache[arg_offset], (cmd->length - arg_offset), prefix, 3);
@@ -669,6 +672,9 @@ int adc_msg_has_named_argument(struct adc_message* cmd, const char prefix_[2])
 
 	ADC_MSG_ASSERT(cmd);
 
+	if (arg_offset < 0 || (size_t) arg_offset >= cmd->length)
+		return 0;
+
 	start = memmem(&cmd->cache[arg_offset], (cmd->length - arg_offset), prefix, 3);
 	while (start)
 	{
@@ -693,6 +699,9 @@ char* adc_msg_get_named_argument(struct adc_message* cmd, const char prefix_[2])
 	int arg_offset = adc_msg_get_arg_offset(cmd);
 
 	ADC_MSG_ASSERT(cmd);
+
+	if (arg_offset < 0 || (size_t) arg_offset >= cmd->length)
+		return NULL;
 
 	start = memmem(&cmd->cache[arg_offset], cmd->length - arg_offset, prefix, 3);
 	if (!start)
@@ -816,12 +825,16 @@ char* adc_msg_get_argument(struct adc_message* cmd, int offset)
 	char* end;
 	char* argument;
 	int count = 0;
+	int arg_offset = adc_msg_get_arg_offset(cmd);
 
 	ADC_MSG_ASSERT(cmd);
 
+	if (arg_offset < 1 || (size_t) arg_offset > cmd->length)
+		return 0;
+
 	adc_msg_unterminate(cmd);
 
-	start = strchr(&cmd->cache[adc_msg_get_arg_offset(cmd)-1], ' ');
+	start = strchr(&cmd->cache[arg_offset - 1], ' ');
 	while (start)
 	{
 		end = strchr(&start[1], ' ');
@@ -867,12 +880,16 @@ int adc_msg_get_argument_index(struct adc_message* cmd, const char prefix[2])
 	char* start;
 	char* end;
 	int count = 0;
+	int arg_offset = adc_msg_get_arg_offset(cmd);
 
 	ADC_MSG_ASSERT(cmd);
 
+	if (arg_offset < 1 || (size_t) arg_offset > cmd->length)
+		return -1;
+
 	adc_msg_unterminate(cmd);
 
-	start = strchr(&cmd->cache[adc_msg_get_arg_offset(cmd)-1], ' ');
+	start = strchr(&cmd->cache[arg_offset - 1], ' ');
 	while (start)
 	{
 		size_t arg_len;

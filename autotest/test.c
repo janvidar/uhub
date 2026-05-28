@@ -581,6 +581,10 @@ int main(int argc, char** argv)
 	exotic_add_test(&handle, &exotic_test_adc_message_parse_26, "adc_message_parse_26");
 	exotic_add_test(&handle, &exotic_test_adc_message_parse_27, "adc_message_parse_27");
 	exotic_add_test(&handle, &exotic_test_adc_message_terminate_empty, "adc_message_terminate_empty");
+	exotic_add_test(&handle, &exotic_test_adc_message_unknown_prefix_has_named, "adc_message_unknown_prefix_has_named");
+	exotic_add_test(&handle, &exotic_test_adc_message_unknown_prefix_get_named, "adc_message_unknown_prefix_get_named");
+	exotic_add_test(&handle, &exotic_test_adc_message_unknown_prefix_remove_named, "adc_message_unknown_prefix_remove_named");
+	exotic_add_test(&handle, &exotic_test_adc_message_unknown_prefix_get_argument, "adc_message_unknown_prefix_get_argument");
 	exotic_add_test(&handle, &exotic_test_adc_message_add_arg_1, "adc_message_add_arg_1");
 	exotic_add_test(&handle, &exotic_test_adc_message_add_arg_2, "adc_message_add_arg_2");
 	exotic_add_test(&handle, &exotic_test_adc_message_remove_arg_1, "adc_message_remove_arg_1");

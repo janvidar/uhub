@@ -202,6 +202,52 @@ EXO_TEST(adc_message_terminate_empty, {
         return ok;
 });
 
+/*
+ * adc_msg_get_arg_offset() returns -1 for messages whose prefix byte is
+ * not in {U,C,I,H,B,F,D,E}. Helpers used to forward that -1 straight
+ * into &cmd->cache[arg_offset], reading one or two bytes before the
+ * heap allocation. Construct a message with prefix 'Z' (FOURCC
+ * 0x5A000000) so adc_msg_get_arg_offset returns -1, and verify that
+ * each helper returns cleanly without OOB-reading.
+ */
+EXO_TEST(adc_message_unknown_prefix_has_named, {
+        struct adc_message* msg = adc_msg_construct(0x5A000000, 8);
+        int ok;
+        if (!msg) return 0;
+        ok = adc_msg_has_named_argument(msg, "NI") == 0;
+        adc_msg_free(msg);
+        return ok;
+});
+
+EXO_TEST(adc_message_unknown_prefix_get_named, {
+        struct adc_message* msg = adc_msg_construct(0x5A000000, 8);
+        char* arg;
+        if (!msg) return 0;
+        arg = adc_msg_get_named_argument(msg, "NI");
+        adc_msg_free(msg);
+        if (arg) { hub_free(arg); return 0; }
+        return 1;
+});
+
+EXO_TEST(adc_message_unknown_prefix_remove_named, {
+        struct adc_message* msg = adc_msg_construct(0x5A000000, 8);
+        int ok;
+        if (!msg) return 0;
+        ok = adc_msg_remove_named_argument(msg, "NI") == 0;
+        adc_msg_free(msg);
+        return ok;
+});
+
+EXO_TEST(adc_message_unknown_prefix_get_argument, {
+        struct adc_message* msg = adc_msg_construct(0x5A000000, 8);
+        char* arg;
+        if (!msg) return 0;
+        arg = adc_msg_get_argument(msg, 0);
+        adc_msg_free(msg);
+        if (arg) { hub_free(arg); return 0; }
+        return 1;
+});
+
 
 
 
