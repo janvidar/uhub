@@ -131,6 +131,32 @@ EXO_TEST(sid_remove_4, {
 	FREE_SID(3);
 });
 
+/*
+ * sid_free() used to write pool->map[sid] = 0 without bounds-checking
+ * sid. Confirm out-of-range and 0 sids are now no-ops, and that a
+ * double-free doesn't underflow pool->count.
+ */
+EXO_TEST(sid_free_out_of_range, {
+	sid_free(sid_pool, 999999); /* past pool->max (=5) */
+	sid_free(sid_pool, 0);      /* reserved sid */
+	return 1;
+});
+
+EXO_TEST(sid_free_double, {
+	struct dummy_user* user = hub_malloc_zero(sizeof(struct dummy_user));
+	sid_t s = sid_alloc(sid_pool, (struct hub_user*) user);
+	sid_free(sid_pool, s);
+	sid_free(sid_pool, s); /* double free must not corrupt count */
+	hub_free(user);
+	/* Allocate again -- if count was decremented twice, pool would
+	 * miscount and refuse this alloc once full. */
+	user = hub_malloc_zero(sizeof(struct dummy_user));
+	s = sid_alloc(sid_pool, (struct hub_user*) user);
+	sid_free(sid_pool, s);
+	hub_free(user);
+	return s != 0;
+});
+
 EXO_TEST(sid_destroy_pool, {
 	sid_pool_destroy(sid_pool);
 	sid_pool = 0;

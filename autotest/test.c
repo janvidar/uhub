@@ -807,6 +807,8 @@ int main(int argc, char** argv)
 	exotic_add_test(&handle, &exotic_test_sid_remove_2, "sid_remove_2");
 	exotic_add_test(&handle, &exotic_test_sid_remove_3, "sid_remove_3");
 	exotic_add_test(&handle, &exotic_test_sid_remove_4, "sid_remove_4");
+	exotic_add_test(&handle, &exotic_test_sid_free_out_of_range, "sid_free_out_of_range");
+	exotic_add_test(&handle, &exotic_test_sid_free_double, "sid_free_double");
 	exotic_add_test(&handle, &exotic_test_sid_destroy_pool, "sid_destroy_pool");
 	exotic_add_test(&handle, &exotic_test_hash_tiger_1, "hash_tiger_1");
 	exotic_add_test(&handle, &exotic_test_hash_tiger_2, "hash_tiger_2");

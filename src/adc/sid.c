@@ -144,6 +144,10 @@ void sid_free(struct sid_pool* pool, sid_t sid)
 #ifdef DEBUG_SID
 	LOG_DUMP("SID_FREE:  %d", (int) sid);
 #endif
+	if (!sid || sid >= pool->max)
+		return;
+	if (!pool->map[sid])
+		return;
 	pool->map[sid] = 0;
 	pool->count--;
 }
