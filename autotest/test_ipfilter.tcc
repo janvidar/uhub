@@ -774,6 +774,24 @@ EXO_TEST(ip_range_ipv6_cidr_0, {
 	return ip_in_range(&addr, &range);
 });
 
+/*
+ * ip_convert_to_string() used to return a pointer into a single static
+ * buffer; two adjacent calls aliased and "%s -> %s" printed the same
+ * value twice. Confirm adjacent calls now return distinct, correct
+ * strings.
+ */
+EXO_TEST(ip_convert_to_string_no_alias, {
+	struct ip_addr_encap a;
+	struct ip_addr_encap b;
+	const char* sa;
+	const char* sb;
+	ip_convert_to_binary("10.0.0.1", &a);
+	ip_convert_to_binary("10.0.0.2", &b);
+	sa = ip_convert_to_string(&a);
+	sb = ip_convert_to_string(&b);
+	return sa != sb && strcmp(sa, "10.0.0.1") == 0 && strcmp(sb, "10.0.0.2") == 0;
+});
+
 
 EXO_TEST(shutdown_network, {
     return net_destroy() == 0;

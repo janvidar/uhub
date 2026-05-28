@@ -157,6 +157,17 @@ EXO_TEST(sid_free_double, {
 	return s != 0;
 });
 
+/*
+ * sid_to_string() used to return a pointer into a single static
+ * buffer, so two calls in the same expression aliased. Confirm
+ * adjacent calls now return distinct, correct values.
+ */
+EXO_TEST(sid_to_string_no_alias, {
+	const char* a = sid_to_string(1);
+	const char* b = sid_to_string(2);
+	return a != b && strcmp(a, "AAAB") == 0 && strcmp(b, "AAAC") == 0;
+});
+
 EXO_TEST(sid_destroy_pool, {
 	sid_pool_destroy(sid_pool);
 	sid_pool = 0;

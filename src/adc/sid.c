@@ -23,9 +23,17 @@ const char* BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
 char* sid_to_string(sid_t sid_)
 {
-	static char t_sid[5];
+	/*
+	 * Rotate over a small ring of static buffers so two calls in the
+	 * same expression don't alias -- e.g. printf("%s -> %s",
+	 * sid_to_string(a), sid_to_string(b)) used to print b twice.
+	 */
+	static char t_sid[8][5];
+	static unsigned int slot = 0;
+	char* buf = t_sid[slot];
 	sid_t sid = (sid_ & 0xFFFFF); /*  20 bits only */
 	sid_t A, B, C, D = 0;
+	slot = (slot + 1) % 8;
 	D     = (sid % 32);
 	sid   = (sid - D) / 32;
 	C     = (sid % 32);
@@ -33,12 +41,12 @@ char* sid_to_string(sid_t sid_)
 	B     = (sid % 32);
 	sid   = (sid - B) / 32;
 	A     = (sid % 32);
-	t_sid[0] = BASE32_ALPHABET[A];
-	t_sid[1] = BASE32_ALPHABET[B];
-	t_sid[2] = BASE32_ALPHABET[C];
-	t_sid[3] = BASE32_ALPHABET[D];
-	t_sid[4] = 0;
-	return t_sid;
+	buf[0] = BASE32_ALPHABET[A];
+	buf[1] = BASE32_ALPHABET[B];
+	buf[2] = BASE32_ALPHABET[C];
+	buf[3] = BASE32_ALPHABET[D];
+	buf[4] = 0;
+	return buf;
 }
 
 

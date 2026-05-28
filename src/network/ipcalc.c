@@ -91,8 +91,17 @@ int ip_convert_to_binary(const char* taddr, struct ip_addr_encap* raw)
 
 const char* ip_convert_to_string(struct ip_addr_encap* raw)
 {
-	static char address[INET6_ADDRSTRLEN+1];
-	memset(address, 0, INET6_ADDRSTRLEN);
+	/*
+	 * Rotate over a small ring of static buffers so two calls live
+	 * across each other. Without this, "%s -> %s" with two
+	 * ip_convert_to_string() arguments silently prints the same
+	 * value twice.
+	 */
+	static char buffers[8][INET6_ADDRSTRLEN+1];
+	static unsigned int slot = 0;
+	char* address = buffers[slot];
+	slot = (slot + 1) % 8;
+	memset(address, 0, INET6_ADDRSTRLEN+1);
 	net_address_to_string(raw->af, (void*) &raw->internal_ip_data, address, INET6_ADDRSTRLEN+1);
 	if (strncmp(address, "::ffff:", 7) == 0) /* IPv6 mapped IPv4 address. */
 	{

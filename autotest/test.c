@@ -510,6 +510,7 @@ int main(int argc, char** argv)
 	exotic_add_test(&handle, &exotic_test_ip_range_ipv6_cidr_64, "ip_range_ipv6_cidr_64");
 	exotic_add_test(&handle, &exotic_test_ip_range_ipv6_cidr_128, "ip_range_ipv6_cidr_128");
 	exotic_add_test(&handle, &exotic_test_ip_range_ipv6_cidr_0, "ip_range_ipv6_cidr_0");
+	exotic_add_test(&handle, &exotic_test_ip_convert_to_string_no_alias, "ip_convert_to_string_no_alias");
 	exotic_add_test(&handle, &exotic_test_shutdown_network, "shutdown_network");
 	exotic_add_test(&handle, &exotic_test_list_create_destroy, "list_create_destroy");
 	exotic_add_test(&handle, &exotic_test_list_create, "list_create");
@@ -809,6 +810,7 @@ int main(int argc, char** argv)
 	exotic_add_test(&handle, &exotic_test_sid_remove_4, "sid_remove_4");
 	exotic_add_test(&handle, &exotic_test_sid_free_out_of_range, "sid_free_out_of_range");
 	exotic_add_test(&handle, &exotic_test_sid_free_double, "sid_free_double");
+	exotic_add_test(&handle, &exotic_test_sid_to_string_no_alias, "sid_to_string_no_alias");
 	exotic_add_test(&handle, &exotic_test_sid_destroy_pool, "sid_destroy_pool");
 	exotic_add_test(&handle, &exotic_test_hash_tiger_1, "hash_tiger_1");
 	exotic_add_test(&handle, &exotic_test_hash_tiger_2, "hash_tiger_2");
