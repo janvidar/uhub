@@ -170,7 +170,7 @@ static enum command_parse_status command_extract_arguments(struct hub_info* hub,
 				if (data)
 				{
 					data->type = type_string;
-					data->data.string = strdup(token);
+					data->data.string = hub_strdup(token);
 					if (!data->data.string)
 					{
 						hub_free(data);
@@ -289,7 +289,7 @@ struct hub_command* command_parse(struct command_base* cbase, struct hub_info* h
 	}
 
 	// Setup hub command.
-	cmd->prefix = strdup(((char*) list_get_first(tokens)) + 1);
+	cmd->prefix = hub_strdup(((char*) list_get_first(tokens)) + 1);
 	if (!cmd->prefix)
 	{
 		cmd->status = cmd_status_syntax_error;

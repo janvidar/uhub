@@ -296,7 +296,7 @@ static int check_nick(struct hub_info* hub, struct hub_user* user, struct adc_me
 	tmp = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_NICK);
 	if (!tmp) return 0;
 	nick = adc_msg_unescape(tmp);
-	free(tmp); tmp = 0;
+	hub_free(tmp); tmp = 0;
 	if (!nick) return 0;
 
 	status = nick_length_ok(nick);

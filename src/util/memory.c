@@ -170,7 +170,7 @@ char* debug_mem_strdup(const char* s)
 
 char* debug_mem_strndup(const char* s, size_t n)
 {
-	size_t size = MIN(strlen(s), n);
+	size_t size = strnlen(s, n);
 	char* ptr = internal_debug_mem_malloc(size+1, "strndup");
 	if (ptr)
 	{
