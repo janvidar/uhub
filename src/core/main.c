@@ -344,6 +344,15 @@ int drop_privileges()
 	int gid_ok = 0;
 	int ret = 0;
 
+	if (arg_uid || arg_gid)
+	{
+		if (setgroups(0, NULL) == -1)
+		{
+			LOG_FATAL("Unable to clear supplementary groups.");
+			return -1;
+		}
+	}
+
 	if (arg_gid)
 	{
 		ret = 0;
