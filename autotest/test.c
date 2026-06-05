@@ -761,6 +761,9 @@ int main(int argc, char** argv)
 	exotic_add_test(&handle, &exotic_test_utf8_valid_38, "utf8_valid_38");
 	exotic_add_test(&handle, &exotic_test_utf8_valid_39, "utf8_valid_39");
 	exotic_add_test(&handle, &exotic_test_utf8_valid_40, "utf8_valid_40");
+	exotic_add_test(&handle, &exotic_test_base32_roundtrip_1, "base32_roundtrip_1");
+	exotic_add_test(&handle, &exotic_test_base32_decode_len_zero, "base32_decode_len_zero");
+	exotic_add_test(&handle, &exotic_test_base32_decode_len_one, "base32_decode_len_one");
 	exotic_add_test(&handle, &exotic_test_rbtree_create_destroy, "rbtree_create_destroy");
 	exotic_add_test(&handle, &exotic_test_rbtree_create_1, "rbtree_create_1");
 	exotic_add_test(&handle, &exotic_test_rbtree_size_0, "rbtree_size_0");

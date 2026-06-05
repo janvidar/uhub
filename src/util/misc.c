@@ -179,6 +179,7 @@ void base32_decode(const char* src, unsigned char* dst, size_t len) {
 		unsigned char n = 0;
 		for (; n < 32; n++) if (src[i] == BASE32_ALPHABET[n]) break;
 		if (n == 32) continue;
+		if (offset >= len) break;
 		if (index <= 3) {
 			index = (index + 5) % 8;
 			if (index == 0) {

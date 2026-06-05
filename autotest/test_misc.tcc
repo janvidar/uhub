@@ -176,3 +176,43 @@ EXO_TEST(utf8_valid_37, { return is_valid_utf8(test_utf_seq_34); });
 EXO_TEST(utf8_valid_38, { return is_valid_utf8(test_utf_seq_35); });
 EXO_TEST(utf8_valid_39, { return !is_valid_utf8(test_utf_seq_36); });
 EXO_TEST(utf8_valid_40, { return !is_valid_utf8(test_utf_seq_37); });
+
+static const unsigned char base32_decode_raw[24] = {
+	0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+	0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
+	0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF
+};
+
+EXO_TEST(base32_roundtrip_1, {
+	char enc[40];
+	unsigned char dec[24];
+	memset(enc, 0, sizeof(enc));
+	base32_encode(base32_decode_raw, 24, enc);
+	base32_decode(enc, dec, 24);
+	return memcmp(dec, base32_decode_raw, 24) == 0;
+});
+
+EXO_TEST(base32_decode_len_zero, {
+	char enc[40];
+	unsigned char dec[8];
+	memset(enc, 0, sizeof(enc));
+	memset(dec, 0xA5, sizeof(dec));
+	base32_encode(base32_decode_raw, 24, enc);
+	base32_decode(enc, dec, 0);
+	for (size_t k = 0; k < sizeof(dec); k++)
+		if (dec[k] != 0xA5) return 0;
+	return 1;
+});
+
+EXO_TEST(base32_decode_len_one, {
+	char enc[40];
+	unsigned char dec[8];
+	memset(enc, 0, sizeof(enc));
+	memset(dec, 0xA5, sizeof(dec));
+	base32_encode(base32_decode_raw, 24, enc);
+	base32_decode(enc, dec, 1);
+	if (dec[0] != base32_decode_raw[0]) return 0;
+	for (size_t k = 1; k < sizeof(dec); k++)
+		if (dec[k] != 0xA5) return 0;
+	return 1;
+});
