@@ -88,11 +88,11 @@ void cbuf_append_bytes(struct cbuffer* buf, const char* msg, size_t len)
 
 	new_size = buf->size + len;
 	if (new_size >= buf->capacity)
+	{
 		cbuf_resize(buf, new_size);
-
-	/* Verify resize succeeded */
-	if (new_size >= buf->capacity)
-		return;
+		if (new_size >= buf->capacity)  /* resize failed */
+			return;
+	}
 
 	memcpy(buf->buf + buf->size, msg, len);
 	buf->size = new_size;
