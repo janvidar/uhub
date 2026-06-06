@@ -88,7 +88,7 @@ void net_notify_destroy(struct uhub_notify_handle* handle)
 	close(handle->pipe_fd[0]);
 	close(handle->pipe_fd[1]);
 	handle->pipe_fd[0] = -1;
-	handle->pipe_fd[0] = -1;
+	handle->pipe_fd[1] = -1;
 #endif
 	hub_free(handle);
 }
