@@ -90,7 +90,7 @@ void cbuf_append_bytes(struct cbuffer* buf, const char* msg, size_t len)
 	if (new_size >= buf->capacity)
 	{
 		cbuf_resize(buf, new_size);
-		if (new_size >= buf->capacity)  /* resize failed */
+		if (new_size > buf->capacity)  /* resize failed */
 			return;
 	}
 
