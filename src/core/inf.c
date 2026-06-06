@@ -82,7 +82,8 @@ static int check_hash_tiger(const char* cid, const char* pid)
 	char raw_pid[64];
 	uint64_t tiger_res[3];
 
-	memset(x_pid, 0, MAX_CID_LEN+1);
+	memset(x_pid, 0, sizeof(x_pid));
+	memset(raw_pid, 0, sizeof(raw_pid));
 
 	base32_decode(pid, (unsigned char*) raw_pid, MAX_CID_LEN);
 	tiger((uint64_t*) raw_pid, TIGERSIZE, (uint64_t*) tiger_res);
