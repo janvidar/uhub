@@ -4,7 +4,7 @@
 # Project related configuration options
 #---------------------------------------------------------------------------
 DOXYFILE_ENCODING      = UTF-8
-PROJECT_NAME           = uHub
+PROJECT_NAME           = uhub
 PROJECT_NUMBER         = 0.2.0-alpha
 OUTPUT_DIRECTORY       = 
 CREATE_SUBDIRS         = NO

@@ -81,7 +81,7 @@ if [ $1 -gt 1 ] ; then
     /etc/rc.d/init.d/uhub restart >/dev/null || :
 fi
 # need more information about add services and users in system
-/usr/sbin/adduser -M -d /tmp -G nobody -s /sbin/nologin -c 'The Uhub ADC p2p hub Daemon' uhub >/dev/null 2>&1 ||:
+/usr/sbin/adduser -M -d /tmp -G nobody -s /sbin/nologin -c 'The uhub ADC p2p hub Daemon' uhub >/dev/null 2>&1 ||:
 # write SSL create 
 echo "PLS see /usr/share/doc/uhub/"
 

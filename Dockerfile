@@ -7,7 +7,7 @@ RUN sed -i 's/\/usr\/lib\/uhub\//\/libs\//g' ./doc/*.conf && \
 sed -i 's/\/usr\/lib\/uhub\//\/libs\//g' ./doc/rules.txt && \
 sed -i 's/\/etc\/uhub\//\/conf\//g' ./doc/*.conf && \
 sed -i 's/\/etc\/uhub\//\/conf\//g' ./doc/rules.txt && \
-echo 'Welcome to uHub' > ./doc/motd.txt
+echo 'Welcome to uhub' > ./doc/motd.txt
 
 FROM alpine:latest
 RUN apk update && apk upgrade && apk add --no-cache bash util-linux openssl-dev sqlite-dev

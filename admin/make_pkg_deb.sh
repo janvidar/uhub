@@ -27,7 +27,7 @@ strip deb/usr/bin/${BINARY}
 # Copy configuration files...
 cp ${PACKAGE}/doc/uhub.conf deb/etc/uhub
 cp ${PACKAGE}/doc/users.conf deb/etc/uhub
-echo "Welcome to uHub" > deb/etc/uhub/motd.txt
+echo "Welcome to uhub" > deb/etc/uhub/motd.txt
 
 # Copy other files
 cp ${PACKAGE}/README deb/usr/share/doc/uhub
@@ -36,11 +36,11 @@ gzip -c --best < ${PACKAGE}/ChangeLog > deb/usr/share/doc/uhub/changelog.gz
 gzip -c --best < ${PACKAGE}/doc/uhub.1 > deb/usr/share/man/man1/uhub.1.gz
 
 cat > deb/usr/share/doc/uhub/copyright <<EOF
-uHub - a high performance hub for the ADC peer-to-peer network
+uhub - a high performance hub for the ADC peer-to-peer network
 
 Copyright (C) 2007-2009 Jan Vidar Krey <janvidar@extatic.org>
 
-uHub is free and open source software, licensed under the
+uhub is free and open source software, licensed under the
 GNU General Public License version 3.
 
 For details, see /usr/share/common-licenses/GPL-3
@@ -74,7 +74,7 @@ Depends: libc6 (>= 2.7-1), libevent1 (>= 1.3e-1)
 Section: net
 Priority: optional
 Description: a high performance hub for the ADC peer-to-peer network
- uHub is a high performance peer-to-peer hub for the ADC network.
+ uhub is a high performance peer-to-peer hub for the ADC network.
  Its low memory footprint allows it to handle several thousand users
  on high-end servers, or a small private hub on embedded hardware.
  .
