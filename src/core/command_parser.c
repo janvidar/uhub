@@ -36,6 +36,9 @@ static void hub_command_args_free(struct hub_command* cmd)
 			case type_range:
 				hub_free(data->data.range);
 				break;
+			case type_address:
+				hub_free(data->data.address);
+				break;
 			default:
 				break;
 		}
@@ -150,8 +153,17 @@ static enum command_parse_status command_extract_arguments(struct hub_info* hub,
 				data = hub_malloc(sizeof(*data));
 				if (!data) { status = cmd_status_syntax_error; break; }
 				data->type = type_address;
+				data->data.address = hub_malloc_zero(sizeof(struct ip_addr_encap));
+				if (!data->data.address)
+				{
+					hub_free(data);
+					data = NULL;
+					status = cmd_status_syntax_error;
+					break;
+				}
 				if (ip_convert_to_binary(token, data->data.address) == -1)
 				{
+					hub_free(data->data.address);
 					hub_free(data);
 					data = NULL;
 					status = cmd_status_arg_address;
