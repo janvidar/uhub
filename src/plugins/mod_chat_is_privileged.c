@@ -102,10 +102,10 @@ static struct user_info *get_user_info(struct chat_data *data, sid_t sid)
 	if (sid >= data->max_users)
 	{
 		u = hub_malloc_zero(sizeof(struct user_info) * (sid + 1));
-		memcpy(u, data->users, data->max_users);
+		memcpy(u, data->users, sizeof(struct user_info) * data->max_users);
 		hub_free(data->users);
 		data->users = u;
-		data->max_users = sid;
+		data->max_users = sid + 1;
 		u = NULL;
 	}
 
