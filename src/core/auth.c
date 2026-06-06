@@ -409,7 +409,9 @@ int acl_is_ip_banned(struct acl_handle* handle, const char* ip_address)
 	struct ip_addr_encap raw;
 	struct ip_range* info;
 
-	ip_convert_to_binary(ip_address, &raw);
+	memset(&raw, 0, sizeof(raw));
+	if (ip_convert_to_binary(ip_address, &raw) == -1)
+		return 0;
 	LIST_FOREACH(struct ip_range*, info, handle->networks,
 	{
 		if (ip_in_range(&raw, info))
@@ -423,7 +425,9 @@ int acl_is_ip_nat_override(struct acl_handle* handle, const char* ip_address)
 	struct ip_addr_encap raw;
 	struct ip_range* info;
 
-	ip_convert_to_binary(ip_address, &raw);
+	memset(&raw, 0, sizeof(raw));
+	if (ip_convert_to_binary(ip_address, &raw) == -1)
+		return 0;
 	LIST_FOREACH(struct ip_range*, info, handle->nat_override,
 	{
 		if (ip_in_range(&raw, info))
