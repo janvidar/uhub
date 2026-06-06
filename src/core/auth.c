@@ -315,9 +315,9 @@ extern int acl_update_user(struct hub_info* hub, struct auth_info* info)
 extern int acl_delete_user(struct hub_info* hub, const char* name)
 {
 	struct auth_info data;
+	memset(&data, 0, sizeof(data));
 	strncpy(data.nickname, name, MAX_NICK_LEN);
 	data.nickname[MAX_NICK_LEN] = '\0';
-	data.password[0] = '\0';
 	data.credentials = auth_cred_none;
 	if (plugin_auth_delete_user(hub, &data) != st_allow)
 	{
