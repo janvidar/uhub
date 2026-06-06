@@ -329,7 +329,9 @@ extern int acl_delete_user(struct hub_info* hub, const char* name)
 struct auth_info* acl_get_access_info(struct hub_info* hub, const char* name)
 {
 	struct auth_info* info = 0;
-	info = (struct auth_info*) hub_malloc(sizeof(struct auth_info));
+	info = (struct auth_info*) hub_malloc_zero(sizeof(struct auth_info));
+	if (!info)
+		return NULL;
 	if (plugin_auth_get_user(hub, name, info) != st_allow)
 	{
 		hub_free(info);
@@ -480,7 +482,15 @@ int acl_password_verify(struct hub_info* hub, struct hub_user* user, const char*
 
 	base32_decode(challenge, (unsigned char*) raw_challenge, MAX_CID_LEN);
 
-	password_len = strlen(access->password);
+	/* access->password is a fixed-size field (MAX_PASS_LEN+1) with a
+	 * terminator at the end; use strnlen so a plugin that returned the
+	 * field unterminated does not cause us to walk past it. */
+	password_len = strnlen(access->password, sizeof(access->password));
+	if (password_len + TIGERSIZE > sizeof(buf))
+	{
+		hub_free(access);
+		return 0;
+	}
 
 	memcpy(&buf[0], access->password, password_len);
 	memcpy(&buf[password_len], raw_challenge, TIGERSIZE);
