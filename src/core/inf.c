@@ -403,8 +403,8 @@ static int check_user_agent(struct hub_info* hub, struct hub_user* user, struct 
 		str = adc_msg_unescape(ua_name_encoded);
 		if (str)
 		{
-			offset = strlen(str);
-			memcpy(user->id.user_agent, str, MIN(offset, MAX_UA_LEN));
+			offset = MIN(strlen(str), MAX_UA_LEN);
+			memcpy(user->id.user_agent, str, offset);
 			hub_free(str);
 		}
 	}
