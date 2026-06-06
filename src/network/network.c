@@ -541,7 +541,10 @@ const char* net_address_to_string(int af, const void* src, char* dst, socklen_t 
 #else
 	if (inet_ntop(af, src, dst, cnt))
 	{
-		if (af == AF_INET6 && strncmp(dst, "::ffff:", 7) == 0) /* IPv6 mapped IPv4 address. */
+		/* IPv6 mapped IPv4 address. Only strip the prefix when there is
+		 * enough room left -- with cnt < 8 the subtraction would wrap
+		 * and memmove would walk arbitrary memory. */
+		if (af == AF_INET6 && cnt > 7 && strncmp(dst, "::ffff:", 7) == 0)
 		{
 			memmove(dst, dst + 7, cnt - 7);
 		}
