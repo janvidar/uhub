@@ -115,7 +115,14 @@ void cbuf_append_format(struct cbuffer* buf, const char* format, ...)
 	va_start(args, format);
 	bytes = vsnprintf(tmp, sizeof(tmp), format, args);
 	va_end(args);
-	cbuf_append_bytes(buf, tmp, bytes);
+	if (bytes < 0)
+		return;
+	/* vsnprintf returns the length it *would* have written; on truncation
+	 * tmp only holds sizeof(tmp)-1 bytes plus a NUL. Clamp before memcpy
+	 * so we don't read past the static buffer. */
+	if ((size_t) bytes >= sizeof(tmp))
+		bytes = (int) sizeof(tmp) - 1;
+	cbuf_append_bytes(buf, tmp, (size_t) bytes);
 }
 
 void cbuf_append_strftime(struct cbuffer* buf, const char* format, const struct tm* tm)
