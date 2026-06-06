@@ -79,20 +79,21 @@ static struct acl_data* parse_config(const char* line)
 		char* split = strchr(token, '=');
 		size_t len = strlen(token);
 		size_t key = split ? (split - token) : len;
+		const char* value = split ? split + 1 : "";
 		if (key == 4 && strncmp(token, "file", 4) == 0)
 		{
 			if (data->file)
 				hub_free(data->file);
-			data->file = strdup(split + 1);
+			data->file = strdup(value);
 		}
 		else if (key == 8 && strncmp(token, "readonly", 8) == 0)
 		{
-			if (!string_to_boolean(split + 1, &data->readonly))
+			if (!string_to_boolean(value, &data->readonly))
 				data->readonly = 1;
 		}
 		else if (key == 9 && strncmp(token, "exclusive", 9) == 0)
 		{
-			if (!string_to_boolean(split + 1, &data->exclusive))
+			if (!string_to_boolean(value, &data->exclusive))
 				data->exclusive = 1;
 		}
 		else
