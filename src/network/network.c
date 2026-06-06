@@ -606,7 +606,7 @@ const char* net_get_peer_address(int fd)
 	struct sockaddr*     name;
 	socklen_t namelen;
 
-	memset(address, 0, INET6_ADDRSTRLEN);
+	memset(address, 0, sizeof(address));
 	namelen = sizeof(struct sockaddr_storage);
 	memset(&storage, 0, namelen);
 
@@ -619,11 +619,11 @@ const char* net_get_peer_address(int fd)
 		int af = storage.ss_family;
 		if (af == AF_INET6)
 		{
-			net_address_to_string(af, (void*) &name6->sin6_addr, address, INET6_ADDRSTRLEN);
+			net_address_to_string(af, (void*) &name6->sin6_addr, address, sizeof(address));
 		}
 		else
 		{
-			net_address_to_string(af, (void*) &name4->sin_addr, address, INET6_ADDRSTRLEN);
+			net_address_to_string(af, (void*) &name4->sin_addr, address, sizeof(address));
 		}
 		return address;
 	}
@@ -645,7 +645,7 @@ const char* net_get_local_address(int fd)
 	struct sockaddr*     name;
 	socklen_t namelen;
 
-	memset(address, 0, INET6_ADDRSTRLEN);
+	memset(address, 0, sizeof(address));
 	namelen = sizeof(struct sockaddr_storage);
 	memset(&storage, 0, namelen);
 
@@ -659,14 +659,14 @@ const char* net_get_local_address(int fd)
 		int af = storage.ss_family;
 		if (af == AF_INET6)
 		{
-			net_address_to_string(af, (void*) &name6->sin6_addr, address, INET6_ADDRSTRLEN);
+			net_address_to_string(af, (void*) &name6->sin6_addr, address, sizeof(address));
 		}
 		else
 #else
 		int af = AF_INET;
 #endif
 		{
-			net_address_to_string(af, (void*) &name4->sin_addr, address, INET6_ADDRSTRLEN);
+			net_address_to_string(af, (void*) &name4->sin_addr, address, sizeof(address));
 		}
 		return address;
 	}
