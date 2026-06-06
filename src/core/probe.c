@@ -54,7 +54,8 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 					{
 						char buf[512];
 						ssize_t len = snprintf(buf, sizeof(buf), "ISUP " ADC_PROTO_SUPPORT "\nISID AAAB\nIINF NIRedirecting...\nIQUI AAAB RD%s\n", probe->hub->config->tls_require_redirect_addr);
-						net_con_send(con, buf, (size_t) len);
+						if (len > 0 && (size_t) len < sizeof(buf))
+							net_con_send(con, buf, (size_t) len);
 						LOG_TRACE("Not TLS connection - Redirecting to %s.", probe->hub->config->tls_require_redirect_addr);
 					}
 					else
