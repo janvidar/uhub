@@ -200,8 +200,9 @@ int ip_mask_create_left(int af, int bits, struct ip_addr_encap* result)
 	if (af == AF_INET)
 	{
 		if (bits > 32) bits = 32;
-		mask = (0xffffffff << (32 - bits));
-		if (bits == 0) mask = 0;
+		/* Shifting a 32-bit value by 32 is undefined behavior;
+		 * branch on bits == 0 instead of computing then overwriting. */
+		mask = (bits == 0) ? 0 : (0xffffffff << (32 - bits));
 
 		result->internal_ip_data.in.s_addr = (((uint8_t*) &mask)[0] << 24) | (((uint8_t*) &mask)[1] << 16) | (((uint8_t*) &mask)[2] << 8) | (((uint8_t*) &mask)[3] << 0);
 	}
@@ -248,8 +249,8 @@ int ip_mask_create_right(int af, int bits, struct ip_addr_encap* result)
 	if (af == AF_INET)
 	{
 		if (bits > 32) bits = 32;
-		mask = (0xffffffff >> (32-bits));
-		if (bits == 0) mask = 0;
+		/* Shifting a 32-bit value by 32 is undefined behavior. */
+		mask = (bits == 0) ? 0 : (0xffffffff >> (32 - bits));
 		result->internal_ip_data.in.s_addr = (((uint8_t*) &mask)[0] << 24) | (((uint8_t*) &mask)[1] << 16) | (((uint8_t*) &mask)[2] << 8) | (((uint8_t*) &mask)[3] << 0);
 
 	}
