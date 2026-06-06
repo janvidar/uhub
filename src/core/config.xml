@@ -330,7 +330,7 @@
 
 	<option name="limit_max_slots" type="int" default="0">
 		<check min="0" />
-		<short>Limit minimum number of upload slots open per user</short>
+		<short>Limit maximum number of upload slots open per user</short>
 		<description><![CDATA[
 		Maximum number of upload slots allowed. Users with more than this will not be allowed to enter the hub.
 		]]></description>
