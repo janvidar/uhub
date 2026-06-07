@@ -682,6 +682,11 @@
 		<since>0.3.1</since>
 	</option>
 
+	<option name="msg_chat_is_privileged" type="message" default="Chat is reserved for operators and above.">
+		<description><![CDATA[This message is sent to unprivileged users who try to chat when chat_is_privileged is enabled.]]></description>
+		<since>0.5.1</since>
+	</option>
+
 	<option name="msg_proto_no_common_hash" type="message" default="No common hash algorithm.">
 		<description><![CDATA[This message is sent if a client connects that does support ADC/1.0 but not a hash algorithm that the hub supports.]]></description>
 		<since>0.3.1</since>

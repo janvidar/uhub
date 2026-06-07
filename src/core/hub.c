@@ -339,9 +339,17 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 	}
 
 	/* FIXME: Plugin should do this! */
-	if (relay && (((hub->config->chat_is_privileged && !user_is_protected(u)) || (user_flag_get(u, flag_muted))) && broadcast))
+	if (relay && broadcast)
 	{
-		relay = 0;
+		if (hub->config->chat_is_privileged && !user_is_protected(u))
+		{
+			relay = 0;
+			hub_send_chat_denied(hub, u, hub->config->msg_chat_is_privileged);
+		}
+		else if (user_flag_get(u, flag_muted))
+		{
+			relay = 0;
+		}
 	}
 
 	if (relay)
@@ -524,6 +532,24 @@ void hub_send_flood_warning(struct hub_info* hub, struct hub_user* u, const char
 
 		route_to_user(hub, u, msg);
 		user_flag_set(u, flag_flood);
+		adc_msg_free(msg);
+	}
+}
+
+void hub_send_chat_denied(struct hub_info* hub, struct hub_user* u, const char* message)
+{
+	struct adc_message* msg;
+	char* tmp;
+
+	msg = adc_msg_construct(ADC_CMD_ISTA, 128);
+	if (msg)
+	{
+		tmp = adc_msg_escape(message);
+		adc_msg_add_argument(msg, "126"); /* recoverable error, registered/privileged users only */
+		adc_msg_add_argument(msg, tmp);
+		hub_free(tmp);
+
+		route_to_user(hub, u, msg);
 		adc_msg_free(msg);
 	}
 }
