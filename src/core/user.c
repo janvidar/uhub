@@ -62,6 +62,7 @@ struct hub_user* user_create(struct hub_info* hub, struct net_connection* con, s
 	flood_control_reset(&user->flood_extras);
 
 	user->hub = hub;
+	user->last_active = time(NULL);
 	return user;
 }
 
