@@ -21,7 +21,7 @@
 
 #ifdef DEBUG
 #define ADC_MSG_ASSERT(X) \
-	do { \	
+	do { \
 		uhub_assert(X); \
 		uhub_assert(X->cache); \
 		uhub_assert(X->capacity); \
