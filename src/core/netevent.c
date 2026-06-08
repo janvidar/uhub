@@ -160,6 +160,7 @@ void net_event(struct net_connection* con, int event, void *arg)
 			hub_disconnect_user(user->hub, user, flag_close);
 			return;
 		}
+		user->last_active = time(NULL);
 	}
 
 	if (event & NET_EVENT_WRITE)
