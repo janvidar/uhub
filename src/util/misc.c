@@ -412,7 +412,8 @@ void* memmem(const void *haystack, size_t haystacklen, const void *needle, size_
 
 int split_string(const char* string, const char* split, struct linked_list* list, int allow_empty)
 {
-	char* tmp1, *tmp2;
+	const char* tmp1;
+	char* tmp2;
 	int n = 0;
 
 	if (!string || !*string || !split || !*split || !list)
