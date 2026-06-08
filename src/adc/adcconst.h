@@ -33,7 +33,7 @@ typedef uint32_t fourcc_t;
 #define FOURCC(a,b,c,d) (fourcc_t) ((a << 24) | (b << 16) | (c << 8) | d)
 
 /* default welcome protocol support message, as sent by this server */
-#define ADC_PROTO_SUPPORT "ADBASE ADTIGR ADPING ADUCMD"
+#define ADC_PROTO_SUPPORT "ADBASE ADTIGR ADPING"
 
 /* Server sent commands */
 #define ADC_CMD_ISID FOURCC('I','S','I','D')
