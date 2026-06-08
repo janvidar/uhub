@@ -178,7 +178,7 @@ static const SSL_METHOD* get_ssl_method(const char* tls_version, long* flags)
         {
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
             LOG_ERROR("TLS 1.3 is not supported by this version of OpenSSL");
-            return 0;
+            return NULL;
 #else
             *flags |= SSL_OP_NO_TLSv1;
             *flags |= SSL_OP_NO_TLSv1_1;
@@ -188,7 +188,7 @@ static const SSL_METHOD* get_ssl_method(const char* tls_version, long* flags)
         else
         {
             LOG_ERROR("Unable to recognize tls_version: %s", tls_version);
-            return 0;
+            return NULL;
         }
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
         // never gets here!
@@ -233,14 +233,14 @@ struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const
 	const SSL_METHOD* ssl_method;
 
 	if (!ctx)
-		return 0;
+		return NULL;
 
 	ssl_method = get_ssl_method(tls_version, &flags);
 
 	if (!ssl_method)
 	{
 		hub_free(ctx);
-		return 0;
+		return NULL;
 	}
 
 	ctx->ssl = SSL_CTX_new(ssl_method);
@@ -248,7 +248,7 @@ struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const
 	{
 		LOG_ERROR("Unable to create SSL context");
 		hub_free(ctx);
-		return 0;
+		return NULL;
 	}
 
 	SSL_CTX_set_quiet_shutdown(ctx->ssl, 1);
@@ -268,7 +268,7 @@ struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const
 		LOG_ERROR("Unable to set cipher suite.");
 		SSL_CTX_free(ctx->ssl);
 		hub_free(ctx);
-		return 0;
+		return NULL;
 	}
 
 	SSL_CTX_set_alpn_select_cb(ctx->ssl, alpn_server_select_protocol, NULL);
