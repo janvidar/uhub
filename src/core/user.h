@@ -119,6 +119,8 @@ struct hub_user
 	struct hub_user_limits limits;	   /** Data used for limitation */
 	enum user_quit_reason quit_reason; /** Quit reason (see user_quit_reason) */
 
+	time_t last_active;
+
 	struct flood_control flood_chat;
 	struct flood_control flood_connect;
 	struct flood_control flood_search;
