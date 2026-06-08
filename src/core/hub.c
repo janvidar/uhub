@@ -311,6 +311,7 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 
 	if (!user_is_logged_in(u))
 	{
+		hub_free(message_decoded);
 		hub_free(message);
 		return 0;
 	}
