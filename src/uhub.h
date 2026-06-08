@@ -42,6 +42,7 @@
 #define TIMEOUT_HANDSHAKE 30
 #define TIMEOUT_SENDQ     120
 #define TIMEOUT_STATS     10
+#define TIMEOUT_IDLE      1800
 
 #define MAX_CID_LEN  39
 #define MAX_NICK_LEN 64
