@@ -120,10 +120,8 @@ static int adc_msg_grow(struct adc_message* msg, size_t size)
 	if (msg->capacity > size)
 		return 1;
 
-	/* Make sure we align our data */
-	newsize = size;
-	newsize += 2; /* termination */
-	newsize += (newsize % sizeof(size_t)); /* alignment padding */
+	newsize = size + 2; /* size + termination */
+	newsize += (sizeof(size_t) - newsize) % sizeof(size_t); /* alignment padding */
 
 	buf = msg_malloc_zero(newsize);
 	if (!buf)
