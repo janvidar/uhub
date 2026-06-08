@@ -138,13 +138,13 @@ static const SSL_METHOD* get_ssl_method(const char* tls_version, long* flags)
         if (!flags)
         {
             LOG_ERROR("flags is null");
-            return 0;
+            return NULL;
         }
 
 	if (!tls_version || !*tls_version)
 	{
             LOG_ERROR("tls_version is not set.");
-            return 0;
+            return NULL;
 	}
 
 	*flags = 0;
