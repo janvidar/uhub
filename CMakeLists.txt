@@ -45,7 +45,7 @@ endif()
 if (SSL_SUPPORT)
 	find_package(OpenSSL)
 	if(NOT OPENSSL_FOUND)
-        message(FATAL_ERROR "OpenSSL is not found!")
+		message(FATAL_ERROR "OpenSSL is not found!")
 endif()
 
 if (NOT SQLITE3_FOUND)
