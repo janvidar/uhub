@@ -35,7 +35,7 @@ int is_white_space(char c)
 
 static int is_printable(unsigned char c)
 {
-	if (c >= 32)
+	if (c >= 32 && c != 0x7f)
 		return 1;
 
 	if (c == '\t' || c == '\r' || c == '\n')
