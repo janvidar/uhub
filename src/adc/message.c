@@ -952,7 +952,10 @@ size_t adc_msg_unescape_length(const char* str)
 
 char* adc_msg_unescape(const char* string)
 {
-	char* new_string = msg_malloc(adc_msg_unescape_length(string)+1);
+	size_t dstlen = adc_msg_unescape_length(string) + 1;
+	char* new_string = msg_malloc(dstlen);
+	if (!new_string)
+		return NULL;
 	char* ptr = (char*) new_string;
 	char* str = (char*) string;
 	int escaped = 0;
