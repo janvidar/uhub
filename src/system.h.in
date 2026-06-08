@@ -104,9 +104,6 @@
 #include <openssl/engine.h>
 #include <openssl/conf.h>
 #endif /* SSL_USE_OPENSSL */
-#ifdef SSL_USE_GNUTLS
-#include <gnutls/gnutls.h>
-#endif /* SSL_USE_GNUTLS */
 #endif
 
 #include "version.h"
