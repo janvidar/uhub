@@ -119,6 +119,8 @@ struct hub_user
 	struct hub_user_limits limits;	   /** Data used for limitation */
 	enum user_quit_reason quit_reason; /** Quit reason (see user_quit_reason) */
 
+	char gpa_challenge[MAX_CID_LEN + 1]; /** GPA password challenge (base32-encoded, per-session) */
+
 	struct flood_control flood_chat;
 	struct flood_control flood_connect;
 	struct flood_control flood_search;
