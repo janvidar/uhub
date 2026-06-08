@@ -440,24 +440,55 @@ int acl_is_ip_nat_override(struct acl_handle* handle, const char* ip_address)
 
 
 /*
- * This will generate the same challenge to the same user, always.
- * The challenge is made up of the time of the user connected
- * seconds since the unix epoch (modulus 1 million)
- * and the SID of the user (0-1 million).
+ * Generate a random GPA password challenge (24 bytes, base32-encoded).
+ * Uses a CSPRNG to produce cryptographically random data as required
+ * by the ADC/1.0 specification (section 5.3.10).
+ *
+ * The challenge is stored on the user object so that the same value
+ * is returned when called again during PAS verification.
  */
 const char* acl_password_generate_challenge(struct hub_info* hub, struct hub_user* user)
 {
-	char buf[64];
-	uint64_t tiger_res[3];
-	static char tiger_buf[MAX_CID_LEN+1];
+	unsigned char raw[TIGERSIZE];
+	int ok = 0;
 
-	// FIXME: Generate a better nonce scheme.
-	snprintf(buf, 64, "%p%d%d", user, (int) user->id.sid, (int) net_con_get_sd(user->connection));
+	(void) hub;
 
-	tiger((uint64_t*) buf, strlen(buf), (uint64_t*) tiger_res);
-	base32_encode((unsigned char*) tiger_res, TIGERSIZE, tiger_buf);
-	tiger_buf[MAX_CID_LEN] = 0;
-	return (const char*) tiger_buf;
+	/* Already generated for this session */
+	if (user->gpa_challenge[0])
+		return user->gpa_challenge;
+
+#ifdef SSL_SUPPORT
+	if (RAND_bytes(raw, sizeof(raw)) == 1)
+		ok = 1;
+#endif
+
+#if !defined(SSL_SUPPORT) || defined(DEBUG)
+	if (!ok)
+	{
+		FILE* fp = fopen("/dev/urandom", "rb");
+		if (fp)
+		{
+			if (fread(raw, 1, sizeof(raw), fp) == sizeof(raw))
+				ok = 1;
+			fclose(fp);
+		}
+	}
+#endif
+
+	if (!ok)
+	{
+		char buf[64];
+		uint64_t tiger_res[3];
+		LOG_WARN("CSPRNG unavailable, falling back to deterministic GPA challenge");
+		snprintf(buf, sizeof(buf), "%p%d%d", user, (int) user->id.sid, (int) net_con_get_sd(user->connection));
+		tiger((uint64_t*) buf, strlen(buf), (uint64_t*) tiger_res);
+		memcpy(raw, tiger_res, TIGERSIZE);
+	}
+
+	base32_encode(raw, TIGERSIZE, user->gpa_challenge);
+	user->gpa_challenge[MAX_CID_LEN] = '\0';
+	return user->gpa_challenge;
 }
 
 
