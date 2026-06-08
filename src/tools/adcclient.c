@@ -721,7 +721,7 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 {
 	ADC_TRACE;
 	const char* hub_address = arg;
-	char* split;
+	const char* split;
 	int ssl = 0;
 
 	if (!arg)
