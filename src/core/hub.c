@@ -657,9 +657,24 @@ static void hub_update_stats(struct hub_info* hub)
 	net_stats_reset();
 }
 
+static void hub_idle_sweep(struct hub_info* hub)
+{
+	time_t now = time(NULL);
+	struct hub_user* user;
+	LIST_FOREACH(struct hub_user*, user, hub->users->list,
+	{
+		if (user_is_logged_in(user) && difftime(now, user->last_active) > TIMEOUT_IDLE)
+		{
+			LOG_INFO("Idle timeout for user: %s", user->id.nick);
+			hub_disconnect_user(hub, user, quit_timeout);
+		}
+	});
+}
+
 static void hub_timer_statistics(struct timeout_evt* t)
 {
 	struct hub_info* hub = (struct hub_info*) t->ptr;
+	hub_idle_sweep(hub);
 	hub_update_stats(hub);
 	timeout_queue_reschedule(net_backend_get_timeout_queue(), hub->stats.timeout, TIMEOUT_STATS);
 }
