@@ -518,16 +518,16 @@ struct adc_message* adc_msg_parse(const char* line, size_t length)
 	}
 
 	/* At this point the arg_offset should point to a space, or the end of message */
-	n = adc_msg_get_arg_offset(command);
-	if (n < 0 || (size_t)n >= command->length)
+	int arg_offset = adc_msg_get_arg_offset(command);
+	if (arg_offset < 0 || (size_t) arg_offset >= command->length)
 	{
 		ok = 0;
 	}
-	else if (command->cache[n] == ' ')
+	else if (command->cache[arg_offset] == ' ')
 	{
-		if (command->cache[n+1] == ' ') ok = 0;
+		if (command->cache[arg_offset+1] == ' ') ok = 0;
 	}
-	else if (command->cache[n] == '\n') ok = 1;
+	else if (command->cache[arg_offset] == '\n') ok = 1;
 	else ok = 0;
 
 	if (!ok)
@@ -680,7 +680,7 @@ int adc_msg_has_named_argument(struct adc_message* cmd, const char prefix_[2])
 	{
 		count++;
 		if ((size_t) (&start[0] - &cmd->cache[0]) < 1+cmd->length)
-			start = memmem(&start[1], (&cmd->cache[cmd->length] - &start[0]), prefix, 3);
+			start = memmem(&start[1], (&cmd->cache[cmd->length] - &start[1]), prefix, 3);
 		else
 			start = NULL;
 	}
@@ -752,7 +752,6 @@ void adc_msg_terminate(struct adc_message* cmd)
 	ADC_MSG_ASSERT(cmd);
 }
 
-/* FIXME: this looks bogus */
 void adc_msg_unterminate(struct adc_message* cmd)
 {
 	ADC_MSG_ASSERT(cmd);
@@ -852,7 +851,10 @@ char* adc_msg_get_argument(struct adc_message* cmd, int offset)
 			}
 
 			if (!argument)
-				return 0; // FIXME: OOM
+			{
+				adc_msg_terminate(cmd);
+				return 0; /* OOM */
+			}
 
 			if (*argument)
 			{
