@@ -197,7 +197,7 @@ void uman_send_quit_message(struct hub_info* hub, struct hub_user_manager* users
 
 	if (leaving->quit_reason == quit_banned || leaving->quit_reason == quit_kicked)
 	{
-		adc_msg_add_argument(command, ADC_QUI_FLAG_DISCONNECT);
+		adc_msg_add_named_argument(command, ADC_QUI_FLAG_DISCONNECT, "1");
 	}
 	route_to_all(hub, command);
 	adc_msg_free(command);

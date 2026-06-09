@@ -149,7 +149,7 @@ typedef uint32_t fourcc_t;
 
 #define ADC_QUI_FLAG_TIME_LEFT          "TL" /* time in seconds before reconnect is allowed, or -1 forever */
 #define ADC_QUI_FLAG_MESSAGE            "MS" /* kick/leave message */
-#define ADC_QUI_FLAG_DISCONNECT         "DI1" /* all further transfers with this user should be disconnected */
+#define ADC_QUI_FLAG_DISCONNECT         "DI" /* all further transfers with this user should be disconnected */
 #define ADC_QUI_FLAG_REDIRECT           "RD" /* redirect to URL */
 #define ADC_QUI_FLAG_KICK_OPERATOR      "ID" /* SID of operator who disconnected the user */
 
