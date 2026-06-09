@@ -53,6 +53,7 @@ struct hub_user* user_create(struct hub_info* hub, struct net_connection* con, s
 	net_con_reinitialize(user->connection, net_event, user, NET_EVENT_READ);
 
 	memcpy(&user->id.addr, addr, sizeof(struct ip_addr_encap));
+	user->tm_connected = time(NULL);
 	user_set_state(user, state_protocol);
 
 	flood_control_reset(&user->flood_chat);

@@ -441,9 +441,9 @@ int acl_is_ip_nat_override(struct acl_handle* handle, const char* ip_address)
 
 /*
  * This will generate the same challenge to the same user, always.
- * The challenge is made up of the time of the user connected
- * seconds since the unix epoch (modulus 1 million)
- * and the SID of the user (0-1 million).
+ * The challenge is made up of the user object's address, the time the
+ * user connected in seconds since the unix epoch (modulus 1 million),
+ * the SID of the user (0-1 million) and the socket descriptor.
  */
 const char* acl_password_generate_challenge(struct hub_info* hub, struct hub_user* user)
 {
@@ -451,8 +451,7 @@ const char* acl_password_generate_challenge(struct hub_info* hub, struct hub_use
 	uint64_t tiger_res[3];
 	static char tiger_buf[MAX_CID_LEN+1];
 
-	// FIXME: Generate a better nonce scheme.
-	snprintf(buf, 64, "%p%d%d", user, (int) user->id.sid, (int) net_con_get_sd(user->connection));
+	snprintf(buf, 64, "%p%d%d%d", user, (int) (user->tm_connected % 1000000), (int) user->id.sid, (int) net_con_get_sd(user->connection));
 
 	tiger((uint64_t*) buf, strlen(buf), (uint64_t*) tiger_res);
 	base32_encode((unsigned char*) tiger_res, TIGERSIZE, tiger_buf);
