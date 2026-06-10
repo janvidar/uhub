@@ -36,10 +36,8 @@ static int is_blocked_or_interrupted()
 ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 {
 	int ret;
-#ifdef SSL_SUPPORT
 	if (!con->ssl)
 	{
-#endif
 		ret = net_send(con->sd, buf, len, UHUB_SEND_SIGNAL);
 		if (ret == -1)
 		{
@@ -47,23 +45,19 @@ ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 				return 0;
 			return -1;
 		}
-#ifdef SSL_SUPPORT
 	}
 	else
 	{
 		ret = net_ssl_send(con, buf, len);
 	}
-#endif /* SSL_SUPPORT */
 	return ret;
 }
 
 ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 {
 	int ret;
-#ifdef SSL_SUPPORT
 	if (!con->ssl)
 	{
-#endif
 		ret = net_recv(con->sd, buf, len, 0);
 		if (ret == -1)
 		{
@@ -75,13 +69,11 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 		{
 			return -1;
 		}
-#ifdef SSL_SUPPORT
 	}
 	else
 	{
 		ret = net_ssl_recv(con, buf, len);
 	}
-#endif /* SSL_SUPPORT */
 	return ret;
 }
 
@@ -99,13 +91,10 @@ ssize_t net_con_peek(struct net_connection* con, void* buf, size_t len)
 	return ret;
 }
 
-#ifdef SSL_SUPPORT
-
 int net_con_is_ssl(struct net_connection* con)
 {
 	return !!con->ssl;
 }
-#endif /* SSL_SUPPORT */
 
 int net_con_get_sd(struct net_connection* con)
 {
@@ -119,11 +108,9 @@ void* net_con_get_ptr(struct net_connection* con)
 
 void net_con_update(struct net_connection* con, int events)
 {
-#ifdef SSL_SUPPORT
 	if (con->ssl)
 		net_ssl_update(con, events);
 	else
-#endif
 		net_backend_update(con, events);
 }
 
@@ -136,10 +123,8 @@ void net_con_reinitialize(struct net_connection* con, net_connection_cb callback
 
 void net_con_destroy(struct net_connection* con)
 {
-#ifdef SSL_SUPPORT
 	if (con && con->ssl)
 		net_ssl_destroy(con);
-#endif
 	hub_free(con);
 }
 
@@ -155,11 +140,9 @@ void net_con_callback(struct net_connection* con, int events)
 		return;
 	}
 
-#ifdef SSL_SUPPORT
 	if (con->ssl)
 		net_ssl_callback(con, events);
 	else
-#endif
 		con->callback(con, events, con->ptr);
 }
 

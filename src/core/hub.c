@@ -766,7 +766,6 @@ static void server_alt_port_stop(struct hub_info* hub)
 	}
 }
 
-#ifdef SSL_SUPPORT
 static int load_ssl_certificates(struct hub_info* hub, struct hub_config* config)
 {
 	if (config->tls_enable)
@@ -793,7 +792,6 @@ static void unload_ssl_certificates(struct hub_info* hub)
 	if (hub->ctx)
 		net_ssl_context_destroy(hub->ctx);
 }
-#endif /* SSL_SUPPORT */
 
 struct hub_info* hub_start_service(struct hub_config* config)
 {
@@ -823,13 +821,11 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	}
 	LOG_INFO("Starting " PRODUCT "/" VERSION ", listening on %s:%d...", net_get_local_address(hub->server->sd), config->server_port);
 
-#ifdef SSL_SUPPORT
 	if (!load_ssl_certificates(hub, config))
 	{
 		hub_free(hub);
 		return 0;
 	}
-#endif
 
 	hub->config = config;
 	hub->users = NULL;
@@ -892,9 +888,7 @@ void hub_shutdown_service(struct hub_info* hub)
 		hub_free(hub->stats.timeout);
 	}
 
-#ifdef SSL_SUPPORT
 	unload_ssl_certificates(hub);
-#endif
 
 	event_queue_shutdown(hub->queue);
 	net_con_close(hub->server);

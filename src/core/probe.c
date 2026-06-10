@@ -46,7 +46,6 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 			if (memcmp(probe_recvbuf, "HSUP", 4) == 0)
 			{
 				LOG_TRACE("Probed ADC");
-#ifdef SSL_SUPPORT
 				if (probe->hub->config->tls_enable && probe->hub->config->tls_require)
 				{
 					LOG_TRACE("Not TLS connection - closing connection.");
@@ -64,7 +63,6 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 					}
 				}
 				else
-#endif
 				if (user_create(probe->hub, probe->connection, &probe->addr))
 				{
 					probe->connection = 0;
@@ -81,7 +79,6 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 				const char* buf = "501 Not implemented\r\n\r\n";
 				net_con_send(con, buf, strlen(buf));
 			}
-#ifdef SSL_SUPPORT
 			else if (bytes >= 11 &&
 				probe_recvbuf[0] == 22 &&
 				probe_recvbuf[1] == 3 && /* protocol major version */
@@ -109,7 +106,6 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 			{
 				LOG_TRACE("Probed unsupported protocol: %x%x%x%x.", (int) probe_recvbuf[0], (int) probe_recvbuf[1], (int) probe_recvbuf[2], (int) probe_recvbuf[3]);
 			}
-#endif
 			probe_destroy(probe);
 			return;
 		}

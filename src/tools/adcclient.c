@@ -31,9 +31,7 @@
 struct ADC_client_global
 {
 	size_t references;
-#ifdef SSL_SUPPORT
 	struct ssl_context_handle* ctx;
-#endif
 };
 
 static struct ADC_client_global* g_adc_client = NULL;
@@ -91,9 +89,7 @@ struct ADC_client
 static ssize_t ADC_client_recv(struct ADC_client* client);
 static void ADC_client_send_info(struct ADC_client* client);
 static void ADC_client_on_connected(struct ADC_client* client);
-#ifdef SSL_SUPPORT
 static void ADC_client_on_connected_ssl(struct ADC_client* client);
-#endif
 static void ADC_client_on_disconnected(struct ADC_client* client);
 static void ADC_client_on_login(struct ADC_client* client);
 static int ADC_client_parse_address(struct ADC_client* client, const char* arg);
@@ -182,7 +178,6 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 			}
 			break;
 
-#ifdef SSL_SUPPORT
 		case ps_conn_ssl:
 			if (events == NET_EVENT_TIMEOUT)
 			{
@@ -201,7 +196,6 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 				ADC_client_on_connected_ssl(client);
 			}
 			break;
-#endif
 
 		default:
 			if (events & NET_EVENT_READ)
@@ -566,10 +560,7 @@ struct ADC_client* ADC_client_create(const char* nickname, const char* descripti
 	if (!g_adc_client)
 	{
 		g_adc_client = (struct ADC_client_global*) hub_malloc_zero(sizeof(struct ADC_client_global));
-#ifdef SSL_SUPPORT
 		g_adc_client->ctx = net_ssl_context_create("1.2", "HIGH");
-
-#endif
 	}
 	g_adc_client->references++;
 
@@ -594,10 +585,8 @@ void ADC_client_destroy(struct ADC_client* client)
 		g_adc_client->references--;
 		if (!g_adc_client->references)
 		{
-#ifdef SSL_SUPPORT
 			net_ssl_context_destroy(g_adc_client->ctx);
 			g_adc_client->ctx = NULL;
-#endif
 			hub_free(g_adc_client);
 			g_adc_client = NULL;
 		}
@@ -662,7 +651,6 @@ static void ADC_client_send_handshake(struct ADC_client* client)
 static void ADC_client_on_connected(struct ADC_client* client)
 {
 	ADC_TRACE;
-#ifdef SSL_SUPPORT
 	if (client->flags & cflag_ssl)
 	{
 		net_con_update(client->con, NET_EVENT_READ | NET_EVENT_WRITE);
@@ -671,12 +659,10 @@ static void ADC_client_on_connected(struct ADC_client* client)
 		net_con_ssl_handshake(client->con, net_con_ssl_mode_client, g_adc_client->ctx);
 	}
 	else
-#endif
 	ADC_client_send_handshake(client);
 	
 }
 
-#ifdef SSL_SUPPORT
 static void ADC_client_on_connected_ssl(struct ADC_client* client)
 {
 	ADC_TRACE;
@@ -690,7 +676,6 @@ static void ADC_client_on_connected_ssl(struct ADC_client* client)
 	client->callback(client, ADC_CLIENT_SSL_OK, &data);
 	ADC_client_send_handshake(client);
 }
-#endif
 
 static void ADC_client_on_disconnected(struct ADC_client* client)
 {

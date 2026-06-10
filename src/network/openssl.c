@@ -22,9 +22,6 @@
 #include "network/tls.h"
 #include "network/backend.h"
 
-#ifdef SSL_SUPPORT
-#ifdef SSL_USE_OPENSSL
-
 void net_stats_add_tx(size_t bytes);
 void net_stats_add_rx(size_t bytes);
 void net_stats_tls_add_accept();
@@ -573,7 +570,4 @@ const char* net_ssl_get_tls_cipher(struct net_connection* con)
 	const SSL_CIPHER *cipher = SSL_get_current_cipher(handle->ssl);
 	return SSL_CIPHER_get_name(cipher);
 }
-
-#endif /* SSL_USE_OPENSSL */
-#endif /* SSL_SUPPORT */
 
