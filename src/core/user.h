@@ -34,7 +34,7 @@ enum user_state
 	state_disconnected = 5, /**<< "User is disconnected" */
 };
 
-enum user_flags : uint32_t
+enum user_flags
 {
 	feature_base = 0x00000001,	  /** BASE: Basic configuration (required by all clients) */
 	feature_auto = 0x00000002,	  /** AUT0: Automatic nat detection traversal */
