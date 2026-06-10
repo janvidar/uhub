@@ -30,7 +30,10 @@ typedef uint32_t fourcc_t;
 /* Internal uhub limit */
 #define MAX_ADC_CMD_LEN 4096
 
-#define FOURCC(a,b,c,d) (fourcc_t) ((a << 24) | (b << 16) | (c << 8) | d)
+/* Cast through unsigned char -> uint32_t so high bytes (e.g. UTF-8 lead bytes
+ * in adc_msg_parse) are not left-shifted as a negative signed char, which is
+ * undefined behaviour. Results for ASCII literal call sites are unchanged. */
+#define FOURCC(a,b,c,d) (fourcc_t) (((uint32_t)(unsigned char)(a) << 24) | ((uint32_t)(unsigned char)(b) << 16) | ((uint32_t)(unsigned char)(c) << 8) | (uint32_t)(unsigned char)(d))
 
 /* default welcome protocol support message, as sent by this server */
 #define ADC_PROTO_SUPPORT "ADBASE ADTIGR ADPING"
