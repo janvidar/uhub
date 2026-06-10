@@ -63,7 +63,24 @@ endif()
 # TLS is mandatory. find_package(OpenSSL) also locates LibreSSL (point it at a
 # LibreSSL prefix with -DOPENSSL_ROOT_DIR=... when both are installed).
 find_package(OpenSSL REQUIRED)
-message(STATUS "TLS provider version: ${OPENSSL_VERSION}")
+
+# FindOpenSSL does not distinguish LibreSSL, which masquerades as OpenSSL 2.0.0
+# via OPENSSL_VERSION_NUMBER. Report the real provider so a LibreSSL build is
+# obvious in the configure output.
+unset(LIBRESSL_VERSION)
+if (EXISTS "${OPENSSL_INCLUDE_DIR}/openssl/opensslv.h")
+	file(STRINGS "${OPENSSL_INCLUDE_DIR}/openssl/opensslv.h" _libressl_text
+		REGEX "^#[ \t]*define[ \t]+LIBRESSL_VERSION_TEXT")
+	if (_libressl_text)
+		string(REGEX MATCH "\"([^\"]+)\"" _m "${_libressl_text}")
+		set(LIBRESSL_VERSION "${CMAKE_MATCH_1}")
+	endif()
+endif()
+if (LIBRESSL_VERSION)
+	message(STATUS "TLS provider: ${LIBRESSL_VERSION}")
+else()
+	message(STATUS "TLS provider: OpenSSL ${OPENSSL_VERSION}")
+endif()
 
 if (SYSTEMD_SUPPORT)
 	find_package(PkgConfig REQUIRED)
@@ -87,6 +104,13 @@ check_symbol_exists(strndup string.h HAVE_STRNDUP)
 # every uhub target needs them, so keep them at directory scope.
 include_directories("${UHUB_SOURCE_DIR}")
 include_directories("${PROJECT_BINARY_DIR}")
+
+# system.h pulls in <openssl/*.h>, so every translation unit (including the
+# openssl.c in the network static lib and the plugins) must compile against the
+# same TLS headers it will link against. The link libraries alone do not carry
+# this to the static libs, so apply the include dir at directory scope -- this
+# is what lets a LibreSSL prefix (-DOPENSSL_ROOT_DIR=...) build correctly.
+include_directories("${OPENSSL_INCLUDE_DIR}")
 
 file (GLOB uhub_SOURCES CONFIGURE_DEPENDS ${UHUB_SOURCE_DIR}/core/*.c)
 list (REMOVE_ITEM uhub_SOURCES
