@@ -224,18 +224,28 @@ if (SYSTEMD_SUPPORT)
 endif()
 
 if (FUZZING)
-	add_executable(fuzz_message ${PROJECT_SOURCE_DIR}/tools/fuzz_message.c)
-	target_link_libraries(fuzz_message adc network utils)
-	if (SSL_SUPPORT)
-		target_link_libraries(fuzz_message ${SSL_LIBS})
-	endif()
-	if (UNIX)
-		target_link_libraries(fuzz_message pthread)
-	endif()
-	# Pull in the libFuzzer runtime (provides main()) plus the runtime
-	# sanitizers for the harness object itself.
-	set_target_properties(fuzz_message PROPERTIES
-		LINK_FLAGS "-fsanitize=address,undefined,fuzzer")
+	# Define a fuzz target. Extra args after the name are additional sources
+	# (e.g. the core objects needed by the command parser).
+	macro(add_fuzzer name)
+		add_executable(${name} ${ARGN})
+		target_link_libraries(${name} adc network utils ${CMAKE_DL_LIBS})
+		if (SSL_SUPPORT)
+			target_link_libraries(${name} ${SSL_LIBS})
+		endif()
+		if (UNIX)
+			target_link_libraries(${name} pthread)
+		endif()
+		# Pull in the libFuzzer runtime (provides main()) plus the runtime
+		# sanitizers for the harness object itself.
+		set_target_properties(${name} PROPERTIES
+			LINK_FLAGS "-fsanitize=address,undefined,fuzzer")
+	endmacro()
+
+	add_fuzzer(fuzz_message      ${PROJECT_SOURCE_DIR}/tools/fuzz_message.c)
+	add_fuzzer(fuzz_config_token ${PROJECT_SOURCE_DIR}/tools/fuzz_config_token.c)
+	# command_parse() lives in the hub core, so compile the core objects in
+	# (same source set as autotest-bin, minus main.c / gen_config.c).
+	add_fuzzer(fuzz_command_parser ${PROJECT_SOURCE_DIR}/tools/fuzz_command_parser.c ${uhub_SOURCES})
 endif()
 
 configure_file ("${PROJECT_SOURCE_DIR}/version.h.in" "${PROJECT_BINARY_DIR}/version.h")

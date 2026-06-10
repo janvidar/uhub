@@ -117,31 +117,50 @@ jobs:
   # reproducer as an artifact.
   # ---------------------------------------------------------------------------
   fuzz:
-    name: fuzz adc_msg_parse (smoke)
+    name: fuzz parsers (smoke)
     runs-on: ubuntu-latest
     env:
       CC: clang
+      # UB (not just memory errors) must fail the job, so the number/IP
+      # parsers stay overflow-free.
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
     steps:
       - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y cmake clang
+          # libsqlite3-dev: CMakeLists requires SQLite3 to configure even when
+          # the fuzz targets themselves don't use it.
+          sudo apt-get install -y cmake clang libsqlite3-dev
 
       - name: Configure (libFuzzer)
         run: cmake -S . -B build-fuzz -DFUZZING=ON -DSSL_SUPPORT=OFF -DRELEASE=ON
 
-      - name: Build fuzzer
-        run: cmake --build build-fuzz --target fuzz_message -j
+      - name: Build fuzzers
+        run: cmake --build build-fuzz --target fuzz_message fuzz_config_token fuzz_command_parser -j
 
-      - name: Run fuzzer (120s)
+      - name: Fuzz adc_msg_parse (90s)
         run: |
           ./build-fuzz/fuzz_message \
             -dict=autotest/fuzz/adc.dict \
-            -max_total_time=120 -timeout=15 -rss_limit_mb=2048 \
+            -max_total_time=90 -timeout=15 -rss_limit_mb=2048 \
             -print_final_stats=1 \
-            autotest/fuzz/corpus
+            autotest/fuzz/corpus/message
+
+      - name: Fuzz config tokenizer (45s)
+        run: |
+          ./build-fuzz/fuzz_config_token \
+            -max_total_time=45 -timeout=15 -rss_limit_mb=2048 \
+            -print_final_stats=1 \
+            autotest/fuzz/corpus/config_token
+
+      - name: Fuzz command parser (75s)
+        run: |
+          ./build-fuzz/fuzz_command_parser \
+            -max_total_time=75 -timeout=15 -rss_limit_mb=2048 \
+            -print_final_stats=1 \
+            autotest/fuzz/corpus/command_parser
 
       - name: Upload crash reproducers
         if: failure()
