@@ -26,7 +26,7 @@
  * than the ADC parser -- but they are still string parsers full of pointer
  * arithmetic, and a malformed config should never crash the hub on startup.
  *
- * Build with:  cmake -B build-fuzz -DFUZZING=ON -DSSL_SUPPORT=OFF .  (clang)
+ * Build with:  cmake -B build-fuzz -DFUZZING=ON .  (clang)
  * Run with:    ./build-fuzz/fuzz_config_token autotest/fuzz/corpus/config_token
  */
 

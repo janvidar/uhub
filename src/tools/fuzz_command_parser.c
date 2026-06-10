@@ -33,7 +33,7 @@
  * mutate them). Commands covering every argument-code branch are registered
  * so the fuzzer can reach each parse path.
  *
- * Build with:  cmake -B build-fuzz -DFUZZING=ON -DSSL_SUPPORT=OFF .  (clang)
+ * Build with:  cmake -B build-fuzz -DFUZZING=ON .  (clang)
  * Run with:    ./build-fuzz/fuzz_command_parser autotest/fuzz/corpus/command_parser
  */
 
