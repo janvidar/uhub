@@ -138,7 +138,7 @@ jobs:
         run: cmake -S . -B build-fuzz -DFUZZING=ON -DSSL_SUPPORT=OFF -DRELEASE=ON
 
       - name: Build fuzzers
-        run: cmake --build build-fuzz --target fuzz_message fuzz_adc_escape fuzz_config_token fuzz_command_parser -j
+        run: cmake --build build-fuzz --target fuzz_message fuzz_adc_escape fuzz_ipcalc fuzz_config_token fuzz_command_parser -j
 
       - name: Fuzz adc_msg_parse (90s)
         run: |
@@ -154,6 +154,13 @@ jobs:
             -max_total_time=45 -timeout=15 -rss_limit_mb=2048 \
             -print_final_stats=1 \
             autotest/fuzz/corpus/adc_escape
+
+      - name: Fuzz ipcalc address/range parser (45s)
+        run: |
+          ./build-fuzz/fuzz_ipcalc \
+            -max_total_time=45 -timeout=15 -rss_limit_mb=2048 \
+            -print_final_stats=1 \
+            autotest/fuzz/corpus/ipcalc
 
       - name: Fuzz config tokenizer (45s)
         run: |
