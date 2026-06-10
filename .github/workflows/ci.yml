@@ -1,0 +1,155 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Catch the documented footgun: autotest/test.c is GENERATED from *.tcc by
+  # autotest/exotic. A stale test.c means new EXO_TEST blocks silently never run.
+  # ---------------------------------------------------------------------------
+  generated-files:
+    name: generated test.c is up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install perl
+        run: sudo apt-get update -qq && sudo apt-get install -y perl
+      - name: Regenerate test.c
+        run: cd autotest && ./update.sh
+      - name: Fail if test.c is out of date
+        run: |
+          if ! git diff --exit-code autotest/test.c; then
+            echo "::error::autotest/test.c is stale. Run 'cd autotest && ./update.sh' and commit the result."
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Build + unit tests across compilers and the minimal/full feature configs.
+  # Replaces the dead Travis pipeline.
+  # ---------------------------------------------------------------------------
+  test:
+    name: test (${{ matrix.compiler }}, ${{ matrix.config }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        config: [minimal, full]
+    env:
+      CC: ${{ matrix.compiler }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          # SQLite3 is a hard requirement of CMakeLists.txt even in the
+          # minimal config; OpenSSL is only needed when SSL_SUPPORT=ON.
+          sudo apt-get install -y cmake perl libsqlite3-dev libssl-dev ${{ matrix.compiler }}
+
+      - name: Regenerate test.c
+        run: cd autotest && ./update.sh
+
+      - name: Configure
+        run: |
+          if [ "${{ matrix.config }}" = "full" ]; then
+            cmake -S . -B build \
+              -DRELEASE=OFF -DLOWLEVEL_DEBUG=ON -DSSL_SUPPORT=ON -DADC_STRESS=ON
+          else
+            cmake -S . -B build \
+              -DRELEASE=ON -DSSL_SUPPORT=OFF -DADC_STRESS=OFF
+          fi
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Run unit tests
+        run: ./build/autotest-bin
+
+  # ---------------------------------------------------------------------------
+  # AddressSanitizer + UndefinedBehaviorSanitizer over the full test suite.
+  # This is a hard gate: any memory error or UB fails the build.
+  # ---------------------------------------------------------------------------
+  sanitizers:
+    name: asan + ubsan
+    runs-on: ubuntu-latest
+    env:
+      CC: clang
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake perl libsqlite3-dev libssl-dev clang
+
+      - name: Regenerate test.c
+        run: cd autotest && ./update.sh
+
+      # Built with RELEASE=OFF so the DEBUG-only internal ADC_MSG_ASSERT
+      # consistency checks run under the sanitizers as well.
+      - name: Configure (ASan/UBSan)
+        run: |
+          cmake -S . -B build-asan -DRELEASE=OFF -DSSL_SUPPORT=ON \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+
+      - name: Build
+        run: cmake --build build-asan --target autotest-bin -j
+
+      - name: Run unit tests under sanitizers
+        env:
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ./build-asan/autotest-bin
+
+  # ---------------------------------------------------------------------------
+  # Time-boxed regression fuzzing of the pre-auth ADC parser. Seeded from the
+  # checked-in corpus + dictionary. A crash fails the job and uploads the
+  # reproducer as an artifact.
+  # ---------------------------------------------------------------------------
+  fuzz:
+    name: fuzz adc_msg_parse (smoke)
+    runs-on: ubuntu-latest
+    env:
+      CC: clang
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake clang
+
+      - name: Configure (libFuzzer)
+        run: cmake -S . -B build-fuzz -DFUZZING=ON -DSSL_SUPPORT=OFF -DRELEASE=ON
+
+      - name: Build fuzzer
+        run: cmake --build build-fuzz --target fuzz_message -j
+
+      - name: Run fuzzer (120s)
+        run: |
+          ./build-fuzz/fuzz_message \
+            -dict=autotest/fuzz/adc.dict \
+            -max_total_time=120 -timeout=15 -rss_limit_mb=2048 \
+            -print_final_stats=1 \
+            autotest/fuzz/corpus
+
+      - name: Upload crash reproducers
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crashes
+          path: |
+            crash-*
+            timeout-*
+            oom-*
+          if-no-files-found: ignore

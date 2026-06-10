@@ -1,0 +1,55 @@
+# libFuzzer dictionary for the ADC wire format.
+# Pass with: ./fuzz_message -dict=autotest/fuzz/adc.dict <corpus>
+
+# Message headers (FOURCC + leading type char)
+"HSUP "
+"BINF "
+"BMSG "
+"EMSG "
+"DMSG "
+"ISTA "
+"IINF "
+"IQUI "
+"IGPA "
+"HPAS "
+"BSCH "
+"FSCH "
+"DCTM "
+"DRCM "
+"BRES "
+"DRES "
+
+# SUP feature tokens
+"ADBASE0"
+"ADTIGR"
+"ADUCM0"
+"ADBLO0"
+"ADPING"
+
+# INF named arguments (the get/remove/replace bug surface)
+" NI"
+" ID"
+" PD"
+" I4"
+" I6"
+" U4"
+" U6"
+" SS"
+" SF"
+" CT"
+" VE"
+" AP"
+" DE"
+" EM"
+" HN"
+" HR"
+" HO"
+" SL"
+" SU"
+" TO"
+" AN"
+
+# Escape sequences
+"\\s"
+"\\n"
+"\\\\"

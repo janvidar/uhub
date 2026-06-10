@@ -20,6 +20,7 @@ option(LOWLEVEL_DEBUG, "Enable low level debug messages." OFF)
 option(SSL_SUPPORT "Enable SSL support" ON)
 option(SYSTEMD_SUPPORT "Enable systemd notify and journal logging" OFF)
 option(ADC_STRESS "Enable the stress tester client" OFF)
+option(FUZZING "Build libFuzzer fuzz targets (requires clang)" OFF)
 
 find_package(Git)
 find_package(Sqlite3)
@@ -40,6 +41,18 @@ endif()
 
 if (NOT RELEASE)
         add_definitions(-DDEBUG)
+endif()
+
+if (FUZZING)
+	if (NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
+		message(FATAL_ERROR "FUZZING requires clang (libFuzzer). Re-run cmake with CC=clang.")
+	endif()
+	# Instrument every translation unit (adc/util/network libs included) so
+	# the fuzzer gets coverage feedback and ASan/UBSan checks across the whole
+	# parse path, not just the harness object. The fuzz target itself adds the
+	# libFuzzer runtime at link time below.
+	set(FUZZ_SANITIZERS "address,undefined,fuzzer-no-link")
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=${FUZZ_SANITIZERS} -fno-omit-frame-pointer -g -O1")
 endif()
 
 if (SSL_SUPPORT)
@@ -208,6 +221,21 @@ if (SYSTEMD_SUPPORT)
         target_link_libraries(uhub-admin ${SD_LIBRARIES})
         include_directories(${SD_INCLUDE_DIRS})
         add_definitions(-DSYSTEMD)
+endif()
+
+if (FUZZING)
+	add_executable(fuzz_message ${PROJECT_SOURCE_DIR}/tools/fuzz_message.c)
+	target_link_libraries(fuzz_message adc network utils)
+	if (SSL_SUPPORT)
+		target_link_libraries(fuzz_message ${SSL_LIBS})
+	endif()
+	if (UNIX)
+		target_link_libraries(fuzz_message pthread)
+	endif()
+	# Pull in the libFuzzer runtime (provides main()) plus the runtime
+	# sanitizers for the harness object itself.
+	set_target_properties(fuzz_message PROPERTIES
+		LINK_FLAGS "-fsanitize=address,undefined,fuzzer")
 endif()
 
 configure_file ("${PROJECT_SOURCE_DIR}/version.h.in" "${PROJECT_BINARY_DIR}/version.h")
