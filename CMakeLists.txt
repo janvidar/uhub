@@ -242,6 +242,7 @@ if (FUZZING)
 	endmacro()
 
 	add_fuzzer(fuzz_message      ${PROJECT_SOURCE_DIR}/tools/fuzz_message.c)
+	add_fuzzer(fuzz_adc_escape   ${PROJECT_SOURCE_DIR}/tools/fuzz_adc_escape.c)
 	add_fuzzer(fuzz_config_token ${PROJECT_SOURCE_DIR}/tools/fuzz_config_token.c)
 	# command_parse() lives in the hub core, so compile the core objects in
 	# (same source set as autotest-bin, minus main.c / gen_config.c).

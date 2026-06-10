@@ -8,8 +8,12 @@ configured with `-DFUZZING=ON` and run for a short time on every CI run.
 | Target | Source | Parser under test | Exposure |
 |--------|--------|-------------------|----------|
 | `fuzz_message`        | `src/tools/fuzz_message.c`        | `adc_msg_parse()` + the message accessor/mutator API | raw network bytes, **pre-auth** |
+| `fuzz_adc_escape`     | `src/tools/fuzz_adc_escape.c`     | `adc_msg_escape()` / `adc_msg_unescape()` / `adc_msg_unescape_to_target()` | arbitrary strings (nicks, chat, user-agent) |
 | `fuzz_command_parser` | `src/tools/fuzz_command_parser.c` | `command_parse()` (`!`/`+` commands), incl. the IP/number argument parsers | logged-in user chat input |
 | `fuzz_config_token`   | `src/tools/fuzz_config_token.c`   | `cfg_tokenize()` / `cfg_settings_split()` | `uhub.conf` / `users.conf` file content |
+
+`fuzz_adc_escape` also checks a property: `escape()` followed by `unescape()`
+must reproduce the original string exactly (a violation aborts the run).
 
 `fuzz_message` is the highest-value target: it runs against attacker bytes
 before authentication. `fuzz_command_parser` also exercises the ipcalc and
@@ -19,7 +23,7 @@ before authentication. `fuzz_command_parser` also exercises the ipcalc and
 
 ```sh
 CC=clang cmake -B build-fuzz -DFUZZING=ON -DSSL_SUPPORT=OFF -DRELEASE=ON .
-cmake --build build-fuzz --target fuzz_message fuzz_config_token fuzz_command_parser -j
+cmake --build build-fuzz --target fuzz_message fuzz_adc_escape fuzz_config_token fuzz_command_parser -j
 ```
 
 ## Run
@@ -30,6 +34,7 @@ cmake --build build-fuzz --target fuzz_message fuzz_config_token fuzz_command_pa
 export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
 
 ./build-fuzz/fuzz_message      -dict=autotest/fuzz/adc.dict autotest/fuzz/corpus/message
+./build-fuzz/fuzz_adc_escape                                autotest/fuzz/corpus/adc_escape
 ./build-fuzz/fuzz_config_token                              autotest/fuzz/corpus/config_token
 ./build-fuzz/fuzz_command_parser                            autotest/fuzz/corpus/command_parser
 ```
