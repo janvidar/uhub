@@ -1,122 +1,328 @@
 const std = @import("std");
 
+// Keep these in sync with CMakeLists.txt (UHUB_VERSION_*).
+const version_major = 0;
+const version_minor = 6;
+const version_patch = 0;
+
+// Shared source sets, mirroring the static libraries CMakeLists.txt builds
+// (adc / network / utils). They are compiled once into a single static
+// library and linked into every artifact below.
+const util_sources = [_][]const u8{
+    "src/util/cbuffer.c",
+    "src/util/config_token.c",
+    "src/util/credentials.c",
+    "src/util/floodctl.c",
+    "src/util/getopt.c",
+    "src/util/list.c",
+    "src/util/log.c",
+    "src/util/memory.c",
+    "src/util/misc.c",
+    "src/util/rbtree.c",
+    "src/util/threads.c",
+    "src/util/tiger.c",
+};
+
+const network_sources = [_][]const u8{
+    "src/network/backend.c",
+    "src/network/connection.c",
+    "src/network/dnsresolver.c",
+    "src/network/epoll.c",
+    "src/network/ipcalc.c",
+    "src/network/kqueue.c",
+    "src/network/network.c",
+    "src/network/notify.c",
+    "src/network/openssl.c",
+    "src/network/select.c",
+    "src/network/timeout.c",
+    "src/network/timer.c",
+};
+
+const adc_sources = [_][]const u8{
+    "src/adc/message.c",
+    "src/adc/sid.c",
+};
+
+// All of src/core/*.c except gen_config.c (a generator) and main.c (the entry
+// point, added explicitly to uhub only). Shared between uhub and autotest-bin.
+const core_sources = [_][]const u8{
+    "src/core/auth.c",
+    "src/core/command_parser.c",
+    "src/core/commands.c",
+    "src/core/config.c",
+    "src/core/eventqueue.c",
+    "src/core/hub.c",
+    "src/core/hubevent.c",
+    "src/core/inf.c",
+    "src/core/ioqueue.c",
+    "src/core/netevent.c",
+    "src/core/plugincallback.c",
+    "src/core/plugininvoke.c",
+    "src/core/pluginloader.c",
+    "src/core/probe.c",
+    "src/core/route.c",
+    "src/core/user.c",
+    "src/core/usermanager.c",
+};
+
+const Plugin = struct {
+    name: []const u8,
+    sqlite: bool = false,
+};
+
+// Mirrors the add_library(... MODULE ...) plugin list in CMakeLists.txt.
+// mod_logging needs adc/sid.c, which already lives in the shared library.
+const plugins = [_]Plugin{
+    .{ .name = "mod_example" },
+    .{ .name = "mod_welcome" },
+    .{ .name = "mod_logging" },
+    .{ .name = "mod_auth_simple" },
+    .{ .name = "mod_auth_sqlite", .sqlite = true },
+    .{ .name = "mod_chat_history" },
+    .{ .name = "mod_chat_history_sqlite", .sqlite = true },
+    .{ .name = "mod_chat_only" },
+    .{ .name = "mod_topic" },
+    .{ .name = "mod_no_guest_downloads" },
+};
+
+const Ctx = struct {
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    cflags: []const []const u8,
+    ssl: bool,
+    systemd: bool,
+    common: *std.Build.Step.Compile,
+    version_h: *std.Build.Step.ConfigHeader,
+    system_h: *std.Build.Step.ConfigHeader,
+
+    // A fresh module carrying the include paths, generated headers and libc
+    // that every C target in this build needs.
+    fn module(ctx: *const Ctx) *std.Build.Module {
+        const m = ctx.b.createModule(.{
+            .target = ctx.target,
+            .optimize = ctx.optimize,
+            .link_libc = true,
+            // Match CMake: it never enables the C UB sanitizer, and the code
+            // relies on a handful of signed-shift / overflow behaviours.
+            .sanitize_c = .off,
+        });
+        m.addIncludePath(ctx.b.path("src"));
+        m.addConfigHeader(ctx.version_h);
+        m.addConfigHeader(ctx.system_h);
+        return m;
+    }
+
+    fn addSources(ctx: *const Ctx, m: *std.Build.Module, files: []const []const u8) void {
+        m.addCSourceFiles(.{ .files = files, .flags = ctx.cflags });
+    }
+
+    // Bundle the in-tree SQLite amalgamation (CMake links a system sqlite3;
+    // bundling keeps the zig build self-contained, same result).
+    fn addSqlite(ctx: *const Ctx, m: *std.Build.Module) void {
+        m.addIncludePath(ctx.b.path("third_party/sqlite3"));
+        m.addCSourceFiles(.{
+            .files = &.{"third_party/sqlite3/sqlite3.c"},
+            .flags = &.{"-DSQLITE_THREADSAFE=1"},
+        });
+    }
+
+    fn linkExternal(ctx: *const Ctx, m: *std.Build.Module) void {
+        if (ctx.ssl) {
+            m.linkSystemLibrary("ssl", .{});
+            m.linkSystemLibrary("crypto", .{});
+        }
+        if (ctx.systemd) {
+            m.linkSystemLibrary("systemd", .{});
+        }
+    }
+};
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const exe_mod = b.createModule(.{
+    // Build options mirroring CMakeLists.txt.
+    const ssl = b.option(bool, "ssl", "Enable SSL/TLS support (OpenSSL)") orelse true;
+    const release = b.option(bool, "release", "Release build; disables the DEBUG define when on") orelse true;
+    const systemd = b.option(bool, "systemd", "Enable systemd notify and journal logging") orelse false;
+    const adc_stress = b.option(bool, "adc-stress", "Build the adcrush stress-tester client") orelse false;
+    const lowlevel_debug = b.option(bool, "lowlevel-debug", "Enable low level debug messages") orelse false;
+
+    // Assemble the common C flags applied to every translation unit.
+    var flags = std.array_list.Managed([]const u8).init(b.allocator);
+    flags.appendSlice(&.{ "-std=gnu23", "-pedantic", "-Wall", "-W", "-D_GNU_SOURCE" }) catch @panic("OOM");
+    if (!release) flags.append("-DDEBUG") catch @panic("OOM");
+    if (lowlevel_debug) flags.append("-DLOWLEVEL_DEBUG") catch @panic("OOM");
+    if (ssl) flags.appendSlice(&.{ "-DSSL_SUPPORT", "-DSSL_USE_OPENSSL" }) catch @panic("OOM");
+    if (systemd) flags.append("-DSYSTEMD") catch @panic("OOM");
+    if (target.result.cpu.arch.endian() == .big) flags.append("-DARCH_BIGENDIAN") catch @panic("OOM");
+    const cflags = flags.toOwnedSlice() catch @panic("OOM");
+
+    // Generate version.h and system.h from the CMake templates, replacing
+    // CMake's configure_file().
+    const git_version = gitVersion(b);
+    const version_h = b.addConfigHeader(.{
+        .style = .{ .cmake = b.path("src/version.h.in") },
+        .include_path = "version.h",
+    }, .{
+        .UHUB_VERSION_MAJOR = version_major,
+        .UHUB_VERSION_MINOR = version_minor,
+        .UHUB_VERSION_PATCH = version_patch,
+        .UHUB_GIT_VERSION = git_version,
+    });
+
+    const is_windows = target.result.os.tag == .windows;
+    const system_h = b.addConfigHeader(.{
+        .style = .{ .cmake = b.path("src/system.h.in") },
+        .include_path = "system.h",
+    }, .{
+        // CMake probes these with check_symbol_exists / check_include_file.
+        // They hold on every POSIX target uhub supports; Windows uses the
+        // in-header fallbacks.
+        .HAVE_SYS_TYPES_H = !is_windows,
+        .HAVE_STDINT_H = true,
+        .HAVE_SSIZE_T = !is_windows,
+        .HAVE_STRNDUP = !is_windows,
+        .HAVE_MEMMEM = !is_windows,
+    });
+
+    // The shared static library (adc + network + utils). Built PIC so it can
+    // be linked into the plugin shared objects.
+    const common_mod = b.createModule(.{
         .target = target,
         .optimize = optimize,
         .link_libc = true,
+        .sanitize_c = .off,
+    });
+    common_mod.pic = true;
+    common_mod.addIncludePath(b.path("src"));
+    common_mod.addConfigHeader(version_h);
+    common_mod.addConfigHeader(system_h);
+    common_mod.addCSourceFiles(.{ .files = &util_sources, .flags = cflags });
+    common_mod.addCSourceFiles(.{ .files = &network_sources, .flags = cflags });
+    common_mod.addCSourceFiles(.{ .files = &adc_sources, .flags = cflags });
+    // Note: external system libraries (ssl/crypto/systemd) are linked on the
+    // final artifacts via linkExternal, never on this static archive -- doing
+    // so would embed the shared .so as a bogus archive member.
+    const common = b.addLibrary(.{
+        .linkage = .static,
+        .name = "uhub_common",
+        .root_module = common_mod,
     });
 
-    exe_mod.addIncludePath(b.path("src"));
-    exe_mod.addCSourceFiles(.{
-        .files = &.{
-            "src/adc/message.c",
-            "src/adc/sid.c",
-            "src/core/auth.c",
-            "src/core/command_parser.c",
-            "src/core/commands.c",
-            "src/core/config.c",
-            "src/core/eventqueue.c",
-            "src/core/hub.c",
-            "src/core/hubevent.c",
-            "src/core/inf.c",
+    const ctx = Ctx{
+        .b = b,
+        .target = target,
+        .optimize = optimize,
+        .cflags = cflags,
+        .ssl = ssl,
+        .systemd = systemd,
+        .common = common,
+        .version_h = version_h,
+        .system_h = system_h,
+    };
+
+    // uhub
+    const uhub_mod = ctx.module();
+    ctx.addSources(uhub_mod, &core_sources);
+    ctx.addSources(uhub_mod, &.{"src/core/main.c"});
+    uhub_mod.linkLibrary(common);
+    ctx.linkExternal(uhub_mod);
+    const uhub = b.addExecutable(.{ .name = "uhub", .root_module = uhub_mod });
+    uhub.rdynamic = true; // export symbols for dlopen'd plugins
+    b.installArtifact(uhub);
+
+    // autotest-bin
+    const autotest_mod = ctx.module();
+    ctx.addSources(autotest_mod, &core_sources);
+    ctx.addSources(autotest_mod, &.{"autotest/test.c"});
+    autotest_mod.linkLibrary(common);
+    ctx.linkExternal(autotest_mod);
+    const autotest = b.addExecutable(.{ .name = "autotest-bin", .root_module = autotest_mod });
+    autotest.rdynamic = true;
+    b.installArtifact(autotest);
+
+    // uhub-passwd (needs SQLite for the password database)
+    const passwd_mod = ctx.module();
+    ctx.addSources(passwd_mod, &.{"src/tools/uhub-passwd.c"});
+    ctx.addSqlite(passwd_mod);
+    passwd_mod.linkLibrary(common);
+    ctx.linkExternal(passwd_mod);
+    const passwd = b.addExecutable(.{ .name = "uhub-passwd", .root_module = passwd_mod });
+    b.installArtifact(passwd);
+
+    // UNIX-only tools (CMake guards these with if(UNIX)).
+    if (!is_windows) {
+        const admin_mod = ctx.module();
+        ctx.addSources(admin_mod, &.{
+            "src/tools/admin.c",
+            "src/tools/adcclient.c",
             "src/core/ioqueue.c",
-            "src/core/main.c",
-            "src/core/netevent.c",
-            "src/core/plugincallback.c",
-            "src/core/plugininvoke.c",
-            "src/core/pluginloader.c",
-            "src/core/probe.c",
-            "src/core/route.c",
-            "src/core/user.c",
-            "src/core/usermanager.c",
-            "src/network/backend.c",
-            "src/network/connection.c",
-            "src/network/dnsresolver.c",
-            "src/network/epoll.c",
-            "src/network/ipcalc.c",
-            "src/network/kqueue.c",
-            "src/network/network.c",
-            "src/network/notify.c",
-            "src/network/openssl.c",
-            "src/network/select.c",
-            "src/network/timeout.c",
-            "src/network/timer.c",
-            "src/util/cbuffer.c",
-            "src/util/credentials.c",
-            "src/util/config_token.c",
-            "src/util/floodctl.c",
-            "src/util/getopt.c",
-            "src/util/list.c",
-            "src/util/log.c",
-            "src/util/memory.c",
-            "src/util/misc.c",
-            "src/util/rbtree.c",
-            "src/util/threads.c",
-            "src/util/tiger.c",
-        },
-        .flags = &.{
-            "-std=gnu23",
-            "-pedantic",
-            "-Wall",
-            "-W",
-            "-DSSL_SUPPORT",
-            "-DSSL_USE_OPENSSL",
-        },
-    });
-
-    exe_mod.linkSystemLibrary("ssl", .{});
-    exe_mod.linkSystemLibrary("crypto", .{});
-
-    const exe = b.addExecutable(.{
-        .name = "uhub",
-        .root_module = exe_mod,
-    });
-
-    b.installArtifact(exe);
-
-    inline for (.{
-        "mod_auth_simple",
-        "mod_auth_sqlite",
-        "mod_chat_history",
-        "mod_chat_is_privileged",
-        "mod_logging",
-        "mod_no_guest_downloads",
-        "mod_topic",
-        "mod_welcome",
-    }) |plugin_name| {
-        const mod = b.createModule(.{
-            .target = target,
-            .optimize = optimize,
-            .link_libc = true,
         });
-        mod.addIncludePath(b.path("src"));
-        mod.addCSourceFiles(.{ .files = &.{"src/plugins/" ++ plugin_name ++ ".c"} });
+        admin_mod.linkLibrary(common);
+        ctx.linkExternal(admin_mod);
+        const admin = b.addExecutable(.{ .name = "uhub-admin", .root_module = admin_mod });
+        b.installArtifact(admin);
 
-        if (std.mem.eql(u8, plugin_name, "mod_auth_sqlite")) {
-            mod.addIncludePath(b.path("third_party/sqlite3"));
-            mod.addCSourceFiles(.{
-                .files = &.{"third_party/sqlite3/sqlite3.c"},
-                .flags = &.{"-DSQLITE_THREADSAFE=1"},
+        if (adc_stress) {
+            const adcrush_mod = ctx.module();
+            ctx.addSources(adcrush_mod, &.{
+                "src/tools/adcrush.c",
+                "src/tools/adcclient.c",
+                "src/core/ioqueue.c",
             });
+            adcrush_mod.linkLibrary(common);
+            ctx.linkExternal(adcrush_mod);
+            const adcrush = b.addExecutable(.{ .name = "adcrush", .root_module = adcrush_mod });
+            b.installArtifact(adcrush);
         }
+    }
 
+    // Plugins -> mod_*.so (CMake sets PREFIX "" so there is no "lib" prefix).
+    for (plugins) |plugin| {
+        const mod = ctx.module();
+        mod.addCSourceFiles(.{
+            .files = &.{b.fmt("src/plugins/{s}.c", .{plugin.name})},
+            .flags = cflags,
+        });
+        if (plugin.sqlite) ctx.addSqlite(mod);
+        mod.linkLibrary(common);
+        ctx.linkExternal(mod);
         const lib = b.addLibrary(.{
             .linkage = .dynamic,
-            .name = plugin_name,
+            .name = plugin.name,
             .root_module = mod,
         });
-        b.installArtifact(lib);
+        const install = b.addInstallFileWithDir(
+            lib.getEmittedBin(),
+            .lib,
+            b.fmt("{s}.so", .{plugin.name}),
+        );
+        b.getInstallStep().dependOn(&install.step);
     }
 
-    const run_step = b.addRunArtifact(exe);
-    if (b.args) |args| {
-        run_step.addArgs(args);
-    }
+    // `zig build run` -> launch uhub.
+    const run_step = b.addRunArtifact(uhub);
+    if (b.args) |args| run_step.addArgs(args);
+    b.step("run", "Run uhub").dependOn(&run_step.step);
 
-    const run_cmd = b.step("run", "Run uhub");
-    run_cmd.dependOn(&run_step.step);
+    // `zig build test` -> run the autotest suite.
+    const test_run = b.addRunArtifact(autotest);
+    b.step("test", "Run the autotest suite").dependOn(&test_run.step);
+}
+
+// Reproduce CMake's git-revision lookup: "git-<short hash>", or "release"
+// when not in a git checkout.
+fn gitVersion(b: *std.Build) []const u8 {
+    const fallback = b.fmt("{d}.{d}.{d}-release", .{ version_major, version_minor, version_patch });
+    var code: u8 = undefined;
+    const stdout = b.runAllowFail(
+        &.{ "git", "show", "-s", "--pretty=format:%h" },
+        &code,
+        .ignore,
+    ) catch return fallback;
+    const hash = std.mem.trim(u8, stdout, " \t\r\n");
+    if (hash.len == 0) return fallback;
+    return b.fmt("{d}.{d}.{d}-git-{s}", .{ version_major, version_minor, version_patch, hash });
 }
