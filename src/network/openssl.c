@@ -22,6 +22,15 @@
 #include "network/tls.h"
 #include "network/backend.h"
 
+/*
+ * uhub targets the modern (opaque-struct) OpenSSL API. OpenSSL 1.0.2 and older
+ * have been end-of-life since 2019. LibreSSL satisfies this via its own 2.x
+ * version number and implements the same API surface.
+ */
+#if !defined(LIBRESSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER < 0x10100000L
+#error "uhub requires OpenSSL >= 1.1.0 or LibreSSL"
+#endif
+
 void net_stats_add_tx(size_t bytes);
 void net_stats_add_rx(size_t bytes);
 void net_stats_tls_add_accept();
@@ -83,41 +92,29 @@ const char* net_ssl_get_provider()
 
 int net_ssl_library_init()
 {
+	/*
+	 * OpenSSL >= 1.1.0 and LibreSSL initialize themselves lazily on first use;
+	 * the old SSL_library_init() / SSL_load_error_strings() calls are no longer
+	 * needed (they are no-op macros on modern OpenSSL).
+	 */
 	LOG_TRACE("Initializing OpenSSL...");
-	SSL_library_init();
-	SSL_load_error_strings();
 	return 1;
 }
 
 int net_ssl_library_shutdown()
 {
-	ERR_clear_error();
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-	ERR_remove_state(0);
-#endif
-
-#ifndef OPENSSL_NO_ENGINE
-	ENGINE_cleanup();
-#endif
-	CONF_modules_unload(1);
-
-	ERR_free_strings();
-	EVP_cleanup();
-	CRYPTO_cleanup_all_ex_data();
-
-	// sk_SSL_COMP_free(SSL_COMP_get_compression_methods());
+	/*
+	 * Modern OpenSSL and LibreSSL clean up automatically at process exit, so the
+	 * legacy ERR/ENGINE/CONF/EVP teardown is unnecessary (and already compiles to
+	 * no-ops on OpenSSL 3.0). Nothing to do here.
+	 */
 	return 1;
 }
 
 static void add_io_stats(struct net_ssl_openssl* handle)
 {
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-	unsigned long num_read = handle->bio->num_read;
-	unsigned long num_write = handle->bio->num_write;
-#else
 	unsigned long num_read = BIO_number_read(handle->bio);
 	unsigned long num_write = BIO_number_written(handle->bio);
-#endif
 
 	if (num_read > handle->bytes_rx)
 	{
@@ -133,75 +130,42 @@ static void add_io_stats(struct net_ssl_openssl* handle)
 }
 
 /*
- * The OPENSSL_VERSION_NUMBER < 0x10100000L branches below select the legacy
- * pre-1.1.0 per-version TLSv1_x_method() API. LibreSSL reports a version number
- * of 0x20000000L, so it intentionally takes the modern TLS_method() + SSL_OP_NO_*
- * path -- which it implements. Note TLS 1.3 needs LibreSSL >= 3.2 at runtime;
- * older LibreSSL accepts tls_version="1.3" at build time but the handshake will
- * find no enabled protocol.
+ * Map the configured tls_version string ("1.0".."1.3") to the matching minimum
+ * protocol-version constant. Used with a single TLS_method() context plus
+ * SSL_CTX_set_min_proto_version(), which is the modern replacement for selecting
+ * a per-version SSL_METHOD and juggling SSL_OP_NO_TLSv1* flags. Returns -1 on an
+ * unrecognised or unsupported version.
+ *
+ * TLS1_3_VERSION is only defined by OpenSSL >= 1.1.1 and LibreSSL >= 3.2; on
+ * older libraries "1.3" is rejected here rather than silently negotiating a
+ * lower version.
  */
-static const SSL_METHOD* get_ssl_method(const char* tls_version, long* flags)
+static int tls_version_to_min_proto(const char* tls_version)
 {
-        if (!flags)
-        {
-            LOG_ERROR("flags is null");
-            return NULL;
-        }
-
 	if (!tls_version || !*tls_version)
 	{
-            LOG_ERROR("tls_version is not set.");
-            return NULL;
+		LOG_ERROR("tls_version is not set.");
+		return -1;
 	}
 
-	*flags = 0;
-	*flags |= SSL_OP_NO_SSLv2;
-        *flags |= SSL_OP_NO_SSLv3;
-
 	if (!strcmp(tls_version, "1.0"))
-        {
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-            return TLSv1_method();
-#endif
-        }
-        else if (!strcmp(tls_version, "1.1"))
-        {
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-            return TLSv1_1_method();
+		return TLS1_VERSION;
+	if (!strcmp(tls_version, "1.1"))
+		return TLS1_1_VERSION;
+	if (!strcmp(tls_version, "1.2"))
+		return TLS1_2_VERSION;
+	if (!strcmp(tls_version, "1.3"))
+	{
+#ifdef TLS1_3_VERSION
+		return TLS1_3_VERSION;
 #else
-            *flags |= SSL_OP_NO_TLSv1;
+		LOG_ERROR("TLS 1.3 is not supported by this TLS library");
+		return -1;
 #endif
-        }
-        else if (!strcmp(tls_version, "1.2"))
-        {
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-            return TLSv1_2_method();
-#else
-            *flags |= SSL_OP_NO_TLSv1;
-            *flags |= SSL_OP_NO_TLSv1_1;
-#endif
-        }
-        else if (!strcmp(tls_version, "1.3"))
-        {
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-            LOG_ERROR("TLS 1.3 is not supported by this version of OpenSSL");
-            return NULL;
-#else
-            *flags |= SSL_OP_NO_TLSv1;
-            *flags |= SSL_OP_NO_TLSv1_1;
-            *flags |= SSL_OP_NO_TLSv1_2;
-#endif
-        }
-        else
-        {
-            LOG_ERROR("Unable to recognize tls_version: %s", tls_version);
-            return NULL;
-        }
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-        // never gets here!
-#else
-	return TLS_method();
-#endif
+	}
+
+	LOG_ERROR("Unable to recognize tls_version: %s", tls_version);
+	return -1;
 }
 
 /**
@@ -236,24 +200,33 @@ static int alpn_server_select_protocol(SSL *ssl, const unsigned char **out, unsi
 struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const char* tls_ciphersuite)
 {
 	struct net_context_openssl* ctx = (struct net_context_openssl*) hub_malloc_zero(sizeof(struct net_context_openssl));
-        long flags = 0;
-	const SSL_METHOD* ssl_method;
+	long flags = 0;
+	int min_proto;
 
 	if (!ctx)
 		return NULL;
 
-	ssl_method = get_ssl_method(tls_version, &flags);
-
-	if (!ssl_method)
+	min_proto = tls_version_to_min_proto(tls_version);
+	if (min_proto < 0)
 	{
 		hub_free(ctx);
 		return NULL;
 	}
 
-	ctx->ssl = SSL_CTX_new(ssl_method);
+	ctx->ssl = SSL_CTX_new(TLS_method());
 	if (!ctx->ssl)
 	{
 		LOG_ERROR("Unable to create SSL context");
+		hub_free(ctx);
+		return NULL;
+	}
+
+	/* Set the minimum acceptable protocol version; the upper bound is left
+	 * open so newer protocols (e.g. TLS 1.3) are used when available. */
+	if (!SSL_CTX_set_min_proto_version(ctx->ssl, min_proto))
+	{
+		LOG_ERROR("Unable to set minimum TLS protocol version.");
+		SSL_CTX_free(ctx->ssl);
 		hub_free(ctx);
 		return NULL;
 	}
@@ -266,8 +239,7 @@ struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const
 	flags |= SSL_OP_NO_COMPRESSION;
 #endif
 
-        // Set flags
-        SSL_CTX_set_options(ctx->ssl, flags);
+	SSL_CTX_set_options(ctx->ssl, flags);
 
 	/* Set preferred cipher suite */
 	if (SSL_CTX_set_cipher_list(ctx->ssl, tls_ciphersuite) != 1)
