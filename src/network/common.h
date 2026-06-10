@@ -37,12 +37,7 @@ struct ssl_handle; /* abstract type */
 #define NET_CON_STRUCT_SSL \
 	struct ssl_handle* ssl;         /** SSL handle */
 
-#ifdef SSL_SUPPORT
 #define NET_CON_STRUCT_COMMON \
 	NET_CON_STRUCT_BASIC \
 	NET_CON_STRUCT_SSL
-#else
-#define NET_CON_STRUCT_COMMON \
-	NET_CON_STRUCT_BASIC
-#endif /* SSL_SUPPORT */
 

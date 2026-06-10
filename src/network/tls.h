@@ -22,9 +22,6 @@
 
 #include "uhub.h"
 
-#ifdef SSL_SUPPORT
-
-
 enum ssl_state
 {
 	tls_st_none,
@@ -109,6 +106,5 @@ extern int   net_con_is_ssl(struct net_connection* con);
 extern const char* net_ssl_get_tls_version(struct net_connection* con);
 extern const char* net_ssl_get_tls_cipher(struct net_connection* con);
 
-#endif /* SSL_SUPPORT */
 #endif /* HAVE_UHUB_NETWORK_TLS_H */
 

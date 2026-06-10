@@ -98,14 +98,10 @@
 #define PRINTF_UINT64_T ("%" PRIu64)
 #endif
 
-#ifdef SSL_SUPPORT
-#ifdef SSL_USE_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/engine.h>
 #include <openssl/conf.h>
-#endif /* SSL_USE_OPENSSL */
-#endif
 
 #include "version.h"
 

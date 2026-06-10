@@ -50,9 +50,7 @@ int net_initialize()
 #endif /* WINSOCK */
 
 		if (!net_backend_init()
-#ifdef SSL_SUPPORT
 			|| !net_ssl_library_init()
-#endif
 			)
 		{
 #ifdef WINSOCK
@@ -101,9 +99,7 @@ int net_destroy()
 
 		net_backend_shutdown();
 
-#ifdef SSL_SUPPORT
 		net_ssl_library_shutdown();
-#endif /* SSL_SUPPORT */
 
 #ifdef WINSOCK
 		WSACleanup();
