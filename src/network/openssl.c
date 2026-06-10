@@ -96,7 +96,9 @@ int net_ssl_library_shutdown()
 	ERR_remove_state(0);
 #endif
 
+#ifndef OPENSSL_NO_ENGINE
 	ENGINE_cleanup();
+#endif
 	CONF_modules_unload(1);
 
 	ERR_free_strings();
@@ -130,6 +132,14 @@ static void add_io_stats(struct net_ssl_openssl* handle)
 	}
 }
 
+/*
+ * The OPENSSL_VERSION_NUMBER < 0x10100000L branches below select the legacy
+ * pre-1.1.0 per-version TLSv1_x_method() API. LibreSSL reports a version number
+ * of 0x20000000L, so it intentionally takes the modern TLS_method() + SSL_OP_NO_*
+ * path -- which it implements. Note TLS 1.3 needs LibreSSL >= 3.2 at runtime;
+ * older LibreSSL accepts tls_version="1.3" at build time but the handshake will
+ * find no enabled protocol.
+ */
 static const SSL_METHOD* get_ssl_method(const char* tls_version, long* flags)
 {
         if (!flags)

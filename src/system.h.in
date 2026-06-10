@@ -100,7 +100,11 @@
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+/* ENGINE is optional: OpenSSL can be built --no-engine and LibreSSL has been
+ * dropping it. ssl.h has already pulled in opensslconf.h (OPENSSL_NO_ENGINE). */
+#ifndef OPENSSL_NO_ENGINE
 #include <openssl/engine.h>
+#endif
 #include <openssl/conf.h>
 
 #include "version.h"
