@@ -204,7 +204,7 @@ int ip_mask_create_left(int af, int bits, struct ip_addr_encap* result)
 		 * branch on bits == 0 instead of computing then overwriting. */
 		mask = (bits == 0) ? 0 : (0xffffffff << (32 - bits));
 
-		result->internal_ip_data.in.s_addr = (((uint8_t*) &mask)[0] << 24) | (((uint8_t*) &mask)[1] << 16) | (((uint8_t*) &mask)[2] << 8) | (((uint8_t*) &mask)[3] << 0);
+		result->internal_ip_data.in.s_addr = ((uint32_t)((uint8_t*) &mask)[0] << 24) | ((uint32_t)((uint8_t*) &mask)[1] << 16) | ((uint32_t)((uint8_t*) &mask)[2] << 8) | ((uint32_t)((uint8_t*) &mask)[3] << 0);
 	}
 	else if (af == AF_INET6)
 	{
@@ -251,7 +251,7 @@ int ip_mask_create_right(int af, int bits, struct ip_addr_encap* result)
 		if (bits > 32) bits = 32;
 		/* Shifting a 32-bit value by 32 is undefined behavior. */
 		mask = (bits == 0) ? 0 : (0xffffffff >> (32 - bits));
-		result->internal_ip_data.in.s_addr = (((uint8_t*) &mask)[0] << 24) | (((uint8_t*) &mask)[1] << 16) | (((uint8_t*) &mask)[2] << 8) | (((uint8_t*) &mask)[3] << 0);
+		result->internal_ip_data.in.s_addr = ((uint32_t)((uint8_t*) &mask)[0] << 24) | ((uint32_t)((uint8_t*) &mask)[1] << 16) | ((uint32_t)((uint8_t*) &mask)[2] << 8) | ((uint32_t)((uint8_t*) &mask)[3] << 0);
 
 	}
 	else if (af == AF_INET6)
@@ -305,22 +305,22 @@ void ip_mask_apply_AND(struct ip_addr_encap* addr, struct ip_addr_encap* mask, s
 		{
 			offset = n * 4;
 
-			A =	(((uint8_t*) &addr->internal_ip_data.in6)[offset+0] << 24) |
-				(((uint8_t*) &addr->internal_ip_data.in6)[offset+1] << 16) |
-				(((uint8_t*) &addr->internal_ip_data.in6)[offset+2] <<  8) |
-				(((uint8_t*) &addr->internal_ip_data.in6)[offset+3] <<  0);
+			A =	((uint32_t)((uint8_t*) &addr->internal_ip_data.in6)[offset+0] << 24) |
+				((uint32_t)((uint8_t*) &addr->internal_ip_data.in6)[offset+1] << 16) |
+				((uint32_t)((uint8_t*) &addr->internal_ip_data.in6)[offset+2] <<  8) |
+				((uint32_t)((uint8_t*) &addr->internal_ip_data.in6)[offset+3] <<  0);
 
-			B =	(((uint8_t*) &mask->internal_ip_data.in6)[offset+0] << 24) |
-				(((uint8_t*) &mask->internal_ip_data.in6)[offset+1] << 16) |
-				(((uint8_t*) &mask->internal_ip_data.in6)[offset+2] <<  8) |
-				(((uint8_t*) &mask->internal_ip_data.in6)[offset+3] <<  0);
+			B =	((uint32_t)((uint8_t*) &mask->internal_ip_data.in6)[offset+0] << 24) |
+				((uint32_t)((uint8_t*) &mask->internal_ip_data.in6)[offset+1] << 16) |
+				((uint32_t)((uint8_t*) &mask->internal_ip_data.in6)[offset+2] <<  8) |
+				((uint32_t)((uint8_t*) &mask->internal_ip_data.in6)[offset+3] <<  0);
 
 			C = A & B;
 
-			D =	(((uint8_t*) &C)[0] << 24) |
-				(((uint8_t*) &C)[1] << 16) |
-				(((uint8_t*) &C)[2] <<  8) |
-				(((uint8_t*) &C)[3] <<  0);
+			D =	((uint32_t)((uint8_t*) &C)[0] << 24) |
+				((uint32_t)((uint8_t*) &C)[1] << 16) |
+				((uint32_t)((uint8_t*) &C)[2] <<  8) |
+				((uint32_t)((uint8_t*) &C)[3] <<  0);
 			((uint32_t*) &result->internal_ip_data.in6)[n] = D;
 		}
 	}
@@ -345,22 +345,22 @@ void ip_mask_apply_OR(struct ip_addr_encap* addr, struct ip_addr_encap* mask, st
 		{
 			offset = n * 4;
 
-			A =	(((uint8_t*) &addr->internal_ip_data.in6)[offset+0] << 24) |
-				(((uint8_t*) &addr->internal_ip_data.in6)[offset+1] << 16) |
-				(((uint8_t*) &addr->internal_ip_data.in6)[offset+2] <<  8) |
-				(((uint8_t*) &addr->internal_ip_data.in6)[offset+3] <<  0);
+			A =	((uint32_t)((uint8_t*) &addr->internal_ip_data.in6)[offset+0] << 24) |
+				((uint32_t)((uint8_t*) &addr->internal_ip_data.in6)[offset+1] << 16) |
+				((uint32_t)((uint8_t*) &addr->internal_ip_data.in6)[offset+2] <<  8) |
+				((uint32_t)((uint8_t*) &addr->internal_ip_data.in6)[offset+3] <<  0);
 
-			B =	(((uint8_t*) &mask->internal_ip_data.in6)[offset+0] << 24) |
-				(((uint8_t*) &mask->internal_ip_data.in6)[offset+1] << 16) |
-				(((uint8_t*) &mask->internal_ip_data.in6)[offset+2] <<  8) |
-				(((uint8_t*) &mask->internal_ip_data.in6)[offset+3] <<  0);
+			B =	((uint32_t)((uint8_t*) &mask->internal_ip_data.in6)[offset+0] << 24) |
+				((uint32_t)((uint8_t*) &mask->internal_ip_data.in6)[offset+1] << 16) |
+				((uint32_t)((uint8_t*) &mask->internal_ip_data.in6)[offset+2] <<  8) |
+				((uint32_t)((uint8_t*) &mask->internal_ip_data.in6)[offset+3] <<  0);
 
 			C = A | B;
 
-			D =	(((uint8_t*) &C)[0] << 24) |
-				(((uint8_t*) &C)[1] << 16) |
-				(((uint8_t*) &C)[2] <<  8) |
-				(((uint8_t*) &C)[3] <<  0);
+			D =	((uint32_t)((uint8_t*) &C)[0] << 24) |
+				((uint32_t)((uint8_t*) &C)[1] << 16) |
+				((uint32_t)((uint8_t*) &C)[2] <<  8) |
+				((uint32_t)((uint8_t*) &C)[3] <<  0);
 			((uint32_t*) &result->internal_ip_data.in6)[n] = D;
 		}
 	}
@@ -374,15 +374,15 @@ int ip_compare(struct ip_addr_encap* a, struct ip_addr_encap* b)
 
 	if (a->af == AF_INET)
 	{
-		A =	(((uint8_t*) &a->internal_ip_data.in.s_addr)[0] << 24) |
-			(((uint8_t*) &a->internal_ip_data.in.s_addr)[1] << 16) |
-			(((uint8_t*) &a->internal_ip_data.in.s_addr)[2] <<  8) |
-			(((uint8_t*) &a->internal_ip_data.in.s_addr)[3] <<  0);
+		A =	((uint32_t)((uint8_t*) &a->internal_ip_data.in.s_addr)[0] << 24) |
+			((uint32_t)((uint8_t*) &a->internal_ip_data.in.s_addr)[1] << 16) |
+			((uint32_t)((uint8_t*) &a->internal_ip_data.in.s_addr)[2] <<  8) |
+			((uint32_t)((uint8_t*) &a->internal_ip_data.in.s_addr)[3] <<  0);
 
-		B =	(((uint8_t*) &b->internal_ip_data.in.s_addr)[0] << 24) |
-			(((uint8_t*) &b->internal_ip_data.in.s_addr)[1] << 16) |
-			(((uint8_t*) &b->internal_ip_data.in.s_addr)[2] <<  8) |
-			(((uint8_t*) &b->internal_ip_data.in.s_addr)[3] <<  0);
+		B =	((uint32_t)((uint8_t*) &b->internal_ip_data.in.s_addr)[0] << 24) |
+			((uint32_t)((uint8_t*) &b->internal_ip_data.in.s_addr)[1] << 16) |
+			((uint32_t)((uint8_t*) &b->internal_ip_data.in.s_addr)[2] <<  8) |
+			((uint32_t)((uint8_t*) &b->internal_ip_data.in.s_addr)[3] <<  0);
 		ret = (A < B) ? -1 : (A > B) ? 1 : 0;
 	}
 	else if (a->af == AF_INET6)
@@ -392,15 +392,15 @@ int ip_compare(struct ip_addr_encap* a, struct ip_addr_encap* b)
 		for (n = 0; n < 4; n++)
 		{
 			offset = n * 4;
-			A =	(((uint8_t*) &a->internal_ip_data.in6)[offset+0] << 24) |
-				(((uint8_t*) &a->internal_ip_data.in6)[offset+1] << 16) |
-				(((uint8_t*) &a->internal_ip_data.in6)[offset+2] <<  8) |
-				(((uint8_t*) &a->internal_ip_data.in6)[offset+3] <<  0);
+			A =	((uint32_t)((uint8_t*) &a->internal_ip_data.in6)[offset+0] << 24) |
+				((uint32_t)((uint8_t*) &a->internal_ip_data.in6)[offset+1] << 16) |
+				((uint32_t)((uint8_t*) &a->internal_ip_data.in6)[offset+2] <<  8) |
+				((uint32_t)((uint8_t*) &a->internal_ip_data.in6)[offset+3] <<  0);
 
-			B =	(((uint8_t*) &b->internal_ip_data.in6)[offset+0] << 24) |
-				(((uint8_t*) &b->internal_ip_data.in6)[offset+1] << 16) |
-				(((uint8_t*) &b->internal_ip_data.in6)[offset+2] <<  8) |
-				(((uint8_t*) &b->internal_ip_data.in6)[offset+3] <<  0);
+			B =	((uint32_t)((uint8_t*) &b->internal_ip_data.in6)[offset+0] << 24) |
+				((uint32_t)((uint8_t*) &b->internal_ip_data.in6)[offset+1] << 16) |
+				((uint32_t)((uint8_t*) &b->internal_ip_data.in6)[offset+2] <<  8) |
+				((uint32_t)((uint8_t*) &b->internal_ip_data.in6)[offset+3] <<  0);
 
 			if (A == B) continue;
 
