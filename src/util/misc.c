@@ -296,25 +296,34 @@ int file_read_lines(const char* file, void* data, file_line_handler_t handler)
 
 
 int uhub_atoi(const char* value) {
-	int len = strlen(value);
-	int offset = 0;
-	int val = 0;
-	int i = 0;
-	for (; i < len; i++)
-		if (value[i] > '9' || value[i] < '0')
-			offset++;
+	int neg = (value[0] == '-');
+	const char* p = value + (neg ? 1 : 0);
+	int64_t val = 0;
 
-	for (i = offset; i< len; i++)
-		val = val*10 + (value[i] - '0');
+	/* Parse an optional leading sign followed by decimal digits, stopping at
+	 * the first non-digit. Accumulate in a wide type and saturate so a long
+	 * digit run never overflows a signed int (undefined behaviour). */
+	for (; *p >= '0' && *p <= '9'; p++)
+	{
+		val = val * 10 + (*p - '0');
+		if (val > (int64_t) INT_MAX + 1)
+		{
+			val = (int64_t) INT_MAX + 1;
+			break;
+		}
+	}
 
-	return value[0] == '-' ? -val : val;
+	val = neg ? -val : val;
+	if (val > INT_MAX) val = INT_MAX;
+	if (val < INT_MIN) val = INT_MIN;
+	return (int) val;
 }
 
 int is_number(const char* value, int* num)
 {
 	int len = strlen(value);
 	int offset = (value[0] == '-') ? 1 : 0;
-	int val = 0;
+	int64_t val = 0;
 	int i = offset;
 
 	if (!*(value + offset))
@@ -325,8 +334,20 @@ int is_number(const char* value, int* num)
 			return 0;
 
 	for (i = offset; i< len; i++)
-		val = val*10 + (value[i] - '0');
-	*num = value[0] == '-' ? -val : val;
+	{
+		val = val * 10 + (value[i] - '0');
+		/* Reject values that do not fit in an int rather than overflowing
+		 * (signed overflow is undefined behaviour). The +1 leaves room for
+		 * INT_MIN's magnitude before the sign is applied below. */
+		if (val > (int64_t) INT_MAX + 1)
+			return 0;
+	}
+
+	val = (value[0] == '-') ? -val : val;
+	if (val < INT_MIN || val > INT_MAX)
+		return 0;
+
+	*num = (int) val;
 
 	return 1;
 }

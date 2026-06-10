@@ -36,6 +36,10 @@ int ip_is_valid_ipv4(const char* address)
 			n++;
 			o *= 10;
 			o += (address[i] - '0');
+			/* Reject as soon as the octet is out of range; this also keeps
+			 * 'o' bounded so the multiply above cannot overflow an int. */
+			if (n > 3 || o > 255)
+				return 0;
 		}
 		else if (address[i] == '.')
 		{
