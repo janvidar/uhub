@@ -207,11 +207,16 @@ EXO_TEST(adc_message_terminate_empty, {
  * not in {U,C,I,H,B,F,D,E}. Helpers used to forward that -1 straight
  * into &cmd->cache[arg_offset], reading one or two bytes before the
  * heap allocation. Construct a message with prefix 'Z' (FOURCC
- * 0x5A000000) so adc_msg_get_arg_offset returns -1, and verify that
- * each helper returns cleanly without OOB-reading.
+ * 0x5A5A5A5A, "ZZZZ") so adc_msg_get_arg_offset returns -1, and verify
+ * that each helper returns cleanly without OOB-reading.
+ *
+ * NOTE: all four FOURCC bytes are 'Z' on purpose. A FOURCC with trailing
+ * zero bytes (e.g. 0x5A000000) would embed NULs in the cache, making
+ * length != strlen(cache) and tripping ADC_MSG_ASSERT in debug builds -
+ * a state the parser never produces, so it would only be a test artifact.
  */
 EXO_TEST(adc_message_unknown_prefix_has_named, {
-        struct adc_message* msg = adc_msg_construct(0x5A000000, 8);
+        struct adc_message* msg = adc_msg_construct(0x5A5A5A5A, 8);
         int ok;
         if (!msg) return 0;
         ok = adc_msg_has_named_argument(msg, "NI") == 0;
@@ -220,7 +225,7 @@ EXO_TEST(adc_message_unknown_prefix_has_named, {
 });
 
 EXO_TEST(adc_message_unknown_prefix_get_named, {
-        struct adc_message* msg = adc_msg_construct(0x5A000000, 8);
+        struct adc_message* msg = adc_msg_construct(0x5A5A5A5A, 8);
         char* arg;
         if (!msg) return 0;
         arg = adc_msg_get_named_argument(msg, "NI");
@@ -230,7 +235,7 @@ EXO_TEST(adc_message_unknown_prefix_get_named, {
 });
 
 EXO_TEST(adc_message_unknown_prefix_remove_named, {
-        struct adc_message* msg = adc_msg_construct(0x5A000000, 8);
+        struct adc_message* msg = adc_msg_construct(0x5A5A5A5A, 8);
         int ok;
         if (!msg) return 0;
         ok = adc_msg_remove_named_argument(msg, "NI") == 0;
@@ -239,7 +244,7 @@ EXO_TEST(adc_message_unknown_prefix_remove_named, {
 });
 
 EXO_TEST(adc_message_unknown_prefix_get_argument, {
-        struct adc_message* msg = adc_msg_construct(0x5A000000, 8);
+        struct adc_message* msg = adc_msg_construct(0x5A5A5A5A, 8);
         char* arg;
         if (!msg) return 0;
         arg = adc_msg_get_argument(msg, 0);
