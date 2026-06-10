@@ -26,7 +26,7 @@
  * out-of-bounds reads and OOM-state leaks, so it is the single most
  * valuable thing to fuzz continuously.
  *
- * Build with:  cmake -B build-fuzz -DFUZZING=ON -DSSL_SUPPORT=OFF .  (clang)
+ * Build with:  cmake -B build-fuzz -DFUZZING=ON .  (clang)
  * Run with:    ./build-fuzz/fuzz_message autotest/fuzz/corpus
  *
  * This harness exercises both the parser and the accessor / mutator

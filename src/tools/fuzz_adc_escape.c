@@ -31,7 +31,7 @@
  * unescaping the result must reproduce the original exactly. A violation is a
  * real correctness bug, so it aborts (and fails the fuzz run).
  *
- * Build with:  cmake -B build-fuzz -DFUZZING=ON -DSSL_SUPPORT=OFF .  (clang)
+ * Build with:  cmake -B build-fuzz -DFUZZING=ON .  (clang)
  * Run with:    ./build-fuzz/fuzz_adc_escape autotest/fuzz/corpus/adc_escape
  */
 

@@ -32,7 +32,7 @@
  * converter, then exercises the downstream address operations (compare,
  * range-membership, to-string) on whatever parsed successfully.
  *
- * Build with:  cmake -B build-fuzz -DFUZZING=ON -DSSL_SUPPORT=OFF .  (clang)
+ * Build with:  cmake -B build-fuzz -DFUZZING=ON .  (clang)
  * Run with:    ./build-fuzz/fuzz_ipcalc autotest/fuzz/corpus/ipcalc
  */
 

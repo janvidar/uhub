@@ -90,7 +90,6 @@ const Ctx = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     cflags: []const []const u8,
-    ssl: bool,
     systemd: bool,
     common: *std.Build.Step.Compile,
     version_h: *std.Build.Step.ConfigHeader,
@@ -128,10 +127,8 @@ const Ctx = struct {
     }
 
     fn linkExternal(ctx: *const Ctx, m: *std.Build.Module) void {
-        if (ctx.ssl) {
-            m.linkSystemLibrary("ssl", .{});
-            m.linkSystemLibrary("crypto", .{});
-        }
+        m.linkSystemLibrary("ssl", .{});
+        m.linkSystemLibrary("crypto", .{});
         if (ctx.systemd) {
             m.linkSystemLibrary("systemd", .{});
         }
@@ -142,8 +139,8 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // Build options mirroring CMakeLists.txt.
-    const ssl = b.option(bool, "ssl", "Enable SSL/TLS support (OpenSSL)") orelse true;
+    // Build options mirroring CMakeLists.txt. TLS is mandatory, so there is no
+    // ssl toggle: ssl/crypto are always linked (OpenSSL or LibreSSL).
     const release = b.option(bool, "release", "Release build; disables the DEBUG define when on") orelse true;
     const systemd = b.option(bool, "systemd", "Enable systemd notify and journal logging") orelse false;
     const adc_stress = b.option(bool, "adc-stress", "Build the adcrush stress-tester client") orelse false;
@@ -154,7 +151,7 @@ pub fn build(b: *std.Build) void {
     flags.appendSlice(&.{ "-std=gnu23", "-pedantic", "-Wall", "-W", "-D_GNU_SOURCE" }) catch @panic("OOM");
     if (!release) flags.append("-DDEBUG") catch @panic("OOM");
     if (lowlevel_debug) flags.append("-DLOWLEVEL_DEBUG") catch @panic("OOM");
-    if (ssl) flags.appendSlice(&.{ "-DSSL_SUPPORT", "-DSSL_USE_OPENSSL" }) catch @panic("OOM");
+    flags.appendSlice(&.{ "-DSSL_SUPPORT", "-DSSL_USE_OPENSSL" }) catch @panic("OOM");
     if (systemd) flags.append("-DSYSTEMD") catch @panic("OOM");
     if (target.result.cpu.arch.endian() == .big) flags.append("-DARCH_BIGENDIAN") catch @panic("OOM");
     const cflags = flags.toOwnedSlice() catch @panic("OOM");
@@ -216,7 +213,6 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .cflags = cflags,
-        .ssl = ssl,
         .systemd = systemd,
         .common = common,
         .version_h = version_h,
