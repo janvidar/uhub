@@ -1,50 +1,56 @@
- ##
+##
 ## Makefile for uhub
 ## Copyright (C) 2007-2013, Jan Vidar Krey <janvidar@extatic.org>
  #
 
-cmake_minimum_required (VERSION 2.8.2)
+cmake_minimum_required (VERSION 3.21)
 
-project (uhub NONE)
-enable_language(C)
+project (uhub
+	VERSION 0.6.0
+	LANGUAGES C)
 
-set (UHUB_VERSION_MAJOR 0)
-set (UHUB_VERSION_MINOR 6)
-set (UHUB_VERSION_PATCH 0)
+# Build everything as C23 (gnu23 - _GNU_SOURCE and friends are still needed).
+set (CMAKE_C_STANDARD 23)
+set (CMAKE_C_STANDARD_REQUIRED ON)
+set (CMAKE_C_EXTENSIONS ON)
 
-set (PROJECT_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src")
-set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake/Modules)
+# version.h.in still refers to these by their old names.
+set (UHUB_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
+set (UHUB_VERSION_MINOR ${PROJECT_VERSION_MINOR})
+set (UHUB_VERSION_PATCH ${PROJECT_VERSION_PATCH})
+
+# Historically PROJECT_SOURCE_DIR (a built-in) was overwritten to point at
+# src/; use a dedicated variable instead of shadowing the built-in.
+set (UHUB_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
 option(RELEASE "Release build, debug build if disabled" ON)
-option(LOWLEVEL_DEBUG, "Enable low level debug messages." OFF)
+option(LOWLEVEL_DEBUG "Enable low level debug messages." OFF)
 option(SSL_SUPPORT "Enable SSL support" ON)
 option(SYSTEMD_SUPPORT "Enable systemd notify and journal logging" OFF)
 option(ADC_STRESS "Enable the stress tester client" OFF)
 option(FUZZING "Build libFuzzer fuzz targets (requires clang)" OFF)
 
 find_package(Git)
-find_package(Sqlite3)
+find_package(SQLite3 REQUIRED)
 
-include(TestBigEndian)
-include(CheckSymbolExists) 
+include(CheckSymbolExists)
 include(CheckIncludeFile)
 include(CheckTypeSize)
 
-#Some functions need this to be found
-add_definitions(-D_GNU_SOURCE)
+# Some functions need this to be found.
+add_compile_definitions(_GNU_SOURCE)
 set(CMAKE_REQUIRED_DEFINITIONS "${CMAKE_REQUIRED_DEFINITIONS} -D_GNU_SOURCE")
 
-TEST_BIG_ENDIAN(BIGENDIAN)
-if (BIGENDIAN)
-	add_definitions(-DARCH_BIGENDIAN)
+if (CMAKE_C_BYTE_ORDER STREQUAL "BIG_ENDIAN")
+	add_compile_definitions(ARCH_BIGENDIAN)
 endif()
 
 if (NOT RELEASE)
-        add_definitions(-DDEBUG)
+	add_compile_definitions(DEBUG)
 endif()
 
 if (FUZZING)
-	if (NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
+	if (NOT CMAKE_C_COMPILER_ID STREQUAL "Clang")
 		message(FATAL_ERROR "FUZZING requires clang (libFuzzer). Re-run cmake with CC=clang.")
 	endif()
 	# Instrument every translation unit (adc/util/network libs included) so
@@ -52,83 +58,76 @@ if (FUZZING)
 	# parse path, not just the harness object. The fuzz target itself adds the
 	# libFuzzer runtime at link time below.
 	set(FUZZ_SANITIZERS "address,undefined,fuzzer-no-link")
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=${FUZZ_SANITIZERS} -fno-omit-frame-pointer -g -O1")
+	string(APPEND CMAKE_C_FLAGS " -fsanitize=${FUZZ_SANITIZERS} -fno-omit-frame-pointer -g -O1")
 endif()
 
 if (SSL_SUPPORT)
-	find_package(OpenSSL)
-	if(NOT OPENSSL_FOUND)
-		message(FATAL_ERROR "OpenSSL is not found!")
-	endif()
-endif()
-
-if (NOT SQLITE3_FOUND)
-    message(FATAL_ERROR "SQLite3 is not found!")
+	find_package(OpenSSL REQUIRED)
 endif()
 
 if (SYSTEMD_SUPPORT)
-        INCLUDE(FindPkgConfig)
-        pkg_search_module(SD REQUIRED libsystemd)
+	find_package(PkgConfig REQUIRED)
+	pkg_check_modules(SD REQUIRED IMPORTED_TARGET libsystemd)
 endif()
 
 if (MSVC)
-	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+	add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 endif()
 
 check_include_file(stdint.h HAVE_STDINT_H)
 check_include_file(sys/types.h HAVE_SYS_TYPES_H)
 if (HAVE_SYS_TYPES_H)
-set (CMAKE_EXTRA_INCLUDE_FILES ${CMAKE_EXTRA_INCLUDE_FILES} "sys/types.h")
+	list(APPEND CMAKE_EXTRA_INCLUDE_FILES "sys/types.h")
 endif()
-check_type_size( ssize_t SSIZE_T )
+check_type_size(ssize_t SSIZE_T)
 check_symbol_exists(memmem string.h HAVE_MEMMEM)
 check_symbol_exists(strndup string.h HAVE_STRNDUP)
 
-include_directories("${PROJECT_SOURCE_DIR}")
+# These directories hold sources and generated headers (version.h/system.h);
+# every uhub target needs them, so keep them at directory scope.
+include_directories("${UHUB_SOURCE_DIR}")
 include_directories("${PROJECT_BINARY_DIR}")
-include_directories(${SQLITE3_INCLUDE_DIRS})
-link_directories(${SQLITE3_LIBRARY_DIRS})
 
-file (GLOB uhub_SOURCES ${PROJECT_SOURCE_DIR}/core/*.c)
+file (GLOB uhub_SOURCES CONFIGURE_DEPENDS ${UHUB_SOURCE_DIR}/core/*.c)
 list (REMOVE_ITEM uhub_SOURCES
-	${PROJECT_SOURCE_DIR}/core/gen_config.c
-	${PROJECT_SOURCE_DIR}/core/main.c
+	${UHUB_SOURCE_DIR}/core/gen_config.c
+	${UHUB_SOURCE_DIR}/core/main.c
 )
 
-file (GLOB adc_SOURCES ${PROJECT_SOURCE_DIR}/adc/*.c)
-file (GLOB network_SOURCES ${PROJECT_SOURCE_DIR}/network/*.c)
-file (GLOB utils_SOURCES ${PROJECT_SOURCE_DIR}/util/*.c)
+file (GLOB adc_SOURCES     CONFIGURE_DEPENDS ${UHUB_SOURCE_DIR}/adc/*.c)
+file (GLOB network_SOURCES CONFIGURE_DEPENDS ${UHUB_SOURCE_DIR}/network/*.c)
+file (GLOB utils_SOURCES   CONFIGURE_DEPENDS ${UHUB_SOURCE_DIR}/util/*.c)
 
 set (adcclient_SOURCES
-	${PROJECT_SOURCE_DIR}/tools/adcclient.c
-	${PROJECT_SOURCE_DIR}/core/ioqueue.c
+	${UHUB_SOURCE_DIR}/tools/adcclient.c
+	${UHUB_SOURCE_DIR}/core/ioqueue.c
 )
 
 add_library(adc       STATIC ${adc_SOURCES})
 add_library(network   STATIC ${network_SOURCES})
 add_library(utils     STATIC ${utils_SOURCES})
-if ("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
-	set_target_properties(utils PROPERTIES COMPILE_FLAGS -fPIC)
-	set_target_properties(network PROPERTIES COMPILE_FLAGS -fPIC)
-endif()
+
+# utils and network are linked into the loadable mod_*.so plugins, so they
+# need position-independent code.
+set_target_properties(utils network PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 add_dependencies(adc utils)
 add_dependencies(network utils)
 
-add_executable(uhub ${PROJECT_SOURCE_DIR}/core/main.c ${uhub_SOURCES} )
-add_executable(autotest-bin ${CMAKE_SOURCE_DIR}/autotest/test.c ${uhub_SOURCES} )
-add_executable(uhub-passwd ${PROJECT_SOURCE_DIR}/tools/uhub-passwd.c)
+add_executable(uhub ${UHUB_SOURCE_DIR}/core/main.c ${uhub_SOURCES})
+add_executable(autotest-bin ${CMAKE_CURRENT_SOURCE_DIR}/autotest/test.c ${uhub_SOURCES})
+add_executable(uhub-passwd ${UHUB_SOURCE_DIR}/tools/uhub-passwd.c)
 
-add_library(mod_example MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_example.c)
-add_library(mod_welcome MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_welcome.c)
-add_library(mod_logging MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_logging.c ${PROJECT_SOURCE_DIR}/adc/sid.c)
-add_library(mod_auth_simple MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_auth_simple.c )
-add_library(mod_chat_history MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_chat_history.c )
-add_library(mod_chat_history_sqlite MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_chat_history_sqlite.c )
-add_library(mod_chat_only MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_chat_only.c)
-add_library(mod_topic MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_topic.c)
-add_library(mod_no_guest_downloads MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_no_guest_downloads.c)
-add_library(mod_auth_sqlite MODULE ${PROJECT_SOURCE_DIR}/plugins/mod_auth_sqlite.c)
+add_library(mod_example MODULE ${UHUB_SOURCE_DIR}/plugins/mod_example.c)
+add_library(mod_welcome MODULE ${UHUB_SOURCE_DIR}/plugins/mod_welcome.c)
+add_library(mod_logging MODULE ${UHUB_SOURCE_DIR}/plugins/mod_logging.c ${UHUB_SOURCE_DIR}/adc/sid.c)
+add_library(mod_auth_simple MODULE ${UHUB_SOURCE_DIR}/plugins/mod_auth_simple.c)
+add_library(mod_chat_history MODULE ${UHUB_SOURCE_DIR}/plugins/mod_chat_history.c)
+add_library(mod_chat_history_sqlite MODULE ${UHUB_SOURCE_DIR}/plugins/mod_chat_history_sqlite.c)
+add_library(mod_chat_only MODULE ${UHUB_SOURCE_DIR}/plugins/mod_chat_only.c)
+add_library(mod_topic MODULE ${UHUB_SOURCE_DIR}/plugins/mod_topic.c)
+add_library(mod_no_guest_downloads MODULE ${UHUB_SOURCE_DIR}/plugins/mod_no_guest_downloads.c)
+add_library(mod_auth_sqlite MODULE ${UHUB_SOURCE_DIR}/plugins/mod_auth_sqlite.c)
 
 set_target_properties(
 	mod_example
@@ -144,14 +143,14 @@ set_target_properties(
 	PROPERTIES PREFIX "")
 
 target_link_libraries(uhub ${CMAKE_DL_LIBS} adc network utils)
-target_link_libraries(uhub-passwd ${SQLITE3_LIBRARIES} utils)
+target_link_libraries(uhub-passwd SQLite::SQLite3 utils)
 target_link_libraries(autotest-bin ${CMAKE_DL_LIBS} adc network utils)
 target_link_libraries(mod_example utils)
 target_link_libraries(mod_welcome network utils)
 target_link_libraries(mod_auth_simple utils)
-target_link_libraries(mod_auth_sqlite ${SQLITE3_LIBRARIES} utils)
+target_link_libraries(mod_auth_sqlite SQLite::SQLite3 utils)
 target_link_libraries(mod_chat_history utils)
-target_link_libraries(mod_chat_history_sqlite ${SQLITE3_LIBRARIES} utils)
+target_link_libraries(mod_chat_history_sqlite SQLite::SQLite3 utils)
 target_link_libraries(mod_no_guest_downloads utils)
 target_link_libraries(mod_chat_only utils)
 target_link_libraries(mod_logging network utils)
@@ -167,20 +166,20 @@ endif()
 
 if(UNIX)
 	add_library(adcclient STATIC ${adcclient_SOURCES})
-	add_executable(uhub-admin ${PROJECT_SOURCE_DIR}/tools/admin.c)
+	add_executable(uhub-admin ${UHUB_SOURCE_DIR}/tools/admin.c)
 	target_link_libraries(uhub-admin adcclient adc network utils pthread)
 	target_link_libraries(uhub pthread)
 	target_link_libraries(autotest-bin pthread)
 
 	if (ADC_STRESS)
-		add_executable(adcrush ${PROJECT_SOURCE_DIR}/tools/adcrush.c ${adcclient_SOURCES})
+		add_executable(adcrush ${UHUB_SOURCE_DIR}/tools/adcrush.c ${adcclient_SOURCES})
 		target_link_libraries(adcrush adcclient adc network utils pthread)
 	endif()
 endif()
 
 if (NOT UHUB_REVISION AND GIT_FOUND)
 	execute_process(COMMAND ${GIT_EXECUTABLE} show -s --pretty=format:%h
-					WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+					WORKING_DIRECTORY ${UHUB_SOURCE_DIR}
 					OUTPUT_VARIABLE UHUB_REVISION_TEMP
 					OUTPUT_STRIP_TRAILING_WHITESPACE)
 	if (UHUB_REVISION_TEMP)
@@ -195,13 +194,10 @@ endif()
 set (UHUB_GIT_VERSION "${UHUB_VERSION_MAJOR}.${UHUB_VERSION_MINOR}.${UHUB_VERSION_PATCH}-${UHUB_REVISION}")
 message (STATUS "Configuring uhub version: ${UHUB_GIT_VERSION}")
 
-if(OPENSSL_FOUND)
-	set(SSL_LIBS ${OPENSSL_LIBRARIES})
-	add_definitions(-DSSL_SUPPORT=1 -DSSL_USE_OPENSSL=1)
-	include_directories(${OPENSSL_INCLUDE_DIR})
-endif()
-
 if(SSL_SUPPORT)
+	add_compile_definitions(SSL_SUPPORT=1 SSL_USE_OPENSSL=1)
+	set(SSL_LIBS OpenSSL::SSL OpenSSL::Crypto)
+
 	target_link_libraries(uhub ${SSL_LIBS})
 	target_link_libraries(autotest-bin ${SSL_LIBS})
 	if(UNIX)
@@ -215,12 +211,11 @@ if(SSL_SUPPORT)
 endif()
 
 if (SYSTEMD_SUPPORT)
-        target_link_libraries(uhub ${SD_LIBRARIES})
-        target_link_libraries(autotest-bin ${SD_LIBRARIES})
-        target_link_libraries(uhub-passwd ${SD_LIBRARIES})
-        target_link_libraries(uhub-admin ${SD_LIBRARIES})
-        include_directories(${SD_INCLUDE_DIRS})
-        add_definitions(-DSYSTEMD)
+	target_link_libraries(uhub PkgConfig::SD)
+	target_link_libraries(autotest-bin PkgConfig::SD)
+	target_link_libraries(uhub-passwd PkgConfig::SD)
+	target_link_libraries(uhub-admin PkgConfig::SD)
+	add_compile_definitions(SYSTEMD)
 endif()
 
 if (FUZZING)
@@ -241,35 +236,24 @@ if (FUZZING)
 			LINK_FLAGS "-fsanitize=address,undefined,fuzzer")
 	endmacro()
 
-	add_fuzzer(fuzz_message      ${PROJECT_SOURCE_DIR}/tools/fuzz_message.c)
-	add_fuzzer(fuzz_adc_escape   ${PROJECT_SOURCE_DIR}/tools/fuzz_adc_escape.c)
-	add_fuzzer(fuzz_ipcalc       ${PROJECT_SOURCE_DIR}/tools/fuzz_ipcalc.c)
-	add_fuzzer(fuzz_config_token ${PROJECT_SOURCE_DIR}/tools/fuzz_config_token.c)
+	add_fuzzer(fuzz_message      ${UHUB_SOURCE_DIR}/tools/fuzz_message.c)
+	add_fuzzer(fuzz_adc_escape   ${UHUB_SOURCE_DIR}/tools/fuzz_adc_escape.c)
+	add_fuzzer(fuzz_ipcalc       ${UHUB_SOURCE_DIR}/tools/fuzz_ipcalc.c)
+	add_fuzzer(fuzz_config_token ${UHUB_SOURCE_DIR}/tools/fuzz_config_token.c)
 	# command_parse() lives in the hub core, so compile the core objects in
 	# (same source set as autotest-bin, minus main.c / gen_config.c).
-	add_fuzzer(fuzz_command_parser ${PROJECT_SOURCE_DIR}/tools/fuzz_command_parser.c ${uhub_SOURCES})
+	add_fuzzer(fuzz_command_parser ${UHUB_SOURCE_DIR}/tools/fuzz_command_parser.c ${uhub_SOURCES})
 endif()
 
-configure_file ("${PROJECT_SOURCE_DIR}/version.h.in" "${PROJECT_BINARY_DIR}/version.h")
-configure_file ("${PROJECT_SOURCE_DIR}/system.h.in" "${PROJECT_BINARY_DIR}/system.h")
-
-# mark_as_advanced(FORCE CMAKE_BUILD_TYPE)
-# if (RELEASE)
-#	set(CMAKE_BUILD_TYPE Release)
-#	add_definitions(-DNDEBUG)
-#else()
-#	set(CMAKE_BUILD_TYPE Debug)
-#	add_definitions(-DDEBUG)
-#endif()
+configure_file ("${UHUB_SOURCE_DIR}/version.h.in" "${PROJECT_BINARY_DIR}/version.h")
+configure_file ("${UHUB_SOURCE_DIR}/system.h.in" "${PROJECT_BINARY_DIR}/system.h")
 
 if (LOWLEVEL_DEBUG)
-	add_definitions(-DLOWLEVEL_DEBUG)
+	add_compile_definitions(LOWLEVEL_DEBUG)
 endif()
 
 if (UNIX)
 	install( TARGETS uhub uhub-passwd RUNTIME DESTINATION bin )
 	install( TARGETS mod_example mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_chat_history mod_chat_history_sqlite mod_chat_only mod_topic mod_no_guest_downloads DESTINATION /usr/lib/uhub/ OPTIONAL )
-	install( FILES ${CMAKE_SOURCE_DIR}/doc/uhub.conf ${CMAKE_SOURCE_DIR}/doc/plugins.conf ${CMAKE_SOURCE_DIR}/doc/rules.txt ${CMAKE_SOURCE_DIR}/doc/motd.txt DESTINATION /etc/uhub OPTIONAL )
+	install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub.conf ${CMAKE_CURRENT_SOURCE_DIR}/doc/plugins.conf ${CMAKE_CURRENT_SOURCE_DIR}/doc/rules.txt ${CMAKE_CURRENT_SOURCE_DIR}/doc/motd.txt DESTINATION /etc/uhub OPTIONAL )
 endif()
-
-
