@@ -825,10 +825,11 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 	if (split == 0 || strlen(split) < 2 || strlen(split) > 6)
 		return 0;
 
-	/* Ensure port number is valid */
-	client->address.port = strtol(split+1, NULL, 10);
-	if (client->address.port <= 0 || client->address.port > 65535)
+	/* Ensure port number is valid (validate before narrowing to uint16_t). */
+	long port = strtol(split+1, NULL, 10);
+	if (port <= 0 || port > 65535)
 		return 0;
+	client->address.port = (uint16_t) port;
 
 	client->address.hostname = strndup(hub_address, &split[0] - &hub_address[0]);
 
