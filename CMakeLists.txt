@@ -76,10 +76,20 @@ if (EXISTS "${OPENSSL_INCLUDE_DIR}/openssl/opensslv.h")
 		set(LIBRESSL_VERSION "${CMAKE_MATCH_1}")
 	endif()
 endif()
+# uhub requires OpenSSL >= 3.0 or the contemporaneous LibreSSL >= 3.4 (both ship
+# the opaque-struct API and TLS 1.3 unconditionally). Fail early at configure
+# time; openssl.c also enforces this with a compile-time #error.
 if (LIBRESSL_VERSION)
 	message(STATUS "TLS provider: ${LIBRESSL_VERSION}")
+	string(REGEX MATCH "[0-9]+\\.[0-9]+\\.[0-9]+" _libressl_ver "${LIBRESSL_VERSION}")
+	if (_libressl_ver AND _libressl_ver VERSION_LESS 3.4.0)
+		message(FATAL_ERROR "uhub requires LibreSSL >= 3.4.0 (found ${_libressl_ver})")
+	endif()
 else()
 	message(STATUS "TLS provider: OpenSSL ${OPENSSL_VERSION}")
+	if (OPENSSL_VERSION AND OPENSSL_VERSION VERSION_LESS 3.0.0)
+		message(FATAL_ERROR "uhub requires OpenSSL >= 3.0.0 (found ${OPENSSL_VERSION})")
+	endif()
 endif()
 
 if (SYSTEMD_SUPPORT)

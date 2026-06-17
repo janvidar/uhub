@@ -467,12 +467,12 @@
 		<description><![CDATA[
 			<p>
 			This allows you to specify the minimum TLS version the hub requires from connecting clients in order to
-			connect to the hub.
+			connect to the hub. Valid values are "1.2" and "1.3".
 			</p>
 			<p>
 			TLS version 1.2 is recommended and enabled by default.
-			TLS version 1.1 is acceptable without any known flaws, and allows for older clients to connect.
-			TLS version 1.0 should be avoided, even though it is the most compatible with older ADC clients.
+			TLS version 1.3 can be required to admit only the most modern clients.
+			TLS versions below 1.2 are deprecated and no longer supported.
 			</p>
 		]]></description>
 		<since>0.5.0</since>

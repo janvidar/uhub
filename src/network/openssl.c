@@ -23,12 +23,19 @@
 #include "network/backend.h"
 
 /*
- * uhub targets the modern (opaque-struct) OpenSSL API. OpenSSL 1.0.2 and older
- * have been end-of-life since 2019. LibreSSL satisfies this via its own 2.x
- * version number and implements the same API surface.
+ * uhub targets OpenSSL >= 3.0 (released 2021) or the contemporaneous
+ * LibreSSL >= 3.4. Both ship the opaque-struct API and TLS 1.3 unconditionally,
+ * so the code below needs no version shims: TLS1_3_VERSION, the
+ * SSL_CTX_set_min_proto_version() interface and SSL_OP_NO_COMPRESSION are always
+ * available. LibreSSL reports its own LIBRESSL_VERSION_NUMBER (and masquerades
+ * as OpenSSL 2.0.0 via OPENSSL_VERSION_NUMBER), so it is checked separately.
  */
-#if !defined(LIBRESSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER < 0x10100000L
-#error "uhub requires OpenSSL >= 1.1.0 or LibreSSL"
+#if defined(LIBRESSL_VERSION_NUMBER)
+#  if LIBRESSL_VERSION_NUMBER < 0x3040000fL
+#    error "uhub requires LibreSSL >= 3.4.0"
+#  endif
+#elif OPENSSL_VERSION_NUMBER < 0x30000000L
+#  error "uhub requires OpenSSL >= 3.0.0 or LibreSSL >= 3.4.0"
 #endif
 
 void net_stats_add_tx(size_t bytes);
@@ -130,15 +137,14 @@ static void add_io_stats(struct net_ssl_openssl* handle)
 }
 
 /*
- * Map the configured tls_version string ("1.0".."1.3") to the matching minimum
- * protocol-version constant. Used with a single TLS_method() context plus
+ * Map the configured tls_version string to the matching minimum protocol-version
+ * constant. Used with a single TLS_method() context plus
  * SSL_CTX_set_min_proto_version(), which is the modern replacement for selecting
  * a per-version SSL_METHOD and juggling SSL_OP_NO_TLSv1* flags. Returns -1 on an
- * unrecognised or unsupported version.
+ * unrecognised version.
  *
- * TLS1_3_VERSION is only defined by OpenSSL >= 1.1.1 and LibreSSL >= 3.2; on
- * older libraries "1.3" is rejected here rather than silently negotiating a
- * lower version.
+ * Only "1.2" and "1.3" are accepted: TLS 1.0/1.1 are deprecated and no longer
+ * offered as a configurable floor.
  */
 static int tls_version_to_min_proto(const char* tls_version)
 {
@@ -148,23 +154,12 @@ static int tls_version_to_min_proto(const char* tls_version)
 		return -1;
 	}
 
-	if (!strcmp(tls_version, "1.0"))
-		return TLS1_VERSION;
-	if (!strcmp(tls_version, "1.1"))
-		return TLS1_1_VERSION;
 	if (!strcmp(tls_version, "1.2"))
 		return TLS1_2_VERSION;
 	if (!strcmp(tls_version, "1.3"))
-	{
-#ifdef TLS1_3_VERSION
 		return TLS1_3_VERSION;
-#else
-		LOG_ERROR("TLS 1.3 is not supported by this TLS library");
-		return -1;
-#endif
-	}
 
-	LOG_ERROR("Unable to recognize tls_version: %s", tls_version);
+	LOG_ERROR("Unsupported tls_version: %s (must be \"1.2\" or \"1.3\")", tls_version);
 	return -1;
 }
 
@@ -233,11 +228,9 @@ struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const
 
 	SSL_CTX_set_quiet_shutdown(ctx->ssl, 1);
 
-#ifdef SSL_OP_NO_COMPRESSION
-	/* Disable compression */
-	LOG_TRACE("Disabling SSL compression."); /* "CRIME" attack */
+	/* Disable compression to mitigate the CRIME attack. */
+	LOG_TRACE("Disabling SSL compression.");
 	flags |= SSL_OP_NO_COMPRESSION;
-#endif
 
 	SSL_CTX_set_options(ctx->ssl, flags);
 
