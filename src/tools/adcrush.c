@@ -356,7 +356,13 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 			break;
 
 		case ADC_CLIENT_LOGIN_ERROR:
-			bot_output(client, LVL_DEBUG, "*** Login error");
+			if (data && data->status)
+				bot_output(client, LVL_DEBUG, "*** Login error %03d: %s", data->status->code, data->status->message ? data->status->message : "");
+			else
+				bot_output(client, LVL_DEBUG, "*** Login error");
+			break;
+
+		case ADC_CLIENT_PROTOCOL_STATUS:
 			break;
 
 		case ADC_CLIENT_SSL_HANDSHAKE:

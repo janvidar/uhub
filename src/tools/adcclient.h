@@ -101,6 +101,13 @@ struct ADC_client_tls_info
 	const char* version;
 };
 
+struct ADC_client_status
+{
+	int code;       /* full 3-digit ADC status code */
+	int severity;   /* 0 = success, 1 = recoverable, 2 = fatal */
+	char* message;
+};
+
 struct ADC_client_callback_data
 {
 	union {
@@ -109,6 +116,7 @@ struct ADC_client_callback_data
 		struct ADC_user* user;
 		struct ADC_client_quit_reason* quit;
 		struct ADC_client_tls_info* tls_info;
+		struct ADC_client_status* status;
 	};
 };
 
