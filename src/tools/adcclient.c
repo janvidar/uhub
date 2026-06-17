@@ -142,15 +142,17 @@ static void ADC_client_set_state(struct ADC_client* client, enum ADC_client_stat
 static void adc_cid_pid(struct ADC_client* client)
 {
 	ADC_TRACE;
+	static uint32_t counter = 0;
 	char seed[64];
 	char pid[64];
 	char cid[64];
 	uint64_t tiger_res1[3];
 	uint64_t tiger_res2[3];
 
-	/* create cid+pid pair */
+	/* create cid+pid pair; mix in pid, time and a per-instance counter so
+	 * the identity is not a predictable function of the heap pointer alone. */
 	memset(seed, 0, 64);
-	snprintf(seed, 64, VERSION "%p", client);
+	snprintf(seed, 64, VERSION "%p%d%ld%u", client, (int) getpid(), (long) time(NULL), ++counter);
 
 	tiger((uint64_t*) seed, strlen(seed), tiger_res1);
 	base32_encode((unsigned char*) tiger_res1, TIGERSIZE, pid);
