@@ -180,13 +180,8 @@ int uman_send_user_list(struct hub_info* hub, struct hub_user_manager* users, st
 		}
 	});
 
-#if 0
-	FIXME: FIXME FIXME handle send queue excess
-	if (!target->send_queue_size)
-	{
-	    user_flag_unset(target, flag_user_list);
-	}
-#endif
+	/* The userlist is fully queued. */
+	user_flag_unset(target, flag_user_list);
 	return ret;
 }
 

@@ -72,8 +72,8 @@ static size_t get_max_send_queue_soft(struct hub_info* hub)
 
 /*
  * @return 1 if send queue is OK.
- *         -1 if send queue is overflowed
- *         0 if soft send queue is overflowed (not implemented at the moment)
+ *         -1 if the hard send queue limit is overflowed (caller disconnects the user)
+ *         0 if the soft send queue limit is overflowed (message still queued, user choked)
  */
 static int check_send_queue(struct hub_info* hub, struct hub_user* user, struct adc_message* msg)
 {
@@ -83,7 +83,7 @@ static int check_send_queue(struct hub_info* hub, struct hub_user* user, struct 
 	if ((user->send_queue->size + msg->length) > get_max_send_queue(hub))
 	{
 		user_flag_set(user, flag_choke);
-		LOG_WARN("send queue overflowed, message discarded.");
+		LOG_WARN("send queue overflowed, disconnecting user.");
 		return -1;
 	}
 
@@ -124,6 +124,11 @@ int route_to_user(struct hub_info* hub, struct hub_user* user, struct adc_messag
 			ioq_send_add(user->send_queue, msg);
 			if (!user_flag_get(user, flag_pipeline))
 				user_net_io_want_write(user);
+		}
+		else
+		{
+			/* Hard send-queue overflow: the client is not keeping up. */
+			hub_disconnect_user(hub, user, quit_send_queue);
 		}
 	}
 	return 1;

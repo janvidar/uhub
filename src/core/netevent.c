@@ -123,6 +123,8 @@ int handle_net_write(struct hub_user* user)
 	}
 	else
 	{
+		/* The send queue drained */
+		user_flag_unset(user, flag_choke);
 		user_net_io_want_read(user);
 	}
 	return 0;
