@@ -164,10 +164,12 @@ struct net_connect_handle
 	const struct net_dns_result* result;
 	struct net_connect_job* job4;
 	struct net_connect_job* job6;
+	enum net_connect_status last_error;
 };
 
 static void net_connect_callback(struct net_connect_handle* handle, enum net_connect_status status, struct net_connection* con);
 static void net_connect_job_internal_cb(struct net_connection* con, int event, void* ptr);
+static int net_connect_process_queue(struct net_connect_handle* handle, struct net_connect_job* job);
 
 /**
  * Check if a connection job is completed.
@@ -207,7 +209,12 @@ static int net_connect_job_check(struct net_connect_job* job)
 			status = net_connect_status_socket_error;
 	}
 
-	net_connect_callback(job->handle, status, NULL);
+	/*
+	 * This address failed. Record the reason but do not invoke the terminal
+	 * callback here: the caller will try the next address and only report
+	 * failure once every address has been exhausted.
+	 */
+	job->handle->last_error = status;
 	return -1;
 }
 
@@ -248,13 +255,13 @@ static int net_connect_job_process(struct net_connect_job* job)
 		if (sd == -1)
 		{
 			LOG_DEBUG("net_connect_job_process: Unable to create socket!");
-			net_connect_callback(job->handle, net_connect_status_socket_error, NULL);
-			return -1; // FIXME
+			job->handle->last_error = net_connect_status_socket_error;
+			return -1;
 		}
 
 		job->con = 	net_con_create();
 		net_con_initialize(job->con, sd, net_connect_job_internal_cb, job, NET_EVENT_WRITE);
-		net_con_set_timeout(job->con, TIMEOUT_CONNECTED); // FIXME: Use a proper timeout value!
+		net_con_set_timeout(job->con, TIMEOUT_CONNECTED);
 	}
 
 	return net_connect_job_check(job);
@@ -262,48 +269,53 @@ static int net_connect_job_process(struct net_connect_job* job)
 
 
 /*
+ * Drop a connect job that has failed (timed out or errored) and try the next
+ * address of the same family. If no connection attempt remains in either
+ * family, report the connect failure to the caller (using the last recorded
+ * error).
+ *
+ * @return 1 if a connection succeeded synchronously (the handle has been
+ *         destroyed and must not be touched), 0 otherwise.
+ */
+static int net_connect_failover(struct net_connect_handle* handle, struct net_connect_job* job)
+{
+	struct net_connect_job* next_job = job->next;
+
+	/* Frees job and advances the family list head to next_job. */
+	net_connect_job_stop(job);
+
+	if (next_job && net_connect_process_queue(handle, next_job) == 1)
+		return 1; /* connected - handle destroyed */
+
+	if (net_connect_depleted(handle))
+	{
+		LOG_TRACE("No more addresses left. Unable to connect!");
+		net_connect_callback(handle, handle->last_error, NULL);
+	}
+	return 0;
+}
+
+/*
  * Internal callback used to establish an outbound connection.
  */
 static void net_connect_job_internal_cb(struct net_connection* con, int event, void* ptr)
 {
 	struct net_connect_job* job = net_con_get_ptr(con);
-	struct net_connect_job* next_job = job->next;
 	struct net_connect_handle* handle = job->handle;
 
 	if (event == NET_EVENT_TIMEOUT)
 	{
-		// FIXME: Try next address, or if no more addresses left declare failure to connect.
-		if (job->addr.ss_family == AF_INET6)
-		{
-			net_connect_job_stop(job);
-
-			if (!next_job)
-			{
-				LOG_TRACE("No more IPv6 addresses to try!");
-			}
-
-		}
-		else
-		{
-			net_connect_job_stop(job);
-
-			if (!next_job)
-			{
-				LOG_TRACE("No more IPv4 addresses to try!");
-			}
-		}
-
-		if (net_connect_depleted(handle))
-		{
-			LOG_TRACE("No more addresses left. Unable to connect!");
-			net_connect_callback(handle, net_connect_status_timeout, NULL);
-		}
+		handle->last_error = net_connect_status_timeout;
+		net_connect_failover(handle, job);
 		return;
 	}
 
 	if (event == NET_EVENT_WRITE)
 	{
-		net_connect_job_process(job);
+		int ret = net_connect_job_process(job);
+		if (ret < 0)
+			net_connect_failover(handle, job);
+		/* ret == 0: still connecting; ret == 1: connected (handle destroyed). */
 	}
 }
 
@@ -338,17 +350,22 @@ static int net_connect_process_queue(struct net_connect_handle* handle, struct n
 		ret = net_connect_job_process(job);
 		if (ret < 0)
 		{
+			/* This address failed; drop it and move on to the next one.
+			 * net_connect_job_stop() frees job, so capture the successor
+			 * first to avoid walking freed memory. */
+			struct net_connect_job* next = job->next;
 			net_connect_job_stop(job);
+			job = next;
 			continue;
 		}
 		else if (ret == 0)
 		{
-			// Need to process again
+			// Connection in progress; wait for the socket event.
 			return 0;
 		}
 		else
 		{
-			// FIXME: Success!
+			// Connected.
 			return 1;
 		}
 	}
@@ -357,13 +374,20 @@ static int net_connect_process_queue(struct net_connect_handle* handle, struct n
 
 static int net_connect_process(struct net_connect_handle* handle)
 {
-	int ret4, ret6;
-
-	ret6 = net_connect_process_queue(handle, handle->job6);
-	if (ret6 == 1)
+	if (net_connect_process_queue(handle, handle->job6) == 1)
 		return 1; // Connected - cool!
 
-	net_connect_process_queue(handle, handle->job4);
+	if (net_connect_process_queue(handle, handle->job4) == 1)
+		return 1;
+
+	// Neither family has a connection attempt left: every address failed
+	// synchronously (or there were none to try).
+	if (net_connect_depleted(handle))
+	{
+		net_connect_callback(handle, handle->last_error, NULL);
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -450,6 +474,13 @@ static int net_con_connect_dns_callback(struct net_dns_job* job, const struct ne
 		addr = net_dns_result_next(result);
 	}
 
+	if (!usable)
+	{
+		LOG_DEBUG("net_con_connect() - No usable addresses!");
+		net_connect_callback(handle, net_connect_status_no_address, NULL);
+		return 0;
+	}
+
 	net_connect_process(handle);
 
 	return 0;
@@ -465,6 +496,7 @@ struct net_connect_handle* net_con_connect(const char* address, uint16_t port, n
 	handle->port = port;
 	handle->ptr = ptr;
 	handle->callback = callback;
+	handle->last_error = net_connect_status_socket_error;
 
 	// FIXME: Check if DNS resolving is necessary ?
 	handle->dns = net_dns_gethostbyname(address, AF_UNSPEC, net_con_connect_dns_callback, handle);
