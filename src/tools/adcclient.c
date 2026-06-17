@@ -697,6 +697,7 @@ int ADC_client_connect(struct ADC_client* client, const char* address)
 	}
 
 	ADC_client_set_state(client, ps_conn);
+	client->callback(client, ADC_CLIENT_CONNECTING, 0);
 	client->connect_job = net_con_connect(client->address.hostname, client->address.port, connect_callback, client);
 	if (!client->connect_job)
 	{
