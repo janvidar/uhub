@@ -327,8 +327,11 @@ static int check_nick(struct hub_info* hub, struct hub_user* user, struct adc_me
 
 	if (user_is_connecting(user))
 	{
-		memcpy(user->id.nick, nick, strlen(nick));
-		user->id.nick[strlen(nick)] = 0;
+		size_t nick_len = strlen(nick);
+		if (nick_len >= sizeof(user->id.nick))
+			nick_len = sizeof(user->id.nick) - 1;
+		memcpy(user->id.nick, nick, nick_len);
+		user->id.nick[nick_len] = 0;
 	}
 
 	hub_free(nick);
