@@ -81,6 +81,7 @@ struct ADC_client
 	struct ADC_client_address address;
 	char* nick;
 	char* desc;
+	char* password;
 	int flags;
 	void* ptr;
 };
@@ -88,6 +89,7 @@ struct ADC_client
 
 static ssize_t ADC_client_recv(struct ADC_client* client);
 static void ADC_client_send_info(struct ADC_client* client);
+static void ADC_client_send_password(struct ADC_client* client, const char* challenge);
 static void ADC_client_on_connected(struct ADC_client* client);
 static void ADC_client_on_connected_ssl(struct ADC_client* client);
 static void ADC_client_on_disconnected(struct ADC_client* client);
@@ -273,6 +275,17 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 	switch (msg->cmd)
 	{
 		case ADC_CMD_ISUP:
+			break;
+
+		case ADC_CMD_IGPA:
+			if (client->state == ps_identify || client->state == ps_verify)
+			{
+				char* challenge = adc_msg_get_argument(msg, 0);
+				client->callback(client, ADC_CLIENT_PASSWORD_REQ, 0);
+				if (challenge)
+					ADC_client_send_password(client, challenge);
+				hub_free(challenge);
+			}
 			break;
 
 		case ADC_CMD_ISID:
@@ -542,6 +555,51 @@ void ADC_client_send_info(struct ADC_client* client)
 }
 
 
+static void ADC_client_send_password(struct ADC_client* client, const char* challenge)
+{
+	struct adc_message* hpas;
+	char buf[MAX_PASS_LEN + TIGERSIZE];
+	char raw_challenge[TIGERSIZE];
+	char response[MAX_CID_LEN + 1];
+	uint64_t tiger_res[3];
+	size_t password_len;
+
+	ADC_TRACE;
+
+	if (!client->password)
+	{
+		ADC_client_debug(client, "Password required but none configured.");
+		client->callback(client, ADC_CLIENT_LOGIN_ERROR, 0);
+		return;
+	}
+
+	/* The challenge is a base32-encoded TIGER hash (MAX_CID_LEN chars). */
+	if (strlen(challenge) != MAX_CID_LEN)
+	{
+		ADC_client_debug(client, "Malformed password challenge: \"%s\"", challenge);
+		return;
+	}
+
+	password_len = strlen(client->password);
+	if (password_len > MAX_PASS_LEN)
+		password_len = MAX_PASS_LEN;
+
+	base32_decode(challenge, (unsigned char*) raw_challenge, MAX_CID_LEN);
+
+	memcpy(&buf[0], client->password, password_len);
+	memcpy(&buf[password_len], raw_challenge, TIGERSIZE);
+
+	tiger((uint64_t*) buf, password_len + TIGERSIZE, tiger_res);
+	base32_encode((unsigned char*) tiger_res, TIGERSIZE, response);
+	response[MAX_CID_LEN] = 0;
+
+	hpas = adc_msg_construct(ADC_CMD_HPAS, MAX_CID_LEN + 8);
+	adc_msg_add_argument(hpas, response);
+	ADC_client_set_state(client, ps_verify);
+	ADC_client_send(client, hpas);
+	adc_msg_free(hpas);
+}
+
 struct ADC_client* ADC_client_create(const char* nickname, const char* description, void* ptr)
 {
 	ADC_TRACE;
@@ -577,6 +635,7 @@ void ADC_client_destroy(struct ADC_client* client)
 	adc_msg_free(client->info);
 	hub_free(client->nick);
 	hub_free(client->desc);
+	hub_free(client->password);
 	hub_free(client->address.hostname);
 	hub_free(client);
 
@@ -745,6 +804,13 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 	client->address.hostname = strndup(hub_address, &split[0] - &hub_address[0]);
 
 	return 1;
+}
+
+void ADC_client_set_password(struct ADC_client* client, const char* password)
+{
+	ADC_TRACE;
+	hub_free(client->password);
+	client->password = password ? hub_strdup(password) : NULL;
 }
 
 void ADC_client_set_callback(struct ADC_client* client, adc_client_cb cb)
