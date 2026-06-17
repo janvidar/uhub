@@ -256,17 +256,17 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 	ADC_client_debug(client, "- LINE: '%s'", line);
 #endif
 
+	if (length < 4)
+	{
+		ADC_client_debug(client, "Unexpected response from hub: '%s'", line);
+		return -1;
+	}
+
 	/* Parse message */
 	struct adc_message* msg = adc_msg_parse(line, length);
 	if (!msg)
 	{
 		ADC_client_debug(client, "WARNING: Message cannot be decoded: \"%s\"", line);
-		return -1;
-	}
-
-	if (length < 4)
-	{
-		ADC_client_debug(client, "Unexpected response from hub: '%s'", line);
 		return -1;
 	}
 
