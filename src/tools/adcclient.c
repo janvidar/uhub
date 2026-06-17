@@ -289,10 +289,15 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 		case ADC_CMD_ISID:
 			if (client->state == ps_protocol)
 			{
-				client->sid = string_to_sid(&line[5]);
-				client->callback(client, ADC_CLIENT_LOGGING_IN, 0);
-				ADC_client_set_state(client, ps_identify);
-				ADC_client_send_info(client);
+				char* sid = adc_msg_get_argument(msg, 0);
+				if (sid)
+				{
+					client->sid = string_to_sid(sid);
+					hub_free(sid);
+					client->callback(client, ADC_CLIENT_LOGGING_IN, 0);
+					ADC_client_set_state(client, ps_identify);
+					ADC_client_send_info(client);
+				}
 			}
 			break;
 
