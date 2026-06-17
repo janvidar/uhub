@@ -387,13 +387,27 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 		}
 
 		case ADC_CMD_ISTA:
-			/*
-			if (strncmp(line, "ISTA 000", 8))
+		{
+			struct ADC_client_status status;
+			char* code = adc_msg_get_argument(msg, 0);
+			memset(&status, 0, sizeof(status));
+			if (code)
 			{
-				ADC_client_debug(client, "status: '%s'\n", (start + 9));
+				status.code = (int) strtol(code, NULL, 10);
+				status.severity = status.code / 100;
+				hub_free(code);
 			}
-			*/
+			EXTRACT_POS_ARG(msg, 1, status.message);
+
+			data.status = &status;
+			if (status.severity == 2 && client->state != ps_normal)
+				client->callback(client, ADC_CLIENT_LOGIN_ERROR, &data);
+			else
+				client->callback(client, ADC_CLIENT_PROTOCOL_STATUS, &data);
+
+			hub_free(status.message);
 			break;
+		}
 
 		default:
 			break;

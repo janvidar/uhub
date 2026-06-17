@@ -124,7 +124,15 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 			break;
 
 		case ADC_CLIENT_LOGIN_ERROR:
-			status("Login error");
+			if (data && data->status)
+				printf("*** Login error %03d: %s\n", data->status->code, data->status->message ? data->status->message : "");
+			else
+				status("Login error");
+			break;
+
+		case ADC_CLIENT_PROTOCOL_STATUS:
+			if (data && data->status)
+				printf("*** Status %03d: %s\n", data->status->code, data->status->message ? data->status->message : "");
 			break;
 
 
