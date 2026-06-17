@@ -700,6 +700,8 @@ static void connect_callback(struct net_connect_handle* handle, enum net_connect
 		case net_connect_status_timeout:
 		case net_connect_status_socket_error:
 			ADC_client_disconnect(client);
+			ADC_client_set_state(client, ps_none);
+			client->callback(client, ADC_CLIENT_DISCONNECTED, 0);
 			break;
 	}
 }
