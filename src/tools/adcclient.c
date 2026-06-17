@@ -373,11 +373,21 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 		case ADC_CMD_IQUI:
 		{
 			struct ADC_client_quit_reason reason;
+			char* sid = adc_msg_get_argument(msg, 0);
+			char* initiator = adc_msg_get_named_argument(msg, ADC_QUI_FLAG_KICK_OPERATOR);
 			memset(&reason, 0, sizeof(reason));
-			reason.sid = string_to_sid(&line[5]);
+
+			if (sid)
+				reason.sid = string_to_sid(sid);
+			if (initiator)
+				reason.initator = string_to_sid(initiator);
+			EXTRACT_NAMED_ARG_X(msg, ADC_QUI_FLAG_MESSAGE, reason.message, sizeof(reason.message));
 
 			if (adc_msg_has_named_argument(msg, ADC_QUI_FLAG_DISCONNECT))
 				reason.flags |= 1;
+
+			hub_free(sid);
+			hub_free(initiator);
 
 			data.quit = &reason;
 			client->callback(client, ADC_CLIENT_USER_QUIT, &data);
