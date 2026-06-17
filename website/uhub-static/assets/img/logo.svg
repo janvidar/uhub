@@ -1,0 +1,17 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="96" height="96" version="1.1" xmlns="http://www.w3.org/2000/svg">
+	
+	<line x1="44" y1="44" x2="16" y2="64" style="stroke-width: 2; stroke: #80ff80;" /> <!-- center to down left -->
+	<circle cx="16" cy="64" r="13" fill="#00cc00" stroke-width="1" stroke="black" />   <!-- down left  -->
+	
+	
+	<line x1="44" y1="44" x2="70" y2="52" style="stroke-width: 2; stroke: #80c9ff;" /> <!-- center to down right -->
+	<circle cx="70" cy="52" r="9"  fill="#0066b3" stroke-width="1" stroke="black" /> <!-- down right -->
+	
+	
+	<line x1="44" y1="44" x2="60" y2="12" style="stroke-width: 2; stroke: #ffc080;" /> <!-- center to top -->
+	<circle cx="60" cy="12" r="7"  fill="#ff8000" stroke-width="1" stroke="black" /> <!-- center top -->
+
+	<circle cx="44" cy="44" r="11" fill="#ff0000" stroke-width="1" stroke="black" /> <!-- center -->
+</svg>

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>uhub — Architecture</title>
+	<meta name="description" content="An overview of uhub's single-threaded, event-driven architecture." />
+	<link rel="icon" href="../assets/img/favicon.ico" />
+	<link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+	<div class="container nav">
+		<a class="brand" href="../index.html">
+			<img src="../assets/img/logo.svg" alt="uhub logo" />
+			<span>uhub</span>
+			<span class="slogan">High performance ADC hub</span>
+		</a>
+		<button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+		<ul class="nav-links">
+			<li><a href="../index.html">About</a></li>
+			<li><a href="../news.html">News</a></li>
+			<li><a href="../download.html">Download</a></li>
+			<li><a href="index.html" class="active">Documentation</a></li>
+		</ul>
+	</div>
+</header>
+
+<div class="container doc-layout">
+	<aside class="doc-sidebar">
+		<h4>Users</h4>
+		<ul>
+			<li><a href="getstarted.html">Getting started</a></li>
+			<li><a href="config-example.html">Example configuration</a></li>
+			<li><a href="config.html">Configuration reference</a></li>
+			<li><a href="plugins/index.html">Plug-ins</a></li>
+			<li><a href="config-ssl.html">SSL / TLS</a></li>
+		</ul>
+		<h4>Developers</h4>
+		<ul>
+			<li><a href="developers.html">Contributors</a></li>
+			<li><a href="compile.html">Compiling</a></li>
+			<li><a href="architecture.html" class="active">Architecture</a></li>
+			<li><a href="plugin-api.html">Plug-in API</a></li>
+		</ul>
+		<h4>Resources</h4>
+		<ul>
+			<li><a href="adc.html">What is ADC?</a></li>
+			<li><a href="coredumps.html">Core dumps</a></li>
+		</ul>
+	</aside>
+
+	<main class="doc-content">
+		<div class="prose">
+			<h1>Architecture</h1>
+			<p class="lead-sub">A single-threaded, event-driven design built for throughput.</p>
+
+			<h2>Overview</h2>
+			<p>
+				uhub is a primarily single-threaded, event-driven hub, developed mainly for Linux and Unix
+				systems while also supporting Windows.
+			</p>
+			<p>
+				It maintains non-blocking connections to all users, and routes and multiplexes ADC messages
+				between them. Each ADC message (<a href="https://github.com/janvidar/uhub/blob/master/src/adc/message.h">struct adc_message</a>)
+				is reference-counted, and each user has a send queue of messages to be delivered.
+			</p>
+
+			<h2>Event notification</h2>
+			<p>
+				Network event notification uses <code>epoll()</code> on Linux, <code>kqueue()</code> on
+				macOS/BSD, and a fallback <code>select()</code> on other systems — chosen at configure time.
+			</p>
+
+			<h2>Timers</h2>
+			<p>
+				Timer handling is low-precision and low-resolution, which allows for constant-time inserts
+				and removals.
+			</p>
+
+			<h2>The login pipeline</h2>
+			<p>
+				New connections pass through a central login pipeline
+				(<code>check_cid → check_nick → check_network → check_user_agent → check_acl → check_logged_in</code>)
+				that enforces validation and access control before a user is trusted. The wire-format parser
+				in <code>src/adc/</code> runs even earlier, against attacker-controlled bytes.
+			</p>
+		</div>
+	</main>
+</div>
+
+<footer class="site-footer">
+	<div class="container footer-inner">
+		<div>uhub &copy; 2007–2025 Jan Vidar Krey</div>
+		<ul class="footer-links">
+			<li><a href="https://github.com/janvidar/uhub/">GitHub</a></li>
+			<li><a href="https://github.com/janvidar/uhub/issues">Issues</a></li>
+			<li><a href="index.html">Documentation</a></li>
+			<li><a href="https://www.gnu.org/licenses/gpl-3.0.html">License</a></li>
+		</ul>
+	</div>
+</footer>
+
+<script src="../assets/js/main.js"></script>
+</body>
+</html>

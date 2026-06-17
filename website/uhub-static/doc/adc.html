@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>uhub — What is ADC?</title>
+	<meta name="description" content="An introduction to the ADC peer-to-peer protocol." />
+	<link rel="icon" href="../assets/img/favicon.ico" />
+	<link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+	<div class="container nav">
+		<a class="brand" href="../index.html">
+			<img src="../assets/img/logo.svg" alt="uhub logo" />
+			<span>uhub</span>
+			<span class="slogan">High performance ADC hub</span>
+		</a>
+		<button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+		<ul class="nav-links">
+			<li><a href="../index.html">About</a></li>
+			<li><a href="../news.html">News</a></li>
+			<li><a href="../download.html">Download</a></li>
+			<li><a href="index.html" class="active">Documentation</a></li>
+		</ul>
+	</div>
+</header>
+
+<div class="container doc-layout">
+	<aside class="doc-sidebar">
+		<h4>Users</h4>
+		<ul>
+			<li><a href="getstarted.html">Getting started</a></li>
+			<li><a href="config-example.html">Example configuration</a></li>
+			<li><a href="config.html">Configuration reference</a></li>
+			<li><a href="plugins/index.html">Plug-ins</a></li>
+			<li><a href="config-ssl.html">SSL / TLS</a></li>
+		</ul>
+		<h4>Developers</h4>
+		<ul>
+			<li><a href="developers.html">Contributors</a></li>
+			<li><a href="compile.html">Compiling</a></li>
+			<li><a href="architecture.html">Architecture</a></li>
+			<li><a href="plugin-api.html">Plug-in API</a></li>
+		</ul>
+		<h4>Resources</h4>
+		<ul>
+			<li><a href="adc.html" class="active">What is ADC?</a></li>
+			<li><a href="coredumps.html">Core dumps</a></li>
+		</ul>
+	</aside>
+
+	<main class="doc-content">
+		<div class="prose">
+			<h1>What is ADC, anyway?</h1>
+			<p class="lead-sub">The protocol uhub speaks.</p>
+
+			<p>
+				ADC is a messaging protocol used in a peer-to-peer network, heavily inspired by the Direct
+				Connect network. It consists mainly of two types of network node: <strong>clients</strong>
+				and <strong>hubs</strong>.
+			</p>
+			<p>
+				Unlike some other peer-to-peer networks, ADC is centralized and community-controlled. Clients
+				connect to one or more hubs to communicate with other clients. This is comparable to super
+				nodes (or ultra nodes) in other networks, except hubs do not openly communicate with each
+				other. The advantage of this design is that hubs control who can access the network, and
+				multiple private networks can coexist.
+			</p>
+			<p>
+				The <a href="https://adc.sourceforge.net/ADC.html">ADC protocol specification</a> is developed
+				by the <a href="https://adc.sourceforge.net/">ADC project</a>.
+			</p>
+		</div>
+	</main>
+</div>
+
+<footer class="site-footer">
+	<div class="container footer-inner">
+		<div>uhub &copy; 2007–2025 Jan Vidar Krey</div>
+		<ul class="footer-links">
+			<li><a href="https://github.com/janvidar/uhub/">GitHub</a></li>
+			<li><a href="https://github.com/janvidar/uhub/issues">Issues</a></li>
+			<li><a href="index.html">Documentation</a></li>
+			<li><a href="https://www.gnu.org/licenses/gpl-3.0.html">License</a></li>
+		</ul>
+	</div>
+</footer>
+
+<script src="../assets/js/main.js"></script>
+</body>
+</html>

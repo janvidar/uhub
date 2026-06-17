@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>uhub — News</title>
+	<meta name="description" content="Latest news and release announcements for the uhub ADC hub." />
+	<link rel="icon" href="assets/img/favicon.ico" />
+	<link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+	<div class="container nav">
+		<a class="brand" href="index.html">
+			<img src="assets/img/logo.svg" alt="uhub logo" />
+			<span>uhub</span>
+			<span class="slogan">High performance ADC hub</span>
+		</a>
+		<button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+		<ul class="nav-links">
+			<li><a href="index.html">About</a></li>
+			<li><a href="news.html" class="active">News</a></li>
+			<li><a href="download.html">Download</a></li>
+			<li><a href="doc/index.html">Documentation</a></li>
+		</ul>
+	</div>
+</header>
+
+<main class="section">
+	<div class="container" style="max-width:760px;">
+		<h2 class="section-title">News</h2>
+		<p class="section-sub">Release announcements and project updates.</p>
+
+		<article class="news-entry">
+			<h2>Development continues on GitHub <span class="tag">ongoing</span></h2>
+			<div class="news-meta">by Jan Vidar Krey</div>
+			<p>
+				Active development happens on
+				<a href="https://github.com/janvidar/uhub/">GitHub</a>. The current build now requires
+				OpenSSL 3.0+ or LibreSSL 3.4+ with TLS 1.2/1.3, and ships with an updated plug-in API.
+				Clone the repository to follow the latest changes, or
+				<a href="https://github.com/janvidar/uhub/issues">report issues</a> there.
+			</p>
+		</article>
+
+		<article class="news-entry">
+			<h2>uhub 0.5.0 released <span class="tag">release</span></h2>
+			<div class="news-meta">2014-10-17 by Jan Vidar Krey</div>
+			<p>
+				uhub 0.5.0 is available as platform-independent source. Build it with CMake on Linux,
+				macOS, BSD and Solaris. See the <a href="download.html">download page</a> to get the
+				sources and the <a href="doc/getstarted.html">getting started guide</a> to run your first hub.
+			</p>
+		</article>
+
+		<p style="color:var(--muted);margin-top:24px;">
+			For the complete history of changes, see the
+			<a href="https://github.com/janvidar/uhub/commits/master">commit log on GitHub</a>.
+		</p>
+	</div>
+</main>
+
+<footer class="site-footer">
+	<div class="container footer-inner">
+		<div>uhub &copy; 2007–2025 Jan Vidar Krey</div>
+		<ul class="footer-links">
+			<li><a href="https://github.com/janvidar/uhub/">GitHub</a></li>
+			<li><a href="https://github.com/janvidar/uhub/issues">Issues</a></li>
+			<li><a href="doc/index.html">Documentation</a></li>
+			<li><a href="https://www.gnu.org/licenses/gpl-3.0.html">License</a></li>
+		</ul>
+	</div>
+</footer>
+
+<script src="assets/js/main.js"></script>
+</body>
+</html>

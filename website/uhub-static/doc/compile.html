@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>uhub — Compiling</title>
+	<meta name="description" content="How to compile uhub from source with CMake." />
+	<link rel="icon" href="../assets/img/favicon.ico" />
+	<link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+	<div class="container nav">
+		<a class="brand" href="../index.html">
+			<img src="../assets/img/logo.svg" alt="uhub logo" />
+			<span>uhub</span>
+			<span class="slogan">High performance ADC hub</span>
+		</a>
+		<button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+		<ul class="nav-links">
+			<li><a href="../index.html">About</a></li>
+			<li><a href="../news.html">News</a></li>
+			<li><a href="../download.html">Download</a></li>
+			<li><a href="index.html" class="active">Documentation</a></li>
+		</ul>
+	</div>
+</header>
+
+<div class="container doc-layout">
+	<aside class="doc-sidebar">
+		<h4>Users</h4>
+		<ul>
+			<li><a href="getstarted.html">Getting started</a></li>
+			<li><a href="config-example.html">Example configuration</a></li>
+			<li><a href="config.html">Configuration reference</a></li>
+			<li><a href="plugins/index.html">Plug-ins</a></li>
+			<li><a href="config-ssl.html">SSL / TLS</a></li>
+		</ul>
+		<h4>Developers</h4>
+		<ul>
+			<li><a href="developers.html">Contributors</a></li>
+			<li><a href="compile.html" class="active">Compiling</a></li>
+			<li><a href="architecture.html">Architecture</a></li>
+			<li><a href="plugin-api.html">Plug-in API</a></li>
+		</ul>
+		<h4>Resources</h4>
+		<ul>
+			<li><a href="adc.html">What is ADC?</a></li>
+			<li><a href="coredumps.html">Core dumps</a></li>
+		</ul>
+	</aside>
+
+	<main class="doc-content">
+		<div class="prose">
+			<h1>Compiling</h1>
+			<p class="lead-sub">Build uhub from source with CMake.</p>
+
+			<h2>Prerequisites</h2>
+			<ul>
+				<li>CMake 3.21 or newer</li>
+				<li>A C compiler — GCC, Clang or MinGW</li>
+				<li>OpenSSL 3.0+ or LibreSSL 3.4+ (TLS is mandatory)</li>
+				<li>SQLite3</li>
+			</ul>
+
+			<h2>Linux, macOS, BSD, Solaris</h2>
+			<p>An out-of-tree build is recommended:</p>
+			<pre><code>mkdir -p build &amp;&amp; cd build
+cmake ..
+make -j
+make install</code></pre>
+
+			<p>Default install directories:</p>
+			<table class="table">
+				<tr><th>Binaries</th><td><code>/usr/local/bin/</code></td></tr>
+				<tr><th>Configuration files</th><td><code>/etc/uhub/</code></td></tr>
+				<tr><th>Plug-ins</th><td><code>/usr/lib/uhub/</code></td></tr>
+				<tr><th>Manual pages</th><td><code>/usr/share/man/man1/</code></td></tr>
+			</table>
+
+			<h2>Debian &amp; Ubuntu</h2>
+			<p>Install the dependencies:</p>
+			<pre><code>sudo apt-get install cmake make gcc git libsqlite3-dev libssl-dev</code></pre>
+			<p>Check out the source code:</p>
+			<pre><code>git clone https://github.com/janvidar/uhub.git</code></pre>
+			<p>Then build as described above.</p>
+
+			<h2>Building against LibreSSL</h2>
+			<p>If both OpenSSL and LibreSSL are installed, point CMake at the LibreSSL prefix:</p>
+			<pre><code>cmake -DOPENSSL_ROOT_DIR=/path/to/libressl ..</code></pre>
+			<p>The configure output prints the detected TLS provider, e.g. <code>TLS provider: LibreSSL 3.5.3</code>.</p>
+
+			<div class="callout">
+				<p>
+					For a sanitizer build that catches bounds bugs, configure with
+					<code>-DCMAKE_C_FLAGS="-fsanitize=address -g -O1"</code> and
+					<code>-DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"</code>.
+				</p>
+			</div>
+		</div>
+	</main>
+</div>
+
+<footer class="site-footer">
+	<div class="container footer-inner">
+		<div>uhub &copy; 2007–2025 Jan Vidar Krey</div>
+		<ul class="footer-links">
+			<li><a href="https://github.com/janvidar/uhub/">GitHub</a></li>
+			<li><a href="https://github.com/janvidar/uhub/issues">Issues</a></li>
+			<li><a href="index.html">Documentation</a></li>
+			<li><a href="https://www.gnu.org/licenses/gpl-3.0.html">License</a></li>
+		</ul>
+	</div>
+</footer>
+
+<script src="../assets/js/main.js"></script>
+</body>
+</html>

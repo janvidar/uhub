@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>uhub — Plug-ins</title>
+	<meta name="description" content="The official plug-ins bundled with uhub and how to configure them." />
+	<link rel="icon" href="../../assets/img/favicon.ico" />
+	<link rel="stylesheet" href="../../assets/css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+	<div class="container nav">
+		<a class="brand" href="../../index.html">
+			<img src="../../assets/img/logo.svg" alt="uhub logo" />
+			<span>uhub</span>
+			<span class="slogan">High performance ADC hub</span>
+		</a>
+		<button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+		<ul class="nav-links">
+			<li><a href="../../index.html">About</a></li>
+			<li><a href="../../news.html">News</a></li>
+			<li><a href="../../download.html">Download</a></li>
+			<li><a href="../index.html" class="active">Documentation</a></li>
+		</ul>
+	</div>
+</header>
+
+<div class="container doc-layout">
+	<aside class="doc-sidebar">
+		<h4>Users</h4>
+		<ul>
+			<li><a href="../getstarted.html">Getting started</a></li>
+			<li><a href="../config-example.html">Example configuration</a></li>
+			<li><a href="../config.html">Configuration reference</a></li>
+			<li><a href="index.html" class="active">Plug-ins</a></li>
+			<li><a href="../config-ssl.html">SSL / TLS</a></li>
+		</ul>
+		<h4>Developers</h4>
+		<ul>
+			<li><a href="../developers.html">Contributors</a></li>
+			<li><a href="../compile.html">Compiling</a></li>
+			<li><a href="../architecture.html">Architecture</a></li>
+			<li><a href="../plugin-api.html">Plug-in API</a></li>
+		</ul>
+		<h4>Resources</h4>
+		<ul>
+			<li><a href="../adc.html">What is ADC?</a></li>
+			<li><a href="../coredumps.html">Core dumps</a></li>
+		</ul>
+	</aside>
+
+	<main class="doc-content">
+		<div class="prose">
+			<h1>Plug-ins</h1>
+			<p class="lead-sub">
+				uhub ships with a set of loadable C plug-ins. Enable them in <code>plugins.conf</code> by
+				pointing at the built <code>.so</code> file with an optional configuration string.
+			</p>
+
+			<p>On Unix systems, a plug-in is loaded like this:</p>
+			<pre><code>plugin /var/lib/uhub/mod_logging.so "file=/var/log/uhub/uhub.log"</code></pre>
+			<p>On Windows, point at the <code>.dll</code> instead:</p>
+			<pre><code>plugin c:\path\to\mod_logging.dll "file=c:\uhub\uhub.log"</code></pre>
+
+			<h2>Bundled plug-ins</h2>
+			<table class="table">
+				<tr><th>Module</th><th>Description</th></tr>
+				<tr><td><code>mod_auth_simple</code></td><td>Authenticate users based on a read-only text file.</td></tr>
+				<tr><td><code>mod_auth_sqlite</code></td><td>Authenticate users based on a SQLite database.</td></tr>
+				<tr><td><code>mod_logging</code></td><td>Logs users entering and leaving the hub.</td></tr>
+				<tr><td><code>mod_welcome</code></td><td>Sends a welcome message (and rules / MOTD) to users when they log in.</td></tr>
+				<tr><td><code>mod_chat_history</code></td><td>Provides a global chat history log.</td></tr>
+				<tr><td><code>mod_chat_history_sqlite</code></td><td>Provides a global chat history log backed by SQLite.</td></tr>
+				<tr><td><code>mod_chat_only</code></td><td>Chat-only hub: disables connection setup, search and results.</td></tr>
+				<tr><td><code>mod_chat_is_privileged</code></td><td>Only registered users can send messages in the main chat.</td></tr>
+				<tr><td><code>mod_topic</code></td><td>Adds commands for changing the hub topic (description).</td></tr>
+				<tr><td><code>mod_no_guest_downloads</code></td><td>Only registered users can search and initiate transfers.</td></tr>
+				<tr><td><code>mod_example</code></td><td>A simple example plug-in to base your own on.</td></tr>
+			</table>
+
+			<h2>Example configuration</h2>
+			<p>A typical <code>plugins.conf</code> combining several modules:</p>
+			<pre><code>plugin /var/lib/uhub/mod_auth_sqlite.so "file=/etc/uhub/users.db"
+plugin /var/lib/uhub/mod_logging.so "file=/var/log/uhub/uhub.log"
+plugin /var/lib/uhub/mod_welcome.so "motd=/etc/uhub/motd.txt rules=/etc/uhub/rules.txt"
+plugin /var/lib/uhub/mod_chat_history.so "history_max=200 history_default=10 history_connect=5"</code></pre>
+
+			<p>
+				Want to write your own? See the <a href="../plugin-api.html">plug-in API</a> documentation.
+			</p>
+		</div>
+	</main>
+</div>
+
+<footer class="site-footer">
+	<div class="container footer-inner">
+		<div>uhub &copy; 2007–2025 Jan Vidar Krey</div>
+		<ul class="footer-links">
+			<li><a href="https://github.com/janvidar/uhub/">GitHub</a></li>
+			<li><a href="https://github.com/janvidar/uhub/issues">Issues</a></li>
+			<li><a href="../index.html">Documentation</a></li>
+			<li><a href="https://www.gnu.org/licenses/gpl-3.0.html">License</a></li>
+		</ul>
+	</div>
+</footer>
+
+<script src="../../assets/js/main.js"></script>
+</body>
+</html>

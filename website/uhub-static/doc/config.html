@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>uhub — Configuration reference</title>
+	<meta name="description" content="Complete reference of uhub configuration directives, message strings and access control list options." />
+	<link rel="icon" href="../assets/img/favicon.ico" />
+	<link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+	<div class="container nav">
+		<a class="brand" href="../index.html">
+			<img src="../assets/img/logo.svg" alt="uhub logo" />
+			<span>uhub</span>
+			<span class="slogan">High performance ADC hub</span>
+		</a>
+		<button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+		<ul class="nav-links">
+			<li><a href="../index.html">About</a></li>
+			<li><a href="../news.html">News</a></li>
+			<li><a href="../download.html">Download</a></li>
+			<li><a href="index.html" class="active">Documentation</a></li>
+		</ul>
+	</div>
+</header>
+
+<div class="container doc-layout">
+	<aside class="doc-sidebar">
+		<h4>Users</h4>
+		<ul>
+			<li><a href="getstarted.html">Getting started</a></li>
+			<li><a href="config-example.html">Example configuration</a></li>
+			<li><a href="config.html" class="active">Configuration reference</a></li>
+			<li><a href="plugins/index.html">Plug-ins</a></li>
+			<li><a href="config-ssl.html">SSL / TLS</a></li>
+		</ul>
+		<h4>Developers</h4>
+		<ul>
+			<li><a href="developers.html">Contributors</a></li>
+			<li><a href="compile.html">Compiling</a></li>
+			<li><a href="architecture.html">Architecture</a></li>
+			<li><a href="plugin-api.html">Plug-in API</a></li>
+		</ul>
+		<h4>Resources</h4>
+		<ul>
+			<li><a href="adc.html">What is ADC?</a></li>
+			<li><a href="coredumps.html">Core dumps</a></li>
+		</ul>
+	</aside>
+
+	<main class="doc-content">
+		<div class="prose">
+			<h1>Configuration reference</h1>
+			<p class="lead-sub">Every directive there is to know. Type to filter; click a directive to expand it.</p>
+
+			<div class="config-toolbar">
+				<input type="text" id="config-search" class="config-search" placeholder="Search directives…" autocomplete="off" />
+				<button class="btn btn-ghost" id="expand-all" type="button">Expand all</button>
+				<button class="btn btn-ghost" id="collapse-all" type="button">Collapse all</button>
+			</div>
+			<p class="no-results">No directives match your search.</p>
+
+			<div class="config-group">
+				<h2>Hub options</h2>
+				<details class="directive" data-name="hub_name" data-desc="Configures the name of the hub.">
+					<summary>hub_name<span class="badge">default: &quot;uhub&quot;</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Configures the name of the hub.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;uhub&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.0</td></tr>
+						<tr><th>Example</th><td><code>hub_name = &quot;my hub&quot;</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="hub_description" data-desc="The description of the hub, as seen by users and hub lists.">
+					<summary>hub_description<span class="badge">default: &quot;&quot;</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>The description of the hub, as seen by users and hub lists.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.0</td></tr>
+						<tr><th>Example</th><td><code>hub_description = &quot;a friendly hub for friendly people&quot;</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="max_users" data-desc="The maximum number of users allowed on the hub. No new users are allowed in once this is exceeded. Operators (and above) can still log in.">
+					<summary>max_users<span class="badge">default: 500</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>The maximum number of users allowed on the hub. No new users are allowed in once this is exceeded. Operators (and above) can still log in.</td></tr>
+						<tr><th>Type</th><td>Number &gt; 0</td></tr>
+						<tr><th>Default</th><td><code>500</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.0</td></tr>
+						<tr><th>Example</th><td><code>max_users = 25</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="show_banner" data-desc="If enabled, the hub announces the software version to clients when they connect, e.g. &quot;Powered by uhub/0.x.y&quot;.">
+					<summary>show_banner<span class="badge">default: yes</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>If enabled, the hub announces the software version to clients when they connect, e.g. "Powered by uhub/0.x.y".</td></tr>
+						<tr><th>Type</th><td>boolean</td></tr>
+						<tr><th>Default</th><td><code>yes</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.0</td></tr>
+						<tr><th>Example</th><td><code>show_banner = no</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="registered_users_only" data-desc="If enabled, only registered users can use the hub. A user must be registered in the acl file (file_acl).">
+					<summary>registered_users_only<span class="badge">default: no</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>If enabled, only registered users can use the hub. A user must be registered in the acl file (file_acl).</td></tr>
+						<tr><th>Type</th><td>boolean</td></tr>
+						<tr><th>Default</th><td><code>no</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.1</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="chat_only" data-desc="If enabled, the hub refuses to relay search and connection-setup messages, making it viable for chat only.">
+					<summary>chat_only<span class="badge">default: no</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>If enabled, the hub refuses to relay search and connection-setup messages, making it viable for chat only.</td></tr>
+						<tr><th>Type</th><td>boolean</td></tr>
+						<tr><th>Default</th><td><code>no</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.1</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="chat_is_privileged" data-desc="If enabled, only operators and admins are allowed to chat in the main chat.">
+					<summary>chat_is_privileged<span class="badge">default: no</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>If enabled, only operators and admins are allowed to chat in the main chat.</td></tr>
+						<tr><th>Type</th><td>boolean</td></tr>
+						<tr><th>Default</th><td><code>no</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.4</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="low_bandwidth_mode" data-desc="If enabled, the hub removes excessive information (description, e-mail, etc.) from each client&#x27;s INF message before broadcasting it.">
+					<summary>low_bandwidth_mode<span class="badge">default: no</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>If enabled, the hub removes excessive information (description, e-mail, etc.) from each client's INF message before broadcasting it.</td></tr>
+						<tr><th>Type</th><td>boolean</td></tr>
+						<tr><th>Default</th><td><code>no</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.2</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="file_motd" data-desc="A message-of-the-day file. Its contents are sent to all users after they log in. Ignored if the file is missing or empty.">
+					<summary>file_motd<span class="badge">default: &quot;/etc/uhub/motd.txt&quot;</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>A message-of-the-day file. Its contents are sent to all users after they log in. Ignored if the file is missing or empty.</td></tr>
+						<tr><th>Type</th><td>file</td></tr>
+						<tr><th>Default</th><td><code>&quot;/etc/uhub/motd.txt&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.3</td></tr>
+						<tr><th>Example</th><td><code>file_motd = &quot;/etc/uhub/motd.txt&quot;</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="file_acl" data-desc="The access control list (acl) file storing registered users, bans, etc. If missing or empty, no registered users or ban records are used.">
+					<summary>file_acl<span class="badge">default: &quot;/etc/uhub/users.conf&quot;</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>The access control list (acl) file storing registered users, bans, etc. If missing or empty, no registered users or ban records are used.</td></tr>
+						<tr><th>Type</th><td>file</td></tr>
+						<tr><th>Default</th><td><code>&quot;/etc/uhub/users.conf&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.3</td></tr>
+						<tr><th>Example</th><td><code>file_acl = &quot;/etc/uhub/users.conf&quot;</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="server_bind_addr" data-desc="The IP address the hub binds to. An IPv4/IPv6 address, or the special values &quot;any&quot; or &quot;loopback&quot;. With &quot;any&quot;/&quot;loopback&quot; the hub auto-detects and prefers IPv6.">
+					<summary>server_bind_addr<span class="badge">default: &quot;any&quot;</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>The IP address the hub binds to. An IPv4/IPv6 address, or the special values "any" or "loopback". With "any"/"loopback" the hub auto-detects and prefers IPv6.</td></tr>
+						<tr><th>Type</th><td>String, IP address, "any" or "loopback"</td></tr>
+						<tr><th>Default</th><td><code>&quot;any&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.2</td></tr>
+						<tr><th>Example</th><td><code>server_bind_addr = &quot;192.168.12.69&quot;</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="server_port" data-desc="The port number the hub listens on.">
+					<summary>server_port<span class="badge">default: 1511</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>The port number the hub listens on.</td></tr>
+						<tr><th>Type</th><td>number &gt; 0 and &lt; 65536</td></tr>
+						<tr><th>Default</th><td><code>1511</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="server_listen_backlog" data-desc="Number of connections the hub accepts in the backlog before they must be processed. Too low a value means the hub will not accept reconnecting users fast enough.">
+					<summary>server_listen_backlog<span class="badge">default: 50</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Number of connections the hub accepts in the backlog before they must be processed. Too low a value means the hub will not accept reconnecting users fast enough.</td></tr>
+						<tr><th>Type</th><td>number &gt; 5</td></tr>
+						<tr><th>Default</th><td><code>50</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.3.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="limit_max_hubs_user" data-desc="Limits the number of hubs a user can be logged into as a guest. If exceeded, entry is denied.">
+					<summary>limit_max_hubs_user<span class="badge">default: 0</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Limits the number of hubs a user can be logged into as a guest. If exceeded, entry is denied.</td></tr>
+						<tr><th>Type</th><td>number, 0 = disabled</td></tr>
+						<tr><th>Default</th><td><code>0</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="limit_max_hubs_reg" data-desc="Limits the number of hubs a user can be logged into as a registered user.">
+					<summary>limit_max_hubs_reg<span class="badge">default: 0</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Limits the number of hubs a user can be logged into as a registered user.</td></tr>
+						<tr><th>Type</th><td>number, 0 = disabled</td></tr>
+						<tr><th>Default</th><td><code>0</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="limit_max_hubs_op" data-desc="Limits the number of hubs a user can be logged into as an operator.">
+					<summary>limit_max_hubs_op<span class="badge">default: 0</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Limits the number of hubs a user can be logged into as an operator.</td></tr>
+						<tr><th>Type</th><td>number, 0 = disabled</td></tr>
+						<tr><th>Default</th><td><code>0</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="limit_max_hubs" data-desc="Limits the total number of hubs a user can be logged into, regardless of registration or privileges.">
+					<summary>limit_max_hubs<span class="badge">default: 0</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Limits the total number of hubs a user can be logged into, regardless of registration or privileges.</td></tr>
+						<tr><th>Type</th><td>number, 0 = disabled</td></tr>
+						<tr><th>Default</th><td><code>0</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="limit_min_hubs_user" data-desc="Only allow users that are logged into other hubs with guest privileges to enter this hub.">
+					<summary>limit_min_hubs_user<span class="badge">default: 0</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Only allow users that are logged into other hubs with guest privileges to enter this hub.</td></tr>
+						<tr><th>Type</th><td>number, 0 = disabled</td></tr>
+						<tr><th>Default</th><td><code>0</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="limit_min_hubs_reg" data-desc="Only allow users that are logged into other hubs as a registered user to enter this hub.">
+					<summary>limit_min_hubs_reg<span class="badge">default: 0</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Only allow users that are logged into other hubs as a registered user to enter this hub.</td></tr>
+						<tr><th>Type</th><td>number, 0 = disabled</td></tr>
+						<tr><th>Default</th><td><code>0</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="limit_min_hubs_op" data-desc="Only allow users that are logged into other hubs with operator privileges to enter this hub.">
+					<summary>limit_min_hubs_op<span class="badge">default: 0</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Only allow users that are logged into other hubs with operator privileges to enter this hub.</td></tr>
+						<tr><th>Type</th><td>number, 0 = disabled</td></tr>
+						<tr><th>Default</th><td><code>0</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="limit_min_share" data-desc="Minimum share in MiB. Users sharing less are not allowed in.">
+					<summary>limit_min_share<span class="badge">default: 0</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Minimum share in MiB. Users sharing less are not allowed in.</td></tr>
+						<tr><th>Type</th><td>number, 0 = disabled</td></tr>
+						<tr><th>Default</th><td><code>0</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+						<tr><th>Example</th><td><code>limit_min_share = 1024</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="limit_max_share" data-desc="Maximum share in MiB. Users sharing more are not allowed in.">
+					<summary>limit_max_share<span class="badge">default: 0</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Maximum share in MiB. Users sharing more are not allowed in.</td></tr>
+						<tr><th>Type</th><td>number, 0 = disabled</td></tr>
+						<tr><th>Default</th><td><code>0</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="limit_min_slots" data-desc="Minimum number of upload slots required. Users with fewer are not allowed in.">
+					<summary>limit_min_slots<span class="badge">default: 0</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Minimum number of upload slots required. Users with fewer are not allowed in.</td></tr>
+						<tr><th>Type</th><td>number, 0 = disabled</td></tr>
+						<tr><th>Default</th><td><code>0</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="limit_max_slots" data-desc="Maximum number of upload slots allowed. Users with more are not allowed in.">
+					<summary>limit_max_slots<span class="badge">default: 0</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Maximum number of upload slots allowed. Users with more are not allowed in.</td></tr>
+						<tr><th>Type</th><td>number, 0 = disabled</td></tr>
+						<tr><th>Default</th><td><code>0</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="tls_certificate" data-desc="Path to a TLS/SSL certificate (PEM format).">
+					<summary>tls_certificate<span class="badge">no default</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Path to a TLS/SSL certificate (PEM format).</td></tr>
+						<tr><th>Type</th><td>file</td></tr>
+						<tr><th>Since</th><td>uhub 0.3.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="tls_private_key" data-desc="Path to a TLS/SSL private key (PEM format).">
+					<summary>tls_private_key<span class="badge">no default</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Path to a TLS/SSL private key (PEM format).</td></tr>
+						<tr><th>Type</th><td>file</td></tr>
+						<tr><th>Since</th><td>uhub 0.3.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="tls_enable" data-desc="Enables/disables TLS/SSL support. tls_certificate and tls_private_key must be set if enabled.">
+					<summary>tls_enable<span class="badge">default: no</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Enables/disables TLS/SSL support. tls_certificate and tls_private_key must be set if enabled.</td></tr>
+						<tr><th>Type</th><td>boolean</td></tr>
+						<tr><th>Default</th><td><code>no</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.3.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="tls_require" data-desc="If TLS/SSL is enabled, whether it is mandatory. If disabled, users may connect with or without TLS.">
+					<summary>tls_require<span class="badge">default: yes</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>If TLS/SSL is enabled, whether it is mandatory. If disabled, users may connect with or without TLS.</td></tr>
+						<tr><th>Type</th><td>boolean</td></tr>
+						<tr><th>Default</th><td><code>yes</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.3.0</td></tr>
+					</table></div>
+				</details>
+			</div>
+			<div class="config-group">
+				<h2>Access control (users.conf)</h2>
+				<details class="directive" data-name="user_admin" data-desc="An administrator user with full access to configure the hub, plus operator privileges.">
+					<summary>user_admin<span class="badge">username:password</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>An administrator user with full access to configure the hub, plus operator privileges.</td></tr>
+						<tr><th>Syntax</th><td><code>user_admin username:password</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.2</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="user_super" data-desc="A super user with more privileges than an operator but fewer than an administrator.">
+					<summary>user_super<span class="badge">username:password</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>A super user with more privileges than an operator but fewer than an administrator.</td></tr>
+						<tr><th>Syntax</th><td><code>user_super username:password</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.1</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="user_op" data-desc="An operator who can kick and ban users from the hub.">
+					<summary>user_op<span class="badge">username:password</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>An operator who can kick and ban users from the hub.</td></tr>
+						<tr><th>Syntax</th><td><code>user_op username:password</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.2</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="user_reg" data-desc="A registered user with no special privileges, but a password-protected username that can enter registered-only hubs.">
+					<summary>user_reg<span class="badge">username:password</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>A registered user with no special privileges, but a password-protected username that can enter registered-only hubs.</td></tr>
+						<tr><th>Syntax</th><td><code>user_reg username:password</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.2</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="deny_nick" data-desc="A denied username. Any user identifying with this nickname is denied access.">
+					<summary>deny_nick<span class="badge">username</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>A denied username. Any user identifying with this nickname is denied access.</td></tr>
+						<tr><th>Syntax</th><td><code>deny_nick username</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.2</td></tr>
+						<tr><th>Example</th><td><code>deny_nick Administrator<br />deny_nick root<br />deny_nick Hub-Security</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="ban_nick" data-desc="A user banned by nickname. Differs from deny_nick in the message the user receives.">
+					<summary>ban_nick<span class="badge">username</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>A user banned by nickname. Differs from deny_nick in the message the user receives.</td></tr>
+						<tr><th>Syntax</th><td><code>ban_nick username</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="ban_cid" data-desc="A user banned by CID (a 39-byte base32-encoded client identifier).">
+					<summary>ban_cid<span class="badge">cid</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>A user banned by CID (a 39-byte base32-encoded client identifier).</td></tr>
+						<tr><th>Syntax</th><td><code>ban_cid cid</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.2</td></tr>
+						<tr><th>Example</th><td><code>ban_cid FOIL5EK2UDZYAXT7UIUFEKL4SEBEAJE3INJDKAY</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="deny_ip" data-desc="Deny access to users from certain IP addresses, given as ranges or address/bitmask. Works for IPv6 too.">
+					<summary>deny_ip<span class="badge">ip range/mask</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Deny access to users from certain IP addresses, given as ranges or address/bitmask. Works for IPv6 too.</td></tr>
+						<tr><th>Syntax</th><td><code>deny_ip ip range/mask</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.2</td></tr>
+						<tr><th>Example</th><td><code>deny_ip 192.168.0.0/24<br />deny_ip ::1/128</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="nat_ip" data-desc="Allow users behind the same NAT router as the hub to advertise a public IP. The hub rewrites IPs for other users on the same NATed network. IPv4 only.">
+					<summary>nat_ip<span class="badge">ip range/mask</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Allow users behind the same NAT router as the hub to advertise a public IP. The hub rewrites IPs for other users on the same NATed network. IPv4 only.</td></tr>
+						<tr><th>Syntax</th><td><code>nat_ip ip range/mask</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.1</td></tr>
+						<tr><th>Example</th><td><code>nat_ip 192.168.1.0/24</code></td></tr>
+					</table></div>
+				</details>
+			</div>
+			<div class="config-group">
+				<h2>Message strings</h2>
+				<details class="directive" data-name="msg_hub_full" data-desc="Sent when the hub is full.">
+					<summary>msg_hub_full<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent when the hub is full.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;Hub is full&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_hub_disabled" data-desc="Sent when the hub is disabled (hub_enable = no).">
+					<summary>msg_hub_disabled<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent when the hub is disabled (hub_enable = no).</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;Hub is disabled&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_hub_registered_users_only" data-desc="Sent when the hub only accepts registered users.">
+					<summary>msg_hub_registered_users_only<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent when the hub only accepts registered users.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;Hub is for registered users only&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_inf_error_nick_missing" data-desc="Sent to clients that do not provide a nickname.">
+					<summary>msg_inf_error_nick_missing<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to clients that do not provide a nickname.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;No nickname given&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_inf_error_nick_multiple" data-desc="Sent to clients that provide multiple nicknames.">
+					<summary>msg_inf_error_nick_multiple<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to clients that provide multiple nicknames.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;Multiple nicknames given&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_inf_error_nick_invalid" data-desc="Sent to clients that provide an invalid nickname.">
+					<summary>msg_inf_error_nick_invalid<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to clients that provide an invalid nickname.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;Nickname is invalid&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_inf_error_nick_long" data-desc="Sent to clients with a too-long nickname.">
+					<summary>msg_inf_error_nick_long<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to clients with a too-long nickname.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;Nickname too long&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_inf_error_nick_short" data-desc="Sent to clients with a too-short nickname.">
+					<summary>msg_inf_error_nick_short<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to clients with a too-short nickname.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;Nickname too short&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_inf_error_nick_spaces" data-desc="Sent to clients whose nickname starts with a space.">
+					<summary>msg_inf_error_nick_spaces<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to clients whose nickname starts with a space.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;Nickname cannot start with spaces&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_inf_error_nick_bad_chars" data-desc="Sent to clients with invalid characters in the nickname.">
+					<summary>msg_inf_error_nick_bad_chars<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to clients with invalid characters in the nickname.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;Nickname contains invalid characters&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_inf_error_nick_not_utf8" data-desc="Sent to clients whose nickname is not valid UTF-8.">
+					<summary>msg_inf_error_nick_not_utf8<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to clients whose nickname is not valid UTF-8.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;Nickname is not valid utf8&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_inf_error_nick_taken" data-desc="Sent when the provided nickname is already in use.">
+					<summary>msg_inf_error_nick_taken<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent when the provided nickname is already in use.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;Nickname is already in use&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_inf_error_nick_restricted" data-desc="Sent when a restricted nickname is used (configured in the acl).">
+					<summary>msg_inf_error_nick_restricted<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent when a restricted nickname is used (configured in the acl).</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;Nickname cannot be used on this hub&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_inf_error_cid_invalid" data-desc="Sent to clients that provide an invalid client ID (CID).">
+					<summary>msg_inf_error_cid_invalid<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to clients that provide an invalid client ID (CID).</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;CID is not valid&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_inf_error_cid_missing" data-desc="Sent to clients that do not provide a client ID (CID).">
+					<summary>msg_inf_error_cid_missing<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to clients that do not provide a client ID (CID).</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;CID is not specified&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_inf_error_cid_taken" data-desc="Sent when the provided CID is already in use.">
+					<summary>msg_inf_error_cid_taken<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent when the provided CID is already in use.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;CID is taken&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_inf_error_pid_missing" data-desc="Sent to clients that do not provide a private ID (PID).">
+					<summary>msg_inf_error_pid_missing<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to clients that do not provide a private ID (PID).</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;PID is not specified&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_inf_error_pid_invalid" data-desc="Sent to clients that provide an invalid private ID (PID).">
+					<summary>msg_inf_error_pid_invalid<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to clients that provide an invalid private ID (PID).</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;PID is invalid&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_ban_permanently" data-desc="Sent to users who are permanently banned (see acl).">
+					<summary>msg_ban_permanently<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to users who are permanently banned (see acl).</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;Banned permanently&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_ban_temporarily" data-desc="Sent to users who are temporarily banned.">
+					<summary>msg_ban_temporarily<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to users who are temporarily banned.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;Banned temporarily&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_auth_invalid_password" data-desc="Sent to users who provide a wrong password.">
+					<summary>msg_auth_invalid_password<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to users who provide a wrong password.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;Password is wrong&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_user_share_size_low" data-desc="Sent to users who are not sharing enough.">
+					<summary>msg_user_share_size_low<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to users who are not sharing enough.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;User is not sharing enough&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_user_share_size_high" data-desc="Sent to users who are sharing too much.">
+					<summary>msg_user_share_size_high<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to users who are sharing too much.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;User is sharing too much&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_user_slots_low" data-desc="Sent to users with too few upload slots.">
+					<summary>msg_user_slots_low<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to users with too few upload slots.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;User have too few upload slots.&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_user_slots_high" data-desc="Sent to users with too many upload slots.">
+					<summary>msg_user_slots_high<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to users with too many upload slots.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;User have too many upload slots.&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_user_hub_limit_low" data-desc="Sent to users on too few other hubs.">
+					<summary>msg_user_hub_limit_low<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to users on too few other hubs.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;User is on too few hubs.&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="msg_user_hub_limit_high" data-desc="Sent to users on too many other hubs.">
+					<summary>msg_user_hub_limit_high<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to users on too many other hubs.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;User is on too many hubs.&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
+					</table></div>
+				</details>
+			</div>
+			<div class="config-group">
+				<h2>Advanced</h2>
+				<details class="directive" data-name="hub_enabled" data-desc="Use this to disable the hub for a while.">
+					<summary>hub_enabled<span class="badge">default: yes</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Use this to disable the hub for a while.</td></tr>
+						<tr><th>Type</th><td>boolean</td></tr>
+						<tr><th>Default</th><td><code>yes</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.3</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="max_recv_buffer" data-desc="Maximum receive buffer before commands are processed. A single ADC message exceeding this limit is discarded. Use with caution.">
+					<summary>max_recv_buffer<span class="badge">default: 4096</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Maximum receive buffer before commands are processed. A single ADC message exceeding this limit is discarded. Use with caution.</td></tr>
+						<tr><th>Type</th><td>number</td></tr>
+						<tr><th>Default</th><td><code>4096</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="max_send_buffer" data-desc="Maximum bytes queued for sending to a user before the hub disconnects them. Lower means more aggressive disconnection of slow clients. Use with caution.">
+					<summary>max_send_buffer<span class="badge">default: 131072</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Maximum bytes queued for sending to a user before the hub disconnects them. Lower means more aggressive disconnection of slow clients. Use with caution.</td></tr>
+						<tr><th>Type</th><td>number</td></tr>
+						<tr><th>Default</th><td><code>131072</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="max_send_buffer_soft" data-desc="Like max_send_buffer, but low-priority messages may be discarded once reached. Use with caution.">
+					<summary>max_send_buffer_soft<span class="badge">default: 98304</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Like max_send_buffer, but low-priority messages may be discarded once reached. Use with caution.</td></tr>
+						<tr><th>Type</th><td>number</td></tr>
+						<tr><th>Default</th><td><code>98304</code></td></tr>
+					</table></div>
+				</details>
+			</div>
+		</div>
+	</main>
+</div>
+
+<footer class="site-footer">
+	<div class="container footer-inner">
+		<div>uhub &copy; 2007–2025 Jan Vidar Krey</div>
+		<ul class="footer-links">
+			<li><a href="https://github.com/janvidar/uhub/">GitHub</a></li>
+			<li><a href="https://github.com/janvidar/uhub/issues">Issues</a></li>
+			<li><a href="index.html">Documentation</a></li>
+			<li><a href="https://www.gnu.org/licenses/gpl-3.0.html">License</a></li>
+		</ul>
+	</div>
+</footer>
+
+<script src="../assets/js/main.js"></script>
+</body>
+</html>

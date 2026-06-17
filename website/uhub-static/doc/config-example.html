@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>uhub — Example configuration</title>
+	<meta name="description" content="Example uhub.conf and plugins.conf configuration files for uhub." />
+	<link rel="icon" href="../assets/img/favicon.ico" />
+	<link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+	<div class="container nav">
+		<a class="brand" href="../index.html">
+			<img src="../assets/img/logo.svg" alt="uhub logo" />
+			<span>uhub</span>
+			<span class="slogan">High performance ADC hub</span>
+		</a>
+		<button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+		<ul class="nav-links">
+			<li><a href="../index.html">About</a></li>
+			<li><a href="../news.html">News</a></li>
+			<li><a href="../download.html">Download</a></li>
+			<li><a href="index.html" class="active">Documentation</a></li>
+		</ul>
+	</div>
+</header>
+
+<div class="container doc-layout">
+	<aside class="doc-sidebar">
+		<h4>Users</h4>
+		<ul>
+			<li><a href="getstarted.html">Getting started</a></li>
+			<li><a href="config-example.html" class="active">Example configuration</a></li>
+			<li><a href="config.html">Configuration reference</a></li>
+			<li><a href="plugins/index.html">Plug-ins</a></li>
+			<li><a href="config-ssl.html">SSL / TLS</a></li>
+		</ul>
+		<h4>Developers</h4>
+		<ul>
+			<li><a href="developers.html">Contributors</a></li>
+			<li><a href="compile.html">Compiling</a></li>
+			<li><a href="architecture.html">Architecture</a></li>
+			<li><a href="plugin-api.html">Plug-in API</a></li>
+		</ul>
+		<h4>Resources</h4>
+		<ul>
+			<li><a href="adc.html">What is ADC?</a></li>
+			<li><a href="coredumps.html">Core dumps</a></li>
+		</ul>
+	</aside>
+
+	<main class="doc-content">
+		<div class="prose">
+			<h1>Example configuration</h1>
+			<p class="lead-sub">
+				Configuration files normally live in <code>/etc/uhub/</code> on Unix systems.
+			</p>
+
+			<dl>
+				<dt>uhub.conf</dt>
+				<dd>The main configuration file.</dd>
+				<dt>plugins.conf</dt>
+				<dd>The plug-in configuration file.</dd>
+			</dl>
+
+			<h2>uhub.conf</h2>
+			<pre><code>hub_name = My Public Hub
+hub_description = Yet another ADC hub
+
+server_port = 12345
+server_bind_addr = any
+max_users = 150</code></pre>
+
+			<h2>plugins.conf</h2>
+			<pre><code>plugin /var/lib/uhub/mod_auth_sqlite.so "file=/etc/uhub/users.db"
+plugin /var/lib/uhub/mod_logging.so "file=/var/log/uhub/uhub.log"
+plugin /var/lib/uhub/mod_welcome.so "motd=/etc/uhub/motd.txt rules=/etc/uhub/rules.txt"
+plugin /var/lib/uhub/mod_chat_history.so "history_max=200 history_default=10 history_connect=5"</code></pre>
+
+			<p>
+				See the <a href="config.html">configuration reference</a> for every available directive,
+				and the <a href="plugins/index.html">plug-ins page</a> for details on each module.
+			</p>
+		</div>
+	</main>
+</div>
+
+<footer class="site-footer">
+	<div class="container footer-inner">
+		<div>uhub &copy; 2007–2025 Jan Vidar Krey</div>
+		<ul class="footer-links">
+			<li><a href="https://github.com/janvidar/uhub/">GitHub</a></li>
+			<li><a href="https://github.com/janvidar/uhub/issues">Issues</a></li>
+			<li><a href="index.html">Documentation</a></li>
+			<li><a href="https://www.gnu.org/licenses/gpl-3.0.html">License</a></li>
+		</ul>
+	</div>
+</footer>
+
+<script src="../assets/js/main.js"></script>
+</body>
+</html>

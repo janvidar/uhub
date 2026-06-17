@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://www.uhub.org/</loc></url>
+  <url><loc>https://www.uhub.org/doc/</loc></url>
+  <url><loc>https://www.uhub.org/doc/adc.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/architecture.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/compile.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/config-example.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/config-ssl.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/config.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/coredumps.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/developers.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/getstarted.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/plugin-api.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/plugins/</loc></url>
+  <url><loc>https://www.uhub.org/download.html</loc></url>
+  <url><loc>https://www.uhub.org/news.html</loc></url>
+</urlset>
