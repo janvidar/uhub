@@ -560,7 +560,7 @@ struct ADC_client* ADC_client_create(const char* nickname, const char* descripti
 	if (!g_adc_client)
 	{
 		g_adc_client = (struct ADC_client_global*) hub_malloc_zero(sizeof(struct ADC_client_global));
-		g_adc_client->ctx = net_ssl_context_create("1.2", "HIGH");
+		g_adc_client->ctx = net_ssl_context_create("1.2", "HIGH", "");
 	}
 	g_adc_client->references++;
 

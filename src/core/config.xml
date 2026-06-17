@@ -445,9 +445,11 @@
 	</option>
 
 	<option name="tls_ciphersuite" type="string" default="ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:ECDH+3DES:DH+3DES:RSA+AESGCM:RSA+AES:RSA+3DES:!aNULL:!MD5:!DSS">
-		<short>List of TLS ciphers to use</short>
+		<short>List of TLS 1.2 (and earlier) ciphers to use</short>
 		<description><![CDATA[
 			This is a colon separated list of preferred ciphers in the OpenSSL format.
+			It only affects TLS 1.2 and earlier; the TLS 1.3 cipher suites are
+			configured separately with <code>tls_ciphersuites</code>.
 		]]></description>
 		<since>0.5.0</since>
 		<example><![CDATA[
@@ -458,6 +460,24 @@
 			<p>
 			Allow ChaCha20/Poly1305 which are secure, yet generally faster:<br />
 			tls_ciphersuite = "ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:DHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA"
+			</p>
+		]]></example>
+	</option>
+
+	<option name="tls_ciphersuites" type="string" default="TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256">
+		<short>List of TLS 1.3 cipher suites to use</short>
+		<description><![CDATA[
+			This is a colon separated list of preferred TLS 1.3 cipher suites in the
+			OpenSSL format. TLS 1.3 uses a separate, fixed set of cipher suites that
+			are named differently from earlier versions, so they cannot be mixed with
+			<code>tls_ciphersuite</code>. The default enables all standard TLS 1.3
+			suites. This setting has no effect unless TLS 1.3 is negotiated.
+		]]></description>
+		<since>0.6.0</since>
+		<example><![CDATA[
+			<p>
+			Prefer AES-256-GCM, then ChaCha20/Poly1305, then AES-128-GCM:<br />
+			tls_ciphersuites = "TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256"
 			</p>
 		]]></example>
 	</option>

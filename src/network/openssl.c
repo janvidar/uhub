@@ -192,7 +192,7 @@ static int alpn_server_select_protocol(SSL *ssl, const unsigned char **out, unsi
 /**
  * Create a new SSL context.
  */
-struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const char* tls_ciphersuite)
+struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const char* tls_ciphersuite, const char* tls_ciphersuites)
 {
 	struct net_context_openssl* ctx = (struct net_context_openssl*) hub_malloc_zero(sizeof(struct net_context_openssl));
 	long flags = 0;
@@ -234,10 +234,22 @@ struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const
 
 	SSL_CTX_set_options(ctx->ssl, flags);
 
-	/* Set preferred cipher suite */
+	/* Set the preferred TLS 1.2 (and earlier) cipher list. */
 	if (SSL_CTX_set_cipher_list(ctx->ssl, tls_ciphersuite) != 1)
 	{
 		LOG_ERROR("Unable to set cipher suite.");
+		SSL_CTX_free(ctx->ssl);
+		hub_free(ctx);
+		return NULL;
+	}
+
+	/* Set the preferred TLS 1.3 cipher suites. These live in a separate
+	 * namespace from the list above and are ignored by SSL_CTX_set_cipher_list(),
+	 * so without this the tls_ciphersuites option would have no effect. An empty
+	 * string is accepted and leaves the library defaults in place. */
+	if (tls_ciphersuites && *tls_ciphersuites && SSL_CTX_set_ciphersuites(ctx->ssl, tls_ciphersuites) != 1)
+	{
+		LOG_ERROR("Unable to set TLS 1.3 cipher suites.");
 		SSL_CTX_free(ctx->ssl);
 		hub_free(ctx);
 		return NULL;
