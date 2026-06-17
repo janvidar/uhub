@@ -73,9 +73,7 @@ struct ADC_client
 	adc_client_cb callback;
 	size_t s_offset;
 	size_t r_offset;
-	size_t timeout;
 	struct net_connection* con;
-	struct net_timer* timer;
 	struct sockaddr_storage addr;
 	struct net_connect_handle* connect_job;
 	struct ADC_client_address address;
@@ -645,7 +643,6 @@ void ADC_client_destroy(struct ADC_client* client)
 	ADC_client_disconnect(client);
 	ioq_send_destroy(client->send_queue);
 	ioq_recv_destroy(client->recv_queue);
-	hub_free(client->timer);
 	adc_msg_free(client->info);
 	hub_free(client->nick);
 	hub_free(client->desc);
