@@ -1,3 +1,11 @@
+0.6.0:
+- TLS is now mandatory: the SSL_SUPPORT build option is gone and a TLS library (OpenSSL or LibreSSL) is always required.
+- LibreSSL is now a first-class, supported TLS provider alongside OpenSSL.
+- Require OpenSSL >= 3.0 or LibreSSL >= 3.4 and modernized the OpenSSL API usage (TLS_method + minimum-protocol-version instead of per-version methods).
+- The lowest selectable TLS version is now 1.2; tls_version accepts only "1.2" or "1.3" (TLS 1.0 and 1.1 are no longer offered).
+- Added the tls_ciphersuites option to configure the TLS 1.3 cipher suites; tls_ciphersuite continues to govern TLS 1.2 and earlier.
+- Removed the long-dead GnuTLS backend and the USE_OPENSSL option.
+
 0.5.0:
 - Use TLS 1.2 and strong ciphers by default, but made this configurable.
 - Fix TLS event handling which caused some busy loops
