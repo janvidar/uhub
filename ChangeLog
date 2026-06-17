@@ -5,6 +5,36 @@
 - The lowest selectable TLS version is now 1.2; tls_version accepts only "1.2" or "1.3" (TLS 1.0 and 1.1 are no longer offered).
 - Added the tls_ciphersuites option to configure the TLS 1.3 cipher suites; tls_ciphersuite continues to govern TLS 1.2 and earlier.
 - Removed the long-dead GnuTLS backend and the USE_OPENSSL option.
+- Advertise the ADC protocol via TLS ALPN and improve TLS protocol negotiation.
+- Fix CPU spikes caused by clients connecting with an incompatible TLS protocol version.
+- Report TLS statistics (handshakes, closes and errors) via the !stats command.
+- Hardened the ADC message parser against malformed and malicious input: fixed out-of-bounds reads, integer overflows/underflows and negative array indexing reachable before authentication (including issue #85). The parser is now exercised by fuzz targets.
+- Fixed a login race (issue #86) that could allow duplicate CID/nick registrations.
+- Fixed deny_ip ACL entries being silently ignored at login, and tightened ACL keyword matching to avoid prefix collisions.
+- Avoid leaking credentials by zeroing authentication state, and clear supplementary groups when dropping privileges.
+- Improved ghost-user detection (issue #72).
+- Fixed a crash in the SID allocator when exceeding one million sessions, and made session-id handling more robust.
+- Enforce a per-user send-queue cap and disconnect clients that overflow it; handle socket errors from connected clients more gracefully.
+- Fixed outbound-connection failover so the hub tries all resolved addresses.
+- Fixed numerous out-of-memory, buffer-overflow and integer-overflow bugs across the hub, plugins, DNS resolver and admin tooling, including possible SQL injection in the admin tool.
+- mod_chat_is_privileged: notify unprivileged users when chat is denied (issue #65).
+- mod_chat_history (sqlite): fixed a buffer overflow when storing long messages.
+- Fixed escaping of !broadcast messages (issue #83).
+- Improved the ADC stress-test client: password login, status/error reporting, connect and connect-failure callbacks, and safer message parsing.
+- Build system modernized: builds as C23, an alternative build.zig is provided, fuzzing support was added, and there is now a Dockerfile.
+- Added support for the aarch64 and LoongArch architectures and fixed MinGW cross-compilation.
+
+0.5.1:
+- Add support for OpenSSL 1.1.
+- Stricter UTF-8 handling, including support for 4-byte UTF-8 characters.
+- Added op-bots and unrestricted bots, and taught uhub-passwd to manage bots.
+- Added tools to import users from FlexHub and PtokaX (< 0.5.0).
+- mod_chat_history (sqlite): fixed truncation of long messages and added VACUUM during cleanup.
+- mod_logging: fixed an inverted syslog config check.
+- Fixed compilation on systemd > 210.
+- Made the config and helper scripts Python 3 compatible.
+- Reduced log noise from net_send debug messages and give a clearer error when sqlite3 is missing.
+- The test binary is now installed as autotest-bin to avoid name clashes.
 
 0.5.0:
 - Use TLS 1.2 and strong ciphers by default, but made this configurable.
