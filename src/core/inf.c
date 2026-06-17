@@ -95,9 +95,6 @@ static int check_hash_tiger(const char* cid, const char* pid)
 }
 
 
-/*
- * FIXME: Only works for tiger hash. If a client doesn't support tiger we cannot let it in!
- */
 static int check_cid(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
     (void) hub;
