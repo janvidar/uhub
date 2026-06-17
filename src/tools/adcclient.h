@@ -121,6 +121,7 @@ typedef int (*adc_client_cb)(struct ADC_client*, enum ADC_client_callback_type, 
 
 struct ADC_client* ADC_client_create(const char* nickname, const char* description, void* ptr);
 void ADC_client_set_callback(struct ADC_client* client, adc_client_cb);
+void ADC_client_set_password(struct ADC_client* client, const char* password);
 void ADC_client_destroy(struct ADC_client* client);
 int ADC_client_connect(struct ADC_client* client, const char* address);
 void ADC_client_disconnect(struct ADC_client* client);

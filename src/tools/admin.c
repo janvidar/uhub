@@ -238,7 +238,7 @@ int main(int argc, char** argv)
 {
 	if (argc < 2)
 	{
-		printf("Usage: %s adc[s]://host:port\n", argv[0]);
+		printf("Usage: %s adc[s]://host:port [password]\n", argv[0]);
 		return 1;
 	}
 
@@ -253,6 +253,8 @@ int main(int argc, char** argv)
 
 	client = ADC_client_create("uhub-admin", "stresstester", NULL);
 	ADC_client_set_callback(client, handle);
+	if (argc > 2)
+		ADC_client_set_password(client, argv[2]);
 	ADC_client_connect(client, argv[1]);
 
 	while (running && net_backend_process()) { }
