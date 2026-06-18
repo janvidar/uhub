@@ -455,7 +455,10 @@ static int command_broadcast(struct command_base* cbase, struct hub_user* user, 
 	struct cbuffer* buf = cbuf_create(128);
 	struct adc_message* command = NULL;
 
-	memcpy(from_sid, sid_to_string(user->id.sid), sizeof(from_sid));
+	/* Deliver as a private message from the hub itself (the reserved SID
+	 * "AAAA" == 0), not from the sending operator. Otherwise away/auto-reply
+	 * messages from every recipient flood the sender. See issue #83. */
+	memcpy(from_sid, sid_to_string(0), sizeof(from_sid));
 	memcpy(pm_flag + 2, from_sid, sizeof(from_sid));
 
 	LIST_FOREACH(struct hub_user*, target, cbase->hub->users->list,
