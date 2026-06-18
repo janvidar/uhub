@@ -874,52 +874,6 @@ char* adc_msg_get_argument(struct adc_message* cmd, int offset)
 	return 0;
 }
 
-/**
- * NOTE: Untested code.
- */
-int adc_msg_get_argument_index(struct adc_message* cmd, const char prefix[2])
-{
-	char* start;
-	char* end;
-	int count = 0;
-	int arg_offset = adc_msg_get_arg_offset(cmd);
-
-	ADC_MSG_ASSERT(cmd);
-
-	if (arg_offset < 1 || (size_t) arg_offset > cmd->length)
-		return -1;
-
-	adc_msg_unterminate(cmd);
-
-	start = strchr(&cmd->cache[arg_offset - 1], ' ');
-	while (start)
-	{
-		size_t arg_len;
-		end = strchr(&start[1], ' ');
-		if (end)
-		{
-			arg_len = &end[0] - &start[1];
-		}
-		else
-		{
-			arg_len = strlen(&start[1]);
-			if (arg_len > 0 && start[1 + arg_len - 1] == '\n')
-				arg_len--;
-		}
-		if ((arg_len > 2) && ((start[1] == prefix[0]) && (start[2] == prefix[1])))
-		{
-			adc_msg_terminate(cmd);
-			return count;
-		}
-		count++;
-		start = end;
-	}
-	adc_msg_terminate(cmd);
-	return -1;
-}
-
-
-
 size_t adc_msg_escape_length(const char* str)
 {
 	size_t add = 0;

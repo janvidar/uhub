@@ -127,16 +127,6 @@ extern int adc_msg_has_named_argument(struct adc_message* cmd, const char prefix
 extern char* adc_msg_get_named_argument(struct adc_message* cmd, const char prefix[2]);
 
 /**
- * Returns a offset of an argument based on the 2 character prefix.
- * If multiple matching arguments exists, only the first one will be returned
- * by this function.
- *
- * @arg prefix a 2 character argument prefix
- * @return the offset or -1 if the argument is not found.
- */
-extern int adc_msg_get_named_argument_index(struct adc_message* cmd, const char prefix[2]);
-
-/**
  * @param cmd command to be checked
  * @return 1 if the command does not have any arguments (parameters), 0 otherwise, -1 if cmd is invalid.
  */
