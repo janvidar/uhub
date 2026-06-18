@@ -233,11 +233,14 @@ int hub_handle_support(struct hub_info* hub, struct hub_user* u, struct adc_mess
 			{
 				/* disconnect user for using an obsolete client. */
 				char* tmp = adc_msg_escape(hub->config->msg_proto_obsolete_adc0);
-				struct adc_message* message = adc_msg_construct(ADC_CMD_IMSG, 6 + strlen(tmp));
-				adc_msg_add_argument(message, tmp);
+				struct adc_message* message = adc_msg_construct(ADC_CMD_IMSG, 6 + (tmp ? strlen(tmp) : 0));
+				if (message)
+				{
+					adc_msg_add_argument(message, tmp);
+					route_to_user(hub, u, message);
+					adc_msg_free(message);
+				}
 				hub_free(tmp);
-				route_to_user(hub, u, message);
-				adc_msg_free(message);
 				hub_disconnect_user(hub, u, quit_protocol_error);
 			}
 		}
@@ -403,6 +406,8 @@ void hub_send_sid(struct hub_info* hub, struct hub_user* u)
 	if (user_is_connecting(u))
 	{
 		command = adc_msg_construct(ADC_CMD_ISID, 10);
+		if (!command)
+			return; /* OOM */
 		sid = uman_get_free_sid(hub->users, u);
 		adc_msg_add_argument(command, (const char*) sid_to_string(sid));
 		route_to_user(hub, u, command);
@@ -415,6 +420,8 @@ void hub_send_ping(struct hub_info* hub, struct hub_user* user)
 {
 	/* This will just send a newline, despite appearing to do more below. */
 	struct adc_message* ping = adc_msg_construct(0, 0);
+	if (!ping)
+		return; /* OOM */
 	ping->cache[0]     = '\n';
 	ping->cache[1]     = 0;
 	ping->length       = 1;
@@ -429,6 +436,9 @@ void hub_send_hubinfo(struct hub_info* hub, struct hub_user* u)
 	struct adc_message* info = adc_msg_copy(hub->command_info);
 	int value = 0;
 	uint64_t size = 0;
+
+	if (!info)
+		return; /* OOM */
 
 	if (user_flag_get(u, feature_ping))
 	{
@@ -509,6 +519,8 @@ void hub_send_password_challenge(struct hub_info* hub, struct hub_user* u)
 {
 	struct adc_message* igpa;
 	igpa = adc_msg_construct(ADC_CMD_IGPA, 38);
+	if (!igpa)
+		return; /* OOM */
 	adc_msg_add_argument(igpa, acl_password_generate_challenge(hub, u));
 	user_set_state(u, state_verify);
 	route_to_user(hub, u, igpa);

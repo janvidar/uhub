@@ -49,6 +49,16 @@ struct hub_user* user_create(struct hub_info* hub, struct net_connection* con, s
 	user->send_queue = ioq_send_create();
 	user->recv_queue = ioq_recv_create();
 
+	if (!user->send_queue || !user->recv_queue)
+	{
+		/* OOM: reject the connection. The caller still owns 'con' and
+		   will close it, since we have not taken ownership yet. */
+		ioq_send_destroy(user->send_queue);
+		ioq_recv_destroy(user->recv_queue);
+		hub_free(user);
+		return NULL;
+	}
+
 	user->connection = con;
 	net_con_reinitialize(user->connection, net_event, user, NET_EVENT_READ);
 
