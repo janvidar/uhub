@@ -23,6 +23,7 @@
 #include <stdint.h>
 #include <time.h>
 
+#include "adc/message.h"
 #include "core/user.h"
 #include "network/ipcalc.h"
 
@@ -132,6 +133,8 @@ struct hub_info
 
 	struct command_base* commands;       /* Hub command handler */
 	struct uhub_plugins* plugins;        /* Plug-ins loaded for this hub instance. */
+
+	uint8_t hub_secret[TIGERSIZE];      /* Hub session secret, used for HBRI, but also password authentication. */
 
 	struct ssl_context_handle* ctx;
 };
@@ -373,4 +376,3 @@ extern void hub_logout_log(struct hub_info* hub, struct hub_user* user);
 
 
 #endif /* HAVE_UHUB_HUB_H */
-

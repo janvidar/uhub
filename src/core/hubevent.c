@@ -19,6 +19,7 @@
 
 #include "adc/message.h"
 #include "network/connection.h"
+#include "core/hbri.h"
 #include "core/hub.h"
 #include "core/hubevent.h"
 #include "core/plugininvoke.h"
@@ -36,6 +37,16 @@ void on_login_success(struct hub_info* hub, struct hub_user* u)
 	/* Mark as being in the normal state, and add user to the user list */
 	user_set_state(u, state_normal);
 	uman_add(hub->users, u);
+
+	/*
+	 * HBRI: the user logs in immediately over its primary protocol. If it also
+	 * advertised an address in the other protocol family, strip that (still
+	 * unverified) address before the INF is broadcast and ask the client to
+	 * prove it. On success the address is added back via an INF update; if it
+	 * never validates the user simply stays primary-only. This must run before
+	 * route_info_message() so the unverified address is never advertised.
+	 */
+	hbri_on_login(hub, u);
 
 	/* Announce new user to all connected users */
 	if (user_is_logged_in(u))

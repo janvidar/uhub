@@ -18,9 +18,11 @@
  */
 
 #include "uhub_limits.h"
+#include <openssl/rand.h>
 #include "util/log.h"
 #include "util/memory.h"
 #include "util/misc.h"
+#include "util/tiger.h"
 #include "adc/message.h"
 #include "adc/sid.h"
 #include "network/connection.h"
@@ -30,6 +32,7 @@
 #include "core/config.h"
 #include "core/eventid.h"
 #include "core/eventqueue.h"
+#include "core/hbri.h"
 #include "core/hub.h"
 #include "core/hubevent.h"
 #include "core/inf.h"
@@ -78,6 +81,14 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 	{
 		switch (cmd->cmd)
 		{
+			case ADC_CMD_HTCP:
+				/* HBRI secondary-protocol validation reply. This arrives on a
+				   fresh connection as its very first command (no HSUP), so it
+				   is handled before the normal handshake. The validation
+				   connection is always closed afterwards. */
+				ret = hbri_handle_validation(hub, u, cmd);
+				break;
+
 			case ADC_CMD_HSUP:
 				CHECK_FLOOD(extras, 0);
 				ret = hub_handle_support(hub, u, cmd);
@@ -835,6 +846,19 @@ static void unload_ssl_certificates(struct hub_info* hub)
 		net_ssl_context_destroy(hub->ctx);
 }
 
+static void hub_init_secret(struct hub_info* hub) {
+    /* A random secret unknown to clients; falls back to startup entropy if the
+	   CSPRNG is somehow unavailable. */
+	if (RAND_bytes(hub->hub_secret, (int) sizeof(hub->hub_secret)) != 1)
+	{
+		uint64_t seed[3];
+		char buf[64];
+		int n = snprintf(buf, sizeof(buf), "%p|%ld|%d", (void*) hub, (long) time(NULL), (int) getpid());
+		tiger((uint64_t*) buf, (uint64_t) n, seed);
+		memcpy(hub->hub_secret, seed, sizeof(hub->hub_secret));
+	}
+}
+
 struct hub_info* hub_start_service(struct hub_config* config)
 {
 	struct hub_info* hub = 0;
@@ -901,6 +925,9 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	}
 
 	hub->logout_info  = (struct linked_list*) list_create();
+
+	hub_init_secret(hub);
+
 	server_alt_port_start(hub, config);
 
 	hub->status = hub_status_running;
@@ -997,10 +1024,12 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 		hub_free(tmp);
 	}
 
-	hub->command_support = adc_msg_construct(ADC_CMD_ISUP, 6 + strlen(ADC_PROTO_SUPPORT));
+	hub->command_support = adc_msg_construct(ADC_CMD_ISUP, 6 + strlen(ADC_PROTO_SUPPORT) + 7);
 	if (hub->command_support)
 	{
 		adc_msg_add_argument(hub->command_support, ADC_PROTO_SUPPORT);
+		if (hbri_is_enabled(hub))
+			adc_msg_add_argument(hub->command_support, "ADHBRI");
 	}
 
 	hub->command_banner = adc_msg_construct(ADC_CMD_ISTA, 100 + (server ? strlen(server) : 0));
@@ -1410,4 +1439,3 @@ void hub_logout_log(struct hub_info* hub, struct hub_user* user)
 		list_remove_first(hub->logout_info, hub_free);
 	}
 }
-
