@@ -69,6 +69,52 @@
 		<since>0.3.0</since>
 	</option>
 
+	<option name="hbri_enable" type="boolean" default="0">
+		<short>Enable HBRI hybrid IPv4/IPv6 connectivity</short>
+		<description><![CDATA[
+			<p>
+			When enabled, the hub advertises the HBRI extension and lets dual-stack clients prove
+			reachability on both IPv4 and IPv6. After a client logs in over one protocol, the hub
+			asks it to open a short-lived secondary connection over the other protocol; on success the
+			client's INF will carry both an IPv4 (I4) and an IPv6 (I6) address, so users behind either
+			protocol can connect to each other.
+			</p>
+			<p>
+			This requires the hub to be reachable on both IPv4 and IPv6 and both hbri_address4 and
+			hbri_address6 to be configured. If either is empty, HBRI is not advertised.
+			</p>
+		]]></description>
+		<since>0.6.1</since>
+	</option>
+
+	<option name="hbri_address4" type="string" default="">
+		<check regexp="[\d:.]+|" />
+		<short>Hub's reachable IPv4 address for HBRI validation</short>
+		<description><![CDATA[
+			The public IPv4 address clients should connect to for HBRI secondary-protocol validation.
+			Must be an address the hub actually listens on (it shares server_port). Leave empty to
+			disable HBRI.
+		]]></description>
+		<example><![CDATA[
+			hbri_address4 = "192.0.2.10"
+		]]></example>
+		<since>0.6.1</since>
+	</option>
+
+	<option name="hbri_address6" type="string" default="">
+		<check regexp="[\da-fA-F:.]+|" />
+		<short>Hub's reachable IPv6 address for HBRI validation</short>
+		<description><![CDATA[
+			The public IPv6 address clients should connect to for HBRI secondary-protocol validation.
+			Must be an address the hub actually listens on (it shares server_port). Leave empty to
+			disable HBRI.
+		]]></description>
+		<example><![CDATA[
+			hbri_address6 = "2001:db8::10"
+		]]></example>
+		<since>0.6.1</since>
+	</option>
+
 	<option name="show_banner" type="boolean" default="1">
 		<short>Show banner on connect</short>
 		<description><![CDATA[

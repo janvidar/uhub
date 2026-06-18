@@ -26,6 +26,7 @@
 #include "core/config.h"
 #include "core/eventid.h"
 #include "core/eventqueue.h"
+#include "core/hbri.h"
 #include "core/hubevent.h"
 #include "core/inf.h"
 #include "core/route.h"
@@ -208,6 +209,53 @@ static int check_required_login_flags(struct hub_info* hub, struct hub_user* use
  * remove any wrong address, and replace it with the correct one
  * as seen by the hub.
  */
+/*
+ * @return 1 if cmd advertises a syntactically valid address in the given
+ * protocol family (used to decide whether an HBRI second-family address is
+ * worth keeping for later validation).
+ */
+static int check_network_secondary_ok(struct adc_message* cmd, int af)
+{
+	const char* flag = (af == AF_INET6) ? ADC_INF_FLAG_IPV6_ADDR : ADC_INF_FLAG_IPV4_ADDR;
+	char* addr = adc_msg_get_named_argument(cmd, flag);
+	int ok = addr && *addr && (af == AF_INET6 ? ip_is_valid_ipv6(addr) : ip_is_valid_ipv4(addr));
+	hub_free(addr);
+	return ok;
+}
+
+/*
+ * When a logged-in HBRI client advertises a new second-family address in an INF
+ * update, ask it to prove the address over a secondary connection. Does nothing
+ * if HBRI is disabled, the client does not support it, or the advertised
+ * address is missing/invalid/unchanged from what we already hold.
+ */
+static void check_hbri_update(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
+{
+	int sec_af;
+	const char* flag;
+	char* advertised;
+	char* current;
+	int is_new;
+
+	if (!hbri_is_enabled(hub) || !user_flag_get(user, feature_hbri))
+		return;
+
+	sec_af = (user->id.addr.af == AF_INET) ? AF_INET6 : AF_INET;
+	if (!check_network_secondary_ok(cmd, sec_af))
+		return;
+
+	flag = (sec_af == AF_INET6) ? ADC_INF_FLAG_IPV6_ADDR : ADC_INF_FLAG_IPV4_ADDR;
+	advertised = adc_msg_get_named_argument(cmd, flag);
+	current = user->info ? adc_msg_get_named_argument(user->info, flag) : 0;
+
+	is_new = advertised && (!current || strcmp(advertised, current) != 0);
+	hub_free(advertised);
+	hub_free(current);
+
+	if (is_new)
+		hbri_send_validation_request(hub, user);
+}
+
 static int check_network(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	const char* address = user_get_address(user);
@@ -227,17 +275,34 @@ static int check_network(struct hub_info* hub, struct hub_user* user, struct adc
 		hub_free(client_given_ip);
 	}
 
+	/*
+	 * The hub overrides the connecting-family address with the one it actually
+	 * sees. The other family is normally stripped, since a client cannot prove
+	 * an address it did not connect from -- except when HBRI is in play: a
+	 * dual-stack client may advertise its second-family address here and prove
+	 * it later over a secondary connection (see hbri.c). In that case we keep
+	 * the advertised second-family address for now; it is stripped again before
+	 * broadcast and only re-added once validated.
+	 */
+	int hbri = hbri_is_enabled(hub) && user_flag_get(user, feature_hbri);
+
 	if (strchr(address, '.'))
 	{
-		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
-		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_UDP_PORT);
+		if (!(hbri && check_network_secondary_ok(cmd, AF_INET6)))
+		{
+			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
+			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_UDP_PORT);
+		}
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
 		adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR, address);
 	}
 	else if (strchr(address, ':'))
 	{
-		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
-		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_UDP_PORT);
+		if (!(hbri && check_network_secondary_ok(cmd, AF_INET)))
+		{
+			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
+			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_UDP_PORT);
+		}
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
 		adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR, address);
 	}
@@ -853,6 +918,16 @@ int hub_handle_info(struct hub_info* hub, struct hub_user* user, const struct ad
 			adc_msg_free(cmd);
 			return -1;
 		}
+
+		/*
+		 * HBRI: a logged-in dual-stack client may add or change its
+		 * second-family address in an update. The address itself is stripped
+		 * from the broadcast below (clients cannot change their IP via an
+		 * update), but if it is new we ask the client to prove it; on success
+		 * it is broadcast as a validated update. This is detected before
+		 * strip_network() removes the address.
+		 */
+		check_hbri_update(hub, user, cmd);
 
 		strip_network(user, cmd);
 		hub_handle_info_low_bandwidth(hub, user, cmd);

@@ -49,7 +49,10 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 
 		if (bytes >= 4)
 		{
-			if (memcmp(probe_recvbuf, "HSUP", 4) == 0)
+			/* "HSUP" starts a normal login; "HTCP" starts an HBRI secondary-
+			   protocol validation connection (see hbri.c). Both are ADC and
+			   handled by the per-user command dispatcher once a user exists. */
+			if (memcmp(probe_recvbuf, "HSUP", 4) == 0 || memcmp(probe_recvbuf, "HTCP", 4) == 0)
 			{
 				LOG_TRACE("Probed ADC");
 				if (probe->hub->config->tls_enable && probe->hub->config->tls_require)

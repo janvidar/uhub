@@ -103,11 +103,18 @@ typedef uint32_t fourcc_t;
 #define ADC_CMD_HCMD FOURCC('H','C','M','D')
 #define ADC_CMD_ICMD FOURCC('I','C','M','D')
 
+/* HBRI Extension (hybrid IPv4/IPv6 connectivity) */
+#define ADC_CMD_ITCP FOURCC('I','T','C','P') /* hub -> client: secondary-protocol validation request */
+#define ADC_CMD_HTCP FOURCC('H','T','C','P') /* client -> hub: reply over the secondary protocol */
+
 
 #define ADC_INF_FLAG_IPV4_ADDR          "I4" /* ipv4 address */
 #define ADC_INF_FLAG_IPV6_ADDR          "I6" /* ipv6 address */
 #define ADC_INF_FLAG_IPV4_UDP_PORT      "U4" /* port number */
 #define ADC_INF_FLAG_IPV6_UDP_PORT      "U6" /* port number */
+#define ADC_INF_FLAG_IPV4_TCP_PORT      "P4" /* tcp port number (HBRI validation request) */
+#define ADC_INF_FLAG_IPV6_TCP_PORT      "P6" /* tcp port number (HBRI validation request) */
+#define ADC_INF_FLAG_TOKEN              "TO" /* token (HBRI validation request) */
 #define ADC_INF_FLAG_CLIENT_TYPE        "CT" /* client type */
 #define ADC_INF_FLAG_PRIVATE_ID         "PD" /* private id, aka PID */
 #define ADC_INF_FLAG_CLIENT_ID          "ID" /* client id, aka CID */
