@@ -1,0 +1,4 @@
+- Update password challenge token generation to match a scheme used for HBRI branch (feature/experimental_hbri) using a hub secret to prevent replay attacks further.
+- Update plug-ins: flood control
+- Config value validation - currently very poorly implemented.
+
