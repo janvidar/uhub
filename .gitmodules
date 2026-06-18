@@ -1,3 +1,0 @@
-[submodule "thirdparty/sqlite"]
-	path = thirdparty/sqlite
-	url = https://github.com/janvidar/sqlite.git
