@@ -151,7 +151,6 @@ pub fn build(b: *std.Build) void {
     flags.appendSlice(&.{ "-std=gnu23", "-pedantic", "-Wall", "-W", "-D_GNU_SOURCE" }) catch @panic("OOM");
     if (!release) flags.append("-DDEBUG") catch @panic("OOM");
     if (lowlevel_debug) flags.append("-DLOWLEVEL_DEBUG") catch @panic("OOM");
-    flags.appendSlice(&.{ "-DSSL_SUPPORT", "-DSSL_USE_OPENSSL" }) catch @panic("OOM");
     if (systemd) flags.append("-DSYSTEMD") catch @panic("OOM");
     if (target.result.cpu.arch.endian() == .big) flags.append("-DARCH_BIGENDIAN") catch @panic("OOM");
     const cflags = flags.toOwnedSlice() catch @panic("OOM");

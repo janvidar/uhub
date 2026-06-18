@@ -228,7 +228,6 @@ endif()
 set (UHUB_GIT_VERSION "${UHUB_VERSION_MAJOR}.${UHUB_VERSION_MINOR}.${UHUB_VERSION_PATCH}-${UHUB_REVISION}")
 message (STATUS "Configuring uhub version: ${UHUB_GIT_VERSION}")
 
-add_compile_definitions(SSL_SUPPORT=1 SSL_USE_OPENSSL=1)
 set(SSL_LIBS OpenSSL::SSL OpenSSL::Crypto)
 
 target_link_libraries(uhub ${SSL_LIBS})
