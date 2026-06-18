@@ -417,6 +417,9 @@ static int check_user_agent(struct hub_info* hub, struct hub_user* user, struct 
 		}
 	}
 
+	/* Ensure the user agent is NUL-terminated regardless of the memcpy lengths above. */
+	user->id.user_agent[MAX_UA_LEN] = '\0';
+
 	hub_free(ua_name_encoded);
 	hub_free(ua_version_encoded);
 	return 0;
