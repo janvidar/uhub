@@ -713,6 +713,8 @@ char* adc_msg_get_named_argument(struct adc_message* cmd, const char prefix_[2])
 	length = &end[0] - &start[0];
 
 	argument = hub_strndup(start, length);
+	if (!argument)
+		return NULL; /* OOM */
 
 	if (length > 0 && argument[length-1] == '\n')
 	{
@@ -948,6 +950,9 @@ int adc_msg_unescape_to_target(const char* string, char* target, size_t target_s
 	char* ptr = (char*) target;
 	char* str = (char*) string;
 	int escaped = 0;
+
+	if (target_size == 0)
+		return 0;
 
 	while (*str && w < (target_size-1))
 	{
