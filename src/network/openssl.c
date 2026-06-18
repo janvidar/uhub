@@ -355,7 +355,7 @@ ssize_t net_con_ssl_accept(struct net_connection* con)
                 net_stats_tls_add_accept();
 		return ret;
 	}
-	return handle_openssl_error(con, ret, tls_st_accepting);
+	return handle_openssl_error(con, ret, 1);
 }
 
 ssize_t net_con_ssl_connect(struct net_connection* con)
@@ -375,7 +375,7 @@ ssize_t net_con_ssl_connect(struct net_connection* con)
 		return ret;
 	}
 	
-	ret = handle_openssl_error(con, ret, tls_st_connecting);
+	ret = handle_openssl_error(con, ret, 1);
 	
         if (ret != 0)
             LOG_ERROR("net_con_ssl_connect: ret=%d", ret);
