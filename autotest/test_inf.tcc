@@ -46,6 +46,9 @@ static void inf_create_user()
 static void inf_destroy_user()
 {
 	if (!inf_user) return;
+	/* Release the info message that hub_handle_info_login() attached via
+	   user_set_info(); a plain hub_free() would leak it. */
+	user_set_info(inf_user, 0);
 	hub_free(inf_user);
 	inf_user = 0;
 }
@@ -58,14 +61,14 @@ EXO_TEST(inf_create_setup,
 });
 
 
-/* FIXME: MEMORY LEAK - Need to fix hub_handle_info_login */
+/* hub_handle_info_login() takes a reference on the message via user_set_info();
+   we free our own reference here, and inf_destroy_user() releases the one held
+   by inf_user at teardown. */
 #define CHECK_INF(MSG, EXPECT) \
 	do { \
 		struct adc_message* msg = adc_msg_parse_verify(inf_user, MSG, strlen(MSG)); \
-		int ok = hub_handle_info_login(inf_hub, inf_user, msg); /* FIXME: MEMORY LEAK */ \
+		int ok = hub_handle_info_login(inf_hub, inf_user, msg); \
 		adc_msg_free(msg); \
-		if (ok == EXPECT) \
-			user_set_info(inf_user, 0); \
 		return ok == EXPECT; \
 	} while(0)
 
