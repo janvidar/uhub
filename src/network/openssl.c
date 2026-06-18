@@ -270,7 +270,7 @@ void net_ssl_context_destroy(struct ssl_context_handle* ctx_)
 int ssl_load_certificate(struct ssl_context_handle* ctx_, const char* pem_file)
 {
 	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
-	if (SSL_CTX_use_certificate_chain_file(ctx->ssl, pem_file) < 0)
+	if (SSL_CTX_use_certificate_chain_file(ctx->ssl, pem_file) != 1)
 	{
 		LOG_ERROR("SSL_CTX_use_certificate_chain_file: %s", ERR_error_string(ERR_get_error(), NULL));
 		return 0;
@@ -282,7 +282,7 @@ int ssl_load_certificate(struct ssl_context_handle* ctx_, const char* pem_file)
 int ssl_load_private_key(struct ssl_context_handle* ctx_, const char* pem_file)
 {
 	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
-	if (SSL_CTX_use_PrivateKey_file(ctx->ssl, pem_file, SSL_FILETYPE_PEM) < 0)
+	if (SSL_CTX_use_PrivateKey_file(ctx->ssl, pem_file, SSL_FILETYPE_PEM) != 1)
 	{
 		LOG_ERROR("SSL_CTX_use_PrivateKey_file: %s", ERR_error_string(ERR_get_error(), NULL));
 		return 0;
