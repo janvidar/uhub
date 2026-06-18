@@ -15,7 +15,7 @@
 #  For details see the accompanying COPYING-CMAKE-SCRIPTS file.
 #
 
-INCLUDE( FindPkgConfig )
+find_package(PkgConfig QUIET)
 # Take care about sqlite3.pc settings
 IF ( Sqlite3_FIND_REQUIRED )
   SET( _pkgconfig_REQUIRED "REQUIRED" )
