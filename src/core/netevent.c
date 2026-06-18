@@ -77,7 +77,6 @@ int handle_net_read(struct hub_user* user)
 				}
 			}
 
-			pos[0] = '\n'; /* FIXME: not needed */
 			pos ++;
 			remaining -= (pos - start);
 			start = pos;

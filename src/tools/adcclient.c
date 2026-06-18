@@ -479,7 +479,6 @@ static ssize_t ADC_client_recv(struct ADC_client* client)
 				}
 			}
 
-			pos[0] = '\n'; /* FIXME: not needed */
 			pos ++;
 			remaining -= (pos - start);
 			start = pos;

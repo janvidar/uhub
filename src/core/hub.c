@@ -657,7 +657,7 @@ static void hub_event_dispatcher(void* callback_data, struct event_data* message
 
 
 		default:
-			/* FIXME: ignored */
+			/* No handler for this event type; nothing to do. */
 			break;
 	}
 }
