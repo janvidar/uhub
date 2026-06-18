@@ -6,7 +6,7 @@
 cmake_minimum_required (VERSION 3.21)
 
 project (uhub
-	VERSION 0.6.0
+	VERSION 0.6.1
 	LANGUAGES C)
 
 # Build everything as C23 (gnu23 - _GNU_SOURCE and friends are still needed).
