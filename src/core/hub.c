@@ -486,6 +486,16 @@ void hub_send_hubinfo(struct hub_info* hub, struct hub_user* u)
 
 		/* uptime in seconds */
 		adc_msg_add_named_argument(info, "UP", uhub_itoa((int) difftime(time(0), hub->tm_started)));
+
+		/* Optional descriptive fields (escaped; omitted when not configured) */
+		if (*hub->config->hub_address)
+			adc_msg_add_named_argument_string(info, "HH", hub->config->hub_address);
+		if (*hub->config->hub_website)
+			adc_msg_add_named_argument_string(info, "WS", hub->config->hub_website);
+		if (*hub->config->hub_network)
+			adc_msg_add_named_argument_string(info, "NE", hub->config->hub_network);
+		if (*hub->config->hub_owner)
+			adc_msg_add_named_argument_string(info, "OW", hub->config->hub_owner);
 	}
 
 	if (user_is_connecting(u) || user_is_logged_in(u))

@@ -156,6 +156,54 @@
 		]]></example>
 	</option>
 
+	<option name="hub_address" type="string" default="">
+		<short>Hub host address advertised to hub lists (HH).</short>
+		<description><![CDATA[
+		The DNS name or IP address clients use to reach this hub. Sent to clients
+		that support the ADC PING extension (the "HH" field). Leave empty to omit.
+		]]></description>
+		<since>0.6.1</since>
+		<example><![CDATA[
+			hub_address = "adc://hub.example.com:1511"
+		]]></example>
+	</option>
+
+	<option name="hub_website" type="string" default="">
+		<short>Hub website address advertised to hub lists (WS).</short>
+		<description><![CDATA[
+		The hub's website. Sent to clients that support the ADC PING extension
+		(the "WS" field). Leave empty to omit.
+		]]></description>
+		<since>0.6.1</since>
+		<example><![CDATA[
+			hub_website = "https://www.example.com"
+		]]></example>
+	</option>
+
+	<option name="hub_network" type="string" default="">
+		<short>Hub network name advertised to hub lists (NE).</short>
+		<description><![CDATA[
+		The name of the network this hub belongs to. Sent to clients that support
+		the ADC PING extension (the "NE" field). Leave empty to omit.
+		]]></description>
+		<since>0.6.1</since>
+		<example><![CDATA[
+			hub_network = "Example Network"
+		]]></example>
+	</option>
+
+	<option name="hub_owner" type="string" default="">
+		<short>Hub owner name advertised to hub lists (OW).</short>
+		<description><![CDATA[
+		The name of the hub owner. Sent to clients that support the ADC PING
+		extension (the "OW" field). Leave empty to omit.
+		]]></description>
+		<since>0.6.1</since>
+		<example><![CDATA[
+			hub_owner = "Jane Doe"
+		]]></example>
+	</option>
+
 	<option name="redirect_addr" type="string" default="">
 		<check regexp="(adcs?|dchub)://.*" />
 		<short>A common hub redirect address.</short>
