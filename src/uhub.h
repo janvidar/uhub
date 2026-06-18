@@ -98,7 +98,6 @@ extern "C" {
 #include "core/hubevent.h"
 #include "core/plugincallback.h"
 #include "core/plugininvoke.h"
-#include "core/pluginloader.h"
 
 
 
