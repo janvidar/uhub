@@ -116,7 +116,7 @@ void user_update_info(struct hub_user* u, struct adc_message* cmd)
 	struct adc_message* cmd_new = adc_msg_copy(u->info);
 	if (!cmd_new)
 	{
-		/* FIXME: OOM! */
+		/* OOM: keep the previous info and drop this update. */
 		return;
 	}
 

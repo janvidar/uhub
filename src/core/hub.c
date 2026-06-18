@@ -936,7 +936,7 @@ void hub_plugins_unload(struct hub_info* hub)
 void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 {
 	char* tmp;
-	char* server = adc_msg_escape(PRODUCT_STRING); /* FIXME: OOM */
+	char* server = adc_msg_escape(PRODUCT_STRING); /* may be NULL on OOM; only used as a size hint below */
 
 	hub->acl = acl;
 	hub->command_info = adc_msg_construct(ADC_CMD_IINF, 15);
@@ -961,7 +961,7 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 		adc_msg_add_argument(hub->command_support, ADC_PROTO_SUPPORT);
 	}
 
-	hub->command_banner = adc_msg_construct(ADC_CMD_ISTA, 100 + strlen(server));
+	hub->command_banner = adc_msg_construct(ADC_CMD_ISTA, 100 + (server ? strlen(server) : 0));
 	if (hub->command_banner)
 	{
 		if (hub->config->show_banner_sys_info)

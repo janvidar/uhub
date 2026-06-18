@@ -807,6 +807,9 @@ int adc_msg_add_named_argument_uint64(struct adc_message* cmd, const char prefix
 
 int adc_msg_add_argument(struct adc_message* cmd, const char* string)
 {
+	if (!string)
+		return -1;
+
 	ADC_MSG_ASSERT(cmd);
 
 	adc_msg_unterminate(cmd);

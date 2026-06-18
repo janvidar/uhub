@@ -47,7 +47,7 @@ static int set_feature_cast_supports(struct hub_user* u, struct adc_message* cmd
 	{
 		tmp = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_SUPPORT);
 		if (!tmp)
-			return -1; // FIXME: OOM
+			return -1; /* OOM: leave SUPPORT flags unset; login still proceeds */
 
 		user_clear_feature_cast_support(u);
 
