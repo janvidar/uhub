@@ -30,13 +30,52 @@ static struct plugin_callback_data* get_callback_data(struct plugin_handle* plug
 	return get_internals(plugin)->callback_data;
 }
 
+/*
+ * The public plugin_* structs are deliberately a layout-compatible "view" of
+ * the internal hub_* structs: plugin_command is a prefix of hub_command, and
+ * plugin_user mirrors the head of hub_user (its hub_user_info fields followed
+ * by credentials). These conversions are the single place that relies on that,
+ * guarded by static assertions so that reordering a struct member fails the
+ * build rather than corrupting memory at runtime.
+ */
+_Static_assert(offsetof(struct plugin_user, sid)         == offsetof(struct hub_user, id.sid),        "plugin_user/hub_user layout mismatch");
+_Static_assert(offsetof(struct plugin_user, nick)        == offsetof(struct hub_user, id.nick),       "plugin_user/hub_user layout mismatch");
+_Static_assert(offsetof(struct plugin_user, cid)         == offsetof(struct hub_user, id.cid),        "plugin_user/hub_user layout mismatch");
+_Static_assert(offsetof(struct plugin_user, user_agent)  == offsetof(struct hub_user, id.user_agent), "plugin_user/hub_user layout mismatch");
+_Static_assert(offsetof(struct plugin_user, addr)        == offsetof(struct hub_user, id.addr),       "plugin_user/hub_user layout mismatch");
+_Static_assert(offsetof(struct plugin_user, credentials) == offsetof(struct hub_user, credentials),   "plugin_user/hub_user layout mismatch");
+
+_Static_assert(offsetof(struct plugin_command, message) == offsetof(struct hub_command, message), "plugin_command/hub_command layout mismatch");
+_Static_assert(offsetof(struct plugin_command, prefix)  == offsetof(struct hub_command, prefix),  "plugin_command/hub_command layout mismatch");
+_Static_assert(offsetof(struct plugin_command, args)    == offsetof(struct hub_command, args),    "plugin_command/hub_command layout mismatch");
+
+static struct hub_user* as_hub_user(struct plugin_user* user)
+{
+	return (struct hub_user*) user;
+}
+
+static struct plugin_user* as_plugin_user(struct hub_user* user)
+{
+	return (struct plugin_user*) user;
+}
+
+static struct hub_command* as_hub_command(struct plugin_command* cmd)
+{
+	return (struct hub_command*) cmd;
+}
+
+static struct plugin_command* as_plugin_command(struct hub_command* cmd)
+{
+	return (struct plugin_command*) cmd;
+}
+
 static int plugin_command_dispatch(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
 	struct plugin_handle* plugin = (struct plugin_handle*) cmd->ptr;
 	struct plugin_callback_data* data = get_callback_data(plugin);
 	struct plugin_command_handle* cmdh;
-	struct plugin_user* puser = (struct plugin_user*) user; // FIXME: Use a proper conversion function instead.
-	struct plugin_command* pcommand = (struct plugin_command*) cmd; // FIXME: Use a proper conversion function instead.
+	struct plugin_user* puser = as_plugin_user(user);
+	struct plugin_command* pcommand = as_plugin_command(cmd);
 
 	LOG_PLUGIN("plugin_command_dispatch: cmd=%s", cmd->prefix);
 
@@ -48,18 +87,12 @@ static int plugin_command_dispatch(struct command_base* cbase, struct hub_user* 
 	return 0;
 }
 
-static struct hub_user* convert_user_type(struct plugin_user* user)
-{
-	struct hub_user* huser = (struct hub_user*) user;
-	return huser;
-}
-
 static int cbfunc_send_message(struct plugin_handle* plugin, struct plugin_user* user, const char* message)
 {
 	char* buffer = adc_msg_escape(message);
 	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
 	adc_msg_add_argument(command, buffer);
-	route_to_user(plugin_get_hub(plugin), convert_user_type(user), command);
+	route_to_user(plugin_get_hub(plugin), as_hub_user(user), command);
 	adc_msg_free(command);
 	hub_free(buffer);
 	return 1;
@@ -84,7 +117,7 @@ static int cbfunc_send_status(struct plugin_handle* plugin, struct plugin_user* 
 	snprintf(code_str, sizeof(code_str), "%03d", code);
 	adc_msg_add_argument(command, code_str);
 	adc_msg_add_argument(command, buffer);
-	route_to_user(plugin_get_hub(plugin), convert_user_type(user), command);
+	route_to_user(plugin_get_hub(plugin), as_hub_user(user), command);
 	adc_msg_free(command);
 	hub_free(buffer);
 	return 1;
@@ -92,7 +125,7 @@ static int cbfunc_send_status(struct plugin_handle* plugin, struct plugin_user* 
 
 static int cbfunc_user_disconnect(struct plugin_handle* plugin, struct plugin_user* user)
 {
-	hub_disconnect_user(plugin_get_hub(plugin), convert_user_type(user), quit_kicked);
+	hub_disconnect_user(plugin_get_hub(plugin), as_hub_user(user), quit_kicked);
 	return 0;
 }
 
@@ -129,14 +162,12 @@ static int cbfunc_command_del(struct plugin_handle* plugin, struct plugin_comman
 
 size_t cbfunc_command_arg_reset(struct plugin_handle* plugin, struct plugin_command* cmd)
 {
-	// TODO: Use proper function for rewriting for plugin_command -> hub_command
-	return hub_command_arg_reset((struct hub_command*) cmd);
+	return hub_command_arg_reset(as_hub_command(cmd));
 }
 
 struct plugin_command_arg_data* cbfunc_command_arg_next(struct plugin_handle* plugin, struct plugin_command* cmd, enum plugin_command_arg_type t)
 {
-	// TODO: Use proper function for rewriting for plugin_command -> hub_command
-	return (struct plugin_command_arg_data*) hub_command_arg_next((struct hub_command*) cmd, (enum hub_command_arg_type) t);
+	return (struct plugin_command_arg_data*) hub_command_arg_next(as_hub_command(cmd), (enum hub_command_arg_type) t);
 }
 
 static size_t cbfunc_get_usercount(struct plugin_handle* plugin)
