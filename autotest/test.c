@@ -44,6 +44,7 @@ extern int  exotic_run(struct exotic_handle* handle);
 
 #endif /* HAVE_EXOTIC_AUTOTEST_H */
 
+#include "test_auth.tcc"
 #include "test_commands.tcc"
 #include "test_credentials.tcc"
 #include "test_eventqueue.tcc"
@@ -69,6 +70,39 @@ int main(int argc, char** argv)
 		return -1;
 
 	/* Register the tests to be run */
+	exotic_add_test(&handle, &exotic_test_acl_setup, "acl_setup");
+	exotic_add_test(&handle, &exotic_test_acl_admin_cred, "acl_admin_cred");
+	exotic_add_test(&handle, &exotic_test_acl_admin_pass, "acl_admin_pass");
+	exotic_add_test(&handle, &exotic_test_acl_super_cred, "acl_super_cred");
+	exotic_add_test(&handle, &exotic_test_acl_op_cred, "acl_op_cred");
+	exotic_add_test(&handle, &exotic_test_acl_op_nopass, "acl_op_nopass");
+	exotic_add_test(&handle, &exotic_test_acl_reg_cred, "acl_reg_cred");
+	exotic_add_test(&handle, &exotic_test_acl_link_cred, "acl_link_cred");
+	exotic_add_test(&handle, &exotic_test_acl_bot_cred, "acl_bot_cred");
+	exotic_add_test(&handle, &exotic_test_acl_ubot_cred, "acl_ubot_cred");
+	exotic_add_test(&handle, &exotic_test_acl_opbot_cred, "acl_opbot_cred");
+	exotic_add_test(&handle, &exotic_test_acl_opubot_cred, "acl_opubot_cred");
+	exotic_add_test(&handle, &exotic_test_acl_unknown_user, "acl_unknown_user");
+	exotic_add_test(&handle, &exotic_test_acl_bot_nopass, "acl_bot_nopass");
+	exotic_add_test(&handle, &exotic_test_acl_deny_nick, "acl_deny_nick");
+	exotic_add_test(&handle, &exotic_test_acl_deny_nick_neg, "acl_deny_nick_neg");
+	exotic_add_test(&handle, &exotic_test_acl_ban_nick, "acl_ban_nick");
+	exotic_add_test(&handle, &exotic_test_acl_ban_nick_case, "acl_ban_nick_case");
+	exotic_add_test(&handle, &exotic_test_acl_ban_nick_neg, "acl_ban_nick_neg");
+	exotic_add_test(&handle, &exotic_test_acl_ban_cid, "acl_ban_cid");
+	exotic_add_test(&handle, &exotic_test_acl_ban_cid_neg, "acl_ban_cid_neg");
+	exotic_add_test(&handle, &exotic_test_acl_deny_ip_in, "acl_deny_ip_in");
+	exotic_add_test(&handle, &exotic_test_acl_deny_ip_edge, "acl_deny_ip_edge");
+	exotic_add_test(&handle, &exotic_test_acl_deny_ip_out, "acl_deny_ip_out");
+	exotic_add_test(&handle, &exotic_test_acl_nat_ip_in, "acl_nat_ip_in");
+	exotic_add_test(&handle, &exotic_test_acl_nat_ip_out, "acl_nat_ip_out");
+	exotic_add_test(&handle, &exotic_test_acl_ok_comment, "acl_ok_comment");
+	exotic_add_test(&handle, &exotic_test_acl_ok_blank, "acl_ok_blank");
+	exotic_add_test(&handle, &exotic_test_acl_err_unknown, "acl_err_unknown");
+	exotic_add_test(&handle, &exotic_test_acl_err_prefix, "acl_err_prefix");
+	exotic_add_test(&handle, &exotic_test_acl_err_no_arg, "acl_err_no_arg");
+	exotic_add_test(&handle, &exotic_test_acl_err_bad_ip, "acl_err_bad_ip");
+	exotic_add_test(&handle, &exotic_test_acl_teardown, "acl_teardown");
 	exotic_add_test(&handle, &exotic_test_setup, "setup");
 	exotic_add_test(&handle, &exotic_test_command_setup_user, "command_setup_user");
 	exotic_add_test(&handle, &exotic_test_command_create, "command_create");
