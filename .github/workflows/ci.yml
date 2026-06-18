@@ -33,7 +33,6 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # Build + unit tests across compilers and the minimal/full feature configs.
-  # Replaces the dead Travis pipeline.
   # ---------------------------------------------------------------------------
   test:
     name: test (${{ matrix.compiler }}, ${{ matrix.config }})
