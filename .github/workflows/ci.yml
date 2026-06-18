@@ -51,8 +51,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -qq
-          # SQLite3 is a hard requirement of CMakeLists.txt even in the
-          # minimal config; OpenSSL is only needed when SSL_SUPPORT=ON.
+          # SQLite3 and a TLS library are hard requirements of CMakeLists.txt:
+          # TLS is mandatory, so find_package(OpenSSL REQUIRED) always runs.
           sudo apt-get install -y cmake perl libsqlite3-dev libssl-dev ${{ matrix.compiler }}
 
       - name: Regenerate test.c
@@ -62,10 +62,10 @@ jobs:
         run: |
           if [ "${{ matrix.config }}" = "full" ]; then
             cmake -S . -B build \
-              -DRELEASE=OFF -DLOWLEVEL_DEBUG=ON -DSSL_SUPPORT=ON -DADC_STRESS=ON
+              -DRELEASE=OFF -DLOWLEVEL_DEBUG=ON -DADC_STRESS=ON
           else
             cmake -S . -B build \
-              -DRELEASE=ON -DSSL_SUPPORT=OFF -DADC_STRESS=OFF
+              -DRELEASE=ON -DADC_STRESS=OFF
           fi
 
       - name: Build
@@ -98,7 +98,7 @@ jobs:
       # consistency checks run under the sanitizers as well.
       - name: Configure (ASan/UBSan)
         run: |
-          cmake -S . -B build-asan -DRELEASE=OFF -DSSL_SUPPORT=ON \
+          cmake -S . -B build-asan -DRELEASE=OFF \
             -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
             -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
 
@@ -130,12 +130,12 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -qq
-          # libsqlite3-dev: CMakeLists requires SQLite3 to configure even when
-          # the fuzz targets themselves don't use it.
-          sudo apt-get install -y cmake clang libsqlite3-dev
+          # libsqlite3-dev / libssl-dev: CMakeLists requires SQLite3 and a TLS
+          # library to configure, even though the fuzz targets don't use them.
+          sudo apt-get install -y cmake clang libsqlite3-dev libssl-dev
 
       - name: Configure (libFuzzer)
-        run: cmake -S . -B build-fuzz -DFUZZING=ON -DSSL_SUPPORT=OFF -DRELEASE=ON
+        run: cmake -S . -B build-fuzz -DFUZZING=ON -DRELEASE=ON
 
       - name: Build fuzzers
         run: cmake --build build-fuzz --target fuzz_message fuzz_adc_escape fuzz_ipcalc fuzz_config_token fuzz_command_parser -j
