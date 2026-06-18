@@ -126,6 +126,49 @@ const Ctx = struct {
         });
     }
 
+    // Generate the autotest driver (autotest/test.c) from the *.tcc sources
+    // with the exotic Perl script, mirroring the add_custom_command in
+    // CMakeLists.txt. This replaces the manual autotest/update.sh step:
+    // editing or adding a .tcc re-runs exotic on the next build. The captured
+    // stdout is compiled into the module; exotic embeds each .tcc as
+    // #include "<basename>", so the autotest dir goes on the include path.
+    fn addAutotest(ctx: *const Ctx, m: *std.Build.Module) void {
+        const b = ctx.b;
+        const exotic = b.addSystemCommand(&.{ b.findProgram(&.{"perl"}, &.{}) catch "perl", "exotic" });
+        exotic.setCwd(b.path("autotest"));
+        exotic.addFileInput(b.path("autotest/exotic"));
+
+        // Collect test_*.tcc basenames deterministically (sorted), matching
+        // the `file(GLOB ...)` + `list(SORT ...)` in CMakeLists.txt.
+        var names = std.array_list.Managed([]const u8).init(b.allocator);
+        var dir = b.build_root.handle.openDir("autotest", .{ .iterate = true }) catch @panic("cannot open autotest/");
+        defer dir.close();
+        var it = dir.iterate();
+        while (it.next() catch @panic("cannot iterate autotest/")) |entry| {
+            if (entry.kind != .file) continue;
+            if (!std.mem.startsWith(u8, entry.name, "test_")) continue;
+            if (!std.mem.endsWith(u8, entry.name, ".tcc")) continue;
+            names.append(b.dupe(entry.name)) catch @panic("OOM");
+        }
+        std.mem.sort([]const u8, names.items, {}, struct {
+            fn lt(_: void, a: []const u8, c: []const u8) bool {
+                return std.mem.lessThan(u8, a, c);
+            }
+        }.lt);
+        for (names.items) |name| {
+            exotic.addArg(name);
+            exotic.addFileInput(b.path(b.fmt("autotest/{s}", .{name})));
+        }
+
+        // exotic writes the driver to stdout; capture it, then copy to a .c
+        // basename so Zig classifies it as a C source (the captured file is
+        // otherwise named "stdout" with no extension).
+        const wf = b.addWriteFiles();
+        const test_c = wf.addCopyFile(exotic.captureStdOut(), "test.c");
+        m.addCSourceFile(.{ .file = test_c, .flags = ctx.cflags });
+        m.addIncludePath(b.path("autotest"));
+    }
+
     fn linkExternal(ctx: *const Ctx, m: *std.Build.Module) void {
         m.linkSystemLibrary("ssl", .{});
         m.linkSystemLibrary("crypto", .{});
@@ -231,7 +274,7 @@ pub fn build(b: *std.Build) void {
     // autotest-bin
     const autotest_mod = ctx.module();
     ctx.addSources(autotest_mod, &core_sources);
-    ctx.addSources(autotest_mod, &.{"autotest/test.c"});
+    ctx.addAutotest(autotest_mod);
     autotest_mod.linkLibrary(common);
     ctx.linkExternal(autotest_mod);
     const autotest = b.addExecutable(.{ .name = "autotest-bin", .root_module = autotest_mod });

@@ -31,6 +31,9 @@ option(FUZZING "Build libFuzzer fuzz targets (requires clang)" OFF)
 
 find_package(Git)
 find_package(SQLite3 REQUIRED)
+# autotest/test.c is generated at build time from the *.tcc sources by the
+# exotic Perl script (see the autotest-bin target below).
+find_package(Perl REQUIRED)
 
 include(CheckSymbolExists)
 include(CheckIncludeFile)
@@ -148,8 +151,33 @@ set_target_properties(utils network PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_dependencies(adc utils)
 add_dependencies(network utils)
 
+# Generate the autotest driver (autotest/test.c) from the *.tcc test sources.
+# This replaces the manual `autotest/update.sh` step: editing or adding a .tcc
+# file re-runs exotic at build time. CONFIGURE_DEPENDS re-globs when a .tcc is
+# added or removed; the explicit DEPENDS re-runs exotic when one is edited.
+set (AUTOTEST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/autotest")
+set (AUTOTEST_GENERATED "${PROJECT_BINARY_DIR}/autotest_test.c")
+file (GLOB autotest_TCC CONFIGURE_DEPENDS ${AUTOTEST_DIR}/test_*.tcc)
+list (SORT autotest_TCC)
+# exotic embeds each argument verbatim as #include "<arg>", so pass bare
+# basenames and run from AUTOTEST_DIR; autotest-bin adds AUTOTEST_DIR to its
+# include path so those quoted includes resolve from the build tree.
+set (autotest_TCC_NAMES "")
+foreach (_tcc ${autotest_TCC})
+	get_filename_component (_tcc_name ${_tcc} NAME)
+	list (APPEND autotest_TCC_NAMES ${_tcc_name})
+endforeach()
+add_custom_command(
+	OUTPUT ${AUTOTEST_GENERATED}
+	COMMAND ${PERL_EXECUTABLE} ${AUTOTEST_DIR}/exotic ${autotest_TCC_NAMES} > ${AUTOTEST_GENERATED}
+	DEPENDS ${AUTOTEST_DIR}/exotic ${autotest_TCC}
+	WORKING_DIRECTORY ${AUTOTEST_DIR}
+	COMMENT "Generating autotest driver from *.tcc (exotic)"
+	VERBATIM)
+
 add_executable(uhub ${UHUB_SOURCE_DIR}/core/main.c ${uhub_SOURCES})
-add_executable(autotest-bin ${CMAKE_CURRENT_SOURCE_DIR}/autotest/test.c ${uhub_SOURCES})
+add_executable(autotest-bin ${AUTOTEST_GENERATED} ${uhub_SOURCES})
+target_include_directories(autotest-bin PRIVATE ${AUTOTEST_DIR})
 add_executable(uhub-passwd ${UHUB_SOURCE_DIR}/tools/uhub-passwd.c)
 
 add_library(mod_example MODULE ${UHUB_SOURCE_DIR}/plugins/mod_example.c)
