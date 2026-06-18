@@ -46,6 +46,7 @@ extern int  exotic_run(struct exotic_handle* handle);
 
 #include "test_auth.tcc"
 #include "test_commands.tcc"
+#include "test_config.tcc"
 #include "test_credentials.tcc"
 #include "test_eventqueue.tcc"
 #include "test_hub.tcc"
@@ -154,6 +155,25 @@ int main(int argc, char** argv)
 	exotic_add_test(&handle, &exotic_test_command_user_destroy, "command_user_destroy");
 	exotic_add_test(&handle, &exotic_test_command_destroy, "command_destroy");
 	exotic_add_test(&handle, &exotic_test_cleanup, "cleanup");
+	exotic_add_test(&handle, &exotic_test_cfg_setup, "cfg_setup");
+	exotic_add_test(&handle, &exotic_test_cfg_string, "cfg_string");
+	exotic_add_test(&handle, &exotic_test_cfg_integer, "cfg_integer");
+	exotic_add_test(&handle, &exotic_test_cfg_boolean_on, "cfg_boolean_on");
+	exotic_add_test(&handle, &exotic_test_cfg_boolean_off, "cfg_boolean_off");
+	exotic_add_test(&handle, &exotic_test_cfg_whitespace, "cfg_whitespace");
+	exotic_add_test(&handle, &exotic_test_cfg_quotes_double, "cfg_quotes_double");
+	exotic_add_test(&handle, &exotic_test_cfg_quotes_single, "cfg_quotes_single");
+	exotic_add_test(&handle, &exotic_test_cfg_comment, "cfg_comment");
+	exotic_add_test(&handle, &exotic_test_cfg_defaults_kept, "cfg_defaults_kept");
+	exotic_add_test(&handle, &exotic_test_cfg_no_equals_ignored, "cfg_no_equals_ignored");
+	exotic_add_test(&handle, &exotic_test_cfg_err_unknown_key, "cfg_err_unknown_key");
+	exotic_add_test(&handle, &exotic_test_cfg_err_int_range, "cfg_err_int_range");
+	exotic_add_test(&handle, &exotic_test_cfg_err_int_garbage, "cfg_err_int_garbage");
+	exotic_add_test(&handle, &exotic_test_cfg_err_bad_boolean, "cfg_err_bad_boolean");
+	exotic_add_test(&handle, &exotic_test_cfg_err_empty_value, "cfg_err_empty_value");
+	exotic_add_test(&handle, &exotic_test_cfg_missing_strict, "cfg_missing_strict");
+	exotic_add_test(&handle, &exotic_test_cfg_missing_allowed, "cfg_missing_allowed");
+	exotic_add_test(&handle, &exotic_test_cfg_teardown, "cfg_teardown");
 	exotic_add_test(&handle, &exotic_test_cred_to_string_1, "cred_to_string_1");
 	exotic_add_test(&handle, &exotic_test_cred_to_string_2, "cred_to_string_2");
 	exotic_add_test(&handle, &exotic_test_cred_to_string_3, "cred_to_string_3");
