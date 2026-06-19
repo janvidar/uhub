@@ -216,7 +216,9 @@ int net_set_nosigpipe(int fd, int toggle)
 int net_set_close_on_exec(int fd, int toggle)
 {
 #ifdef WINSOCK
-	return -1; /* FIXME: How is this done on Windows? */
+	/* No-op on Windows: there is no exec()-style call that would inherit
+	   the socket, so close-on-exec semantics do not apply. */
+	return 0;
 #else
 	return fcntl(fd, F_SETFD, toggle);
 #endif

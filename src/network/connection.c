@@ -498,7 +498,6 @@ struct net_connect_handle* net_con_connect(const char* address, uint16_t port, n
 	handle->callback = callback;
 	handle->last_error = net_connect_status_socket_error;
 
-	// FIXME: Check if DNS resolving is necessary ?
 	handle->dns = net_dns_gethostbyname(address, AF_UNSPEC, net_con_connect_dns_callback, handle);
 	if (!handle->dns)
 	{
