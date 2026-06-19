@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2014, Jan Vidar Krey
+ * Copyright (C) 2007-2026, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,7 +17,11 @@
  *
  */
 
-#include "uhub.h"
+#include "system.h"
+#include "util/config_token.h"
+#include "util/list.h"
+#include "util/memory.h"
+#include "util/misc.h"
 
 #define ADD_CHAR(X) do { *out = X; out++; token_size++; } while(0)
 #define RESET_TOKEN do { ADD_CHAR('\0'); out = buffer; if (cfg_token_add(tokens, out)) token_count++; token_size = 0; buffer[0] = '\0'; } while (0)

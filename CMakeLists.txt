@@ -1,6 +1,6 @@
 ##
 ## Makefile for uhub
-## Copyright (C) 2007-2013, Jan Vidar Krey <janvidar@extatic.org>
+## Copyright (C) 2007-2026, Jan Vidar Krey <janvidar@extatic.org>
  #
 
 cmake_minimum_required (VERSION 3.21)

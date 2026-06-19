@@ -20,8 +20,13 @@ approximate and may drift; grep the marker text to relocate.
 - Flood control as a plugin — src/core/hub.c:24,345. Move flood control
   and other core-side policy out of the core into loadable plugin
   callbacks (the plugin ABI was built to host this).
-- Break up the src/uhub.h god-header (~40 includes pulled into every core
-  .c) into per-file includes.
+- Make the plugin-facing user type opaque. The plugin ABI currently hands
+  plugins a fully-laid-out `struct plugin_user` (src/plugin_api/types.h:33
+  — sid/nick/cid/user_agent/addr/credentials), a by-value mirror of the
+  internal hub_user. Plugins should instead receive an opaque handle (e.g.
+  `plugin_hub_user`) reached through accessor functions, so the hub can
+  evolve its user internals without breaking the plugin ABI and plugins
+  keep a genuinely limited view of hub internals.
 - Name the raw ADC status codes inlined as magic numbers in
   src/core/hub.c:1056-1086.
 - Fix the inaccurate hub_free-as-function-pointer claim in CLAUDE.md and

@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2014, Jan Vidar Krey
+ * Copyright (C) 2007-2026, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,6 +20,8 @@
 
 #ifndef HAVE_UHUB_HASH_TIGER_H
 #define HAVE_UHUB_HASH_TIGER_H
+
+#include <stdint.h>
 
 extern void tiger(uint64_t* str, uint64_t length, uint64_t* res);
 

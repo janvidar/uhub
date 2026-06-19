@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2014, Jan Vidar Krey
+ * Copyright (C) 2007-2026, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 #ifndef HAVE_UHUB_NETWORK_CONNECTION_H
 #define HAVE_UHUB_NETWORK_CONNECTION_H
 
-#include "uhub.h"
+#include "system.h"
 #include "network/common.h"
 #include "network/backend.h"
 #include "network/tls.h"

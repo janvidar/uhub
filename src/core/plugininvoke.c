@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2014, Jan Vidar Krey
+ * Copyright (C) 2007-2026, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,7 +17,11 @@
  *
  */
 
-#include "uhub.h"
+#include "util/list.h"
+#include "util/log.h"
+#include "core/hub.h"
+#include "core/plugininvoke.h"
+#include "core/pluginloader.h"
 #include "plugin_api/handle.h"
 
 #define PLUGIN_DEBUG(hub, name) LOG_PLUGIN("Invoke %s on %d plugins", name, (int) (hub->plugins ? list_size(hub->plugins->loaded) : -1));

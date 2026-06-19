@@ -1,4 +1,8 @@
-#include <uhub.h>
+#include "util/list.h"
+#include "util/memory.h"
+#include "network/ipcalc.h"
+#include "network/network.h"
+#include "core/auth.h"
 
 static int ipv6 = 0;
 

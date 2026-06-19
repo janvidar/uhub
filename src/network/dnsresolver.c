@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2014, Jan Vidar Krey
+ * Copyright (C) 2007-2026, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,7 +17,12 @@
  *
  */
 
-#include "uhub.h"
+#include "util/list.h"
+#include "util/log.h"
+#include "util/memory.h"
+#include "util/threads.h"
+#include "network/dnsresolver.h"
+#include "network/notify.h"
 
 static struct net_dns_job* find_and_remove_job(struct net_dns_job* job);
 static struct net_dns_result* find_and_remove_result(struct net_dns_job* job);

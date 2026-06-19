@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2014, Jan Vidar Krey
+ * Copyright (C) 2007-2026, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -464,7 +464,7 @@ void runloop(size_t clients)
 static void print_version()
 {
 	printf(ADCRUSH "\n");
-	printf("Copyright (C) 2008-2012, Jan Vidar Krey\n");
+	printf("Copyright (C) 2008-2026, Jan Vidar Krey\n");
 	printf("\n");
 }
 

@@ -1,4 +1,9 @@
-#include <uhub.h>
+#include "util/list.h"
+#include "util/memory.h"
+#include "network/network.h"
+#include "core/auth.h"
+#include "core/config.h"
+#include "plugin_api/types.h"
 
 /*
  * Exercises acl_parse_line() (the ACL config line parser in src/core/auth.c).

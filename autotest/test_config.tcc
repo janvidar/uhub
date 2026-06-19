@@ -1,4 +1,5 @@
-#include <uhub.h>
+#include "network/network.h"
+#include "core/config.h"
 
 /*
  * Exercises config_parse_line() (the uhub.conf line parser in src/core/config.c)

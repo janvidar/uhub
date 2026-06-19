@@ -1,4 +1,6 @@
-#include <uhub.h>
+#include "system.h"
+#include "util/memory.h"
+#include "network/timeout.h"
 
 #define MAX_EVENTS 15
 static struct timeout_queue* g_queue;

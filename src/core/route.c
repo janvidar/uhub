@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2014, Jan Vidar Krey
+ * Copyright (C) 2007-2026, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,7 +17,14 @@
  *
  */
 
-#include "uhub.h"
+#include "util/log.h"
+#include "adc/message.h"
+#include "core/config.h"
+#include "core/hub.h"
+#include "core/ioqueue.h"
+#include "core/netevent.h"
+#include "core/route.h"
+#include "core/usermanager.h"
 
 int route_message(struct hub_info* hub, struct hub_user* u, struct adc_message* msg)
 {

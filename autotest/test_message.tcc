@@ -1,4 +1,6 @@
-#include <uhub.h>
+#include "util/memory.h"
+#include "adc/message.h"
+#include "core/user.h"
 static struct hub_user* g_user = 0;
 static const char* test_string1 = "IINF AAfoo BBbar CCwhat\n";
 static const char* test_string2 = "BMSG AAAB Hello\\sWorld!\n";

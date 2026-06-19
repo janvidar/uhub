@@ -1,4 +1,8 @@
-#include <uhub.h>
+#include "system.h"
+#include "util/config_token.h"
+#include "util/list.h"
+#include "util/memory.h"
+#include "util/misc.h"
 
 #define SETUP(X, STR) struct cfg_tokens* tokens = cfg_tokenize(STR)
 #define CLEANUP_LIST(X) do { list_clear(X, hub_free); list_destroy(X); } while(0)

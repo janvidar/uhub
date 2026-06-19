@@ -1,4 +1,5 @@
-#include <uhub.h>
+#include "system.h"
+#include "util/misc.h"
 
 EXO_TEST(is_num_0,  { return is_num('0'); });
 EXO_TEST(is_num_1,  { return is_num('1'); });

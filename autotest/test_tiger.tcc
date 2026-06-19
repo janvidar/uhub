@@ -1,4 +1,6 @@
-#include <uhub.h>
+#include "system.h"
+#include "util/tiger.h"
+#include "adc/adctypes.h"
 
 #define DEBUG_HASH
 

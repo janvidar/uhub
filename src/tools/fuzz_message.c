@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2014, Jan Vidar Krey
+ * Copyright (C) 2007-2026, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -35,7 +35,10 @@
  * adc_msg_parse() itself.
  */
 
-#include "uhub.h"
+#include "system.h"
+#include "util/log.h"
+#include "util/memory.h"
+#include "adc/message.h"
 
 #include <stdint.h>
 #include <stddef.h>

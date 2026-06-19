@@ -1,4 +1,7 @@
-#include <uhub.h>
+#include "util/memory.h"
+#include "core/commands.h"
+#include "core/hub.h"
+#include "core/usermanager.h"
 
 static struct hub_info* hub = NULL;
 static struct hub_command* cmd = NULL;

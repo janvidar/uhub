@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2014, Jan Vidar Krey
+ * Copyright (C) 2007-2026, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,7 +37,11 @@
  * Run with:    ./build-fuzz/fuzz_command_parser autotest/fuzz/corpus/command_parser
  */
 
-#include "uhub.h"
+#include "util/log.h"
+#include "util/memory.h"
+#include "core/commands.h"
+#include "core/hub.h"
+#include "core/usermanager.h"
 
 #include <stdint.h>
 #include <stddef.h>

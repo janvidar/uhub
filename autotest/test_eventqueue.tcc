@@ -1,4 +1,4 @@
-#include <uhub.h>
+#include "core/eventqueue.h"
 
 static struct event_queue* eq;
 static int eq_val;

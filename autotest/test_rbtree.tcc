@@ -1,4 +1,6 @@
-#include <uhub.h>
+#include "system.h"
+#include "util/memory.h"
+#include "util/misc.h"
 #include <util/rbtree.h>
 
 #define MAX_NODES 10000

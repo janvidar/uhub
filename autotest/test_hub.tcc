@@ -1,4 +1,7 @@
-#include <uhub.h>
+#include "network/network.h"
+#include "core/auth.h"
+#include "core/config.h"
+#include "core/hub.h"
 
 static struct hub_config g_config;
 static struct acl_handle g_acl;

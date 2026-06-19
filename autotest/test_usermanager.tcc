@@ -1,4 +1,5 @@
-#include <uhub.h>
+#include "core/user.h"
+#include "core/usermanager.h"
 
 #define MAX_USERS 64
 

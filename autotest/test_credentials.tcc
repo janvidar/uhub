@@ -1,4 +1,5 @@
-#include <uhub.h>
+#include "system.h"
+#include "util/credentials.h"
 
 EXO_TEST(cred_to_string_1, { return !strcmp(auth_cred_to_string(auth_cred_none),     "none");     });
 EXO_TEST(cred_to_string_2, { return !strcmp(auth_cred_to_string(auth_cred_bot),      "bot");      });

@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2019, Jan Vidar Krey
+ * Copyright (C) 2007-2026, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,7 +17,13 @@
  *
  */
 
-#include "uhub.h"
+#include "system.h"
+#include "uhub_limits.h"
+#include "util/log.h"
+#include "network/backend.h"
+#include "network/dnsresolver.h"
+#include "network/network.h"
+#include "network/tls.h"
 
 static int is_ipv6_supported = -1; /* -1 = CHECK, 0 = NO, 1 = YES */
 static int net_initialized = 0;

@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2014, Jan Vidar Krey
+ * Copyright (C) 2007-2026, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,6 +19,24 @@
 
 #ifndef HAVE_UHUB_HUB_H
 #define HAVE_UHUB_HUB_H
+
+#include <stdint.h>
+#include <time.h>
+
+#include "core/user.h"
+#include "network/ipcalc.h"
+
+struct timeout_evt;
+struct net_connection;
+struct linked_list;
+struct event_queue;
+struct hub_config;
+struct hub_user_manager;
+struct acl_handle;
+struct adc_message;
+struct command_base;
+struct uhub_plugins;
+struct ssl_context_handle;
 
 enum status_message
 {

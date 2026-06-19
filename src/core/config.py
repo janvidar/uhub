@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
   uhub - A tiny ADC p2p connection hub
-  Copyright (C) 2007-2013, Jan Vidar Krey
+  Copyright (C) 2007-2026, Jan Vidar Krey
 """
 
 from xml.dom import minidom, Node

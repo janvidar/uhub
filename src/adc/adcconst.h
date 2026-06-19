@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2014, Jan Vidar Krey
+ * Copyright (C) 2007-2026, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,10 +20,9 @@
 #ifndef HAVE_UHUB_ADC_CONSTANTS_H
 #define HAVE_UHUB_ADC_CONSTANTS_H
 
-#ifndef SID_T_DEFINED
-typedef uint32_t sid_t;
-#define SID_T_DEFINED
-#endif
+#include <stdint.h>
+
+#include "adc/adctypes.h"
 
 typedef uint32_t fourcc_t;
 

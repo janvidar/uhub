@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2014, Jan Vidar Krey
+ * Copyright (C) 2007-2026, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,7 +17,17 @@
  *
  */
 
-#include "uhub.h"
+#include "util/list.h"
+#include "util/log.h"
+#include "util/memory.h"
+#include "util/misc.h"
+#include "util/tiger.h"
+#include "network/connection.h"
+#include "network/network.h"
+#include "core/auth.h"
+#include "core/config.h"
+#include "core/plugininvoke.h"
+#include "core/user.h"
 
 #define ACL_ADD_USER(S, L, V) do { ret = check_cmd_user(S, V, L, line, line_count); if (ret != 0) return ret; } while(0)
 #define ACL_ADD_BOOL(S, L)    do { ret = check_cmd_bool(S,    L, line, line_count); if (ret != 0) return ret; } while(0)

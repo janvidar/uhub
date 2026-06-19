@@ -1,4 +1,6 @@
-#include <uhub.h>
+#include "system.h"
+#include "util/memory.h"
+#include "adc/sid.h"
 
 static struct sid_pool* sid_pool = 0;
 

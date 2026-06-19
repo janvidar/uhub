@@ -1,4 +1,4 @@
-#include <uhub.h>
+#include "adc/message.h"
 
 struct adc_message* g_msg;
 

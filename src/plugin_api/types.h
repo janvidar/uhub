@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2014, Jan Vidar Krey
+ * Copyright (C) 2007-2026, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,28 +20,13 @@
 #ifndef HAVE_UHUB_PLUGIN_TYPES_H
 #define HAVE_UHUB_PLUGIN_TYPES_H
 
+#include <time.h>
+
+#include "adc/adctypes.h"
+#include "util/credentials.h"
+#include "network/ipcalc.h"
+
 #define PLUGIN_API_VERSION 1
-
-#ifndef MAX_NICK_LEN
-#define MAX_NICK_LEN 64
-#endif
-
-#ifndef MAX_PASS_LEN
-#define MAX_PASS_LEN 64
-#endif
-
-#ifndef MAX_CID_LEN
-#define MAX_CID_LEN 39
-#endif
-
-#ifndef MAX_UA_LEN
-#define MAX_UA_LEN   32
-#endif
-
-#ifndef SID_T_DEFINED
-typedef uint32_t sid_t;
-#define SID_T_DEFINED
-#endif
 
 struct plugin_handle;
 

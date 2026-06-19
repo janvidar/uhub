@@ -1,4 +1,10 @@
-#include <uhub.h>
+#include "util/memory.h"
+#include "adc/message.h"
+#include "network/network.h"
+#include "core/auth.h"
+#include "core/config.h"
+#include "core/hub.h"
+#include "core/usermanager.h"
 
 #define USER_CID "GNSSMURMD7K466NGZIHU65TP3S3UZSQ6MN5B2RI"
 #define USER_PID "3A4545WFVGZLSGUXZLG7OS6ULQUVG3HM2T63I7Y"

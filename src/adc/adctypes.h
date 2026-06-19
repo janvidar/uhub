@@ -17,28 +17,30 @@
  *
  */
 
-#ifndef HAVE_UHUB_SID_H
-#define HAVE_UHUB_SID_H
+/*
+ * Small ADC value types and protocol identifier limits shared between the hub
+ * core (adc/adcconst.h) and the plugin ABI (plugin_api/types.h). This is the
+ * single source of truth for these definitions: include this header instead of
+ * redefining sid_t or the MAX_*_LEN limits (which used to be duplicated behind
+ * the SID_T_DEFINED / #ifndef guards).
+ */
+
+#ifndef HAVE_UHUB_ADC_TYPES_H
+#define HAVE_UHUB_ADC_TYPES_H
 
 #include <stdint.h>
-#include "adc/adcconst.h"
 
-#define SID_MAX 1048576
+/* ADC session ID. */
+typedef uint32_t sid_t;
 
-struct sid_pool;
-struct hub_user;
+/* Maximum lengths of ADC protocol identifiers, in bytes (excluding any NUL
+ * terminator). */
+#define MAX_CID_LEN  39
+#define MAX_NICK_LEN 64
+#define MAX_PASS_LEN 64
+#define MAX_UA_LEN   32
 
-extern char* sid_to_string(sid_t sid_);
-extern sid_t string_to_sid(const char* sid);
+/* Size of a Tiger hash digest, in bytes. */
+#define TIGERSIZE    24
 
-extern struct sid_pool* sid_pool_create(sid_t max);
-extern void sid_pool_destroy(struct sid_pool*);
-
-extern sid_t sid_alloc(struct sid_pool*, struct hub_user*);
-extern void sid_free(struct sid_pool*, sid_t);
-extern struct hub_user* sid_lookup(struct sid_pool*, sid_t);
-
-
-
-#endif /* HAVE_UHUB_SID_H */
-
+#endif /* HAVE_UHUB_ADC_TYPES_H */

@@ -1,6 +1,6 @@
 /*
  * uhub - A tiny ADC p2p connection hub
- * Copyright (C) 2007-2014, Jan Vidar Krey
+ * Copyright (C) 2007-2026, Jan Vidar Krey
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,7 +17,14 @@
  *
  */
 
-#include "uhub.h"
+#include "util/memory.h"
+#include "util/rbtree.h"
+#include "adc/message.h"
+#include "adc/sid.h"
+#include "network/network.h"
+#include "core/route.h"
+#include "core/user.h"
+#include "core/usermanager.h"
 
 /*
  * This callback function is used to clear user objects from the userlist.
