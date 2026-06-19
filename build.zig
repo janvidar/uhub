@@ -65,6 +65,30 @@ const core_sources = [_][]const u8{
     "src/core/usermanager.c",
 };
 
+// autotest/test_*.tcc sources, sorted, mirroring the `file(GLOB ...)` +
+// `list(SORT ...)` in CMakeLists.txt. Kept as an explicit list (like the C
+// source sets above) rather than globbed at build time; add a new .tcc here.
+const tcc_sources = [_][]const u8{
+    "test_auth.tcc",
+    "test_commands.tcc",
+    "test_config.tcc",
+    "test_credentials.tcc",
+    "test_eventqueue.tcc",
+    "test_hub.tcc",
+    "test_inf.tcc",
+    "test_ipfilter.tcc",
+    "test_list.tcc",
+    "test_memory.tcc",
+    "test_message.tcc",
+    "test_misc.tcc",
+    "test_rbtree.tcc",
+    "test_sid.tcc",
+    "test_tiger.tcc",
+    "test_timer.tcc",
+    "test_tokenizer.tcc",
+    "test_usermanager.tcc",
+};
+
 const Plugin = struct {
     name: []const u8,
     sqlite: bool = false,
@@ -138,24 +162,9 @@ const Ctx = struct {
         exotic.setCwd(b.path("autotest"));
         exotic.addFileInput(b.path("autotest/exotic"));
 
-        // Collect test_*.tcc basenames deterministically (sorted), matching
+        // Feed exotic the sorted test_*.tcc list (see tcc_sources), matching
         // the `file(GLOB ...)` + `list(SORT ...)` in CMakeLists.txt.
-        var names = std.array_list.Managed([]const u8).init(b.allocator);
-        var dir = b.build_root.handle.openDir("autotest", .{ .iterate = true }) catch @panic("cannot open autotest/");
-        defer dir.close();
-        var it = dir.iterate();
-        while (it.next() catch @panic("cannot iterate autotest/")) |entry| {
-            if (entry.kind != .file) continue;
-            if (!std.mem.startsWith(u8, entry.name, "test_")) continue;
-            if (!std.mem.endsWith(u8, entry.name, ".tcc")) continue;
-            names.append(b.dupe(entry.name)) catch @panic("OOM");
-        }
-        std.mem.sort([]const u8, names.items, {}, struct {
-            fn lt(_: void, a: []const u8, c: []const u8) bool {
-                return std.mem.lessThan(u8, a, c);
-            }
-        }.lt);
-        for (names.items) |name| {
+        for (tcc_sources) |name| {
             exotic.addArg(name);
             exotic.addFileInput(b.path(b.fmt("autotest/{s}", .{name})));
         }
@@ -164,7 +173,7 @@ const Ctx = struct {
         // basename so Zig classifies it as a C source (the captured file is
         // otherwise named "stdout" with no extension).
         const wf = b.addWriteFiles();
-        const test_c = wf.addCopyFile(exotic.captureStdOut(), "test.c");
+        const test_c = wf.addCopyFile(exotic.captureStdOut(.{}), "test.c");
         m.addCSourceFile(.{ .file = test_c, .flags = ctx.cflags });
         m.addIncludePath(b.path("autotest"));
     }
