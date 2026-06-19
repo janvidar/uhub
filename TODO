@@ -11,11 +11,6 @@ approximate and may drift; grep the marker text to relocate.
 - Finish version reconciliation: sources are 0.6.1; tag on release
   (latest tag = 0.6.0).
 
-## Security / auth
-- Update password challenge token generation to match the scheme used on
-  the HBRI branch (feature/experimental_hbri), using a hub secret to
-  prevent replay attacks.
-
 ## Design / refactor
 - Flood control as a plugin — src/core/hub.c:24,345. Move flood control
   and other core-side policy out of the core into loadable plugin
