@@ -1,4 +1,59 @@
-- Update password challenge token generation to match a scheme used for HBRI branch (feature/experimental_hbri) using a hub secret to prevent replay attacks further.
-- Update plug-ins: flood control
-- Config value validation - currently very poorly implemented.
+# uhub — outstanding work
 
+Consolidated task list, merged from the former source-tree FIXME ledger
+(TODO.md) and the actionable recommendations of the repository / code /
+security assessment (2026-06-18). None of these are known correctness or
+security defects — they are release tasks, design aspirations, incomplete
+features, tuning questions, or hygiene cleanup. Line numbers are
+approximate and may drift; grep the marker text to relocate.
+
+## Release blockers (0.6.1)
+- Finish version reconciliation: sources are 0.6.1; tag on release
+  (latest tag = 0.6.0).
+
+## Security / auth
+- Update password challenge token generation to match the scheme used on
+  the HBRI branch (feature/experimental_hbri), using a hub secret to
+  prevent replay attacks.
+
+## Design / refactor
+- Flood control as a plugin — src/core/hub.c:24,345. Move flood control
+  and other core-side policy out of the core into loadable plugin
+  callbacks (the plugin ABI was built to host this).
+- Break up the src/uhub.h god-header (~40 includes pulled into every core
+  .c) into per-file includes.
+- Name the raw ADC status codes inlined as magic numbers in
+  src/core/hub.c:1056-1086.
+- Fix the inaccurate hub_free-as-function-pointer claim in CLAUDE.md and
+  pick one spelling.
+
+## Incomplete features
+- Config value validation — src/core/config.c:40. Config data is not
+  regex-validated on load; currently very poorly implemented.
+
+## Tuning / magic numbers (not bugs)
+- Reconnect/ban retry timeouts — src/core/hub.c:1046,1065 (hardcoded 600s).
+- Timeout queue cap — src/network/backend.c:79 (capped at 120s).
+- Dynamic send-queue limit — src/core/route.c:62 (could adapt vs fixed).
+- Skip no-op INF updates — src/core/user.c:134. user_update_info could
+  drop arguments that don't change anything, saving bandwidth on repeated
+  client updates. Optimization only.
+
+## Networking / platform
+- Resolver thread-pool sizing — src/network/dnsresolver.c:247. Replace
+  one-thread-per-lookup with a work queue plus a configurable min/max
+  thread pool.
+- Windows socket support — src/network/network.c. uhub is meant to be
+  portable to Windows (not a tier-1 platform, not covered by CI).
+  net_set_close_on_exec is resolved (deliberate no-op); other WINSOCK
+  paths may still need real implementations.
+- Connected-only user search — src/core/usermanager.h:85. Open question:
+  is searching only connected users safe/sensible?
+- Decide kqueue's fate — USE_KQUEUE is commented out
+  (src/system.h.in:117); kqueue.c (278 lines) is still listed in
+  build.zig but compiles to an empty object, and BSD silently falls back
+  to select. Re-enable + test on BSD, or drop kqueue.c from the build.
+- Outbound-connect DNS (DECIDED, informational) — src/network/connection.c.
+  Keep: DNS resolving on the outbound connect path is required now, will
+  be reused by the ADC client code, and later for hub-list / tracker
+  pinging.
