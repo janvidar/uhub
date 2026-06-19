@@ -250,6 +250,24 @@
 		]]></example>
 	</option>
 
+	<option name="reg_server_url" type="string" default="">
+		<short>ADC registration server URL to announce this hub to at startup.</short>
+		<description><![CDATA[
+		The HTTP/HTTPS URL of an ADC hub-list registration server. When set, the
+		hub sends a single POST request to this URL at startup with its own IINF
+		line as the body, expecting a "202 Accepted" reply, so hub lists can pick
+		the hub up automatically. Leave empty (the default) to disable; this is
+		the on/off switch, so leave it empty for private hubs. The path defaults
+		to /register and the port defaults to 80 (http) or 443 (https). For the
+		announce to carry a usable address, also configure hub_address (the HH
+		field). No retries are attempted; the outcome is logged.
+		]]></description>
+		<since>0.6.1</since>
+		<example><![CDATA[
+			reg_server_url = "http://adcreg.dchublist.org:8080/register"
+		]]></example>
+	</option>
+
 	<option name="redirect_addr" type="string" default="">
 		<check regexp="(adcs?|dchub)://.*" />
 		<short>A common hub redirect address.</short>

@@ -39,6 +39,7 @@
 #include "core/netevent.h"
 #include "core/plugininvoke.h"
 #include "core/pluginloader.h"
+#include "core/regserver.h"
 #include "core/route.h"
 #include "core/usermanager.h"
 
@@ -952,6 +953,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 
 	// Start the hub command sub-system
 	hub->commands = command_initialize(hub);
+
 	return hub;
 }
 
@@ -959,6 +961,8 @@ struct hub_info* hub_start_service(struct hub_config* config)
 void hub_shutdown_service(struct hub_info* hub)
 {
 	LOG_DEBUG("hub_shutdown_service()");
+
+	regserver_cleanup(hub);
 
 	if (net_backend_get_timeout_queue())
 	{

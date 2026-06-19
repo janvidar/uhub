@@ -24,6 +24,7 @@
 #include "core/auth.h"
 #include "core/config.h"
 #include "core/hub.h"
+#include "core/regserver.h"
 
 #ifdef SYSTEMD
 #include <systemd/sd-daemon.h>
@@ -114,6 +115,7 @@ int main_loop()
 	struct hub_config configuration;
 	struct acl_handle acl;
 	struct hub_info* hub = 0;
+	int announce_pending = 0;
 
 	if (net_initialize() == -1)
 		return -1;
@@ -165,9 +167,18 @@ int main_loop()
 #endif /* SYSTEMD */
 
 #endif /* ! WIN32 */
+			announce_pending = 1;
 		}
 
 		hub_set_variables(hub, &acl);
+
+		/* Announce to the registration server once, at first start only (not on
+		 * SIGHUP config reloads). command_info is built by hub_set_variables. */
+		if (announce_pending)
+		{
+			regserver_announce(hub);
+			announce_pending = 0;
+		}
 
 		hub_event_loop(hub);
 
