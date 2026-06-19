@@ -26,6 +26,7 @@
 #include "network/network.h"
 #include "core/auth.h"
 #include "core/config.h"
+#include "core/hub.h"
 #include "core/plugininvoke.h"
 #include "core/user.h"
 
@@ -450,20 +451,41 @@ int acl_is_ip_nat_override(struct acl_handle* handle, const char* ip_address)
 
 
 /*
- * This will generate the same challenge to the same user, always.
- * The challenge is made up of the user object's address, the time the
- * user connected in seconds since the unix epoch (modulus 1 million),
- * the SID of the user (0-1 million) and the socket descriptor.
+ * The challenge consists of:
+ * - the hub's session entropy (from hub->hub_secret)
+ * - the client's time connected, SID and socket descriptor.
+ *
+ * The challenge will be the same every time called for the
+ * exact same user.
  */
 const char* acl_password_generate_challenge(struct hub_info* hub, struct hub_user* user)
 {
-	char buf[64];
+	char buf[sizeof(hub->hub_secret) + 12];
 	uint64_t tiger_res[3];
 	static char tiger_buf[MAX_CID_LEN+1];
 
-	snprintf(buf, 64, "%p%d%d%d", user, (int) (user->tm_connected % 1000000), (int) user->id.sid, (int) net_con_get_sd(user->connection));
+	size_t offset = 0;
 
-	tiger((uint64_t*) buf, strlen(buf), (uint64_t*) tiger_res);
+	/* Add hub secret */
+	memcpy(buf + offset, hub->hub_secret, sizeof(hub->hub_secret));
+	offset += sizeof(hub->hub_secret);
+
+	/* Add time connected (4 bytes) */
+	uint32_t time_connected = (uint32_t) (user->tm_connected % 1000000);
+	memcpy(buf + offset, &time_connected, sizeof(time_connected));
+	offset += sizeof(time_connected);
+
+	/* Add SID (4 bytes) */
+	uint32_t sid = (uint32_t) user->id.sid;
+	memcpy(buf + offset, &sid, sizeof(sid));
+	offset += sizeof(sid);
+
+	/* Add socket ID (4 bytes) */
+	uint32_t sfd = (uint32_t) net_con_get_sd(user->connection);
+	memcpy(buf + offset, &sfd, sizeof(sfd));
+	offset += sizeof(sfd);
+
+	tiger((uint64_t*) buf, offset, (uint64_t*) tiger_res);
 	base32_encode((unsigned char*) tiger_res, TIGERSIZE, tiger_buf);
 	tiger_buf[MAX_CID_LEN] = 0;
 	return (const char*) tiger_buf;
@@ -516,6 +538,3 @@ int acl_password_verify(struct hub_info* hub, struct hub_user* user, const char*
 	}
 	return 0;
 }
-
-
-
