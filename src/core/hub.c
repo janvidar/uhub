@@ -160,6 +160,15 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 				CHECK_FLOOD(connect, 1);
 				ROUTE_MSG;
 
+			case ADC_CMD_DNAT:
+			case ADC_CMD_DRNT:
+				/* NATT (NAT traversal): relayed verbatim between the two peers,
+				   like DCTM/DRCM. The hub only passes these through; the hole-
+				   punching is entirely client-driven. */
+				cmd->priority = -1;
+				CHECK_FLOOD(connect, 1);
+				ROUTE_MSG;
+
 			case ADC_CMD_BCMD:
 			case ADC_CMD_DCMD:
 			case ADC_CMD_ECMD:

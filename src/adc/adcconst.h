@@ -35,7 +35,7 @@ typedef uint32_t fourcc_t;
 #define FOURCC(a,b,c,d) (fourcc_t) (((uint32_t)(unsigned char)(a) << 24) | ((uint32_t)(unsigned char)(b) << 16) | ((uint32_t)(unsigned char)(c) << 8) | (uint32_t)(unsigned char)(d))
 
 /* default welcome protocol support message, as sent by this server */
-#define ADC_PROTO_SUPPORT "ADBASE ADTIGR ADPING"
+#define ADC_PROTO_SUPPORT "ADBASE ADTIGR ADPING ADNATT"
 
 /* Server sent commands */
 #define ADC_CMD_ISID FOURCC('I','S','I','D')
@@ -76,6 +76,8 @@ typedef uint32_t fourcc_t;
 #define ADC_CMD_DRCM FOURCC('D','R','C','M')
 #define ADC_CMD_ECTM FOURCC('E','C','T','M')
 #define ADC_CMD_ERCM FOURCC('E','R','C','M')
+#define ADC_CMD_DNAT FOURCC('D','N','A','T') /* NATT: NAT traversal request (relayed client->client) */
+#define ADC_CMD_DRNT FOURCC('D','R','N','T') /* NATT: NAT traversal reply (relayed client->client) */
 
 /* chat messages */
 #define ADC_CMD_BMSG FOURCC('B','M','S','G')
