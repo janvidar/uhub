@@ -13,6 +13,7 @@ project (uhub
 set (CMAKE_C_STANDARD 23)
 set (CMAKE_C_STANDARD_REQUIRED ON)
 set (CMAKE_C_EXTENSIONS ON)
+set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # version.h.in still refers to these by their old names.
 set (UHUB_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
