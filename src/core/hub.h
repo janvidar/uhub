@@ -71,6 +71,7 @@ enum status_message
 	status_msg_user_slots_high           = -43, /* User has too many slots open. */
 	status_msg_user_hub_limit_low        = -44, /* User is on too few hubs. */
 	status_msg_user_hub_limit_high       = -45, /* User is on too many hubs. */
+	status_msg_search_too_short          = -46, /* Search term is too short. */
 
 	status_msg_proto_no_common_hash      = -50, /* No common hash algorithms */
 	status_msg_proto_obsolete_adc0       = -51, /* Client is using an obsolete protocol version */

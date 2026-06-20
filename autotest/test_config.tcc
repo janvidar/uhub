@@ -141,4 +141,23 @@ EXO_TEST(cfg_missing_allowed, {
 	return ok;
 });
 
+/* limit_min_search: parsed onto its field, defaults off, range-checked (0..255). */
+EXO_TEST(cfg_min_search, {
+	struct hub_config config;
+	int ok = cfg_read("limit_min_search = 3\n", &config) == 0
+	         && config.limit_min_search == 3;
+	free_config(&config);
+	return ok;
+});
+
+EXO_TEST(cfg_min_search_default, {
+	struct hub_config config;
+	int ok = cfg_read("max_users = 9\n", &config) == 0
+	         && config.limit_min_search == 0;
+	free_config(&config);
+	return ok;
+});
+
+EXO_TEST(cfg_min_search_range, { return cfg_expect("limit_min_search = 256\n", -1); }); /* max is 255 */
+
 EXO_TEST(cfg_teardown, { remove(cfg_test_file); net_destroy(); return 1; });

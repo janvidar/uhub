@@ -67,6 +67,46 @@ struct hub_info* g_hub = 0;
 	} \
 	break;
 
+/**
+ * Returns 1 if a search request must be rejected because its longest substring
+ * include term ("AN") is shorter than the configured limit_min_search.
+ *
+ * Substring searches on very short terms (such as a single letter) match a huge
+ * number of files and generate a lot of traffic, so the hub can require search
+ * terms to be a few characters long. Exact content (TTH) searches are cheap and
+ * are never restricted, and searches without any include term (e.g. by size or
+ * extension only) are left alone.
+ */
+static int hub_search_is_too_short(struct hub_info* hub, struct adc_message* cmd)
+{
+	int min = hub->config->limit_min_search;
+	int offset = 0;
+	char* arg;
+	int has_include = 0;
+	size_t longest = 0;
+
+	if (min <= 0)
+		return 0;
+
+	/* Exact content (TTH) searches resolve to a single file; never reject them. */
+	if (adc_msg_has_named_argument(cmd, ADC_SCH_FLAG_TTH))
+		return 0;
+
+	while ((arg = adc_msg_get_argument(cmd, offset++)) != NULL)
+	{
+		if (strncmp(arg, ADC_SCH_FLAG_INCLUDE, 2) == 0)
+		{
+			size_t len = strlen(arg) - 2;
+			has_include = 1;
+			if (len > longest)
+				longest = len;
+		}
+		hub_free(arg);
+	}
+
+	return (has_include && longest < (size_t) min);
+}
+
 int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* line, size_t length)
 {
 	int ret = 0;
@@ -131,6 +171,11 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 				cmd->priority = -1;
 				if (plugin_handle_search(hub, u, cmd->cache) == st_deny)
 					break;
+				if (hub_search_is_too_short(hub, cmd) && !auth_cred_is_unrestricted(u->credentials))
+				{
+					hub_send_status(hub, u, status_msg_search_too_short, status_level_error);
+					break;
+				}
 				CHECK_FLOOD(search, 1);
 				ROUTE_MSG;
 
@@ -1144,6 +1189,7 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 		STATUS(43, msg_user_slots_high,       "FB" ADC_INF_FLAG_UPLOAD_SLOTS, 0, 1);
 		STATUS(43, msg_user_hub_limit_low, 0, 0, 1);
 		STATUS(43, msg_user_hub_limit_high, 0, 0, 1);
+		STATUS(0, msg_search_too_short, 0, 0, 0);
 		STATUS(47, msg_proto_no_common_hash, 0, -1, 1);
 		STATUS(40, msg_proto_obsolete_adc0, 0, -1, 1);
 	}
@@ -1228,6 +1274,7 @@ const char* hub_get_status_message(struct hub_info* hub, enum status_message msg
 		STATUS(msg_user_slots_high);
 		STATUS(msg_user_hub_limit_low);
 		STATUS(msg_user_hub_limit_high);
+		STATUS(msg_search_too_short);
 		STATUS(msg_proto_no_common_hash);
 		STATUS(msg_proto_obsolete_adc0);
 	}
@@ -1269,6 +1316,7 @@ const char* hub_get_status_message_log(struct hub_info* hub, enum status_message
 		STATUS(msg_user_slots_high);
 		STATUS(msg_user_hub_limit_low);
 		STATUS(msg_user_hub_limit_high);
+		STATUS(msg_search_too_short);
 		STATUS(msg_proto_no_common_hash);
 		STATUS(msg_proto_obsolete_adc0);
 	}

@@ -152,6 +152,7 @@ typedef uint32_t fourcc_t;
 #define ADC_SCH_FLAG_GREATER_THAN       "GE" /* search for files with this size or greater */
 #define ADC_SCH_FLAG_EQUAL              "EQ" /* search only for files with this exact size */
 #define ADC_SCH_FLAG_TOKEN              "TO" /* use this token for search replies */
+#define ADC_SCH_FLAG_TTH                "TR" /* search for a file with this exact TTH root */
 
 #define ADC_RES_FLAG_FILE_NAME          "FN" /* file name */
 #define ADC_RES_FLAG_FILE_SIZE          "SI" /* file size */

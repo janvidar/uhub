@@ -450,6 +450,25 @@
 		<since>0.2.0</since>
 	</option>
 
+	<option name="limit_min_search" type="int" default="0">
+		<check min="0" max="255" />
+		<short>Limit minimum search term length</short>
+		<description><![CDATA[
+		Minimum length (in bytes) of a substring search term. Searches whose
+		longest include term ("AN") is shorter than this are rejected. Very
+		short terms (such as a single letter) match a huge number of files and
+		generate a lot of traffic through the hub, so requiring a few characters
+		keeps searches precise and reduces load. Exact content (TTH) searches and
+		searches from operators and above are never restricted.
+		]]></description>
+		<syntax>0 = off</syntax>
+		<since>0.6.1</since>
+		<example><![CDATA[
+			To require search terms to be at least 3 characters long:<br />
+			limit_min_search = 3
+		]]></example>
+	</option>
+
 	<option name="flood_ctl_interval" type="int" default="0">
 		<check min="1" max="60" />
 		<short>Time interval in seconds for flood control check.</short>
@@ -802,6 +821,11 @@
 	<option name="msg_user_flood_search" type="message" default="Search flood detected, search is stopped.">
 		<description><![CDATA[This message is sent once to users who are sending too many search requests too fast.]]></description>
 		<since>0.3.1</since>
+	</option>
+
+	<option name="msg_search_too_short" type="message" default="Search term is too short.">
+		<description><![CDATA[This message is sent to users whose search term is shorter than limit_min_search.]]></description>
+		<since>0.6.1</since>
 	</option>
 
 	<option name="msg_user_flood_update" type="message" default="Update flood detected.">
