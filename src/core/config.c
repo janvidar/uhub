@@ -38,10 +38,54 @@ static int apply_boolean(const char* key, const char* data, int* target)
 	return string_to_boolean(data, target);
 }
 
-static int apply_string(const char* key, const char* data, char** target, char* regexp)
+#ifndef WIN32
+#include <regex.h>
+
+/*
+ * Validate a string config value against a POSIX extended regular expression.
+ * The pattern is anchored so the entire value must match, not just a substring.
+ * Returns 1 on match, 0 on mismatch (or on an internal pattern-compile error).
+ */
+static int config_check_regexp(const char* key, const char* data, const char* regexp)
 {
-	(void) regexp;
-	// FIXME: Add regexp checks for correct data
+	regex_t preg;
+	char* pattern;
+	int rc;
+
+	pattern = hub_malloc(strlen(regexp) + 5); /* "^(" + regexp + ")$" + NUL */
+	sprintf(pattern, "^(%s)$", regexp);
+
+	rc = regcomp(&preg, pattern, REG_EXTENDED | REG_NOSUB);
+	hub_free(pattern);
+	if (rc != 0)
+	{
+		LOG_ERROR("Internal error: invalid validation pattern for config key '%s'", key);
+		return 0;
+	}
+
+	rc = regexec(&preg, data, 0, NULL, 0);
+	regfree(&preg);
+
+	if (rc != 0)
+	{
+		LOG_ERROR("Invalid value for configuration key '%s': \"%s\"", key, data);
+		return 0;
+	}
+	return 1;
+}
+#else
+/* POSIX <regex.h> is not available on Windows; skip value validation there. */
+static int config_check_regexp(const char* key, const char* data, const char* regexp)
+{
+	(void) key; (void) data; (void) regexp;
+	return 1;
+}
+#endif
+
+static int apply_string(const char* key, const char* data, char** target, const char* regexp)
+{
+	if (regexp && *regexp && !config_check_regexp(key, data, regexp))
+		return 0;
 
 	if (*target)
 		hub_free(*target);

@@ -160,4 +160,59 @@ EXO_TEST(cfg_min_search_default, {
 
 EXO_TEST(cfg_min_search_range, { return cfg_expect("limit_min_search = 256\n", -1); }); /* max is 255 */
 
+/*
+ * String value validation: options carrying a <check regexp=...> in config.xml
+ * are matched against an anchored POSIX ERE in apply_string(). A value that
+ * matches is stored; one that does not makes read_config() return -1.
+ * (On Windows the validator is a no-op, but the suite is POSIX-only.)
+ */
+
+/* redirect_addr requires an adc:// / adcs:// / dchub:// URL. */
+EXO_TEST(cfg_re_redirect_ok, {
+	struct hub_config config;
+	int ok = cfg_read("redirect_addr = adcs://example.com:1511\n", &config) == 0
+	         && strcmp(config.redirect_addr, "adcs://example.com:1511") == 0;
+	free_config(&config);
+	return ok;
+});
+
+EXO_TEST(cfg_re_redirect_adc,   { return cfg_expect("redirect_addr = adc://example.com\n", 0); });
+EXO_TEST(cfg_re_redirect_dchub, { return cfg_expect("redirect_addr = dchub://example.com\n", 0); });
+EXO_TEST(cfg_re_redirect_bad,   { return cfg_expect("redirect_addr = http://example.com\n", -1); });
+
+/* Anchoring: a valid URL preceded by junk must still be rejected. */
+EXO_TEST(cfg_re_redirect_anchor, { return cfg_expect("redirect_addr = junk adcs://example.com\n", -1); });
+
+/* server_alt_ports is a comma-separated list of numbers. */
+EXO_TEST(cfg_re_altports_ok, {
+	struct hub_config config;
+	int ok = cfg_read("server_alt_ports = 1295,1512,53990\n", &config) == 0
+	         && strcmp(config.server_alt_ports, "1295,1512,53990") == 0;
+	free_config(&config);
+	return ok;
+});
+
+EXO_TEST(cfg_re_altports_bad, { return cfg_expect("server_alt_ports = 1295,abc\n", -1); });
+
+/* Anchoring: a trailing/leading non-digit run must not match a digit substring. */
+EXO_TEST(cfg_re_altports_anchor, { return cfg_expect("server_alt_ports = abc123\n", -1); });
+
+/* server_bind_addr accepts an address, "any" or "loopback". */
+EXO_TEST(cfg_re_bind_ok,   { return cfg_expect("server_bind_addr = 192.168.0.1\n", 0); });
+EXO_TEST(cfg_re_bind_word, { return cfg_expect("server_bind_addr = loopback\n", 0); });
+EXO_TEST(cfg_re_bind_bad,  { return cfg_expect("server_bind_addr = not!an!addr\n", -1); });
+
+/* hbri_address6: hex digits, colons and dots only. */
+EXO_TEST(cfg_re_hbri6_ok,  { return cfg_expect("hbri_address6 = 2001:db8::10\n", 0); });
+EXO_TEST(cfg_re_hbri6_bad, { return cfg_expect("hbri_address6 = zzz!!\n", -1); });
+
+/* An unchecked string option (no regexp) accepts arbitrary text. */
+EXO_TEST(cfg_re_unchecked, {
+	struct hub_config config;
+	int ok = cfg_read("hub_name = weird @!$%^&* name\n", &config) == 0
+	         && strcmp(config.hub_name, "weird @!$%^&* name") == 0;
+	free_config(&config);
+	return ok;
+});
+
 EXO_TEST(cfg_teardown, { remove(cfg_test_file); net_destroy(); return 1; });

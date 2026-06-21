@@ -27,10 +27,6 @@ approximate and may drift; grep the marker text to relocate.
 - Fix the inaccurate hub_free-as-function-pointer claim in CLAUDE.md and
   pick one spelling.
 
-## Incomplete features
-- Config value validation — src/core/config.c:40. Config data is not
-  regex-validated on load; currently very poorly implemented.
-
 ## Tuning / magic numbers (not bugs)
 - Reconnect/ban retry timeouts — src/core/hub.c:1046,1065 (hardcoded 600s).
 - Timeout queue cap — src/network/backend.c:79 (capped at 120s).

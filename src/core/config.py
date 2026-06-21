@@ -11,6 +11,9 @@ import argparse
 class OptionParseError(Exception):
 	pass
 
+def c_string_escape(s):
+	return s.replace("\\", "\\\\").replace("\"", "\\\"")
+
 class Option(object):
 	def _get(self, node, name):
 		self.__dict__[name] = None
@@ -141,7 +144,11 @@ class CSourceGenerator(SourceGenerator):
 		elif option.otype == "boolean":
 			s += "\t\tif (!apply_boolean(key, data, &config->%s))\n" % option.name
 		elif option.is_string:
-			s += "\t\tif (!apply_string(key, data, &config->%s, (char*) \"\"))\n" % option.name
+			if option.check_regexp:
+				regexp_arg = "(const char*) \"%s\"" % c_string_escape(option.check_regexp)
+			else:
+				regexp_arg = "NULL"
+			s += "\t\tif (!apply_string(key, data, &config->%s, %s))\n" % (option.name, regexp_arg)
 		s += "\t\t{\n\t\t\tLOG_ERROR(\"Configuration parse error on line %d\", line_count);\n\t\t\treturn -1;\n\t\t}\n\t\treturn 0;\n\t}\n\n"
 		self.f.write(s)
 

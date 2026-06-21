@@ -17,7 +17,7 @@
 	</option>
 
 	<option name="server_bind_addr" type="string" default="any">
-		<check regexp="[\x:.]+|any|loopback" />
+		<check regexp="[[:xdigit:]:.]+|any|loopback" />
 		<short>Server bind address</short>
 		<description><![CDATA[
 			Specify the IP address the local hub should bind to. This can be an IPv4 or IPv6 address, or one of the special addresses "any" or "loopback". <br />
@@ -58,7 +58,7 @@
 	</option>
 
 	<option name="server_alt_ports" type="string" default="">
-		<check regexp="\d+(,\d+)*" />
+		<check regexp="[0-9]+(,[0-9]+)*" />
 		<short>Comma separated list of alternative ports to listen to</short>
 		<description><![CDATA[
 		In addition to the server_port the hub can listen to a list of alternative ports.
@@ -88,7 +88,7 @@
 	</option>
 
 	<option name="hbri_address4" type="string" default="">
-		<check regexp="[\d:.]+|" />
+		<check regexp="[0-9:.]+|" />
 		<short>Hub's reachable IPv4 address for HBRI validation</short>
 		<description><![CDATA[
 			The public IPv4 address clients should connect to for HBRI secondary-protocol validation.
@@ -102,7 +102,7 @@
 	</option>
 
 	<option name="hbri_address6" type="string" default="">
-		<check regexp="[\da-fA-F:.]+|" />
+		<check regexp="[0-9a-fA-F:.]+|" />
 		<short>Hub's reachable IPv6 address for HBRI validation</short>
 		<description><![CDATA[
 			The public IPv6 address clients should connect to for HBRI secondary-protocol validation.
