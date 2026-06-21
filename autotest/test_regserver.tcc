@@ -98,3 +98,79 @@ EXO_TEST(regserver_url_reject_unterminated_ipv6, {
 EXO_TEST(regserver_url_reject_null, {
 	return regserver_parse_url(NULL, &u) == 0;
 });
+
+/* regserver_hub_url(): normalize hub_address into the advertised HH adc(s) URL. */
+static char hh[256 + 8];
+
+/* A complete adc:// URL with a port is passed through unchanged. */
+EXO_TEST(regserver_hh_complete, {
+	return regserver_hub_url("adc://hub.example.org:1511", 0, 411, hh, sizeof(hh))
+		&& strcmp(hh, "adc://hub.example.org:1511") == 0;
+});
+
+/* A complete adcs:// URL with a port is passed through unchanged. */
+EXO_TEST(regserver_hh_complete_tls, {
+	return regserver_hub_url("adcs://hub.example.org:1511", 0, 411, hh, sizeof(hh))
+		&& strcmp(hh, "adcs://hub.example.org:1511") == 0;
+});
+
+/* Missing port -> server_port appended. */
+EXO_TEST(regserver_hh_add_port, {
+	return regserver_hub_url("adc://hub.example.org", 0, 1511, hh, sizeof(hh))
+		&& strcmp(hh, "adc://hub.example.org:1511") == 0;
+});
+
+/* Missing scheme, no TLS -> adc:// prepended. */
+EXO_TEST(regserver_hh_add_scheme_plain, {
+	return regserver_hub_url("hub.example.org:1511", 0, 411, hh, sizeof(hh))
+		&& strcmp(hh, "adc://hub.example.org:1511") == 0;
+});
+
+/* Missing scheme, TLS enabled -> adcs:// prepended. */
+EXO_TEST(regserver_hh_add_scheme_tls, {
+	return regserver_hub_url("hub.example.org:1511", 1, 411, hh, sizeof(hh))
+		&& strcmp(hh, "adcs://hub.example.org:1511") == 0;
+});
+
+/* Bare host: both scheme and port are synthesized. */
+EXO_TEST(regserver_hh_bare_host, {
+	return regserver_hub_url("hub.example.org", 1, 1511, hh, sizeof(hh))
+		&& strcmp(hh, "adcs://hub.example.org:1511") == 0;
+});
+
+/* Bracketed IPv6 literal without a port -> port appended after the bracket. */
+EXO_TEST(regserver_hh_ipv6_add_port, {
+	return regserver_hub_url("adc://[2001:db8::1]", 0, 1511, hh, sizeof(hh))
+		&& strcmp(hh, "adc://[2001:db8::1]:1511") == 0;
+});
+
+/* Bracketed IPv6 literal that already has a port is left alone (colons inside
+ * the brackets must not be mistaken for a port separator). */
+EXO_TEST(regserver_hh_ipv6_keep_port, {
+	return regserver_hub_url("adcs://[2001:db8::1]:1511", 0, 411, hh, sizeof(hh))
+		&& strcmp(hh, "adcs://[2001:db8::1]:1511") == 0;
+});
+
+/* Empty / NULL hub_address -> no address to advertise. */
+EXO_TEST(regserver_hh_empty, {
+	return regserver_hub_url("", 0, 1511, hh, sizeof(hh)) == 0
+		&& regserver_hub_url(NULL, 0, 1511, hh, sizeof(hh)) == 0;
+});
+
+/* A non-ADC scheme is refused rather than advertised verbatim. */
+EXO_TEST(regserver_hh_reject_foreign_scheme, {
+	return regserver_hub_url("http://hub.example.org:80", 0, 1511, hh, sizeof(hh)) == 0
+		&& regserver_hub_url("dchub://hub.example.org:411", 0, 1511, hh, sizeof(hh)) == 0;
+});
+
+/* When a port must be synthesized, an out-of-range server_port is rejected. */
+EXO_TEST(regserver_hh_reject_bad_port, {
+	return regserver_hub_url("hub.example.org", 0, 0, hh, sizeof(hh)) == 0
+		&& regserver_hub_url("hub.example.org", 0, 70000, hh, sizeof(hh)) == 0;
+});
+
+/* A result that does not fit the destination buffer is rejected, not truncated. */
+EXO_TEST(regserver_hh_reject_overflow, {
+	char small[8];
+	return regserver_hub_url("adc://hub.example.org:1511", 0, 411, small, sizeof(small)) == 0;
+});

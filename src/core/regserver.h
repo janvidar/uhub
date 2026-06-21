@@ -63,6 +63,27 @@ struct regserver_url
 extern int regserver_parse_url(const char* url, struct regserver_url* out);
 
 /**
+ * Normalize a configured hub_address into the adc:// or adcs:// URL advertised
+ * to a registration server in the "HH" field. The registration server needs a
+ * reachable ADC URL that includes the port, so this fills in whatever the admin
+ * left out:
+ *   - the scheme: kept if hub_address already starts with adc:// or adcs://,
+ *     otherwise defaulted to adcs:// when use_tls is set, else adc://;
+ *   - the port: appended as ":server_port" when the host carries none.
+ * A bracketed IPv6 literal ([::1]) is recognized when deciding whether a port
+ * is already present.
+ *
+ * @param hub_address the configured address (may be empty/NULL)
+ * @param use_tls     non-zero if the hub listens with TLS (selects the default scheme)
+ * @param server_port the hub's listening port, used when hub_address omits one
+ * @param out         destination buffer for the NUL-terminated URL
+ * @param out_size    size of @p out
+ * @return 1 on success, 0 if no address can be formed (empty hub_address, a
+ *         non-ADC scheme, or the result does not fit in @p out).
+ */
+extern int regserver_hub_url(const char* hub_address, int use_tls, int server_port, char* out, size_t out_size);
+
+/**
  * Kick off the one-time registration announce, if reg_server_enable is set and
  * reg_server_url is configured and valid. Safe to call unconditionally at the
  * end of hub startup; it is a no-op when disabled or misconfigured.

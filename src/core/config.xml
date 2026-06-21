@@ -260,7 +260,10 @@
 		the on/off switch, so leave it empty for private hubs. The path defaults
 		to /register and the port defaults to 80 (http) or 443 (https). For the
 		announce to carry a usable address, also configure hub_address (the HH
-		field). No retries are attempted; the outcome is logged.
+		field): it is normalized to an adc:// or adcs:// URL including the port,
+		so a missing scheme (adcs:// when tls_enable is set, otherwise adc://)
+		and a missing port (server_port) are filled in automatically. No retries
+		are attempted; the outcome is logged.
 		]]></description>
 		<since>0.6.1</since>
 		<example><![CDATA[

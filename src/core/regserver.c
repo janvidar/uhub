@@ -133,12 +133,75 @@ int regserver_parse_url(const char* url, struct regserver_url* out)
 	return 1;
 }
 
+/* True if a "host[:port]" string already carries a ":port", accounting for a
+ * bracketed IPv6 literal where the colons inside the brackets are not a port. */
+static int hostport_has_port(const char* hostport)
+{
+	if (*hostport == '[')
+	{
+		const char* close = strchr(hostport, ']');
+		return close && close[1] == ':';
+	}
+	return strchr(hostport, ':') != NULL;
+}
+
+int regserver_hub_url(const char* hub_address, int use_tls, int server_port, char* out, size_t out_size)
+{
+	const char* scheme;
+	const char* hostport;
+	char portbuf[8];
+	int n;
+
+	if (!hub_address || !*hub_address || !out || out_size == 0)
+		return 0;
+
+	if (!strncasecmp(hub_address, "adc://", 6))
+	{
+		scheme = "adc://";
+		hostport = hub_address + 6;
+	}
+	else if (!strncasecmp(hub_address, "adcs://", 7))
+	{
+		scheme = "adcs://";
+		hostport = hub_address + 7;
+	}
+	else if (strstr(hub_address, "://"))
+	{
+		/* Some other scheme (http://, dchub://, ...) was configured; an ADC
+		 * registration must advertise an adc:// or adcs:// URL, so refuse. */
+		return 0;
+	}
+	else
+	{
+		scheme = use_tls ? "adcs://" : "adc://";
+		hostport = hub_address;
+	}
+
+	if (!*hostport)
+		return 0; /* scheme but no host */
+
+	portbuf[0] = '\0';
+	if (!hostport_has_port(hostport))
+	{
+		if (server_port < 1 || server_port > 65535)
+			return 0;
+		snprintf(portbuf, sizeof(portbuf), ":%d", server_port);
+	}
+
+	n = snprintf(out, out_size, "%s%s%s", scheme, hostport, portbuf);
+	if (n < 0 || (size_t) n >= out_size)
+		return 0;
+	return 1;
+}
+
 /*
  * Build the raw IINF line submitted as the POST body. This reuses the hub's
  * static info command (CT/AP/VE/NI/DE) and appends the descriptive HH/WS/NE/OW
- * fields exactly as hub_send_hubinfo() does. Live counters (UC/SS/SF) are
- * deliberately omitted: they are zero at startup and the hub list's pinger
- * gathers them later. Returns a NUL-terminated string (caller frees) or NULL.
+ * fields. The HH hub address is normalized to a complete adc:// or adcs:// URL
+ * with a port (see regserver_hub_url) so the registration server gets a
+ * reachable address. Live counters (UC/SS/SF) are deliberately omitted: they
+ * are zero at startup and the hub list's pinger gathers them later. Returns a
+ * NUL-terminated string (caller frees) or NULL.
  */
 static char* regserver_build_payload(struct hub_info* hub)
 {
@@ -149,8 +212,12 @@ static char* regserver_build_payload(struct hub_info* hub)
 	if (!info)
 		return NULL;
 
-	if (*hub->config->hub_address)
-		adc_msg_add_named_argument_string(info, "HH", hub->config->hub_address);
+	{
+		char hh[256 + 8];
+		if (regserver_hub_url(hub->config->hub_address, hub->config->tls_enable,
+				hub->config->server_port, hh, sizeof(hh)))
+			adc_msg_add_named_argument_string(info, "HH", hh);
+	}
 	if (*hub->config->hub_website)
 		adc_msg_add_named_argument_string(info, "WS", hub->config->hub_website);
 	if (*hub->config->hub_network)
