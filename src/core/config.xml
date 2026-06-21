@@ -206,11 +206,16 @@
 		<short>Hub host address advertised to hub lists (HH).</short>
 		<description><![CDATA[
 		The DNS name or IP address clients use to reach this hub. Sent to clients
-		that support the ADC PING extension (the "HH" field). Leave empty to omit.
+		that support the ADC PING extension and to a registration server (the "HH"
+		field). It is normalized to a complete adc:// or adcs:// URL with a port:
+		a missing scheme (adcs:// when tls_enable is set, otherwise adc://) and a
+		missing port (server_port) are filled in automatically, so a bare host is
+		accepted. Leave empty to omit.
 		]]></description>
 		<since>0.6.1</since>
 		<example><![CDATA[
 			hub_address = "adc://hub.example.com:1511"
+			A bare host such as "hub.example.com" is expanded to adc(s)://hub.example.com:&lt;server_port&gt;.
 		]]></example>
 	</option>
 

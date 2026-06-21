@@ -64,9 +64,9 @@ extern int regserver_parse_url(const char* url, struct regserver_url* out);
 
 /**
  * Normalize a configured hub_address into the adc:// or adcs:// URL advertised
- * to a registration server in the "HH" field. The registration server needs a
- * reachable ADC URL that includes the port, so this fills in whatever the admin
- * left out:
+ * in the "HH" field, both to a registration server and to PING-capable clients.
+ * Consumers need a reachable ADC URL that includes the port, so this fills in
+ * whatever the admin left out:
  *   - the scheme: kept if hub_address already starts with adc:// or adcs://,
  *     otherwise defaulted to adcs:// when use_tls is set, else adc://;
  *   - the port: appended as ":server_port" when the host carries none.

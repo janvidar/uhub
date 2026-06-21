@@ -574,8 +574,15 @@ void hub_send_hubinfo(struct hub_info* hub, struct hub_user* u)
 		adc_msg_add_named_argument(info, "UP", uhub_itoa((int) difftime(time(0), hub->tm_started)));
 
 		/* Optional descriptive fields (escaped; omitted when not configured) */
-		if (*hub->config->hub_address)
-			adc_msg_add_named_argument_string(info, "HH", hub->config->hub_address);
+		{
+			/* Normalize the advertised hub address to a complete adc:// or
+			 * adcs:// URL with a port (same form as the registration announce),
+			 * filling in a missing scheme/port from tls_enable/server_port. */
+			char hh[256 + 8];
+			if (regserver_hub_url(hub->config->hub_address, hub->config->tls_enable,
+					hub->config->server_port, hh, sizeof(hh)))
+				adc_msg_add_named_argument_string(info, "HH", hh);
+		}
 		if (*hub->config->hub_website)
 			adc_msg_add_named_argument_string(info, "WS", hub->config->hub_website);
 		if (*hub->config->hub_network)
