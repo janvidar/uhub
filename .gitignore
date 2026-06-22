@@ -25,6 +25,7 @@ uhub-passwd
 # Zig
 .zig-cache/
 zig-out/
+zig-pkg/
 
 # Ninja
 .ninja_deps

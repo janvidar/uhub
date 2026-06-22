@@ -84,6 +84,7 @@ const tcc_sources = [_][]const u8{
     "test_memory.tcc",
     "test_message.tcc",
     "test_misc.tcc",
+    "test_netbackend.tcc",
     "test_rbtree.tcc",
     "test_regserver.tcc",
     "test_sid.tcc",
@@ -122,6 +123,8 @@ const Ctx = struct {
     common: *std.Build.Step.Compile,
     version_h: *std.Build.Step.ConfigHeader,
     system_h: *std.Build.Step.ConfigHeader,
+    // The bundled LibreSSL dependency, or null when -Dsystem-ssl links the host's.
+    libressl: ?*std.Build.Dependency,
 
     // A fresh module carrying the include paths, generated headers and libc
     // that every C target in this build needs.
@@ -182,9 +185,22 @@ const Ctx = struct {
         m.addIncludePath(b.path("autotest"));
     }
 
+    // Link the TLS libraries (ssl + crypto) into a module. This also makes
+    // <openssl/*.h> findable: linking the bundled LibreSSL artifacts propagates
+    // their installed headers to the consumer, and linkSystemLibrary pulls the
+    // host's include path via pkg-config.
+    fn linkTls(ctx: *const Ctx, m: *std.Build.Module) void {
+        if (ctx.libressl) |dep| {
+            m.linkLibrary(dep.artifact("ssl"));
+            m.linkLibrary(dep.artifact("crypto"));
+        } else {
+            m.linkSystemLibrary("ssl", .{});
+            m.linkSystemLibrary("crypto", .{});
+        }
+    }
+
     fn linkExternal(ctx: *const Ctx, m: *std.Build.Module) void {
-        m.linkSystemLibrary("ssl", .{});
-        m.linkSystemLibrary("crypto", .{});
+        ctx.linkTls(m);
         if (ctx.systemd) {
             m.linkSystemLibrary("systemd", .{});
         }
@@ -201,6 +217,11 @@ pub fn build(b: *std.Build) void {
     const systemd = b.option(bool, "systemd", "Enable systemd notify and journal logging") orelse false;
     const adc_stress = b.option(bool, "adc-stress", "Build the adcrush stress-tester client") orelse false;
     const lowlevel_debug = b.option(bool, "lowlevel-debug", "Enable low level debug messages") orelse false;
+    // TLS is mandatory. By default we build the bundled LibreSSL (a zig
+    // dependency, see build.zig.zon), which makes the build self-contained and
+    // avoids needing the system OpenSSL headers on the include path (keg-only
+    // on Homebrew macOS). -Dsystem-ssl links the host's ssl/crypto instead.
+    const system_ssl = b.option(bool, "system-ssl", "Link the host OpenSSL/LibreSSL instead of the bundled LibreSSL") orelse false;
 
     // Assemble the common C flags applied to every translation unit.
     var flags = std.array_list.Managed([]const u8).init(b.allocator);
@@ -239,6 +260,14 @@ pub fn build(b: *std.Build) void {
         .HAVE_MEMMEM = !is_windows,
     });
 
+    // The bundled LibreSSL (default) or null when -Dsystem-ssl links the host's
+    // ssl/crypto. Building it ourselves keeps the build self-contained and
+    // carries the TLS headers, so no system include path is required.
+    const libressl: ?*std.Build.Dependency = if (system_ssl) null else b.dependency("libressl", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
     // The shared static library (adc + network + utils). Built PIC so it can
     // be linked into the plugin shared objects.
     const common_mod = b.createModule(.{
@@ -254,9 +283,17 @@ pub fn build(b: *std.Build) void {
     common_mod.addCSourceFiles(.{ .files = &util_sources, .flags = cflags });
     common_mod.addCSourceFiles(.{ .files = &network_sources, .flags = cflags });
     common_mod.addCSourceFiles(.{ .files = &adc_sources, .flags = cflags });
-    // Note: external system libraries (ssl/crypto/systemd) are linked on the
-    // final artifacts via linkExternal, never on this static archive -- doing
-    // so would embed the shared .so as a bogus archive member.
+    // openssl.c (in network_sources) includes <openssl/*.h>, so this archive
+    // needs the TLS headers at compile time. Linking the bundled LibreSSL
+    // static artifacts here propagates their installed headers (and the link
+    // dependency flows transitively to the final artifacts). With -Dsystem-ssl
+    // the host include path is used instead and only the final artifacts link
+    // ssl/crypto via linkExternal -- linking the host's shared libs into this
+    // static archive would embed a bogus .so member.
+    if (libressl) |dep| {
+        common_mod.linkLibrary(dep.artifact("ssl"));
+        common_mod.linkLibrary(dep.artifact("crypto"));
+    }
     const common = b.addLibrary(.{
         .linkage = .static,
         .name = "uhub_common",
@@ -272,6 +309,7 @@ pub fn build(b: *std.Build) void {
         .common = common,
         .version_h = version_h,
         .system_h = system_h,
+        .libressl = libressl,
     };
 
     // uhub
