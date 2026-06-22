@@ -125,6 +125,9 @@ const Ctx = struct {
     system_h: *std.Build.Step.ConfigHeader,
     // The bundled LibreSSL dependency, or null when -Dsystem-ssl links the host's.
     libressl: ?*std.Build.Dependency,
+    // The bundled SQLite dependency (build.zig.zon), used by uhub-passwd and the
+    // sqlite-backed plugins.
+    sqlite3: *std.Build.Dependency,
 
     // A fresh module carrying the include paths, generated headers and libc
     // that every C target in this build needs.
@@ -147,14 +150,13 @@ const Ctx = struct {
         m.addCSourceFiles(.{ .files = files, .flags = ctx.cflags });
     }
 
-    // Bundle the in-tree SQLite amalgamation (CMake links a system sqlite3;
-    // bundling keeps the zig build self-contained, same result).
+    // Link the bundled SQLite (a zig dependency, see build.zig.zon). CMake links
+    // a system sqlite3; building it from the package keeps the zig build
+    // self-contained. Linking the artifact propagates <sqlite3.h> to the
+    // consumer, and the port defaults to SQLITE_THREADSAFE=1 (SQLite's own
+    // default), matching what the in-tree amalgamation was compiled with.
     fn addSqlite(ctx: *const Ctx, m: *std.Build.Module) void {
-        m.addIncludePath(ctx.b.path("third_party/sqlite3"));
-        m.addCSourceFiles(.{
-            .files = &.{"third_party/sqlite3/sqlite3.c"},
-            .flags = &.{"-DSQLITE_THREADSAFE=1"},
-        });
+        m.linkLibrary(ctx.sqlite3.artifact("sqlite3"));
     }
 
     // Generate the autotest driver (autotest/test.c) from the *.tcc sources
@@ -268,6 +270,16 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    // SQLite, built from the package dependency (used by uhub-passwd and the
+    // sqlite-backed plugins). Always bundled, as the in-tree amalgamation was.
+    // Force ReleaseFast regardless of our own optimize mode: it is third-party C
+    // we never debug into, and a Debug build of the port emits __ubsan_handle_*
+    // references that our sanitize_c=off consumers do not resolve.
+    const sqlite3 = b.dependency("sqlite3", .{
+        .target = target,
+        .optimize = .ReleaseFast,
+    });
+
     // The shared static library (adc + network + utils). Built PIC so it can
     // be linked into the plugin shared objects.
     const common_mod = b.createModule(.{
@@ -310,6 +322,7 @@ pub fn build(b: *std.Build) void {
         .version_h = version_h,
         .system_h = system_h,
         .libressl = libressl,
+        .sqlite3 = sqlite3,
     };
 
     // uhub
