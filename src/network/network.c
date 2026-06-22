@@ -198,7 +198,17 @@ int net_set_nonblocking(int fd, int toggle)
 	ret = ioctl(fd, FIONBIO, &toggle);
 #endif
 #endif
-	if (ret == -1)
+	/* Suppress ENOTSOCK: FIONBIO is a socket ioctl, so it can fail on a
+	   non-socket fd (e.g. the notify self-pipe). On the platforms uhub runs,
+	   FIONBIO does work on pipes; where it would not, the notify pipe is only
+	   read after the reactor reports it readable, so a blocking fd is benign.
+	   Guarded for WINSOCK, where net_error() returns Winsock codes and the
+	   notify pipe does not exist. */
+	if (ret == -1
+#ifndef WINSOCK
+	    && net_error() != ENOTSOCK
+#endif
+	)
 	{
 		net_error_out(fd, "net_set_nonblocking");
 	}
@@ -210,8 +220,13 @@ int net_set_nosigpipe(int fd, int toggle)
 {
 	int ret = -1;
 #ifdef SO_NOSIGPIPE
-	ret = net_setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &toggle, sizeof(toggle));
-	if (ret == -1)
+	/* Call setsockopt() directly rather than net_setsockopt() so we can vet
+	   the error ourselves instead of logging it twice. ENOTSOCK is expected
+	   and harmless when fd is not a socket (e.g. the notify self-pipe, whose
+	   read end is monitored like a connection); SIGPIPE suppression does not
+	   apply there, so silently ignore it. */
+	ret = setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &toggle, sizeof(toggle));
+	if (ret == -1 && net_error() != ENOTSOCK)
 	{
 		net_error_out(fd, "net_set_nosigpipe");
 	}
