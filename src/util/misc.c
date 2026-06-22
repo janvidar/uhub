@@ -123,7 +123,7 @@ static int is_valid_utf8_str(const unsigned char* string, size_t length)
 
 int is_valid_utf8(const char* string)
 {
-	return is_valid_utf8_str(string, strlen(string));
+	return is_valid_utf8_str((const unsigned char*) string, strlen(string));
 }
 
 int is_printable_utf8(const char* string, size_t length)
@@ -134,7 +134,7 @@ int is_printable_utf8(const char* string, size_t length)
 		if (!is_printable(string[pos]))
 			return 0;
 	}
-	return is_valid_utf8_str(string, length);
+	return is_valid_utf8_str((const unsigned char*) string, length);
 }
 
 int is_valid_base32_char(char c)
