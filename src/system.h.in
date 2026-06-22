@@ -113,10 +113,13 @@
 
 #ifdef BSD_LIKE
 #define POSIX_THREAD_SUPPORT
-/*
 #define USE_KQUEUE
-#include <sys/event.h>
-*/
+/* NOTE: <sys/event.h> is intentionally NOT included here. It pulls in
+   <sys/queue.h>, whose LIST_FOREACH() macro collides with uhub's own
+   4-argument LIST_FOREACH() (util/list.h). Including it globally would
+   clobber the macro in every translation unit depending on include order.
+   Only kqueue.c needs the kqueue types, so it includes <sys/event.h>
+   locally and isolates the collision there. */
 #endif
 
 #ifdef __GNU__

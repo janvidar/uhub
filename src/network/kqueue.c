@@ -18,8 +18,16 @@
  */
 
 #include "system.h"
+#include "util/log.h"
+#include "util/memory.h"
 
 #ifdef USE_KQUEUE
+
+/* <sys/event.h> drags in <sys/queue.h>, whose LIST_FOREACH() macro collides
+   with uhub's own (util/list.h). kqueue.c does not use the uhub list macros,
+   so the clash is harmless here and kept out of every other translation unit
+   by including the header locally rather than from system.h. */
+#include <sys/event.h>
 
 #include "network/connection.h"
 #include "network/common.h"
@@ -87,6 +95,13 @@ void net_backend_process_kqueue(struct net_backend* data, int res)
 	for (n = 0; n < res; n++)
 	{
 		struct net_connection_kqueue* con = (struct net_connection_kqueue*) backend->events[n].udata;
+
+		/* EV_ERROR is reported for failed changelist entries (e.g. EV_DELETE
+		   of a descriptor that was never registered). It is not an I/O event;
+		   delivering it as read/write readiness would misfire the callback. */
+		if (backend->events[n].flags & EV_ERROR)
+			continue;
+
 		if (con && con->sd >= 0 && backend->conns[con->sd])
 		{
 			int ev = 0;
@@ -210,11 +225,21 @@ static void net_backend_set_handlers(struct net_backend_handler* handler)
 
 static void add_change(struct net_backend_kqueue* backend, struct net_connection_kqueue* con, int actions)
 {
-	if (actions && !con->change)
-	{
+	if (!actions)
+		return;
+
+	/* Append the descriptor to the change list only the first time it is
+	   touched in a cycle; the list is flushed and con->change cleared by
+	   create_change_list() at the next poll. */
+	if (!con->change)
 		backend->change_list[backend->change_list_len++] = con->sd;
+
+	/* Last write wins: a later net_con_update() within the same cycle must
+	   replace the desired read/write mask rather than be silently dropped,
+	   matching the epoll backend's full-mask-replace semantics. A delete is
+	   terminal and must not be downgraded back to an add/mod. */
+	if (!(con->change & CHANGE_ACTION_DEL))
 		con->change = actions;
-	}
 }
 
 static size_t create_change_list(struct net_backend_kqueue* backend)
