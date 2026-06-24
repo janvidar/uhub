@@ -45,11 +45,3 @@ approximate and may drift; grep the marker text to relocate.
   paths may still need real implementations.
 - Connected-only user search — src/core/usermanager.h:85. Open question:
   is searching only connected users safe/sensible?
-- Decide kqueue's fate — USE_KQUEUE is commented out
-  (src/system.h.in:117); kqueue.c (278 lines) is still listed in
-  build.zig but compiles to an empty object, and BSD silently falls back
-  to select. Re-enable + test on BSD, or drop kqueue.c from the build.
-- Outbound-connect DNS (DECIDED, informational) — src/network/connection.c.
-  Keep: DNS resolving on the outbound connect path is required now, will
-  be reused by the ADC client code, and later for hub-list / tracker
-  pinging.
