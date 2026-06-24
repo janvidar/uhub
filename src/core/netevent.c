@@ -20,6 +20,7 @@
 #include "system.h"
 #include "uhub_limits.h"
 #include "util/log.h"
+#include "network/backend.h"
 #include "network/connection.h"
 #include "network/network.h"
 #include "core/config.h"
@@ -208,6 +209,24 @@ void net_on_accept(struct net_connection* con, int event, void *arg)
 				LOG_ERROR("Accept error: %d %s", net_error(), strerror(net_error()));
 				break;
 			}
+		}
+
+		/*
+		 * Enforce a hard ceiling on concurrently tracked connections. This
+		 * bounds fd/memory consumption from a flood of (pre-login) connections,
+		 * and keeps the descriptor within range of the backend's conns[] table:
+		 * net_accept() can hand back an fd >= the table size when the soft fd
+		 * limit (RLIMIT_NOFILE) has been raised above the table capacity, which
+		 * would otherwise be an out-of-bounds index in the backend. Reject and
+		 * close the socket in either case. We continue draining the backlog so
+		 * the kernel accept queue empties and the listener stops re-firing.
+		 */
+		if (net_backend_get_num_connections() >= net_backend_get_max_connections() ||
+		    (size_t) fd >= net_backend_get_max_connections())
+		{
+			LOG_WARN("Connection limit reached (%zu), rejecting connection.", net_backend_get_max_connections());
+			net_close(fd);
+			continue;
 		}
 
 		status = plugin_check_ip_early(hub, &ipaddr);

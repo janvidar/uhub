@@ -158,6 +158,16 @@ time_t net_get_time()
 	return g_backend->now;
 }
 
+size_t net_backend_get_num_connections()
+{
+	return g_backend->common.num;
+}
+
+size_t net_backend_get_max_connections()
+{
+	return g_backend->common.max;
+}
+
 
 void net_con_initialize(struct net_connection* con, int sd, net_connection_cb callback, const void* ptr, int events)
 {
@@ -207,6 +217,22 @@ void net_cleanup_shutdown(struct net_cleanup_handler* handler)
 
 void net_cleanup_delayed_free(struct net_cleanup_handler* handler, struct net_connection* con)
 {
+	/*
+	 * The queue is sized to hold every connection the backend can track
+	 * (net_get_max_sockets()), and net_con_close() guards against enqueueing a
+	 * connection twice via the NET_CLEANUP flag, so num should never reach max.
+	 * Guard anyway: an out-of-bounds write here would corrupt the heap, so on
+	 * the should-never-happen overflow we destroy the connection immediately
+	 * rather than queueing it.
+	 */
+	if (handler->num >= handler->max)
+	{
+		LOG_ERROR("net_cleanup_delayed_free: cleanup queue full (%zu), freeing connection %p immediately", handler->max, (void*) con);
+		con->flags |= NET_CLEANUP;
+		net_con_destroy(con);
+		return;
+	}
+
 	handler->queue[handler->num++] = con;
 	con->flags |= NET_CLEANUP;
 }

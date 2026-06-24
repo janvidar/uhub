@@ -99,6 +99,15 @@ void net_con_backend_add_epoll(struct net_backend* data, struct net_connection* 
 	struct net_backend_epoll* backend = (struct net_backend_epoll*) data;
 	struct net_connection_epoll* con = (struct net_connection_epoll*) con_;
 
+	/* Backstop: conns[] is indexed by fd value and sized to common->max.
+	   The accept path already rejects out-of-range descriptors; refuse to
+	   index out of bounds here rather than corrupt the heap. */
+	if (con->sd < 0 || (size_t) con->sd >= backend->common->max)
+	{
+		LOG_ERROR("net_con_backend_add_epoll: fd %d out of range (max %zu)", con->sd, backend->common->max);
+		return;
+	}
+
 	backend->conns[con->sd] = con;
 
 	if (events & NET_EVENT_READ)  con->ev.events |= EPOLLIN;

@@ -18,6 +18,7 @@
  */
 
 #include "system.h"
+#include "util/log.h"
 #include "util/memory.h"
 #include "network/network.h"
 
@@ -130,6 +131,16 @@ void net_con_initialize_select(struct net_backend* data, struct net_connection* 
 void net_con_backend_add_select(struct net_backend* data, struct net_connection* con, int events)
 {
 	struct net_backend_select* backend = (struct net_backend_select*) data;
+
+	/* Backstop: conns[] is indexed by fd value and sized to common->max.
+	   The accept path already rejects out-of-range descriptors; refuse to
+	   index out of bounds here rather than corrupt the heap. */
+	if (con->sd < 0 || (size_t) con->sd >= backend->common->max)
+	{
+		LOG_ERROR("net_con_backend_add_select: fd %d out of range (max %zu)", con->sd, backend->common->max);
+		return;
+	}
+
 	backend->conns[con->sd] = (struct net_connection_select*) con;
 	con->flags |= (events & (NET_EVENT_READ | NET_EVENT_WRITE));
 }

@@ -90,6 +90,16 @@ extern void net_backend_update(struct net_connection* con, int events);
  */
 time_t net_get_time();
 
+/**
+ * Number of connections currently tracked by the backend.
+ */
+extern size_t net_backend_get_num_connections();
+
+/**
+ * Maximum number of connections the backend can track (size of the fd tables).
+ */
+extern size_t net_backend_get_max_connections();
+
 extern struct timeout_queue* net_backend_get_timeout_queue();
 
 struct net_cleanup_handler* net_cleanup_initialize(size_t max);
