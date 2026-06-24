@@ -1031,7 +1031,7 @@ void hub_shutdown_service(struct hub_info* hub)
 	hub->status = hub_status_stopped;
 	hub_free(hub->sendbuf);
 	hub_free(hub->recvbuf);
-	list_clear(hub->logout_info, &hub_free);
+	list_clear(hub->logout_info, hub_free_handle);
 	list_destroy(hub->logout_info);
 	command_shutdown(hub->commands);
 	hub_free(hub);
@@ -1504,6 +1504,6 @@ void hub_logout_log(struct hub_info* hub, struct hub_user* user)
 	list_append(hub->logout_info, loginfo);
 	while (list_size(hub->logout_info) > (size_t) hub->config->max_logout_log)
 	{
-		list_remove_first(hub->logout_info, hub_free);
+		list_remove_first(hub->logout_info, hub_free_handle);
 	}
 }

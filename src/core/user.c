@@ -281,7 +281,7 @@ void user_clear_feature_cast_support(struct hub_user* u)
 {
 	if (u->feature_cast)
 	{
-		list_clear(u->feature_cast, &hub_free);
+		list_clear(u->feature_cast, hub_free_handle);
 		list_destroy(u->feature_cast);
 		u->feature_cast = 0;
 	}

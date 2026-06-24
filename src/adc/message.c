@@ -235,14 +235,14 @@ void adc_msg_free(struct adc_message* msg)
 
 		if (msg->feature_cast_include)
 		{
-			list_clear(msg->feature_cast_include, &hub_free);
+			list_clear(msg->feature_cast_include, hub_free_handle);
 			list_destroy(msg->feature_cast_include);
 			msg->feature_cast_include = 0;
 		}
 
 		if (msg->feature_cast_exclude)
 		{
-			list_clear(msg->feature_cast_exclude, &hub_free);
+			list_clear(msg->feature_cast_exclude, hub_free_handle);
 			list_destroy(msg->feature_cast_exclude);
 			msg->feature_cast_exclude = 0;
 		}

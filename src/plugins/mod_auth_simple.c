@@ -53,7 +53,7 @@ static void free_acl(struct acl_data* data)
 
 	if (data->users)
 	{
-		list_clear(data->users, hub_free);
+		list_clear(data->users, hub_free_handle);
 		list_destroy(data->users);
 	}
 	hub_free(data->file);

@@ -128,7 +128,7 @@ void cfg_tokens_free(struct cfg_tokens* tokens)
 {
 	if (tokens)
 	{
-		list_clear(tokens->list, hub_free);
+		list_clear(tokens->list, hub_free_handle);
 		list_destroy(tokens->list);
 		hub_free(tokens);
 	}

@@ -46,4 +46,12 @@ extern char* debug_mem_strndup(const char* s, size_t n);
 
 extern void* hub_malloc_zero(size_t size);
 
+/*
+ * Free callback with a stable address and the exact void(*)(void*) signature
+ * required by list_clear() / list_remove_first(). Use this instead of passing
+ * the hub_free macro as a function pointer: hub_free is a macro, and its being
+ * passable as a function pointer is an accident of how it currently expands.
+ */
+extern void hub_free_handle(void* ptr);
+
 #endif /* HAVE_UHUB_MEMORY_HANDLER_H */

@@ -205,6 +205,11 @@ void* hub_malloc_zero(size_t size)
 	return data;
 }
 
+void hub_free_handle(void* ptr)
+{
+	hub_free(ptr);
+}
+
 #ifdef DEBUG_FUNCTION_TRACE
 #define FTRACE_LOG "ftrace.log"
 static FILE* functrace = 0;

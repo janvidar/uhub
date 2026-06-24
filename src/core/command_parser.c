@@ -50,7 +50,7 @@ static void hub_command_args_free(struct hub_command* cmd)
 		}
 	});
 
-	list_clear(cmd->args, hub_free);
+	list_clear(cmd->args, hub_free_handle);
 	list_destroy(cmd->args);
 	cmd->args = NULL;
 }
@@ -356,7 +356,7 @@ struct hub_command* command_parse(struct command_base* cbase, struct hub_info* h
 command_parse_cleanup:
 	if (tokens)
 	{
-		list_clear(tokens, &hub_free);
+		list_clear(tokens, hub_free_handle);
 		list_destroy(tokens);
 	}
 	return cmd;

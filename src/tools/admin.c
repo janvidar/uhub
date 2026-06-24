@@ -74,7 +74,7 @@ static void on_message(struct ADC_chat_message* chat)
 		ret++;
 	});
 
-	list_clear(lines, &hub_free);
+	list_clear(lines, hub_free_handle);
 	list_destroy(lines);
 }
 

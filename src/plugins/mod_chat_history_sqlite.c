@@ -169,7 +169,7 @@ void user_login(struct plugin_handle* plugin, struct plugin_user* user)
 		plugin->hub.send_message(plugin, user, cbuf_get(buf));
 		cbuf_destroy(buf);
 	}
-	list_clear(found, &hub_free);
+	list_clear(found, hub_free_handle);
 	list_destroy(found);
 }
 
@@ -213,7 +213,7 @@ static int command_history(struct plugin_handle* plugin, struct plugin_user* use
 
 	plugin->hub.send_message(plugin, user, cbuf_get(buf));
 	cbuf_destroy(buf);
-	list_clear(found, &hub_free);
+	list_clear(found, hub_free_handle);
 	list_destroy(found);
 
 	return 0;

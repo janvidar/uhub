@@ -54,7 +54,7 @@ static void history_add(struct plugin_handle* plugin, struct plugin_user* from, 
 	list_append(data->chat_history, log);
 	while (list_size(data->chat_history) > data->history_max)
 	{
-		list_remove_first(data->chat_history, hub_free);
+		list_remove_first(data->chat_history, hub_free_handle);
 	}
 }
 
@@ -233,7 +233,7 @@ int plugin_unregister(struct plugin_handle* plugin)
 
 	if (data)
 	{
-		list_clear(data->chat_history, &hub_free);
+		list_clear(data->chat_history, hub_free_handle);
 		list_destroy(data->chat_history);
 
 		plugin->hub.command_del(plugin, data->command_history_handle);

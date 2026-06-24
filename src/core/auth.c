@@ -272,20 +272,20 @@ int acl_shutdown(struct acl_handle* handle)
 
 	if (handle->users_denied)
 	{
-		list_clear(handle->users_denied, &hub_free);
+		list_clear(handle->users_denied, hub_free_handle);
 		list_destroy(handle->users_denied);
 	}
 
 	if (handle->users_banned)
 	{
-		list_clear(handle->users_banned, &hub_free);
+		list_clear(handle->users_banned, hub_free_handle);
 		list_destroy(handle->users_banned);
 	}
 
 
 	if (handle->cids)
 	{
-		list_clear(handle->cids, &hub_free);
+		list_clear(handle->cids, hub_free_handle);
 		list_destroy(handle->cids);
 	}
 

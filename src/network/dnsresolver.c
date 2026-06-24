@@ -398,7 +398,7 @@ extern void net_dns_result_free(const struct net_dns_result* res)
 	if (!res)
 		return;
 
-	list_clear(res->addr_list, &hub_free);
+	list_clear(res->addr_list, hub_free_handle);
 	list_destroy(res->addr_list);
 	free_job(res->job);
 	hub_free((struct net_dns_result*) res);

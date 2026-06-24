@@ -453,7 +453,7 @@ int split_string(const char* string, const char* split, struct linked_list* list
 
 		if (!tmp2)
 		{
-			list_clear(list, &hub_free);
+			list_clear(list, hub_free_handle);
 			return -1;
 		}
 
