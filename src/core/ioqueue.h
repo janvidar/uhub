@@ -31,10 +31,12 @@ typedef int (*ioq_read)(void* desc, void* buf, size_t len);
 
 struct ioq_send
 {
-	size_t               size;      /** Size of send queue (in bytes, not messages) */
-	size_t               offset;    /** Queue byte offset in the first message. Should be 0 unless a partial write. */
-	size_t               last_send; /** When using SSL, one have to send the exact same buffer and length if a write cannot complete. */
-	struct linked_list*  queue;     /** List of queued messages (struct adc_message) */
+	size_t               size;        /** Size of send queue (in bytes, not messages) */
+	size_t               offset;      /** Queue byte offset in the first message. Should be 0 unless a partial write. */
+	size_t               last_send;   /** TLS only: bytes pinned in `scratch` for a blocked write that must be retried with the exact same buffer and length. 0 when no send is in flight. */
+	char*                scratch;     /** TLS only: buffer used to coalesce several queued messages into a single SSL_write. */
+	size_t               scratch_cap; /** Allocated capacity of `scratch`. */
+	struct linked_list*  queue;       /** List of queued messages (struct adc_message) */
 };
 
 struct ioq_recv

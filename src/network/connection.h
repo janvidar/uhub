@@ -92,6 +92,16 @@ extern void net_con_close(struct net_connection* con);
  */
 extern ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len);
 
+#ifdef HAVE_FUNC_WRITEV
+/**
+ * Send data using scatter-gather I/O (plaintext connections only; TLS
+ * coalescing is handled in the send queue).
+ *
+ * @return number of bytes sent, 0 on EWOULDBLOCK/EINTR, <0 on error.
+ */
+extern ssize_t net_con_writev(struct net_connection* con, const struct iovec* iov, int iovcnt);
+#endif
+
 /**
  * Receive data
  *

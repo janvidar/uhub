@@ -110,9 +110,11 @@ check_include_file(sys/types.h HAVE_SYS_TYPES_H)
 if (HAVE_SYS_TYPES_H)
 	list(APPEND CMAKE_EXTRA_INCLUDE_FILES "sys/types.h")
 endif()
+check_include_file(sys/uio.h HAVE_SYS_UIO_H)
 check_type_size(ssize_t SSIZE_T)
 check_symbol_exists(memmem string.h HAVE_MEMMEM)
 check_symbol_exists(strndup string.h HAVE_STRNDUP)
+check_symbol_exists(writev sys/uio.h HAVE_FUNC_WRITEV)
 
 # These directories hold sources and generated headers (version.h/system.h);
 # every uhub target needs them, so keep them at directory scope.

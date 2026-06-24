@@ -260,6 +260,8 @@ pub fn build(b: *std.Build) void {
         .HAVE_SSIZE_T = !is_windows,
         .HAVE_STRNDUP = !is_windows,
         .HAVE_MEMMEM = !is_windows,
+        .HAVE_SYS_UIO_H = !is_windows,
+        .HAVE_FUNC_WRITEV = !is_windows,
     });
 
     // The bundled LibreSSL (default) or null when -Dsystem-ssl links the host's

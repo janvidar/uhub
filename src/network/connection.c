@@ -59,6 +59,23 @@ ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 	return ret;
 }
 
+#ifdef HAVE_FUNC_WRITEV
+ssize_t net_con_writev(struct net_connection* con, const struct iovec* iov, int iovcnt)
+{
+	/* Plaintext scatter-gather only. TLS coalescing is handled in the send
+	   queue (SSL_write has no iovec form), so this is never called on an SSL
+	   connection. */
+	ssize_t ret = writev(con->sd, iov, iovcnt);
+	if (ret == -1)
+	{
+		if (is_blocked_or_interrupted())
+			return 0;
+		return -1;
+	}
+	return ret;
+}
+#endif
+
 ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 {
 	int ret;
