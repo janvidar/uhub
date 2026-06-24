@@ -88,7 +88,7 @@
 	</option>
 
 	<option name="hbri_address4" type="string" default="">
-		<check regexp="[0-9:.]+|" />
+		<check regexp="[0-9:.]*" />
 		<short>Hub's reachable IPv4 address for HBRI validation</short>
 		<description><![CDATA[
 			The public IPv4 address clients should connect to for HBRI secondary-protocol validation.
@@ -102,7 +102,7 @@
 	</option>
 
 	<option name="hbri_address6" type="string" default="">
-		<check regexp="[0-9a-fA-F:.]+|" />
+		<check regexp="[0-9a-fA-F:.]*" />
 		<short>Hub's reachable IPv6 address for HBRI validation</short>
 		<description><![CDATA[
 			The public IPv6 address clients should connect to for HBRI secondary-protocol validation.
