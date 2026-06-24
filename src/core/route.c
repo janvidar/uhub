@@ -118,27 +118,53 @@ int route_to_user(struct hub_info* hub, struct hub_user* user, struct adc_messag
 
 	uhub_assert(msg->cache && *msg->cache);
 
-	if (ioq_send_is_empty(user->send_queue) && !user_flag_get(user, flag_pipeline))
+	if (check_send_queue(hub, user, msg) < 0)
 	{
-		/* Perform oportunistic write */
-		ioq_send_add(user->send_queue, msg);
-		handle_net_write(user);
+		/* Hard send-queue overflow: the client is not keeping up. */
+		hub_disconnect_user(hub, user, quit_send_queue);
+		return 1;
 	}
-	else
+
+	ioq_send_add(user->send_queue, msg);
+
+	/* Defer the write to the end of the event-loop iteration (route_flush_dirty)
+	   so that several messages queued in the same tick -- e.g. a broadcast, or
+	   the per-message fan-out of a busy hub -- coalesce into a single
+	   writev()/SSL_write() instead of one syscall each. Pipelined handshake
+	   messages are flushed explicitly by route_flush_pipeline(). */
+	if (!user_flag_get(user, flag_pipeline) && !user_flag_get(user, flag_dirty))
 	{
-		if (check_send_queue(hub, user, msg) >= 0)
-		{
-			ioq_send_add(user->send_queue, msg);
-			if (!user_flag_get(user, flag_pipeline))
-				user_net_io_want_write(user);
-		}
-		else
-		{
-			/* Hard send-queue overflow: the client is not keeping up. */
-			hub_disconnect_user(hub, user, quit_send_queue);
-		}
+		user_flag_set(user, flag_dirty);
+		list_append(hub->write_queue, user);
 	}
 	return 1;
+}
+
+/*
+ * Flush all connections with messages queued this iteration. Called once per
+ * event-loop pass, after net_backend_process() and before event_queue_process()
+ * frees any disconnected users -- so every entry is still a live struct, though
+ * its connection may already have been closed (skipped below).
+ */
+void route_flush_dirty(struct hub_info* hub)
+{
+	struct hub_user* user;
+
+	if (list_size(hub->write_queue) == 0)
+		return;
+
+	LIST_FOREACH(struct hub_user*, user, hub->write_queue,
+	{
+		user_flag_unset(user, flag_dirty);
+		if (user->connection && !user_is_disconnecting(user))
+		{
+			int ret = handle_net_write(user);
+			if (ret)
+				hub_disconnect_user(hub, user, ret);
+		}
+	});
+
+	list_clear(hub->write_queue, NULL);
 }
 
 int route_flush_pipeline(struct hub_info* hub, struct hub_user* u)

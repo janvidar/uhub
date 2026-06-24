@@ -62,6 +62,7 @@ enum user_flags
 	feature_adcs = 0x00000200,	  /** ADCS: ADC over TLS/SSL */
 	feature_bas0 = 0x00000400,	  /** BAS0: Obsolete pre-ADC/1.0 protocol version */
 	feature_hbri = 0x00000800,	  /** HBRI: Hybrid IPv4/IPv6 connectivity */
+	flag_dirty = 0x00100000,	  /** Queued for a deferred write; present in hub->write_queue. */
 	flag_flood = 0x00400000,	  /** User has been notified about flooding. */
 	flag_muted = 0x00800000,	  /** User is muted (cannot chat) */
 	flag_ignore = 0x01000000,	  /** Ignore further reads */

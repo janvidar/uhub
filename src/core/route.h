@@ -35,6 +35,13 @@ extern int route_message(struct hub_info* hub, struct hub_user* u, struct adc_me
 extern int route_flush_pipeline(struct hub_info* hub, struct hub_user* u);
 
 /**
+ * Flush all connections that had messages queued during this event-loop
+ * iteration (the deferred writes accumulated by route_to_user). Coalesces
+ * each connection's queued messages into as few syscalls as possible.
+ */
+extern void route_flush_dirty(struct hub_info* hub);
+
+/**
  * Transmit message directly to one user.
  */
 extern int route_to_user(struct hub_info* hub, struct hub_user*, struct adc_message* command);

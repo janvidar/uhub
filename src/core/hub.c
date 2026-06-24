@@ -36,6 +36,7 @@
 #include "core/hub.h"
 #include "core/hubevent.h"
 #include "core/inf.h"
+#include "core/ioqueue.h"
 #include "core/netevent.h"
 #include "core/plugininvoke.h"
 #include "core/pluginloader.h"
@@ -987,6 +988,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	}
 
 	hub->logout_info  = (struct linked_list*) list_create();
+	hub->write_queue  = (struct linked_list*) list_create();
 
 	hub_init_secret(hub);
 
@@ -1033,6 +1035,8 @@ void hub_shutdown_service(struct hub_info* hub)
 	hub_free(hub->recvbuf);
 	list_clear(hub->logout_info, hub_free_handle);
 	list_destroy(hub->logout_info);
+	list_clear(hub->write_queue, NULL);
+	list_destroy(hub->write_queue);
 	command_shutdown(hub->commands);
 	hub_free(hub);
 	hub = 0;
@@ -1439,6 +1443,7 @@ void hub_event_loop(struct hub_info* hub)
 	do
 	{
 		net_backend_process();
+		route_flush_dirty(hub);
 		event_queue_process(hub->queue);
 	}
 	while (hub->status == hub_status_running || hub->status == hub_status_disabled);
@@ -1466,6 +1471,13 @@ void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason
 	{
 		return;
 	}
+
+	/* Best-effort flush of queued output before closing. Writes are normally
+	   deferred to route_flush_dirty() at end of the event-loop iteration, but a
+	   status message routed immediately before a disconnect (e.g. a fatal login
+	   error) must still be pushed to the socket before it is closed. */
+	if (user->connection && !ioq_send_is_empty(user->send_queue))
+		handle_net_write(user);
 
 	/* stop reading from user */
 	net_shutdown_r(net_con_get_sd(user->connection));

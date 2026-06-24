@@ -131,6 +131,7 @@ struct hub_info
 	char* sendbuf; /* Global send buffer */
 
 	struct linked_list* logout_info;     /* Log of people logging out. */
+	struct linked_list* write_queue;     /* Users with deferred writes, flushed once per event-loop iteration. */
 
 	struct command_base* commands;       /* Hub command handler */
 	struct uhub_plugins* plugins;        /* Plug-ins loaded for this hub instance. */
