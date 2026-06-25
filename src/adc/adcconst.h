@@ -177,4 +177,29 @@ typedef uint32_t fourcc_t;
 #define ADC_CLIENT_TYPE_HUB             "32"  /* the hub itself */
 
 
+/* ADC ISTA/IQUI status error codes.
+ *
+ * On the wire a status code is three digits: a leading severity digit (see
+ * enum msg_status_level - 0 info, 1 recoverable, 2 fatal) followed by these
+ * two-digit error codes. set_status_code() in hub.c combines the two. Values
+ * follow the ADC specification's general defined codes. */
+#define ADC_STATUS_GENERIC               0  /* 00: generic / undefined */
+#define ADC_STATUS_HUB_GENERIC          10  /* 10: generic hub error */
+#define ADC_STATUS_HUB_FULL             11  /* 11: hub is full */
+#define ADC_STATUS_HUB_DISABLED         12  /* 12: hub is disabled */
+#define ADC_STATUS_LOGIN_GENERIC        20  /* 20: generic login/access error */
+#define ADC_STATUS_NICK_INVALID         21  /* 21: invalid nick (formatting/length/charset) */
+#define ADC_STATUS_NICK_TAKEN           22  /* 22: nick already taken */
+#define ADC_STATUS_INVALID_PASSWORD     23  /* 23: invalid password */
+#define ADC_STATUS_CID_TAKEN            24  /* 24: CID already taken */
+#define ADC_STATUS_REGISTERED_ONLY      26  /* 26: registered users only */
+#define ADC_STATUS_INVALID_PID          27  /* 27: invalid PID */
+#define ADC_STATUS_DISCONNECT_GENERIC   30  /* 30: generic kick/ban/disconnect */
+#define ADC_STATUS_BANNED_PERMANENTLY   31  /* 31: permanently banned */
+#define ADC_STATUS_BANNED_TEMPORARILY   32  /* 32: temporarily banned (TL seconds) */
+#define ADC_STATUS_PROTOCOL_GENERIC     40  /* 40: generic protocol error */
+#define ADC_STATUS_INF_FIELD_BAD        43  /* 43: required INF field missing or bad (FC field) */
+#define ADC_STATUS_NO_COMMON_HASH       47  /* 47: no common hash algorithm */
+
+
 #endif /* HAVE_UHUB_ADC_CONSTANTS_H */

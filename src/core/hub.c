@@ -640,10 +640,21 @@ void hub_send_password_challenge(struct hub_info* hub, struct hub_user* u)
 	adc_msg_free(igpa);
 }
 
+/* Format an ADC status code as "<severity><2-digit error>" into a 4-byte
+ * buffer, e.g. (status_level_error, ADC_STATUS_HUB_GENERIC) -> "110". */
+static void set_status_code(enum msg_status_level level, int code, char buffer[4])
+{
+	buffer[0] = ('0' + (int) level);
+	buffer[1] = ('0' + (code / 10));
+	buffer[2] = ('0' + (code % 10));
+	buffer[3] = 0;
+}
+
 void hub_send_flood_warning(struct hub_info* hub, struct hub_user* u, const char* message)
 {
 	struct adc_message* msg;
 	char* tmp;
+	char code[4];
 
 	if (user_flag_get(u, flag_flood))
 		return;
@@ -652,7 +663,8 @@ void hub_send_flood_warning(struct hub_info* hub, struct hub_user* u, const char
 	if (msg)
 	{
 		tmp = adc_msg_escape(message);
-		adc_msg_add_argument(msg, "110");
+		set_status_code(status_level_error, ADC_STATUS_HUB_GENERIC, code);
+		adc_msg_add_argument(msg, code);
 		adc_msg_add_argument(msg, tmp);
 		hub_free(tmp);
 
@@ -666,12 +678,15 @@ void hub_send_chat_denied(struct hub_info* hub, struct hub_user* u, const char* 
 {
 	struct adc_message* msg;
 	char* tmp;
+	char code[4];
 
 	msg = adc_msg_construct(ADC_CMD_ISTA, 128);
 	if (msg)
 	{
 		tmp = adc_msg_escape(message);
-		adc_msg_add_argument(msg, "126"); /* recoverable error, registered/privileged users only */
+		/* recoverable error, registered/privileged users only */
+		set_status_code(status_level_error, ADC_STATUS_REGISTERED_ONLY, code);
+		adc_msg_add_argument(msg, code);
 		adc_msg_add_argument(msg, tmp);
 		hub_free(tmp);
 
@@ -1114,11 +1129,13 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 	hub->command_banner = adc_msg_construct(ADC_CMD_ISTA, 100 + (server ? strlen(server) : 0));
 	if (hub->command_banner)
 	{
+		char code[4];
 		if (hub->config->show_banner_sys_info)
 			tmp = adc_msg_escape("Powered by " PRODUCT_STRING " on " OPSYS "/" CPUINFO);
 		else
 			tmp = adc_msg_escape("Powered by " PRODUCT_STRING);
-		adc_msg_add_argument(hub->command_banner, "000");
+		set_status_code(status_level_info, ADC_STATUS_GENERIC, code);
+		adc_msg_add_argument(hub->command_banner, code);
 		adc_msg_add_argument(hub->command_banner, tmp);
 		hub_free(tmp);
 	}
@@ -1144,13 +1161,6 @@ void hub_free_variables(struct hub_info* hub)
 	adc_msg_free(hub->command_support);
 }
 
-static void set_status_code(enum msg_status_level level, int code, char buffer[4])
-{
-	buffer[0] = ('0' + (int) level);
-	buffer[1] = ('0' + (code / 10));
-	buffer[2] = ('0' + (code % 10));
-	buffer[3] = 0;
-}
 
 /**
  * @param hub The hub instance this message is sent from.
@@ -1181,38 +1191,38 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 #define STATUS(CODE, MSG, FLAG, RCONTIME, REDIRECT) case status_ ## MSG : set_status_code(level, CODE, code); text = cfg->MSG; flag = FLAG; reconnect_time = RCONTIME; redirect = REDIRECT; break
 	switch (msg)
 	{
-		STATUS(11, msg_hub_full, 0, 600, 1); /* FIXME: Proper timeout? */
-		STATUS(12, msg_hub_disabled, 0, -1, 1);
-		STATUS(26, msg_hub_registered_users_only, 0, 0, 1);
-		STATUS(43, msg_inf_error_nick_missing, 0, 0, 0);
-		STATUS(43, msg_inf_error_nick_multiple, 0, 0, 0);
-		STATUS(21, msg_inf_error_nick_invalid, 0, 0, 0);
-		STATUS(21, msg_inf_error_nick_long, 0, 0, 0);
-		STATUS(21, msg_inf_error_nick_short, 0, 0, 0);
-		STATUS(21, msg_inf_error_nick_spaces, 0, 0, 0);
-		STATUS(21, msg_inf_error_nick_bad_chars, 0, 0, 0);
-		STATUS(21, msg_inf_error_nick_not_utf8, 0, 0, 0);
-		STATUS(22, msg_inf_error_nick_taken, 0, 0, 0);
-		STATUS(21, msg_inf_error_nick_restricted, 0, 0, 0);
-		STATUS(43, msg_inf_error_cid_invalid, "FBID", 0, 0);
-		STATUS(43, msg_inf_error_cid_missing, "FMID", 0, 0);
-		STATUS(24, msg_inf_error_cid_taken, 0, 0, 0);
-		STATUS(43, msg_inf_error_pid_missing, "FMPD", 0, 0);
-		STATUS(27, msg_inf_error_pid_invalid, "FBPD", 0, 0);
-		STATUS(31, msg_ban_permanently, 0, 0, 0);
-		STATUS(32, msg_ban_temporarily, "TL600", 600, 0); /* FIXME: Proper timeout? */
-		STATUS(23, msg_auth_invalid_password, 0, 0, 0);
-		STATUS(20, msg_auth_user_not_found, 0, 0, 0);
-		STATUS(30, msg_error_no_memory, 0, 0, 0);
-		STATUS(43, msg_user_share_size_low,   "FB" ADC_INF_FLAG_SHARED_SIZE, 0, 1);
-		STATUS(43, msg_user_share_size_high,  "FB" ADC_INF_FLAG_SHARED_SIZE, 0, 1);
-		STATUS(43, msg_user_slots_low,        "FB" ADC_INF_FLAG_UPLOAD_SLOTS, 0, 1);
-		STATUS(43, msg_user_slots_high,       "FB" ADC_INF_FLAG_UPLOAD_SLOTS, 0, 1);
-		STATUS(43, msg_user_hub_limit_low, 0, 0, 1);
-		STATUS(43, msg_user_hub_limit_high, 0, 0, 1);
-		STATUS(0, msg_search_too_short, 0, 0, 0);
-		STATUS(47, msg_proto_no_common_hash, 0, -1, 1);
-		STATUS(40, msg_proto_obsolete_adc0, 0, -1, 1);
+		STATUS(ADC_STATUS_HUB_FULL, msg_hub_full, 0, 600, 1); /* FIXME: Proper timeout? */
+		STATUS(ADC_STATUS_HUB_DISABLED, msg_hub_disabled, 0, -1, 1);
+		STATUS(ADC_STATUS_REGISTERED_ONLY, msg_hub_registered_users_only, 0, 0, 1);
+		STATUS(ADC_STATUS_INF_FIELD_BAD, msg_inf_error_nick_missing, 0, 0, 0);
+		STATUS(ADC_STATUS_INF_FIELD_BAD, msg_inf_error_nick_multiple, 0, 0, 0);
+		STATUS(ADC_STATUS_NICK_INVALID, msg_inf_error_nick_invalid, 0, 0, 0);
+		STATUS(ADC_STATUS_NICK_INVALID, msg_inf_error_nick_long, 0, 0, 0);
+		STATUS(ADC_STATUS_NICK_INVALID, msg_inf_error_nick_short, 0, 0, 0);
+		STATUS(ADC_STATUS_NICK_INVALID, msg_inf_error_nick_spaces, 0, 0, 0);
+		STATUS(ADC_STATUS_NICK_INVALID, msg_inf_error_nick_bad_chars, 0, 0, 0);
+		STATUS(ADC_STATUS_NICK_INVALID, msg_inf_error_nick_not_utf8, 0, 0, 0);
+		STATUS(ADC_STATUS_NICK_TAKEN, msg_inf_error_nick_taken, 0, 0, 0);
+		STATUS(ADC_STATUS_NICK_INVALID, msg_inf_error_nick_restricted, 0, 0, 0);
+		STATUS(ADC_STATUS_INF_FIELD_BAD, msg_inf_error_cid_invalid, "FBID", 0, 0);
+		STATUS(ADC_STATUS_INF_FIELD_BAD, msg_inf_error_cid_missing, "FMID", 0, 0);
+		STATUS(ADC_STATUS_CID_TAKEN, msg_inf_error_cid_taken, 0, 0, 0);
+		STATUS(ADC_STATUS_INF_FIELD_BAD, msg_inf_error_pid_missing, "FMPD", 0, 0);
+		STATUS(ADC_STATUS_INVALID_PID, msg_inf_error_pid_invalid, "FBPD", 0, 0);
+		STATUS(ADC_STATUS_BANNED_PERMANENTLY, msg_ban_permanently, 0, 0, 0);
+		STATUS(ADC_STATUS_BANNED_TEMPORARILY, msg_ban_temporarily, "TL600", 600, 0); /* FIXME: Proper timeout? */
+		STATUS(ADC_STATUS_INVALID_PASSWORD, msg_auth_invalid_password, 0, 0, 0);
+		STATUS(ADC_STATUS_LOGIN_GENERIC, msg_auth_user_not_found, 0, 0, 0);
+		STATUS(ADC_STATUS_DISCONNECT_GENERIC, msg_error_no_memory, 0, 0, 0);
+		STATUS(ADC_STATUS_INF_FIELD_BAD, msg_user_share_size_low,   "FB" ADC_INF_FLAG_SHARED_SIZE, 0, 1);
+		STATUS(ADC_STATUS_INF_FIELD_BAD, msg_user_share_size_high,  "FB" ADC_INF_FLAG_SHARED_SIZE, 0, 1);
+		STATUS(ADC_STATUS_INF_FIELD_BAD, msg_user_slots_low,        "FB" ADC_INF_FLAG_UPLOAD_SLOTS, 0, 1);
+		STATUS(ADC_STATUS_INF_FIELD_BAD, msg_user_slots_high,       "FB" ADC_INF_FLAG_UPLOAD_SLOTS, 0, 1);
+		STATUS(ADC_STATUS_INF_FIELD_BAD, msg_user_hub_limit_low, 0, 0, 1);
+		STATUS(ADC_STATUS_INF_FIELD_BAD, msg_user_hub_limit_high, 0, 0, 1);
+		STATUS(ADC_STATUS_GENERIC, msg_search_too_short, 0, 0, 0);
+		STATUS(ADC_STATUS_NO_COMMON_HASH, msg_proto_no_common_hash, 0, -1, 1);
+		STATUS(ADC_STATUS_PROTOCOL_GENERIC, msg_proto_obsolete_adc0, 0, -1, 1);
 	}
 #undef STATUS
 
