@@ -89,15 +89,7 @@ extern sid_t uman_get_free_sid(struct hub_user_manager* users, struct hub_user* 
 /**
  * Lookup a user based on the session ID (SID).
  *
- * NOTE: This function will only search connected users, which means
- * that SIDs assigned to users who are not yet completely logged in,
- * or are in the process of being disconnected will result in this
- * function returning NULL even though the sid is not freely available.
- *
- * FIXME: Is that really safe / sensible ?
- * - Makes sense from a message routing point of view.
- *
- * @return a user if found, or NULL if not found
+ * @return a user if found, or NULL if not found or user is not fully logged in.
  */
 extern struct hub_user* uman_get_user_by_sid(struct hub_user_manager* users, sid_t sid);
 

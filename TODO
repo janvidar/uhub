@@ -43,5 +43,3 @@ approximate and may drift; grep the marker text to relocate.
   portable to Windows (not a tier-1 platform, not covered by CI).
   net_set_close_on_exec is resolved (deliberate no-op); other WINSOCK
   paths may still need real implementations.
-- Connected-only user search — src/core/usermanager.h:85. Open question:
-  is searching only connected users safe/sensible?
