@@ -142,9 +142,13 @@ int route_to_user(struct hub_info* hub, struct hub_user* user, struct adc_messag
 
 /*
  * Flush all connections with messages queued this iteration. Called once per
- * event-loop pass, after net_backend_process() and before event_queue_process()
- * frees any disconnected users -- so every entry is still a live struct, though
- * its connection may already have been closed (skipped below).
+ * event-loop pass, at the very end -- after both net_backend_process() and
+ * event_queue_process() -- so that deferred writes produced while handling
+ * events (e.g. the user-list dump and presence sent on login) go out in the
+ * same iteration rather than waiting for the next reactor wakeup. A user
+ * destroyed during event processing is removed from the queue by
+ * route_clear_dirty(), so every remaining entry is a live struct (its
+ * connection may already be closed, which is skipped below).
  */
 void route_flush_dirty(struct hub_info* hub)
 {
@@ -165,6 +169,19 @@ void route_flush_dirty(struct hub_info* hub)
 	});
 
 	list_clear(hub->write_queue, NULL);
+}
+
+/*
+ * Drop a user from the deferred-write queue. Called when a user is about to be
+ * destroyed so route_flush_dirty() never dereferences a freed struct.
+ */
+void route_clear_dirty(struct hub_info* hub, struct hub_user* user)
+{
+	if (user_flag_get(user, flag_dirty))
+	{
+		user_flag_unset(user, flag_dirty);
+		list_remove(hub->write_queue, user);
+	}
 }
 
 int route_flush_pipeline(struct hub_info* hub, struct hub_user* u)

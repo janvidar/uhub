@@ -42,6 +42,12 @@ extern int route_flush_pipeline(struct hub_info* hub, struct hub_user* u);
 extern void route_flush_dirty(struct hub_info* hub);
 
 /**
+ * Remove a user from the deferred-write queue before it is destroyed, so
+ * route_flush_dirty() never dereferences a freed struct.
+ */
+extern void route_clear_dirty(struct hub_info* hub, struct hub_user* user);
+
+/**
  * Transmit message directly to one user.
  */
 extern int route_to_user(struct hub_info* hub, struct hub_user*, struct adc_message* command);

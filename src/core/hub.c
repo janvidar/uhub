@@ -733,6 +733,7 @@ static void hub_event_dispatcher(void* callback_data, struct event_data* message
 
 		case UHUB_EVENT_USER_DESTROY:
 		{
+			route_clear_dirty(hub, user);
 			user_destroy(user);
 			break;
 		}
@@ -1443,8 +1444,12 @@ void hub_event_loop(struct hub_info* hub)
 	do
 	{
 		net_backend_process();
-		route_flush_dirty(hub);
 		event_queue_process(hub->queue);
+		/* Flush deferred writes last, so output queued while handling events
+		   (notably the user-list dump and presence sent on login) is sent in
+		   this iteration instead of waiting for the next reactor wakeup -- which
+		   on an idle hub is a timer, delaying logins by seconds. */
+		route_flush_dirty(hub);
 	}
 	while (hub->status == hub_status_running || hub->status == hub_status_disabled);
 
