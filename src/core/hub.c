@@ -1193,10 +1193,14 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 		return;
 	}
 
+/* Stringize, with one level of macro expansion, so RECONNECT_TIME_TEMP_BAN
+ * (e.g. 600) yields the string "600" for the "TL" flag below. */
+#define HUB_STR_(x) #x
+#define HUB_STR(x) HUB_STR_(x)
 #define STATUS(CODE, MSG, FLAG, RCONTIME, REDIRECT) case status_ ## MSG : set_status_code(level, CODE, code); text = cfg->MSG; flag = FLAG; reconnect_time = RCONTIME; redirect = REDIRECT; break
 	switch (msg)
 	{
-		STATUS(ADC_STATUS_HUB_FULL, msg_hub_full, 0, 600, 1); /* FIXME: Proper timeout? */
+		STATUS(ADC_STATUS_HUB_FULL, msg_hub_full, 0, RECONNECT_TIME_HUB_FULL, 1);
 		STATUS(ADC_STATUS_HUB_DISABLED, msg_hub_disabled, 0, -1, 1);
 		STATUS(ADC_STATUS_REGISTERED_ONLY, msg_hub_registered_users_only, 0, 0, 1);
 		STATUS(ADC_STATUS_INF_FIELD_BAD, msg_inf_error_nick_missing, 0, 0, 0);
@@ -1215,7 +1219,7 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 		STATUS(ADC_STATUS_INF_FIELD_BAD, msg_inf_error_pid_missing, "FMPD", 0, 0);
 		STATUS(ADC_STATUS_INVALID_PID, msg_inf_error_pid_invalid, "FBPD", 0, 0);
 		STATUS(ADC_STATUS_BANNED_PERMANENTLY, msg_ban_permanently, 0, 0, 0);
-		STATUS(ADC_STATUS_BANNED_TEMPORARILY, msg_ban_temporarily, "TL600", 600, 0); /* FIXME: Proper timeout? */
+		STATUS(ADC_STATUS_BANNED_TEMPORARILY, msg_ban_temporarily, "TL" HUB_STR(RECONNECT_TIME_TEMP_BAN), RECONNECT_TIME_TEMP_BAN, 0);
 		STATUS(ADC_STATUS_INVALID_PASSWORD, msg_auth_invalid_password, 0, 0, 0);
 		STATUS(ADC_STATUS_LOGIN_GENERIC, msg_auth_user_not_found, 0, 0, 0);
 		STATUS(ADC_STATUS_DISCONNECT_GENERIC, msg_error_no_memory, 0, 0, 0);
@@ -1230,6 +1234,8 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 		STATUS(ADC_STATUS_PROTOCOL_GENERIC, msg_proto_obsolete_adc0, 0, -1, 1);
 	}
 #undef STATUS
+#undef HUB_STR
+#undef HUB_STR_
 
 	escaped_text = adc_msg_escape(text);
 	if (!escaped_text)

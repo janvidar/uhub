@@ -18,6 +18,7 @@
  */
 
 #include "system.h"
+#include "uhub_limits.h"
 #include "util/log.h"
 #include "util/memory.h"
 #include "network/backend.h"
@@ -80,7 +81,7 @@ int net_backend_init()
 	g_backend->common.num = 0;
 	g_backend->common.max = net_get_max_sockets();
 	g_backend->now = time(0);
-	timeout_queue_initialize(&g_backend->timeout_queue, g_backend->now, 120); /* FIXME: max 120 secs! */
+	timeout_queue_initialize(&g_backend->timeout_queue, g_backend->now, TIMEOUT_QUEUE_MAX);
 	g_backend->cleaner = net_cleanup_initialize(g_backend->common.max);
 
 	for (n = 0; net_backend_init_funcs[n]; n++)

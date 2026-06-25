@@ -46,6 +46,21 @@
 #define TIMEOUT_SENDQ     120
 #define TIMEOUT_STATS     10
 
+/*
+ * Size of the network timeout wheel, in seconds. Timeout events are hashed into
+ * the wheel by (timestamp % TIMEOUT_QUEUE_MAX), so this must be at least as
+ * large as the longest timeout scheduled above (currently TIMEOUT_SENDQ); a
+ * timeout longer than this would alias onto an earlier slot.
+ */
+#define TIMEOUT_QUEUE_MAX 120
+
+/*
+ * Reconnect-delay hints (seconds) advertised to clients in the QUI "TL" flag,
+ * telling them how long to wait before reconnecting after a fatal status.
+ */
+#define RECONNECT_TIME_HUB_FULL 600
+#define RECONNECT_TIME_TEMP_BAN 600
+
 #define MAX_RECV_BUF 65535
 #define MAX_SEND_BUF 65535
 
