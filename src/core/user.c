@@ -126,6 +126,16 @@ void user_set_info(struct hub_user* user, struct adc_message* cmd)
 
 void user_update_info(struct hub_user* u, struct adc_message* cmd)
 {
+	/*
+	 * Collect the prefixes of fields that don't actually change anything, so
+	 * they can be stripped from 'cmd' (the broadcast message) after the merge
+	 * loop. 'cmd' is walked by argument offset below, so we can't remove while
+	 * iterating; we defer the removals. The cap is generous -- a real INF has
+	 * far fewer fields -- and any overflow is simply left in the broadcast,
+	 * which is harmless (just not optimized).
+	 */
+	char noop[256][2];
+	size_t noop_count = 0;
 	char prefix[2];
 	char* argument;
 	size_t n = 0;
@@ -137,25 +147,47 @@ void user_update_info(struct hub_user* u, struct adc_message* cmd)
 	}
 
 	/*
-	 * FIXME: Optimization potential:
-	 *
-	 * remove parts of cmd that do not really change anything in cmd_new.
-	 * this can save bandwidth if clients send multiple updates for information
-	 * that does not really change anything.
+	 * Merge each incoming field into cmd_new, but skip fields whose value is
+	 * identical to what the user already advertises. Such no-op fields are
+	 * removed from 'cmd' so they are not rebroadcast; if every field is a no-op
+	 * the caller's adc_msg_is_empty() guard suppresses the broadcast entirely.
+	 * The comparison is against the *old* u->info, which is still in place --
+	 * it is only replaced by user_set_info() at the end.
 	 */
 	argument = adc_msg_get_argument(cmd, n++);
 	while (argument)
 	{
 		if (strlen(argument) >= 2)
 		{
+			char* current;
 			prefix[0] = argument[0];
 			prefix[1] = argument[1];
-			adc_msg_replace_named_argument(cmd_new, prefix, argument+2);
+
+			current = u->info ? adc_msg_get_named_argument(u->info, prefix) : NULL;
+			if (current && strcmp(current, argument + 2) == 0)
+			{
+				/* No change: drop it from the broadcast (deferred). */
+				if (noop_count < (sizeof(noop) / sizeof(noop[0])))
+				{
+					noop[noop_count][0] = prefix[0];
+					noop[noop_count][1] = prefix[1];
+					noop_count++;
+				}
+			}
+			else
+			{
+				adc_msg_replace_named_argument(cmd_new, prefix, argument+2);
+			}
+			hub_free(current);
 		}
 
 		hub_free(argument);
 		argument = adc_msg_get_argument(cmd, n++);
 	}
+
+	for (n = 0; n < noop_count; n++)
+		adc_msg_remove_named_argument(cmd, noop[n]);
+
 	user_set_info(u, cmd_new);
 	adc_msg_free(cmd_new);
 }

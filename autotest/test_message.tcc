@@ -636,6 +636,69 @@ EXO_TEST(adc_message_update_4_cleanup, {
 });
 
 
+/* user_update_info() must strip fields whose value is unchanged from the
+   broadcast message, so repeated identical updates produce no fan-out. */
+static struct adc_message* noop_info = NULL;
+
+EXO_TEST(adc_message_noop_setup, {
+	const char* base = "BINF AAAB IDABCDEFGHIJKLMNOPQRSTUVWXYZ1234567ABCDEF NItester SS100 SL5 DEhello\n";
+	noop_info = adc_msg_parse_verify(g_user, base, strlen(base));
+	if (!noop_info)
+		return 0;
+	user_set_info(g_user, noop_info);
+	return g_user->info != NULL;
+});
+
+/* Every field repeats the current value -> stripped to empty, no broadcast. */
+EXO_TEST(adc_message_noop_all, {
+	const char* upd = "BINF AAAB SS100 SL5\n";
+	struct adc_message* cmd = adc_msg_parse_verify(g_user, upd, strlen(upd));
+	int ok = 0;
+	user_update_info(g_user, cmd);
+	ok = adc_msg_is_empty(cmd) == 1
+		&& adc_msg_has_named_argument(cmd, "SS") == 0
+		&& adc_msg_has_named_argument(cmd, "SL") == 0;
+	adc_msg_free(cmd);
+	return ok;
+});
+
+/* Mixed update: the unchanged SS is dropped, the changed SL survives and the
+   stored info reflects the new value. */
+EXO_TEST(adc_message_noop_mixed, {
+	const char* upd = "BINF AAAB SS100 SL9\n";
+	struct adc_message* cmd = adc_msg_parse_verify(g_user, upd, strlen(upd));
+	char* sl;
+	int ok = 0;
+	user_update_info(g_user, cmd);
+	ok = adc_msg_has_named_argument(cmd, "SS") == 0
+		&& adc_msg_has_named_argument(cmd, "SL") == 1;
+	sl = adc_msg_get_named_argument(g_user->info, "SL");
+	ok = ok && sl && strcmp(sl, "9") == 0;
+	hub_free(sl);
+	adc_msg_free(cmd);
+	return ok;
+});
+
+/* A field absent from the stored info is new and must be kept. */
+EXO_TEST(adc_message_noop_newfield, {
+	const char* upd = "BINF AAAB AW1\n";
+	struct adc_message* cmd = adc_msg_parse_verify(g_user, upd, strlen(upd));
+	int ok = 0;
+	user_update_info(g_user, cmd);
+	ok = adc_msg_has_named_argument(cmd, "AW") == 1;
+	adc_msg_free(cmd);
+	return ok;
+});
+
+EXO_TEST(adc_message_noop_cleanup, {
+	adc_msg_free(noop_info);
+	noop_info = 0;
+	adc_msg_free(g_user->info);
+	g_user->info = 0;
+	return 1;
+});
+
+
 EXO_TEST(adc_message_empty_1, {
 	struct adc_message* msg = adc_msg_parse_verify(g_user, test_string2, strlen(test_string2));
 	int ok = adc_msg_is_empty(msg) == 0;

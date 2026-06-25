@@ -31,9 +31,6 @@ approximate and may drift; grep the marker text to relocate.
 - Reconnect/ban retry timeouts — src/core/hub.c:1046,1065 (hardcoded 600s).
 - Timeout queue cap — src/network/backend.c:79 (capped at 120s).
 - Dynamic send-queue limit — src/core/route.c:62 (could adapt vs fixed).
-- Skip no-op INF updates — src/core/user.c:134. user_update_info could
-  drop arguments that don't change anything, saving bandwidth on repeated
-  client updates. Optimization only.
 
 ## Networking / platform
 - Resolver thread-pool sizing — src/network/dnsresolver.c:247. Replace
