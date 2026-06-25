@@ -53,6 +53,31 @@ int uhub_mutex_trylock(uhub_mutex_t* mutex)
 	return (ret == 0);
 }
 
+void uhub_cond_init(uhub_cond_t* cond)
+{
+	pthread_cond_init(cond, NULL);
+}
+
+void uhub_cond_destroy(uhub_cond_t* cond)
+{
+	pthread_cond_destroy(cond);
+}
+
+void uhub_cond_wait(uhub_cond_t* cond, uhub_mutex_t* mutex)
+{
+	pthread_cond_wait(cond, mutex);
+}
+
+void uhub_cond_signal(uhub_cond_t* cond)
+{
+	pthread_cond_signal(cond);
+}
+
+void uhub_cond_broadcast(uhub_cond_t* cond)
+{
+	pthread_cond_broadcast(cond);
+}
+
 uhub_thread_t* uhub_thread_create(uhub_thread_start start, void* arg)
 {
 	struct pthread_data* thread = (struct pthread_data*) hub_malloc_zero(sizeof(struct pthread_data));
@@ -120,6 +145,32 @@ void uhub_mutex_unlock(uhub_mutex_t* mutex)
 int uhub_mutex_trylock(uhub_mutex_t* mutex)
 {
 	return TryEnterCriticalSection(mutex);
+}
+
+void uhub_cond_init(uhub_cond_t* cond)
+{
+	InitializeConditionVariable(cond);
+}
+
+void uhub_cond_destroy(uhub_cond_t* cond)
+{
+	/* Windows condition variables require no explicit destruction. */
+	(void) cond;
+}
+
+void uhub_cond_wait(uhub_cond_t* cond, uhub_mutex_t* mutex)
+{
+	SleepConditionVariableCS(cond, mutex, INFINITE);
+}
+
+void uhub_cond_signal(uhub_cond_t* cond)
+{
+	WakeConditionVariable(cond);
+}
+
+void uhub_cond_broadcast(uhub_cond_t* cond)
+{
+	WakeAllConditionVariable(cond);
 }
 
 uhub_thread_t* uhub_thread_create(uhub_thread_start start, void* arg)

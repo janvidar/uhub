@@ -35,6 +35,16 @@ void net_dns_initialize();
 /// Shutdown and destroy the DNS subsystem. This will cancel any pending DNS jobs.
 void net_dns_destroy();
 
+/**
+ * Set the number of worker threads used for asynchronous lookups.
+ *
+ * Must be called after net_dns_initialize() but before the first lookup is
+ * started (the pool is spawned lazily on the first lookup). Calling it once
+ * the pool has started has no effect; the size only changes on restart.
+ * The value is clamped to a sane range.
+ */
+void net_dns_set_pool_size(size_t num_workers);
+
 /// Process finished DNS lookups.
 void net_dns_process();
 

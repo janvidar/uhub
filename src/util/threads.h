@@ -27,12 +27,14 @@ typedef void*(*uhub_thread_start)(void*) ;
 #ifdef POSIX_THREAD_SUPPORT
 typedef struct pthread_data uhub_thread_t;
 typedef pthread_mutex_t uhub_mutex_t;
+typedef pthread_cond_t uhub_cond_t;
 #endif
 
 #ifdef WINTHREAD_SUPPORT
 struct winthread_data;
 typedef struct winthread_data uhub_thread_t;
 typedef CRITICAL_SECTION uhub_mutex_t;
+typedef CONDITION_VARIABLE uhub_cond_t;
 #endif
 
 // Mutexes
@@ -41,6 +43,14 @@ extern void uhub_mutex_destroy(uhub_mutex_t* mutex);
 extern void uhub_mutex_lock(uhub_mutex_t* mutex);
 extern void uhub_mutex_unlock(uhub_mutex_t* mutex);
 extern int uhub_mutex_trylock(uhub_mutex_t* mutex);
+
+// Condition variables. uhub_cond_wait() must be called with mutex held; it
+// atomically releases the mutex while blocking and re-acquires it on wake.
+extern void uhub_cond_init(uhub_cond_t* cond);
+extern void uhub_cond_destroy(uhub_cond_t* cond);
+extern void uhub_cond_wait(uhub_cond_t* cond, uhub_mutex_t* mutex);
+extern void uhub_cond_signal(uhub_cond_t* cond);
+extern void uhub_cond_broadcast(uhub_cond_t* cond);
 
 // Threads
 uhub_thread_t* uhub_thread_create(uhub_thread_start start, void* arg);

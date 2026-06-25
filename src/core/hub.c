@@ -26,6 +26,7 @@
 #include "adc/message.h"
 #include "adc/sid.h"
 #include "network/connection.h"
+#include "network/dnsresolver.h"
 #include "network/network.h"
 #include "core/auth.h"
 #include "core/commands.h"
@@ -960,6 +961,10 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	}
 
 	hub->tm_started = time(0);
+
+	/* Size the DNS worker pool before any outbound lookup spawns it. */
+	net_dns_set_pool_size((size_t) config->dns_thread_pool_size);
+
 	ipv6_supported = net_is_ipv6_supported();
 	if (ipv6_supported)
 		LOG_DEBUG("IPv6 supported.");

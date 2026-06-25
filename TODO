@@ -12,8 +12,6 @@
   `plugin_hub_user`) reached through accessor functions, so the hub can
   evolve its user internals without breaking the plugin ABI and plugins
   keep a genuinely limited view of hub internals.
-- Name the raw ADC status codes inlined as magic numbers in
-  src/core/hub.c:1056-1086.
 
 ## Tuning / magic numbers (not bugs)
 - Reconnect/ban retry timeouts — src/core/hub.c:1046,1065 (hardcoded 600s).
@@ -21,9 +19,6 @@
 - Dynamic send-queue limit — src/core/route.c:62 (could adapt vs fixed).
 
 ## Networking / platform
-- Resolver thread-pool sizing — src/network/dnsresolver.c:247. Replace
-  one-thread-per-lookup with a work queue plus a configurable min/max
-  thread pool.
 - Windows socket support — src/network/network.c. uhub is meant to be
   portable to Windows (not a tier-1 platform, not covered by CI).
   net_set_close_on_exec is resolved (deliberate no-op); other WINSOCK

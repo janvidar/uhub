@@ -69,6 +69,23 @@
 		<since>0.3.0</since>
 	</option>
 
+	<option name="dns_thread_pool_size" type="int" default="4" advanced="true" >
+		<check min="1" max="64" />
+		<short>Number of worker threads for asynchronous DNS lookups</short>
+		<description><![CDATA[
+			<p>
+			Hostname resolution (for hub linking and registration server announcements) runs on a pool
+			of background threads so the main event loop never blocks on a slow DNS lookup. This option
+			sets the number of worker threads in that pool.
+			</p>
+			<p>
+			A small pool is plenty for a typical hub; raise it only if a large number of outbound lookups
+			must run concurrently. Changing this value takes effect on restart, not on a configuration reload.
+			</p>
+		]]></description>
+		<since>0.6.1</since>
+	</option>
+
 	<option name="hbri_enable" type="boolean" default="0">
 		<short>Enable HBRI hybrid IPv4/IPv6 connectivity</short>
 		<description><![CDATA[
