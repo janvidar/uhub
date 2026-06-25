@@ -30,6 +30,7 @@
 #include "core/hubevent.h"
 #include "core/inf.h"
 #include "core/route.h"
+#include "network/connection.h"
 #include "core/usermanager.h"
 #include "plugin_api/types.h"
 
@@ -87,6 +88,76 @@ static int set_feature_cast_supports(struct hub_user* u, struct adc_message* cmd
 		hub_free(tmp);
 	}
 	return 0;
+}
+
+
+/*
+ * The INF "SU" field is a comma-separated list of 4-character feature tokens
+ * (e.g. "ADC0,TCP4,UDP4") that the hub re-broadcasts to other clients. Remove
+ * one feature token from that list, rewriting the SU argument in place (or
+ * removing it entirely if it becomes empty). Feature tokens contain no
+ * ADC-special characters, so the rewritten value needs no re-escaping.
+ *
+ * Returns 1 if the feature was present (and removed), 0 otherwise.
+ */
+static int remove_support_feature(struct adc_message* cmd, const char* feature)
+{
+	char* su;
+	char* out;
+	char* rd;
+	char* wr;
+	int removed = 0;
+
+	if (!adc_msg_has_named_argument(cmd, ADC_INF_FLAG_SUPPORT))
+		return 0;
+
+	su = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_SUPPORT);
+	if (!su)
+		return 0;
+
+	out = hub_malloc(strlen(su) + 1);
+	if (!out)
+	{
+		hub_free(su);
+		return 0;
+	}
+
+	wr = out;
+	rd = su;
+	while (*rd)
+	{
+		char* comma = strchr(rd, ',');
+		size_t toklen = comma ? (size_t) (comma - rd) : strlen(rd);
+
+		if (toklen == 4 && memcmp(rd, feature, 4) == 0)
+		{
+			removed = 1;
+		}
+		else if (toklen > 0)
+		{
+			if (wr != out)
+				*wr++ = ',';
+			memcpy(wr, rd, toklen);
+			wr += toklen;
+		}
+
+		rd += toklen;
+		if (*rd == ',')
+			rd++;
+	}
+	*wr = '\0';
+
+	if (removed)
+	{
+		if (*out)
+			adc_msg_replace_named_argument(cmd, ADC_INF_FLAG_SUPPORT, out);
+		else
+			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_SUPPORT);
+	}
+
+	hub_free(su);
+	hub_free(out);
+	return removed;
 }
 
 
@@ -745,10 +816,20 @@ static int check_registered_users_only(struct hub_info* hub, struct hub_user* us
 	return 0;
 }
 
-static int hub_handle_info_common(struct hub_user* user, struct adc_message* cmd)
+int hub_handle_info_common(struct hub_user* user, struct adc_message* cmd)
 {
 	/* Remove server restricted flags */
 	remove_server_restricted_flags(cmd);
+
+	/*
+	 * ADC0 in the support cast advertises that the client accepts plaintext
+	 * (non-TLS) client-to-client connections. Only let clients whose hub
+	 * connection is confirmed TLS advertise it; otherwise strip it so it is
+	 * not re-broadcast to other users. Fail closed: anything not provably TLS
+	 * (including a user with no connection) loses the flag.
+	 */
+	if (!(user->connection && net_con_is_ssl(user->connection)))
+		remove_support_feature(cmd, "ADC0");
 
 	/* Update/set the feature cast flags. */
 	set_feature_cast_supports(user, cmd);

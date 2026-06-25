@@ -15,6 +15,7 @@ static struct hub_user* inf_user       = 0;
 static struct hub_info* inf_hub    = 0;
 
 extern int hub_handle_info_login(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd);
+extern int hub_handle_info_common(struct hub_user* user, struct adc_message* cmd);
 
 static void inf_create_hub()
 {
@@ -162,6 +163,47 @@ EXO_TEST(inf_limit_hubs_5, { CHECK_INF("BINF AAAB NIFriend IDGNSSMURMD7K466NGZIH
 EXO_TEST(inf_limit_hubs_6, { CHECK_INF("BINF AAAB NIFriend IDGNSSMURMD7K466NGZIHU65TP3S3UZSQ6MN5B2RI PD3A4545WFVGZLSGUXZLG7OS6ULQUVG3HM2T63I7Y HR1\n", status_msg_user_hub_limit_low); });
 EXO_TEST(inf_limit_hubs_7, { CHECK_INF("BINF AAAB NIFriend IDGNSSMURMD7K466NGZIHU65TP3S3UZSQ6MN5B2RI PD3A4545WFVGZLSGUXZLG7OS6ULQUVG3HM2T63I7Y HN15 HR15 HO15\n", status_msg_user_hub_limit_high); });
 
+
+/*
+ * ADC0 support-cast stripping. inf_user has no connection, which counts as
+ * "not confirmed TLS", so hub_handle_info_common() must drop the ADC0 feature
+ * token from the SU field. EXPECT is the resulting SU value, or NULL when the
+ * SU argument is expected to be removed entirely.
+ */
+static int check_su_strip(const char* line, const char* expect_su)
+{
+	struct adc_message* msg = adc_msg_parse_verify(inf_user, line, strlen(line));
+	char* su;
+	int ok;
+
+	if (!msg)
+		return 0;
+
+	hub_handle_info_common(inf_user, msg);
+	su = adc_msg_get_named_argument(msg, "SU");
+
+	if (expect_su == NULL)
+		ok = (su == NULL);
+	else
+		ok = (su != NULL && strcmp(su, expect_su) == 0);
+
+	if (!ok)
+		printf("SU mismatch: got '%s', expected '%s'\n", su ? su : "(null)", expect_su ? expect_su : "(null)");
+
+	hub_free(su);
+	adc_msg_free(msg);
+	user_clear_feature_cast_support(inf_user);
+	return ok;
+}
+
+EXO_TEST(inf_su_adc0_only,  { return check_su_strip("BINF AAAB SUADC0\n", NULL); });
+EXO_TEST(inf_su_adc0_first, { return check_su_strip("BINF AAAB SUADC0,TCP4,UDP4\n", "TCP4,UDP4"); });
+EXO_TEST(inf_su_adc0_mid,   { return check_su_strip("BINF AAAB SUTCP4,ADC0,UDP4\n", "TCP4,UDP4"); });
+EXO_TEST(inf_su_adc0_last,  { return check_su_strip("BINF AAAB SUTCP4,UDP4,ADC0\n", "TCP4,UDP4"); });
+EXO_TEST(inf_su_no_adc0,    { return check_su_strip("BINF AAAB SUTCP4,UDP4\n", "TCP4,UDP4"); });
+EXO_TEST(inf_su_adcs_kept,  { return check_su_strip("BINF AAAB SUADCS,TCP4\n", "ADCS,TCP4"); }); /* ADCS must not be confused with ADC0 */
+EXO_TEST(inf_su_adcs_adc0,  { return check_su_strip("BINF AAAB SUADCS,ADC0,TCP4\n", "ADCS,TCP4"); });
+EXO_TEST(inf_su_none,       { return check_su_strip("BINF AAAB NIFriend\n", NULL); }); /* no SU field at all */
 
 EXO_TEST(inf_destroy_setup,
 {
