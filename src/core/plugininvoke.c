@@ -180,6 +180,12 @@ plugin_st plugin_handle_revconnect(struct hub_info* hub, struct hub_user* from, 
 	PLUGIN_INVOKE_STATUS_2(hub, on_p2p_revconnect, user1, user2);
 }
 
+plugin_st plugin_flood_detected(struct hub_info* hub, struct hub_user* who, enum plugin_flood_type type)
+{
+	struct plugin_user* user = convert_user_type(who);
+	PLUGIN_INVOKE_STATUS_2(hub, on_flood_detected, user, type);
+}
+
 plugin_st plugin_auth_get_user(struct hub_info* hub, const char* nickname, struct auth_info* info)
 {
 	PLUGIN_INVOKE_STATUS_2(hub, auth_get_user, nickname, info);

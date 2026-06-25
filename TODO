@@ -1,20 +1,10 @@
 # uhub — outstanding work
 
-Consolidated task list, merged from the former source-tree FIXME ledger
-(TODO.md) and the actionable recommendations of the repository / code /
-security assessment (2026-06-18). None of these are known correctness or
-security defects — they are release tasks, design aspirations, incomplete
-features, tuning questions, or hygiene cleanup. Line numbers are
-approximate and may drift; grep the marker text to relocate.
-
 ## Release blockers (0.6.1)
 - Finish version reconciliation: sources are 0.6.1; tag on release
   (latest tag = 0.6.0).
 
 ## Design / refactor
-- Flood control as a plugin — src/core/hub.c:24,345. Move flood control
-  and other core-side policy out of the core into loadable plugin
-  callbacks (the plugin ABI was built to host this).
 - Make the plugin-facing user type opaque. The plugin ABI currently hands
   plugins a fully-laid-out `struct plugin_user` (src/plugin_api/types.h:33
   — sid/nick/cid/user_agent/addr/credentials), a by-value mirror of the
@@ -24,8 +14,6 @@ approximate and may drift; grep the marker text to relocate.
   keep a genuinely limited view of hub internals.
 - Name the raw ADC status codes inlined as magic numbers in
   src/core/hub.c:1056-1086.
-- Fix the inaccurate hub_free-as-function-pointer claim in CLAUDE.md and
-  pick one spelling.
 
 ## Tuning / magic numbers (not bugs)
 - Reconnect/ban retry timeouts — src/core/hub.c:1046,1065 (hardcoded 600s).

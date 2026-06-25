@@ -58,6 +58,8 @@ typedef plugin_st (*on_search_result_t)(struct plugin_handle*, struct plugin_use
 typedef plugin_st (*on_p2p_connect_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to);
 typedef plugin_st (*on_p2p_revconnect_t)(struct plugin_handle*, struct plugin_user* from, struct plugin_user* to);
 
+typedef plugin_st (*on_flood_detected_t)(struct plugin_handle*, struct plugin_user* user, enum plugin_flood_type type);
+
 typedef plugin_st (*auth_get_user_t)(struct plugin_handle*, const char* nickname, struct auth_info* info);
 typedef plugin_st (*auth_register_user_t)(struct plugin_handle*, struct auth_info* user);
 typedef plugin_st (*auth_update_user_t)(struct plugin_handle*, struct auth_info* user);
@@ -97,6 +99,7 @@ struct plugin_funcs
 	on_search_result_t      on_search_result;    /* A search result is about to be sent (can be intercepted) */
 	on_p2p_connect_t        on_p2p_connect;      /* A user is about to connect to another user (can be intercepted) */
 	on_p2p_revconnect_t     on_p2p_revconnect;   /* A user is about to connect to another user (can be intercepted) */
+	on_flood_detected_t     on_flood_detected;   /* The hub detected a flood; plugin decides the action (st_default: drop+warn, st_deny: drop quietly, st_allow: let through) */
 
 	// Authentication actions.
 	auth_get_user_t         auth_get_user;       /* Get authentication info from plugin */

@@ -26,7 +26,7 @@
 #include "util/credentials.h"
 #include "network/ipcalc.h"
 
-#define PLUGIN_API_VERSION 1
+#define PLUGIN_API_VERSION 2
 
 struct plugin_handle;
 
@@ -53,6 +53,20 @@ enum plugin_status
 };
 
 typedef enum plugin_status plugin_st;
+
+/**
+ * Flood categories matching the hub's flood_ctl_* thresholds. The hub detects
+ * the flood (counting events against the configured limits) and raises an
+ * on_flood_detected event with one of these; the plugin decides what to do.
+ */
+enum plugin_flood_type
+{
+	flood_type_chat = 1,    /* Too many chat messages. */
+	flood_type_connect,     /* Too many connect/revconnect requests. */
+	flood_type_search,      /* Too many searches. */
+	flood_type_update,      /* Too many INF updates. */
+	flood_type_extras,      /* Too many of everything else (handshake, commands, ...). */
+};
 
 struct auth_info
 {

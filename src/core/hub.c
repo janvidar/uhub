@@ -46,15 +46,24 @@
 
 struct hub_info* g_hub = 0;
 
-/* FIXME: Flood control should be done in a plugin! */
+/* The hub detects floods against the configured flood_ctl_* thresholds; the
+ * action is delegated to plugins via the on_flood_detected event. A plugin may
+ * return st_allow to let the offending message through, st_deny to drop it
+ * quietly (the plugin handled it - e.g. disconnected or warned itself), or
+ * st_default (also the no-plugin case) to get the hub's built-in response:
+ * drop the message and send the configured msg_user_flood_* warning. */
 #define CHECK_FLOOD(TYPE, WARN) \
 	if (flood_control_check(&u->flood_ ## TYPE , hub->config->flood_ctl_  ## TYPE, hub->config->flood_ctl_interval, net_get_time()) &&  !auth_cred_is_unrestricted(u->credentials)) \
 	{ \
-		if (WARN) \
+		plugin_st flood_action = plugin_flood_detected(hub, u, flood_type_ ## TYPE); \
+		if (flood_action != st_allow) \
 		{ \
-			hub_send_flood_warning(hub, u, hub->config->msg_user_flood_ ## TYPE); \
+			if (flood_action == st_default && (WARN)) \
+			{ \
+				hub_send_flood_warning(hub, u, hub->config->msg_user_flood_ ## TYPE); \
+			} \
+			break; \
 		} \
-		break; \
 	}
 
 #define ROUTE_MSG \
