@@ -30,7 +30,6 @@
 #include "core/hubevent.h"
 #include "core/inf.h"
 #include "core/route.h"
-#include "network/connection.h"
 #include "core/usermanager.h"
 #include "plugin_api/types.h"
 
@@ -822,14 +821,12 @@ int hub_handle_info_common(struct hub_user* user, struct adc_message* cmd)
 	remove_server_restricted_flags(cmd);
 
 	/*
-	 * ADC0 in the support cast advertises that the client accepts plaintext
-	 * (non-TLS) client-to-client connections. Only let clients whose hub
-	 * connection is confirmed TLS advertise it; otherwise strip it so it is
-	 * not re-broadcast to other users. Fail closed: anything not provably TLS
-	 * (including a user with no connection) loses the flag.
+	 * ADC0 in the support cast advertises the obsolete pre-1.0 ADC
+	 * client-to-client protocol, which also implies outdated transport
+	 * security. The hub never wants to re-broadcast it, so strip it
+	 * unconditionally.
 	 */
-	if (!(user->connection && net_con_is_ssl(user->connection)))
-		remove_support_feature(cmd, "ADC0");
+	remove_support_feature(cmd, "ADC0");
 
 	/* Update/set the feature cast flags. */
 	set_feature_cast_supports(user, cmd);
