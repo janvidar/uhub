@@ -13,12 +13,6 @@
   evolve its user internals without breaking the plugin ABI and plugins
   keep a genuinely limited view of hub internals.
 
-## Tuning
-- Dynamic send-queue limit — src/core/route.c::get_max_send_queue() returns
-  the fixed config value max_send_buffer; it could instead scale with the
-  user count (see the formula sketched in the comment there). Behavioral
-  change, not just a constant, so left as a deliberate decision.
-
 ## Networking / platform
 - Windows socket support — src/network/network.c. uhub is meant to be
   portable to Windows (not a tier-1 platform, not covered by CI).
