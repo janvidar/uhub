@@ -22,6 +22,7 @@
 #include "core/hbri.h"
 #include "core/hub.h"
 #include "core/hubevent.h"
+#include "core/netevent.h"
 #include "core/plugininvoke.h"
 #include "core/route.h"
 #include "core/usermanager.h"
@@ -33,6 +34,23 @@ void on_login_success(struct hub_info* hub, struct hub_user* u)
 	/* Send user list of all existing users */
 	if (!uman_send_user_list(hub, hub->users, u))
 		return;
+
+	/*
+	 * Flush the freshly-queued user list to the socket now. The list is sent
+	 * with the send-queue limit bypassed (flag_user_list) and, since writes are
+	 * deferred to route_flush_dirty() at the end of the iteration, it would
+	 * otherwise sit in the send queue. On a populated hub that backlog exceeds
+	 * max_send_buffer, so the very next route to this user -- route_info_message()
+	 * below -- would trip the hard send-queue limit and disconnect the user
+	 * mid-login (nulling u->connection and crashing the code after this point).
+	 * Draining it here keeps the deferred-write fast path for steady-state
+	 * traffic while restoring correct login behaviour.
+	 */
+	if (u->connection && handle_net_write(u))
+	{
+		hub_disconnect_user(hub, u, quit_send_queue);
+		return;
+	}
 
 	/* Mark as being in the normal state, and add user to the user list */
 	user_set_state(u, state_normal);
@@ -54,8 +72,10 @@ void on_login_success(struct hub_info* hub, struct hub_user* u)
 
 	plugin_log_user_login_success(hub, u);
 
-	/* reset timeout */
-	net_con_clear_timeout(u->connection);
+	/* reset timeout -- guard against a disconnect triggered while routing above
+	   (e.g. a send-queue overflow), which clears u->connection. */
+	if (u->connection)
+		net_con_clear_timeout(u->connection);
 }
 
 void on_login_failure(struct hub_info* hub, struct hub_user* u, enum status_message msg)

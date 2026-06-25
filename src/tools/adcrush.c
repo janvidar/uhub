@@ -340,6 +340,9 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 
 		case ADC_CLIENT_DISCONNECTED:
 			bot_output(client, LVL_DEBUG, "*** Disconnected.");
+			/* The connection is gone; stop issuing timer-driven actions against
+			   it, otherwise the next perf_* call sends on a NULL connection. */
+			user->logged_in = 0;
 			break;
 
 		case ADC_CLIENT_LOGGING_IN:
@@ -542,6 +545,14 @@ int main(int argc, char** argv)
 {
 
 	parse_command_line(argc, argv);
+
+	/* Writing to a peer that has gone away (e.g. the hub disconnecting many bots
+	   at once) would otherwise deliver SIGPIPE and kill the process. The hub
+	   itself ignores SIGPIPE via its own signal setup; adcrush has its own main()
+	   and must do the same. */
+#ifdef SIGPIPE
+	signal(SIGPIPE, SIG_IGN);
+#endif
 
 	net_initialize();
 	net_stats_get(&stats_intermediate, &stats_total);

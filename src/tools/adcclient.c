@@ -190,7 +190,6 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 			if (events == NET_EVENT_ERROR)
 			{
 				ADC_client_on_disconnected(client);
-				client->callback(client, ADC_CLIENT_DISCONNECTED, 0);
 				return;
 			}
 			else
@@ -205,6 +204,7 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 				if (ADC_client_recv(client) == -1)
 				{
 					ADC_client_on_disconnected(client);
+					return; /* connection gone; don't touch it for WRITE below */
 				}
 			}
 
@@ -769,9 +769,18 @@ static void ADC_client_on_connected_ssl(struct ADC_client* client)
 static void ADC_client_on_disconnected(struct ADC_client* client)
 {
 	ADC_TRACE;
-	net_con_close(client->con);
-	client->con = 0;
+	if (client->con)
+	{
+		net_con_close(client->con);
+		client->con = 0;
+	}
 	ADC_client_set_state(client, ps_none);
+
+	/* Notify the owner that the connection is gone. Without this an unexpected
+	   drop (peer reset, recv error) leaves the client with a NULL connection but
+	   the owner still believing it is logged in, so the next attempt to send a
+	   message trips the uhub_assert(client->con != NULL) in ADC_client_send(). */
+	client->callback(client, ADC_CLIENT_DISCONNECTED, 0);
 }
 
 static void ADC_client_on_login(struct ADC_client* client)
@@ -784,6 +793,17 @@ static void ADC_client_on_login(struct ADC_client* client)
 void ADC_client_disconnect(struct ADC_client* client)
 {
 	ADC_TRACE;
+	/* Cancel a still-pending connect (DNS/connect in flight). connect_callback()
+	   clears connect_job before it fires and the net layer frees the handle
+	   itself afterwards, so a non-NULL connect_job here means the callback has
+	   not run yet -- without this the handle outlives the client and the eventual
+	   callback dereferences freed memory. */
+	if (client->connect_job)
+	{
+		net_connect_destroy(client->connect_job);
+		client->connect_job = 0;
+	}
+
 	if (client->con && net_con_get_sd(client->con) != -1)
 	{
 		net_con_close(client->con);
