@@ -1,0 +1,234 @@
+Connecting uhub to Prometheus
+-----------------------------
+
+uhub can expose its internal counters and gauges as a Prometheus
+text-exposition document. This document explains how to enable the endpoint,
+point a Prometheus server at it, and what each metric means.
+
+
+1. How it works
+---------------
+
+The metrics endpoint is NOT a separate listener and does NOT use a separate
+port. uhub already demultiplexes ADC, TLS and HTTP on its regular server
+port(s); an HTTP "GET <metrics_path>" request is recognised and answered with a
+Prometheus document. Everything else on the port continues to be served as ADC
+as before.
+
+Because it shares the server port, the endpoint is reachable:
+
+  * over plain HTTP on the server port, and
+  * over HTTPS on the SAME port when the hub has tls_enable set.
+
+A single TLS-enabled port therefore serves ADC-over-TLS and HTTPS metrics at
+once; the handler uses TLS transparently whenever the connection is encrypted.
+
+Access is guarded by a bearer token. The endpoint is only active when BOTH
+metrics_enable is on AND a non-empty metrics_token is configured -- enabling it
+without a token leaves it switched off.
+
+
+2. Configuration
+----------------
+
+Add the following to your uhub.conf (typically /etc/uhub/uhub.conf):
+
+  # Turn the endpoint on.
+  metrics_enable = yes
+
+  # Bearer token required on every scrape. Use a long random secret.
+  metrics_token = "change-me-to-a-long-random-secret"
+
+  # Request path that serves the document. Must begin with "/".
+  metrics_path = "/metrics"
+
+Defaults: metrics_enable is off, metrics_token is empty (which keeps the
+endpoint off even if metrics_enable is yes), and metrics_path is "/metrics".
+
+After editing the config, reload uhub (UNIX):
+
+  % killall -HUP uhub
+
+Generate a token with, for example:
+
+  % openssl rand -hex 32
+
+Verify the endpoint by hand:
+
+  # plain HTTP
+  % curl -H "Authorization: Bearer <token>" http://<host>:1511/metrics
+
+  # HTTPS on the same port (when tls_enable is set; -k skips cert checks)
+  % curl -k -H "Authorization: Bearer <token>" https://<host>:1511/metrics
+
+Responses:
+
+  * 200  authorized GET for metrics_path -- the document
+  * 403  Forbidden -- missing or wrong bearer token
+  * 404  Not Found -- path did not match metrics_path
+  * 405  Method Not Allowed -- only GET is served
+
+
+3. Security
+-----------
+
+The token travels in the Authorization header in cleartext over plain HTTP. On
+an untrusted network, anyone who can see the traffic can capture it. Therefore:
+
+  * Scrape over HTTPS (tls_enable), or
+  * Restrict scraping to loopback / a trusted management network, e.g. by
+    binding Prometheus and uhub on the same host or a private subnet, and
+    firewalling the server port from the public internet for HTTP clients.
+
+The token is compared in length-aware constant time, so it cannot be recovered
+byte-by-byte by timing the response. Treat the token as a secret: rotate it by
+changing metrics_token and sending SIGHUP, and keep it out of version control.
+
+
+4. Prometheus scrape configuration
+----------------------------------
+
+Add a job to prometheus.yml. The bearer token is supplied with
+authorization.credentials (Prometheus sends it as "Authorization: Bearer ...").
+
+Plain HTTP:
+
+  scrape_configs:
+    - job_name: uhub
+      metrics_path: /metrics
+      authorization:
+        type: Bearer
+        credentials: "change-me-to-a-long-random-secret"
+      static_configs:
+        - targets: ["hub.example.org:1511"]
+
+HTTPS on the same port (hub has tls_enable):
+
+  scrape_configs:
+    - job_name: uhub
+      metrics_path: /metrics
+      scheme: https
+      authorization:
+        type: Bearer
+        credentials: "change-me-to-a-long-random-secret"
+      tls_config:
+        # Set to true only for self-signed certs in a trusted environment.
+        insecure_skip_verify: false
+      static_configs:
+        - targets: ["hub.example.org:1511"]
+
+To keep the token out of prometheus.yml, use authorization.credentials_file
+pointing at a file containing just the token.
+
+If you changed metrics_path in uhub.conf, set the matching metrics_path in the
+scrape job. Reload Prometheus after editing (SIGHUP or the /-/reload endpoint).
+
+
+5. Exposed metrics
+------------------
+
+Counters (monotonic, suffix _total):
+
+  uhub_logins_total                 Successful user logins.
+  uhub_login_failures_total         Rejected or failed login attempts.
+  uhub_logouts_total                Logged-in users that disconnected.
+  uhub_chat_messages_total          Public chat messages accepted for routing.
+  uhub_private_messages_total       Private chat messages accepted for routing.
+  uhub_searches_total               Search requests accepted for routing.
+  uhub_search_results_total         Search results relayed.
+  uhub_connect_requests_total       Active connect requests (ConnectToMe).
+  uhub_rev_connect_requests_total   Passive connect requests (ReverseConnectToMe).
+  uhub_broadcasts_total             Messages broadcast to all users.
+  uhub_feature_casts_total          Feature-cast messages routed to subscribers.
+  uhub_net_tx_bytes_total           Total bytes transmitted by the hub.
+  uhub_net_rx_bytes_total           Total bytes received by the hub.
+  uhub_connections_accepted_total   Connections accepted.
+  uhub_connections_closed_total     Connections closed.
+  uhub_connections_errors_total     Connection errors.
+  uhub_tls_accept_total             Inbound TLS handshakes accepted.
+  uhub_tls_connect_total            Outbound TLS handshakes completed.
+  uhub_tls_error_total              TLS errors.
+  uhub_tls_close_total              TLS connections closed.
+
+Gauges (point-in-time):
+
+  uhub_uptime_seconds               Seconds since the hub started.
+  uhub_users                        Currently logged-in users.
+  uhub_users_peak                   Peak number of logged-in users.
+  uhub_users_max                    Configured maximum number of users.
+  uhub_users_ipv4                   Logged-in users connected over IPv4.
+  uhub_users_ipv6                   Logged-in users connected over IPv6.
+  uhub_users_active                 Users advertising a routable address (active).
+  uhub_users_passive                Users not advertising a routable address.
+  uhub_users_by_credential{credential="guest|registered|bot|operator|admin"}
+                                    Logged-in users by credential class.
+  uhub_shared_bytes                 Total bytes shared by connected users.
+  uhub_shared_files                 Total files shared by connected users.
+  uhub_send_queue_bytes             Total bytes queued for sending across all users.
+  uhub_net_tx_rate_bytes            Current transmit rate (bytes/sec).
+  uhub_net_rx_rate_bytes            Current receive rate (bytes/sec).
+  uhub_net_tx_rate_bytes_peak       Peak transmit rate (bytes/sec).
+  uhub_net_rx_rate_bytes_peak       Peak receive rate (bytes/sec).
+
+Histogram:
+
+  uhub_event_loop_seconds           Event-loop processing time per reactor
+                                    iteration, in seconds. The idle poll wait is
+                                    excluded, so this reflects main-thread
+                                    saturation. Exposed as _bucket / _sum /
+                                    _count in the usual Prometheus form.
+
+Notes on a couple of the gauges:
+
+  * Active vs passive: the hub injects the observed IP (I4/I6) into every user's
+    INF, so an advertised IP says nothing about reachability. "active" counts
+    users that advertised their own UDP port (U4/U6), which is the real
+    active-mode signal.
+  * uhub_users_by_credential collapses uhub's credential classes into five
+    labels: bot/ubot -> "bot"; operator/opbot/opubot -> "operator";
+    admin/super -> "admin".
+
+
+6. Example PromQL
+-----------------
+
+  # Logins per minute (rate over 5m).
+  rate(uhub_logins_total[5m]) * 60
+
+  # Login failure ratio.
+  rate(uhub_login_failures_total[5m])
+    / clamp_min(rate(uhub_logins_total[5m]), 1)
+
+  # Fraction of the user cap in use.
+  uhub_users / uhub_users_max
+
+  # 99th-percentile event-loop processing time over 5m.
+  histogram_quantile(0.99, rate(uhub_event_loop_seconds_bucket[5m]))
+
+  # Outbound throughput in megabits/sec.
+  rate(uhub_net_tx_bytes_total[1m]) * 8 / 1e6
+
+
+7. Example alerts
+-----------------
+
+  groups:
+    - name: uhub
+      rules:
+        - alert: UhubNearUserCap
+          expr: uhub_users / uhub_users_max > 0.9
+          for: 5m
+          annotations:
+            summary: "uhub is above 90% of its user cap"
+
+        - alert: UhubEventLoopSaturated
+          expr: histogram_quantile(0.99, rate(uhub_event_loop_seconds_bucket[5m])) > 0.1
+          for: 5m
+          annotations:
+            summary: "uhub event loop p99 > 100ms (main thread saturated)"
+
+        - alert: UhubSendQueueBacklog
+          expr: uhub_send_queue_bytes > 10e6
+          for: 5m
+          annotations:
+            summary: "uhub send-queue backlog above 10 MB"

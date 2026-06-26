@@ -1,15 +1,62 @@
 Getting started guide
 ---------------------
 
-Unpack your binaries 
+Build uhub from source
 
-Example:
-  % tar xzf uhub-0.2.6-linux-i386.tar.gz
-  % cd uhub-0.2.6
+uhub is distributed as source code -- there are no prebuilt binaries.
+You will need a C compiler, CMake, SQLite3, and a TLS library
+(OpenSSL >= 3.0 or LibreSSL >= 3.4). TLS support is mandatory.
 
-Copy the binary to /usr/local/bin
+On Debian/Ubuntu the build dependencies can be installed with:
+
+  % sudo apt-get install build-essential cmake libsqlite3-dev libssl-dev
+
+Unpack the source and enter the directory:
+
+  % tar xzf uhub-0.6.1-src.tar.gz
+  % cd uhub-0.6.1
+
+Configure and build (out-of-tree):
+
+  % mkdir -p build && cd build
+  % cmake ..
+  % make -j
+
+This produces the uhub binary (along with the mod_*.so plugins) in the
+build directory. Install it to /usr/local/bin:
+
+  % sudo make install
+
+Or copy the binary by hand:
 
   % sudo cp uhub /usr/local/bin
+
+Building with Zig (alternative)
+
+The repository also ships a build.zig, which is more self-contained: it
+fetches and statically links bundled LibreSSL and SQLite3, so no system
+TLS or SQLite development packages are required. You only need Zig
+(>= 0.14.1); get it from https://ziglang.org/download/.
+
+  % tar xzf uhub-0.6.1-src.tar.gz
+  % cd uhub-0.6.1
+  % zig build
+
+The artifacts (uhub, the plugins, and helper tools) are placed in
+zig-out/bin. Useful options:
+
+  % zig build -Drelease=false      # debug build
+  % zig build -Dsystemd=true       # systemd notify + journal logging
+  % zig build -Dsystem-ssl=true    # link the host OpenSSL/LibreSSL instead
+  % zig build run                  # build and launch uhub
+  % zig build test                 # build and run the autotest suite
+
+Because Zig bundles its own cross-compiling toolchain, you can build for a
+different platform by passing -Dtarget. For example, to produce a static
+Linux binary for ARM64 or a 64-bit Windows binary:
+
+  % zig build -Dtarget=aarch64-linux-musl
+  % zig build -Dtarget=x86_64-windows
 
 Create configuration files.
 If no configuration files are created, uhub will use the default parameters, so you can skip this step if you are in a hurry to see it run.
@@ -62,6 +109,10 @@ You can interact with uhub in your hub main chat using the `!` prefix, followed 
 Example :
 
       *     to display help and the command you can use:
-            !help 
-                     
+            !help
+
+To monitor uhub with Prometheus, uhub can expose its counters and gauges over an
+HTTP/HTTPS endpoint on the regular server port. See doc/prometheus.txt for how to
+enable it and point a Prometheus server at it.
+
 Your mileage may vary -- Good luck!
