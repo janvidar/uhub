@@ -822,8 +822,8 @@ int hub_handle_info_common(struct hub_user* user, struct adc_message* cmd)
 	remove_server_restricted_flags(cmd);
 
 	/*
-	 * ADC0 in the support cast advertises that the client accepts plaintext
-	 * (non-TLS) client-to-client connections. Only let clients whose hub
+	 * ADC0 in the support cast advertises that the client accepts
+	 * TLS client-to-client connections. Only let clients whose hub
 	 * connection is confirmed TLS advertise it; otherwise strip it so it is
 	 * not re-broadcast to other users. Fail closed: anything not provably TLS
 	 * (including a user with no connection) loses the flag.
