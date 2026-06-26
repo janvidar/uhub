@@ -104,6 +104,20 @@ struct hub_stats
 	struct timeout_evt* timeout;    /**<< "Timeout handler for statistics" */
 };
 
+/**
+ * Monotonically-increasing event counters exposed through the metrics endpoint.
+ * Bumped at the central dispatch sites (login/logout in hubevent.c, chat/search
+ * in hub.c); single-threaded, so a plain increment is sufficient.
+ */
+struct metrics_counters
+{
+	uint64_t logins;          /**<< Successful user logins */
+	uint64_t login_failures;  /**<< Rejected/failed login attempts */
+	uint64_t logouts;         /**<< User logouts */
+	uint64_t chat_messages;   /**<< Public chat messages accepted for routing */
+	uint64_t searches;        /**<< Search requests accepted for routing */
+};
+
 struct hub_logout_info
 {
 	time_t time;
@@ -118,6 +132,7 @@ struct hub_info
 	struct net_connection* server;
 	struct linked_list* server_alt_ports;
 	struct hub_stats stats;
+	struct metrics_counters metrics;
 	struct event_queue* queue;
 	struct hub_config* config;
 	struct hub_user_manager* users;

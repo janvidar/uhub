@@ -473,6 +473,36 @@ ssize_t net_ssl_recv(struct net_connection* con, void* buf, size_t len)
 	return ret;
 }
 
+ssize_t net_ssl_peek(struct net_connection* con, void* buf, size_t len)
+{
+	struct net_ssl_openssl* handle = get_handle(con);
+	ssize_t ret;
+
+	if (handle->state == tls_st_error)
+		return -2;
+
+	if (handle->state == tls_st_accepting || handle->state == tls_st_connecting)
+		return -1;
+
+	uhub_assert(handle->state == tls_st_connected);
+
+	ERR_clear_error();
+
+	/* Like net_ssl_recv(), but SSL_peek() leaves the decrypted bytes in the SSL
+	   buffer so a later SSL_read() (by the user or metrics handler this probe
+	   hands off to) still sees them. */
+	ret = SSL_peek(handle->ssl, buf, len);
+	add_io_stats(handle);
+	LOG_PROTO("SSL_peek(con=%p, buf=%p, len=" PRINTF_SIZE_T ") => %d", con, buf, len, ret);
+	if (ret > 0)
+		handle->ssl_read_events = 0;
+	else
+		ret = handle_openssl_error(con, ret, 1);
+
+	net_ssl_update(con, handle->events);  // Update backend only
+	return ret;
+}
+
 void net_ssl_update(struct net_connection* con, int events)
 {
 	struct net_ssl_openssl* handle = get_handle(con);

@@ -71,6 +71,7 @@ void on_login_success(struct hub_info* hub, struct hub_user* u)
 		route_info_message(hub, u);
 
 	plugin_log_user_login_success(hub, u);
+	hub->metrics.logins++;
 
 	/* reset timeout -- guard against a disconnect triggered while routing above
 	   (e.g. a send-queue overflow), which clears u->connection. */
@@ -81,6 +82,7 @@ void on_login_success(struct hub_info* hub, struct hub_user* u)
 void on_login_failure(struct hub_info* hub, struct hub_user* u, enum status_message msg)
 {
 	plugin_log_user_login_error(hub, u, hub_get_status_message_log(hub, msg));
+	hub->metrics.login_failures++;
 	hub_send_status(hub, u, msg, status_level_fatal);
 	hub_disconnect_user(hub, u, quit_logon_error);
 }
@@ -106,5 +108,11 @@ void on_logout_user(struct hub_info* hub, struct hub_user* user)
 
 	plugin_log_user_logout(hub, user, reason);
 	hub_logout_log(hub, user);
+
+	/* Only count teardown of users that actually completed login, so the count
+	   pairs with metrics.logins (connecting users that never logged in quit here
+	   too, but were counted as login_failures instead). */
+	if (user_is_logged_in(user))
+		hub->metrics.logouts++;
 }
 

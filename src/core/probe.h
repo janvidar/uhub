@@ -30,6 +30,7 @@ struct hub_probe
 	struct hub_info*        hub;                /** The hub instance this probe belong to */
 	struct net_connection*  connection;         /** Connection data */
 	struct ip_addr_encap    addr;               /** IP address */
+	int                     tls;                /** Set once a TLS handshake has been started on this connection */
 };
 
 extern struct hub_probe* probe_create(struct hub_info* hub, int sd, struct ip_addr_encap* addr);

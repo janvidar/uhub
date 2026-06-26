@@ -792,6 +792,10 @@ void net_stats_reset()
 	stats_total.accept += stats.accept;
 	stats_total.errors += stats.errors;
 	stats_total.closed += stats.closed;
+	stats_total.tls_accept += stats.tls_accept;
+	stats_total.tls_connect += stats.tls_connect;
+	stats_total.tls_error += stats.tls_error;
+	stats_total.tls_close += stats.tls_close;
 
 	memset(&stats, 0, sizeof(struct net_statistics));
 	stats.timestamp = time(NULL);
