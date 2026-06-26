@@ -204,6 +204,7 @@ int route_flush_pipeline(struct hub_info* hub, struct hub_user* u)
 int route_to_all(struct hub_info* hub, struct adc_message* command) /* iterate users */
 {
 	struct hub_user* user;
+	hub->metrics.broadcasts++;
 	LIST_FOREACH(struct hub_user*, user, hub->users->list,
 	{
 		route_to_user(hub, user, command);
@@ -218,6 +219,7 @@ int route_to_subscribers(struct hub_info* hub, struct adc_message* command) /* i
 	char* tmp;
 
 	struct hub_user* user;
+	hub->metrics.feature_casts++;
 	LIST_FOREACH(struct hub_user*, user, hub->users->list,
 	{
 		if (user->feature_cast)

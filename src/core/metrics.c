@@ -21,12 +21,17 @@
 #include "util/log.h"
 #include "util/memory.h"
 #include "util/cbuffer.h"
+#include "util/list.h"
 #include "network/connection.h"
 #include "network/network.h"
 #include "network/ipcalc.h"
+#include "adc/adcconst.h"
+#include "adc/message.h"
 #include "core/config.h"
 #include "core/hub.h"
+#include "core/user.h"
 #include "core/usermanager.h"
+#include "core/ioqueue.h"
 #include "core/metrics.h"
 
 /* Hard cap on the request bytes we are willing to buffer before giving up. The
@@ -140,6 +145,24 @@ static void metrics_build_body(struct hub_info* hub, struct cbuffer* body)
 	METRIC("uhub_searches_total", "counter", "Search requests accepted for routing.");
 	cbuf_append_format(body, "uhub_searches_total %" PRIu64 "\n", hub->metrics.searches);
 
+	METRIC("uhub_search_results_total", "counter", "Search results relayed.");
+	cbuf_append_format(body, "uhub_search_results_total %" PRIu64 "\n", hub->metrics.search_results);
+
+	METRIC("uhub_private_messages_total", "counter", "Private chat messages accepted for routing.");
+	cbuf_append_format(body, "uhub_private_messages_total %" PRIu64 "\n", hub->metrics.private_messages);
+
+	METRIC("uhub_connect_requests_total", "counter", "Active connect requests (ConnectToMe).");
+	cbuf_append_format(body, "uhub_connect_requests_total %" PRIu64 "\n", hub->metrics.connect_requests);
+
+	METRIC("uhub_rev_connect_requests_total", "counter", "Passive connect requests (ReverseConnectToMe).");
+	cbuf_append_format(body, "uhub_rev_connect_requests_total %" PRIu64 "\n", hub->metrics.rev_connect_requests);
+
+	METRIC("uhub_broadcasts_total", "counter", "Messages broadcast to all users.");
+	cbuf_append_format(body, "uhub_broadcasts_total %" PRIu64 "\n", hub->metrics.broadcasts);
+
+	METRIC("uhub_feature_casts_total", "counter", "Feature-cast messages routed to subscribers.");
+	cbuf_append_format(body, "uhub_feature_casts_total %" PRIu64 "\n", hub->metrics.feature_casts);
+
 	METRIC("uhub_net_tx_bytes_total", "counter", "Total bytes transmitted by the hub.");
 	cbuf_append_format(body, "uhub_net_tx_bytes_total " PRINTF_SIZE_T "\n", hub->stats.net_tx_total);
 
@@ -169,6 +192,87 @@ static void metrics_build_body(struct hub_info* hub, struct cbuffer* body)
 
 	METRIC("uhub_tls_close_total", "counter", "TLS connections closed.");
 	cbuf_append_format(body, "uhub_tls_close_total " PRINTF_SIZE_T "\n", total->tls_close + intermediate->tls_close);
+
+	/* Current send/receive rates (bytes/sec, normalised over the stats window). */
+	METRIC("uhub_net_tx_rate_bytes", "gauge", "Current transmit rate in bytes per second.");
+	cbuf_append_format(body, "uhub_net_tx_rate_bytes " PRINTF_SIZE_T "\n", hub->stats.net_tx);
+
+	METRIC("uhub_net_rx_rate_bytes", "gauge", "Current receive rate in bytes per second.");
+	cbuf_append_format(body, "uhub_net_rx_rate_bytes " PRINTF_SIZE_T "\n", hub->stats.net_rx);
+
+	METRIC("uhub_net_tx_rate_bytes_peak", "gauge", "Peak transmit rate in bytes per second.");
+	cbuf_append_format(body, "uhub_net_tx_rate_bytes_peak " PRINTF_SIZE_T "\n", hub->stats.net_tx_peak);
+
+	METRIC("uhub_net_rx_rate_bytes_peak", "gauge", "Peak receive rate in bytes per second.");
+	cbuf_append_format(body, "uhub_net_rx_rate_bytes_peak " PRINTF_SIZE_T "\n", hub->stats.net_rx_peak);
+
+	/* A single pass over the logged-in users produces the per-user breakdowns:
+	   IP family, active vs passive (whether a routable IP is advertised), the
+	   aggregate send-queue backlog, and the credential-class histogram. */
+	{
+		struct hub_user* user;
+		size_t ipv4 = 0, ipv6 = 0, active = 0, passive = 0;
+		size_t send_queue_bytes = 0;
+		size_t cred_guest = 0, cred_registered = 0, cred_operator = 0, cred_admin = 0, cred_bot = 0;
+
+		LIST_FOREACH(struct hub_user*, user, hub->users->list,
+		{
+			if (user->id.addr.af == AF_INET6)
+				ipv6++;
+			else
+				ipv4++;
+
+			/* The hub always injects I4/I6 (the observed address), so presence of
+			   an IP says nothing about reachability. A client signals active mode
+			   by advertising its own port (U4/U6); the hub never injects those, so
+			   their presence means the client offered a way to be connected to. */
+			if (user->info &&
+				(adc_msg_has_named_argument(user->info, ADC_INF_FLAG_IPV4_UDP_PORT) ||
+				 adc_msg_has_named_argument(user->info, ADC_INF_FLAG_IPV6_UDP_PORT)))
+				active++;
+			else
+				passive++;
+
+			if (user->send_queue)
+				send_queue_bytes += ioq_send_get_bytes(user->send_queue);
+
+			switch (user->credentials)
+			{
+				case auth_cred_guest:    cred_guest++; break;
+				case auth_cred_user:     cred_registered++; break;
+				case auth_cred_bot:
+				case auth_cred_ubot:     cred_bot++; break;
+				case auth_cred_operator:
+				case auth_cred_opbot:
+				case auth_cred_opubot:   cred_operator++; break;
+				case auth_cred_admin:
+				case auth_cred_super:    cred_admin++; break;
+				default: break;
+			}
+		});
+
+		METRIC("uhub_users_ipv4", "gauge", "Logged-in users connected over IPv4.");
+		cbuf_append_format(body, "uhub_users_ipv4 " PRINTF_SIZE_T "\n", ipv4);
+
+		METRIC("uhub_users_ipv6", "gauge", "Logged-in users connected over IPv6.");
+		cbuf_append_format(body, "uhub_users_ipv6 " PRINTF_SIZE_T "\n", ipv6);
+
+		METRIC("uhub_users_active", "gauge", "Users advertising a routable address (can accept TCP).");
+		cbuf_append_format(body, "uhub_users_active " PRINTF_SIZE_T "\n", active);
+
+		METRIC("uhub_users_passive", "gauge", "Users not advertising a routable address (passive).");
+		cbuf_append_format(body, "uhub_users_passive " PRINTF_SIZE_T "\n", passive);
+
+		METRIC("uhub_send_queue_bytes", "gauge", "Total bytes queued for sending across all users.");
+		cbuf_append_format(body, "uhub_send_queue_bytes " PRINTF_SIZE_T "\n", send_queue_bytes);
+
+		METRIC("uhub_users_by_credential", "gauge", "Logged-in users by credential class.");
+		cbuf_append_format(body, "uhub_users_by_credential{credential=\"guest\"} " PRINTF_SIZE_T "\n", cred_guest);
+		cbuf_append_format(body, "uhub_users_by_credential{credential=\"registered\"} " PRINTF_SIZE_T "\n", cred_registered);
+		cbuf_append_format(body, "uhub_users_by_credential{credential=\"bot\"} " PRINTF_SIZE_T "\n", cred_bot);
+		cbuf_append_format(body, "uhub_users_by_credential{credential=\"operator\"} " PRINTF_SIZE_T "\n", cred_operator);
+		cbuf_append_format(body, "uhub_users_by_credential{credential=\"admin\"} " PRINTF_SIZE_T "\n", cred_admin);
+	}
 
 #undef METRIC
 }
