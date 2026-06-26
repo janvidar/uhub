@@ -102,6 +102,23 @@ extern size_t net_backend_get_max_connections();
 
 extern struct timeout_queue* net_backend_get_timeout_queue();
 
+/**
+ * Histogram of event-loop processing time per reactor iteration, in seconds.
+ * The idle wait in backend_poll() is excluded, so this measures how long the
+ * main thread spends doing work each tick (event dispatch + queued events +
+ * deferred-write flush) -- a rising distribution means the loop is saturated.
+ */
+struct net_loop_stats
+{
+	const double* bounds;    /**< Upper bounds (le) in seconds; n_buckets entries. */
+	const uint64_t* counts;  /**< Per-bucket observation counts; n_buckets+1 entries (last is +Inf). Non-cumulative. */
+	int n_buckets;
+	double sum;              /**< Sum of all observed durations, in seconds. */
+	uint64_t count;          /**< Total number of observations. */
+};
+
+extern void net_backend_get_loop_stats(struct net_loop_stats* out);
+
 struct net_cleanup_handler* net_cleanup_initialize(size_t max);
 
 void net_cleanup_shutdown(struct net_cleanup_handler* handler);

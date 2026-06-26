@@ -24,6 +24,7 @@
 #include "util/list.h"
 #include "network/connection.h"
 #include "network/network.h"
+#include "network/backend.h"
 #include "network/ipcalc.h"
 #include "adc/adcconst.h"
 #include "adc/message.h"
@@ -272,6 +273,29 @@ static void metrics_build_body(struct hub_info* hub, struct cbuffer* body)
 		cbuf_append_format(body, "uhub_users_by_credential{credential=\"bot\"} " PRINTF_SIZE_T "\n", cred_bot);
 		cbuf_append_format(body, "uhub_users_by_credential{credential=\"operator\"} " PRINTF_SIZE_T "\n", cred_operator);
 		cbuf_append_format(body, "uhub_users_by_credential{credential=\"admin\"} " PRINTF_SIZE_T "\n", cred_admin);
+	}
+
+	/* Event-loop processing time per reactor iteration (Prometheus histogram).
+	   The idle poll wait is excluded, so this reflects main-thread saturation. */
+	{
+		struct net_loop_stats ls;
+		uint64_t cumulative = 0;
+		int i;
+
+		net_backend_get_loop_stats(&ls);
+
+		cbuf_append(body,
+			"# HELP uhub_event_loop_seconds Event-loop processing time per iteration in seconds (excludes the idle poll wait).\n"
+			"# TYPE uhub_event_loop_seconds histogram\n");
+		for (i = 0; i < ls.n_buckets; i++)
+		{
+			cumulative += ls.counts[i];
+			cbuf_append_format(body, "uhub_event_loop_seconds_bucket{le=\"%g\"} %" PRIu64 "\n", ls.bounds[i], cumulative);
+		}
+		cumulative += ls.counts[ls.n_buckets]; /* +Inf */
+		cbuf_append_format(body, "uhub_event_loop_seconds_bucket{le=\"+Inf\"} %" PRIu64 "\n", cumulative);
+		cbuf_append_format(body, "uhub_event_loop_seconds_sum %f\n", ls.sum);
+		cbuf_append_format(body, "uhub_event_loop_seconds_count %" PRIu64 "\n", ls.count);
 	}
 
 #undef METRIC

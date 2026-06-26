@@ -128,13 +128,67 @@ struct timeout_queue* net_backend_get_timeout_queue()
 /**
  * Process the network backend.
  */
+/*
+ * Event-loop processing-time histogram. We sample the wall-clock span between
+ * one backend_poll() returning and the next one being entered: that covers all
+ * the work done for a reactor iteration (event dispatch, queued events, deferred
+ * writes) and deliberately excludes the blocking poll wait, which would
+ * otherwise dominate on an idle hub.
+ */
+#define LOOP_HIST_NBUCKETS 13
+static const double loop_hist_bounds[LOOP_HIST_NBUCKETS] = {
+	1e-4, 2.5e-4, 5e-4, 1e-3, 2.5e-3, 5e-3, 1e-2, 2.5e-2, 5e-2, 1e-1, 2.5e-1, 5e-1, 1.0
+};
+static uint64_t loop_hist_counts[LOOP_HIST_NBUCKETS + 1]; /* last bucket is +Inf */
+static double loop_hist_sum;
+static uint64_t loop_hist_count;
+static struct timespec loop_last_poll_end;
+static int loop_timing_active;
+
+static void loop_hist_observe(double seconds)
+{
+	int i;
+	for (i = 0; i < LOOP_HIST_NBUCKETS; i++)
+		if (seconds <= loop_hist_bounds[i])
+			break;
+	loop_hist_counts[i]++;
+	loop_hist_sum += seconds;
+	loop_hist_count++;
+}
+
+void net_backend_get_loop_stats(struct net_loop_stats* out)
+{
+	out->bounds = loop_hist_bounds;
+	out->counts = loop_hist_counts;
+	out->n_buckets = LOOP_HIST_NBUCKETS;
+	out->sum = loop_hist_sum;
+	out->count = loop_hist_count;
+}
+
 int net_backend_process()
 {
+	struct timespec now_ts;
 	int res = 0;
-	size_t secs = timeout_queue_get_next_timeout(&g_backend->timeout_queue, g_backend->now);
+	size_t secs;
+
+	/* Close out the previous iteration: the span from the last poll returning to
+	   now is the work the reactor did for that iteration (poll wait excluded). */
+	clock_gettime(CLOCK_MONOTONIC, &now_ts);
+	if (loop_timing_active)
+	{
+		double work = (double) (now_ts.tv_sec - loop_last_poll_end.tv_sec)
+			+ (double) (now_ts.tv_nsec - loop_last_poll_end.tv_nsec) / 1e9;
+		if (work >= 0.0)
+			loop_hist_observe(work);
+	}
+
+	secs = timeout_queue_get_next_timeout(&g_backend->timeout_queue, g_backend->now);
 
 	if (g_backend->common.num)
 		res = g_backend->handler.backend_poll(g_backend->data, secs * 1000);
+
+	clock_gettime(CLOCK_MONOTONIC, &loop_last_poll_end);
+	loop_timing_active = 1;
 
 	g_backend->now = time(0);
 	timeout_queue_process(&g_backend->timeout_queue, g_backend->now);
