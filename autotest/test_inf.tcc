@@ -165,10 +165,10 @@ EXO_TEST(inf_limit_hubs_7, { CHECK_INF("BINF AAAB NIFriend IDGNSSMURMD7K466NGZIH
 
 
 /*
- * ADC0 support-cast stripping. ADC0 advertises the obsolete pre-1.0 ADC
- * client-to-client protocol, so hub_handle_info_common() drops it from the SU
- * field unconditionally. EXPECT is the resulting SU value, or NULL when the SU
- * argument is expected to be removed entirely.
+ * ADC0 support-cast stripping. inf_user has no connection, which counts as
+ * "not confirmed TLS", so hub_handle_info_common() must drop the ADC0 feature
+ * token from the SU field. EXPECT is the resulting SU value, or NULL when the
+ * SU argument is expected to be removed entirely.
  */
 static int check_su_strip(const char* line, const char* expect_su)
 {
