@@ -102,7 +102,11 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 
 ssize_t net_con_peek(struct net_connection* con, void* buf, size_t len)
 {
-	int ret = net_recv(con->sd, buf, len, MSG_PEEK);
+	int ret;
+	if (con->ssl)
+		return net_ssl_peek(con, buf, len);
+
+	ret = net_recv(con->sd, buf, len, MSG_PEEK);
 	if (ret == -1)
 	{
 		if (is_blocked_or_interrupted())

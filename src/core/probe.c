@@ -23,6 +23,7 @@
 #include "network/connection.h"
 #include "core/config.h"
 #include "core/hub.h"
+#include "core/metrics.h"
 #include "core/probe.h"
 #include "probe.h"
 
@@ -49,15 +50,46 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 
 		if (bytes >= 4)
 		{
+			/* A TLS ClientHello on a not-yet-encrypted connection: start the
+			   handshake and re-probe the *decrypted* stream once it completes.
+			   net_ssl_callback() drives the handshake and re-enters us (with
+			   NET_EVENT_READ) only when the connection is established, at which
+			   point net_con_peek() returns the decrypted application bytes. This
+			   lets ADC and the HTTP metrics endpoint share a port over TLS too. */
+			if (!probe->tls && bytes >= 11 &&
+				probe_recvbuf[0] == 22 &&
+				probe_recvbuf[1] == 3 && /* protocol major version */
+				probe_recvbuf[5] == 1 && /* message type */
+				probe_recvbuf[9] == probe_recvbuf[1])
+			{
+				if (probe->hub->config->tls_enable)
+				{
+					LOG_TRACE("Probed TLS %d.%d connection", (int) probe_recvbuf[9], (int) probe_recvbuf[10]);
+					probe->tls = 1;
+					if (net_con_ssl_handshake(con, net_con_ssl_mode_server, probe->hub->ctx) < 0)
+					{
+						LOG_TRACE("TLS handshake negotiation failed.");
+						probe_destroy(probe);
+						return;
+					}
+					/* Handshake in flight; wait to be re-entered with the
+					   decrypted bytes. */
+					return;
+				}
+
+				LOG_TRACE("Probed TLS %d.%d connection. TLS disabled in hub.", (int) probe_recvbuf[9], (int) probe_recvbuf[10]);
+				probe_destroy(probe);
+				return;
+			}
+
 			/* "HSUP" starts a normal login; "HTCP" starts an HBRI secondary-
 			   protocol validation connection (see hbri.c). Both are ADC and
 			   handled by the per-user command dispatcher once a user exists. */
 			if (memcmp(probe_recvbuf, "HSUP", 4) == 0 || memcmp(probe_recvbuf, "HTCP", 4) == 0)
 			{
 				LOG_TRACE("Probed ADC");
-				if (probe->hub->config->tls_enable && probe->hub->config->tls_require)
+				if (!probe->tls && probe->hub->config->tls_enable && probe->hub->config->tls_require)
 				{
-					LOG_TRACE("Not TLS connection - closing connection.");
 					if (*probe->hub->config->tls_require_redirect_addr)
 					{
 						char buf[512];
@@ -75,6 +107,12 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 				if (user_create(probe->hub, probe->connection, &probe->addr))
 				{
 					probe->connection = 0;
+					/* On TLS the handshake peek (SSL_peek) already drained the
+					   socket into the SSL buffer, so epoll won't deliver a read
+					   event for the decrypted bytes we peeked. Kick the freshly
+					   installed handler once so it processes them. */
+					if (probe->tls)
+						net_con_callback(con, NET_EVENT_READ);
 				}
 				probe_destroy(probe);
 				return;
@@ -83,33 +121,29 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 				 (memcmp(probe_recvbuf, "POST", 4) == 0) ||
 				 (memcmp(probe_recvbuf, "HEAD", 4) == 0))
 			{
+				/* Looks like HTTP (plaintext, or decrypted on a TLS connection). If
+				   the metrics endpoint is enabled (and a token is configured) hand the
+				   connection off to it; the handler does its own method/path/token
+				   checks and transparently uses TLS when con is encrypted. Otherwise
+				   it stays unsupported. */
+				if (probe->hub->config->metrics_enable && *probe->hub->config->metrics_token)
+				{
+					LOG_TRACE("Probed HTTP connection - serving metrics endpoint (%s)", ip_convert_to_string(&probe->addr));
+					metrics_handle_connection(probe->hub, probe->connection, &probe->addr);
+					probe->connection = 0;
+					/* See the ADC branch: on TLS the peeked bytes are buffered in
+					   the SSL layer and the socket is drained, so kick the metrics
+					   handler once to process the already-received request. */
+					if (probe->tls)
+						net_con_callback(con, NET_EVENT_READ);
+					probe_destroy(probe);
+					return;
+				}
+
 				/* Looks like HTTP - Not supported, but we log it. */
 				LOG_TRACE("Probed HTTP connection. Not supported closing connection (%s)", ip_convert_to_string(&probe->addr));
 				const char* buf = "501 Not implemented\r\n\r\n";
 				net_con_send(con, buf, strlen(buf));
-			}
-			else if (bytes >= 11 &&
-				probe_recvbuf[0] == 22 &&
-				probe_recvbuf[1] == 3 && /* protocol major version */
-				probe_recvbuf[5] == 1 && /* message type */
-				probe_recvbuf[9] == probe_recvbuf[1])
-			{
-				if (probe->hub->config->tls_enable)
-				{
-					LOG_TRACE("Probed TLS %d.%d connection", (int) probe_recvbuf[9], (int) probe_recvbuf[10]);
-					if (net_con_ssl_handshake(con, net_con_ssl_mode_server, probe->hub->ctx) < 0)
-					{
-						LOG_TRACE("TLS handshake negotiation failed.");
-					}
-					else if (user_create(probe->hub, probe->connection, &probe->addr))
-					{
-						probe->connection = 0;
-					}
-				}
-				else
-				{
-					LOG_TRACE("Probed TLS %d.%d connection. TLS disabled in hub.", (int) probe_recvbuf[9], (int) probe_recvbuf[10]);
-				}
 			}
 			else
 			{

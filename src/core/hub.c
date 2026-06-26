@@ -188,6 +188,7 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 					break;
 				}
 				CHECK_FLOOD(search, 1);
+				hub->metrics.searches++;
 				ROUTE_MSG;
 
 			case ADC_CMD_FRES: // spam
@@ -479,6 +480,7 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 		if (broadcast)
 		{
 			plugin_log_chat_message(hub, u, message_decoded, 0);
+			hub->metrics.chat_messages++;
 		}
 		ret = route_message(hub, u, cmd);
 	}

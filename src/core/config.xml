@@ -69,6 +69,48 @@
 		<since>0.3.0</since>
 	</option>
 
+	<option name="metrics_enable" type="boolean" default="0">
+		<short>Enable the Prometheus metrics endpoint</short>
+		<description><![CDATA[
+			<p>
+			When enabled, the hub answers HTTP <code>GET</code> requests for the metrics path
+			(see <code>metrics_path</code>) on the regular server port(s) with a Prometheus
+			text-exposition document. A valid bearer token (<code>metrics_token</code>) is
+			required; if no token is configured the endpoint stays disabled.
+			</p>
+			<p>
+			The endpoint is served on the same port(s) as ADC, both over plain HTTP and, when
+			<code>tls_enable</code> is set, over HTTPS (scrape with <code>https://</code>). Use
+			HTTPS to keep the bearer token confidential: plain HTTP is also accepted on the same
+			port, so over plain HTTP the token is exposed on an untrusted network -- scrape over
+			loopback/a trusted network, or use HTTPS.
+			</p>
+		]]></description>
+		<since>0.6.1</since>
+	</option>
+
+	<option name="metrics_token" type="string" default="">
+		<short>Bearer token required to read the metrics endpoint</short>
+		<description><![CDATA[
+			The token that scrapers must present in an <code>Authorization: Bearer &lt;token&gt;</code>
+			request header. The metrics endpoint is refused unless this is set to a non-empty value.
+		]]></description>
+		<example><![CDATA[
+			metrics_token = "a-long-random-secret"
+		]]></example>
+		<since>0.6.1</since>
+	</option>
+
+	<option name="metrics_path" type="string" default="/metrics">
+		<check regexp="/.*" />
+		<short>Request path that serves the metrics document</short>
+		<description><![CDATA[
+			The HTTP path that returns metrics. Requests for any other path receive 404. Change this
+			to obscure the endpoint if desired. Must begin with a slash.
+		]]></description>
+		<since>0.6.1</since>
+	</option>
+
 	<option name="dns_thread_pool_size" type="int" default="4" advanced="true" >
 		<check min="1" max="64" />
 		<short>Number of worker threads for asynchronous DNS lookups</short>

@@ -56,6 +56,7 @@ const core_sources = [_][]const u8{
     "src/core/hubevent.c",
     "src/core/inf.c",
     "src/core/ioqueue.c",
+    "src/core/metrics.c",
     "src/core/netevent.c",
     "src/core/plugincallback.c",
     "src/core/plugininvoke.c",
