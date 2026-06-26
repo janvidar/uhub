@@ -111,11 +111,17 @@ struct hub_stats
  */
 struct metrics_counters
 {
-	uint64_t logins;          /**<< Successful user logins */
-	uint64_t login_failures;  /**<< Rejected/failed login attempts */
-	uint64_t logouts;         /**<< User logouts */
-	uint64_t chat_messages;   /**<< Public chat messages accepted for routing */
-	uint64_t searches;        /**<< Search requests accepted for routing */
+	uint64_t logins;                /**<< Successful user logins */
+	uint64_t login_failures;        /**<< Rejected/failed login attempts */
+	uint64_t logouts;               /**<< User logouts */
+	uint64_t chat_messages;         /**<< Public chat messages accepted for routing */
+	uint64_t private_messages;      /**<< Private chat messages accepted for routing */
+	uint64_t searches;              /**<< Search requests accepted for routing */
+	uint64_t search_results;        /**<< Search results relayed (DRES) */
+	uint64_t connect_requests;      /**<< Active connect requests (CTM) */
+	uint64_t rev_connect_requests;  /**<< Passive/reverse connect requests (RCM) */
+	uint64_t broadcasts;            /**<< Messages broadcast to all users */
+	uint64_t feature_casts;         /**<< Feature-cast messages routed to subscribers */
 };
 
 struct hub_logout_info

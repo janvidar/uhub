@@ -202,6 +202,7 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 				if (plugin_handle_search_result(hub, u, uman_get_user_by_sid(hub->users, cmd->target), cmd->cache) == st_deny)
 					break;
 				/* CHECK_FLOOD(search, 0); */
+				hub->metrics.search_results++;
 				ROUTE_MSG;
 
 			case ADC_CMD_DRCM:
@@ -209,6 +210,7 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 				if (plugin_handle_revconnect(hub, u, uman_get_user_by_sid(hub->users, cmd->target)) == st_deny)
 					break;
 				CHECK_FLOOD(connect, 1);
+				hub->metrics.rev_connect_requests++;
 				ROUTE_MSG;
 
 			case ADC_CMD_DCTM:
@@ -216,6 +218,7 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 				if (plugin_handle_connect(hub, u, uman_get_user_by_sid(hub->users, cmd->target)) == st_deny)
 					break;
 				CHECK_FLOOD(connect, 1);
+				hub->metrics.connect_requests++;
 				ROUTE_MSG;
 
 			case ADC_CMD_DNAT:
@@ -481,6 +484,10 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 		{
 			plugin_log_chat_message(hub, u, message_decoded, 0);
 			hub->metrics.chat_messages++;
+		}
+		else if (private_msg)
+		{
+			hub->metrics.private_messages++;
 		}
 		ret = route_message(hub, u, cmd);
 	}
