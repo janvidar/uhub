@@ -433,20 +433,15 @@ int net_accept(int fd, struct ip_addr_encap* ipaddr)
 
 int net_connect(int fd, const struct sockaddr *serv_addr, socklen_t addrlen)
 {
-	int ret = connect(fd, serv_addr, addrlen);
-	if (ret == -1)
-	{
-#ifdef WINSOCK
-		if (net_error() != WSAEINPROGRESS)
-#else
-		if (net_error() != EINPROGRESS)
-#endif
-		{
-			net_error_out(fd, "net_connect");
-			net_stats_add_error();
-		}
-	}
-	return ret;
+	/*
+	 * Thin wrapper used by the happy-eyeballs connect state machine in
+	 * connection.c, which polls this repeatedly across both address
+	 * families and owns all error reporting. Errors are deliberately not
+	 * logged here: doing so would announce e.g. an unreachable IPv6 address
+	 * even when the IPv4 address goes on to connect successfully. The state
+	 * machine reports a failure only once every address has been exhausted.
+	 */
+	return connect(fd, serv_addr, addrlen);
 }
 
 

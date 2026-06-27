@@ -198,6 +198,37 @@ static void net_connect_callback(struct net_connect_handle* handle, enum net_con
 static void net_connect_job_internal_cb(struct net_connection* con, int event, void* ptr);
 static int net_connect_process_queue(struct net_connect_handle* handle, struct net_connect_job* job);
 
+static const char* net_connect_status_to_string(enum net_connect_status status)
+{
+	switch (status)
+	{
+		case net_connect_status_ok:             return "connected";
+		case net_connect_status_host_not_found: return "host not found";
+		case net_connect_status_no_address:     return "no usable address";
+		case net_connect_status_dns_error:      return "DNS error";
+		case net_connect_status_refused:        return "connection refused";
+		case net_connect_status_unreachable:    return "network unreachable";
+		case net_connect_status_timeout:        return "connection timed out";
+		case net_connect_status_socket_error:   return "socket error";
+	}
+	return "unknown error";
+}
+
+/*
+ * Every address in both families has been exhausted without connecting.
+ * This is the only place an outbound-connect failure is logged: per-address
+ * failures are kept at trace level, so "network unreachable" is reported only
+ * when every candidate address - IPv6 and IPv4 alike - was unreachable. If
+ * either family connects, this path is never reached and nothing is logged.
+ */
+static void net_connect_report_failure(struct net_connect_handle* handle)
+{
+	LOG_ERROR("Unable to connect to %s:%d: %s", handle->address, (int) handle->port,
+		net_connect_status_to_string(handle->last_error));
+	net_stats_add_error();
+	net_connect_callback(handle, handle->last_error, NULL);
+}
+
 /**
  * Check if a connection job is completed.
  * @return -1 on completed with an error, 0 on not yet completed, or 1 if completed successfully (connected).
@@ -317,7 +348,7 @@ static int net_connect_failover(struct net_connect_handle* handle, struct net_co
 	if (net_connect_depleted(handle))
 	{
 		LOG_TRACE("No more addresses left. Unable to connect!");
-		net_connect_callback(handle, handle->last_error, NULL);
+		net_connect_report_failure(handle);
 	}
 	return 0;
 }
@@ -411,7 +442,7 @@ static int net_connect_process(struct net_connect_handle* handle)
 	// synchronously (or there were none to try).
 	if (net_connect_depleted(handle))
 	{
-		net_connect_callback(handle, handle->last_error, NULL);
+		net_connect_report_failure(handle);
 		return -1;
 	}
 
