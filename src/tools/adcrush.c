@@ -25,6 +25,15 @@
 #define BIG_BUFSIZE 32768
 #define TIGERSIZE 24
 #define STATS_INTERVAL 3
+/* Initial connects are spread out instead of fired all at once: a simultaneous
+   storm of N SYNs overflows the hub's listen backlog (default 50) and the
+   connects that lose the accept race fail. Start at most CONNECT_STAGGER_RATE
+   connects per second, but never spread them over more than CONNECT_STAGGER_MAX
+   seconds -- the timeout wheel is only TIMEOUT_QUEUE_MAX (120s) deep, so the
+   offset must stay well under that. Very large runs reuse the final slot and
+   lean on the retry logic for any stragglers. */
+#define CONNECT_STAGGER_RATE 50
+#define CONNECT_STAGGER_MAX 100
 #define ADCRUSH "adcrush/0.3"
 #define ADC_NICK "[BOT]adcrush"
 #define ADC_DESC "crash\\stest\\sdummy"
@@ -65,6 +74,9 @@ struct AdcFuzzUser
 	struct ADC_client* client;
 	struct timeout_evt* timer;
 	int logged_in;
+	int needs_reconnect; /* connect failed, hub dropped us before login, or initial connect still pending; (re)connect on the next timer tick */
+	char nick[24];
+	const char* description;
 };
 
 #define MAX_CHAT_MSGS 35
@@ -236,20 +248,42 @@ static void perf_update(struct ADC_client* client)
 
 static void client_disconnect(struct AdcFuzzUser* c)
 {
-		ADC_client_destroy(c->client);
-		c->client = 0;
+		/* The client object is NULL for a slot whose initial connect is still
+		   pending (see client_schedule), so guard before destroying it. */
+		if (c->client)
+		{
+			ADC_client_destroy(c->client);
+			c->client = 0;
+		}
 
-		timeout_queue_remove(net_backend_get_timeout_queue(), c->timer);
-		hub_free(c->timer);
-		c->timer = 0;
+		if (c->timer)
+		{
+			timeout_queue_remove(net_backend_get_timeout_queue(), c->timer);
+			hub_free(c->timer);
+			c->timer = 0;
+		}
 
 		c->logged_in = 0;
 }
 
-static void client_connect(struct AdcFuzzUser* c, const char* nick, const char* description)
+/* Arm a slot's timer without connecting yet. The first timer tick performs the
+   initial connect via the needs_reconnect path in timer_callback, which lets
+   runloop() spread the initial connects out over time. nick/description are
+   stored on the slot and reused for every (re)connect. */
+static void client_schedule(struct AdcFuzzUser* c, size_t timeout)
+{
+	c->client = 0;
+	c->logged_in = 0;
+	c->needs_reconnect = 1;
+	c->timer = (struct timeout_evt*) hub_malloc(sizeof(struct timeout_evt));
+	timeout_evt_initialize(c->timer, timer_callback, c);
+	timeout_queue_insert(net_backend_get_timeout_queue(), c->timer, timeout);
+}
+
+static void client_connect(struct AdcFuzzUser* c)
 {
 	size_t timeout = get_next_timeout_evt();
-	struct ADC_client* client = ADC_client_create(nick, description, c);
+	struct ADC_client* client = ADC_client_create(c->nick, c->description, c);
 
 	c->client = client;
 	c->timer = (struct timeout_evt*) hub_malloc(sizeof(struct timeout_evt));
@@ -258,6 +292,7 @@ static void client_connect(struct AdcFuzzUser* c, const char* nick, const char* 
 
 	bot_output(client, LVL_VERBOSE, "Initial timeout: %d seconds", timeout);
 	c->logged_in = 0;
+	c->needs_reconnect = 0;
 
 	ADC_client_set_callback(client, handle);
 	ADC_client_connect(client, cfg_uri);
@@ -274,16 +309,9 @@ static void perf_normal_action(struct ADC_client* client)
 		case 0:
 			// if (p > (90 - (10 * cfg_level)))
 			{
-				struct ADC_client* c;
-				char* nick = hub_strdup(ADC_client_get_nick(client));
-				char* desc = hub_strdup(ADC_client_get_description(client));
-
 				bot_output(client, LVL_VERBOSE, "timeout -> disconnect");
 				client_disconnect(user);
-				client_connect(user, nick, desc);
-
-				hub_free(nick);
-				hub_free(desc);
+				client_connect(user);
 			}
 			break;
 
@@ -343,6 +371,15 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 			/* The connection is gone; stop issuing timer-driven actions against
 			   it, otherwise the next perf_* call sends on a NULL connection. */
 			user->logged_in = 0;
+			/* This fires when a connect attempt failed or the hub dropped us
+			   before login. adcrush otherwise only ever reconnects clients that
+			   reached the logged-in state (via perf_normal_action), so a client
+			   lost during the initial connect storm would stay dead for the rest
+			   of the run -- which is why a -n 1000 run settles at ~half. Flag it
+			   so the next timer tick reconnects it. (Our own teardown in
+			   client_disconnect() goes through ADC_client_destroy(), which does
+			   not invoke this callback, so this never races the case-0 path.) */
+			user->needs_reconnect = 1;
 			break;
 
 		case ADC_CLIENT_LOGGING_IN:
@@ -405,6 +442,18 @@ static void timer_callback(struct timeout_evt* t)
 		perf_normal_action(client->client);
 		bot_output(client->client, LVL_VERBOSE, "Next timeout: %d seconds", (int) timeout);
 	}
+	else if (client->needs_reconnect)
+	{
+		/* Either this slot's initial connect was deferred (staggered startup) or
+		   a previous attempt failed / the hub dropped us before login. Tear down
+		   whatever is there (client_disconnect tolerates a NULL client) and start
+		   a fresh connection, reusing the slot's stored nick/description. The
+		   random per-client timer spreads these out, so retries do not re-create
+		   the simultaneous-connect storm. */
+		bot_output(client->client, LVL_VERBOSE, "timeout -> (re)connect");
+		client_disconnect(client);
+		client_connect(client);
+	}
 	timeout_queue_reschedule(net_backend_get_timeout_queue(), client->timer, timeout);
 }
 
@@ -447,9 +496,18 @@ void runloop(size_t clients)
 
 	for (n = 0; n < clients; n++)
 	{
-		char nick[20];
-		snprintf(nick, 20, "adcrush_%d", (int) n);
-		client_connect(&client[n], nick, "stresstester");
+		struct AdcFuzzUser* c = &client[n];
+		size_t offset;
+
+		snprintf(c->nick, sizeof(c->nick), "adcrush_%d", (int) n);
+		c->description = "stresstester";
+
+		/* Spread the initial connects out instead of firing every SYN at once.
+		   Start CONNECT_STAGGER_RATE per second, capped at CONNECT_STAGGER_MAX
+		   seconds so the offset stays inside the timeout wheel. The first tick
+		   (>= 1s out) performs the connect. */
+		offset = 1 + MIN(n / CONNECT_STAGGER_RATE, (size_t) CONNECT_STAGGER_MAX);
+		client_schedule(c, offset);
 	}
 
 	while (running && net_backend_process())
