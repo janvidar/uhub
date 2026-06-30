@@ -819,7 +819,7 @@ static void hub_timer_statistics(struct timeout_evt* t)
 	timeout_queue_reschedule(net_backend_get_timeout_queue(), hub->stats.timeout, TIMEOUT_STATS);
 }
 
-static struct net_connection* start_listening_socket(const char* bind_addr, uint16_t port, int backlog, struct hub_info* hub)
+static struct net_connection* start_listening_socket(const char* bind_addr, uint16_t port, int backlog, int reuseport, struct hub_info* hub)
 {
 	struct net_connection* server;
 	struct sockaddr_storage addr;
@@ -839,6 +839,15 @@ static struct net_connection* start_listening_socket(const char* bind_addr, uint
 
 	if ((net_set_reuseaddress(sd, 1) == -1) || (net_set_nonblocking(sd, 1) == -1))
 	{
+		net_close(sd);
+		return 0;
+	}
+
+	/* When several worker processes share the client-facing port, set
+	   SO_REUSEPORT so the kernel load-balances connections across them. */
+	if (reuseport && net_set_reuseport(sd, 1) == -1)
+	{
+		LOG_ERROR("start_listening_socket(): server_reuseport is set but SO_REUSEPORT is unavailable");
 		net_close(sd);
 		return 0;
 	}
@@ -876,7 +885,7 @@ static int server_alt_port_start_one(char* line, int count, void* ptr)
 	struct server_alt_port_data* data = (struct server_alt_port_data*) ptr;
 
 	int port = uhub_atoi(line);
-	struct net_connection* con = start_listening_socket(data->config->server_bind_addr, port, data->config->server_listen_backlog, data->hub);
+	struct net_connection* con = start_listening_socket(data->config->server_bind_addr, port, data->config->server_listen_backlog, data->config->server_reuseport, data->hub);
 	if (con)
 	{
 		list_append(data->hub->server_alt_ports, con);
@@ -983,7 +992,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	else
 		LOG_DEBUG("IPv6 not supported.");
 
-	hub->server = start_listening_socket(config->server_bind_addr, config->server_port, config->server_listen_backlog, hub);
+	hub->server = start_listening_socket(config->server_bind_addr, config->server_port, config->server_listen_backlog, config->server_reuseport, hub);
 	if (!hub->server)
 	{
 		hub_free(hub);

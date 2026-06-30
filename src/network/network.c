@@ -317,6 +317,22 @@ int net_set_reuseaddress(int fd, int toggle)
 	return ret;
 }
 
+int net_set_reuseport(int fd, int toggle)
+{
+#ifdef SO_REUSEPORT
+	int ret = net_setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &toggle, sizeof(toggle));
+	if (ret == -1)
+	{
+		net_error_out(fd, "net_set_reuseport");
+	}
+	return ret;
+#else
+	(void) fd;
+	(void) toggle;
+	return -1; /* not supported on this platform */
+#endif
+}
+
 int net_set_sendbuf_size(int fd, size_t size)
 {
 	return net_setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &size, sizeof(size));

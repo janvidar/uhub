@@ -104,7 +104,10 @@ int link_make_nonce(char* out)
 #include "adc/message.h"
 #include "adc/sid.h"
 #include "network/connection.h"
+#include "network/network.h"
 #include "network/ipcalc.h"
+#include <sys/un.h>
+#include <unistd.h>
 #include "core/config.h"
 #include "core/hub.h"
 #include "core/user.h"
@@ -535,6 +538,153 @@ static void link_connect_callback(struct net_connect_handle* handle, enum net_co
 		link_disconnect(link);
 }
 
+/* -------------------------------------------------------------------------
+ * Unix-domain-socket transport.
+ *
+ * On a multi-core box one logical hub runs as several worker processes that
+ * share the client port (SO_REUSEPORT) and link to each other. Those inter-
+ * worker links must NOT use the shared client port -- a TCP connection there
+ * would be load-balanced to an arbitrary worker -- so they run over per-worker
+ * Unix domain sockets instead. The link protocol itself is transport-agnostic;
+ * only the listen/connect plumbing differs.
+ * ------------------------------------------------------------------------- */
+
+static struct net_connection* g_uds_listen = 0;
+static char g_uds_path[108] = {0}; /* sun_path is ~108 bytes */
+
+/* Attach a freshly connected/accepted link fd (TCP or UDS) to a new link and
+   start the handshake. Takes ownership of fd. */
+static int link_attach_fd(struct hub_info* hub, int fd, int is_client, const char* desc)
+{
+	struct hub_link* link;
+	struct net_connection* con;
+
+	if (!*hub->config->link_secret)
+	{
+		LOG_WARN("link: rejecting link from %s (link_secret not configured)", desc);
+		net_close(fd);
+		return 0;
+	}
+	if (net_set_nonblocking(fd, 1) == -1)
+	{
+		net_close(fd);
+		return 0;
+	}
+	con = net_con_create();
+	if (!con)
+	{
+		net_close(fd);
+		return 0;
+	}
+	link = link_create_internal(hub, is_client, desc);
+	if (!link)
+	{
+		net_con_destroy(con);
+		net_close(fd);
+		return 0;
+	}
+	link->connection = con;
+	net_con_initialize(con, fd, link_net_event, link, NET_EVENT_READ);
+	net_con_set_timeout(con, LINK_TIMEOUT);
+	if (link_begin_handshake(link) < 0)
+		link_disconnect(link);
+	return 1;
+}
+
+static void link_uds_on_accept(struct net_connection* con, int event, void* arg)
+{
+	struct hub_info* hub = (struct hub_info*) arg;
+	struct ip_addr_encap dummy;
+	int server_fd = net_con_get_sd(con);
+	(void) event;
+
+	memset(&dummy, 0, sizeof(dummy));
+	for (;;)
+	{
+		int fd = net_accept(server_fd, &dummy);
+		if (fd == -1)
+			break; /* drained (EWOULDBLOCK) or error */
+		link_attach_fd(hub, fd, 0, "unix-socket");
+	}
+}
+
+static int link_uds_listen(struct hub_info* hub, const char* path)
+{
+	struct sockaddr_un addr;
+	int sd;
+
+	if (strlen(path) >= sizeof(addr.sun_path))
+	{
+		LOG_ERROR("link: link_socket path too long: %s", path);
+		return -1;
+	}
+
+	sd = net_socket_create(AF_UNIX, SOCK_STREAM, 0);
+	if (sd == -1)
+		return -1;
+
+	unlink(path); /* clear a stale socket from a previous run */
+	memset(&addr, 0, sizeof(addr));
+	addr.sun_family = AF_UNIX;
+	strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+
+	if (net_bind(sd, (struct sockaddr*) &addr, sizeof(addr)) == -1)
+	{
+		LOG_ERROR("link: unable to bind link socket %s", path);
+		net_close(sd);
+		return -1;
+	}
+	if (net_listen(sd, 16) == -1 || net_set_nonblocking(sd, 1) == -1)
+	{
+		net_close(sd);
+		unlink(path);
+		return -1;
+	}
+
+	g_uds_listen = net_con_create();
+	if (!g_uds_listen)
+	{
+		net_close(sd);
+		unlink(path);
+		return -1;
+	}
+	net_con_initialize(g_uds_listen, sd, link_uds_on_accept, hub, NET_EVENT_READ);
+	strncpy(g_uds_path, path, sizeof(g_uds_path) - 1);
+	LOG_INFO("link: listening for hub links on unix socket %s", path);
+	return 0;
+}
+
+static void link_uds_connect(struct hub_info* hub, const char* path)
+{
+	struct sockaddr_un addr;
+	int sd;
+
+	if (strlen(path) >= sizeof(addr.sun_path))
+	{
+		LOG_ERROR("link: link_peer path too long: %s", path);
+		return;
+	}
+
+	sd = net_socket_create(AF_UNIX, SOCK_STREAM, 0);
+	if (sd == -1)
+		return;
+
+	memset(&addr, 0, sizeof(addr));
+	addr.sun_family = AF_UNIX;
+	strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+
+	/* The socket is still blocking here; a local UDS connect completes
+	   immediately, so we avoid the async-connect machinery. */
+	if (net_connect(sd, (struct sockaddr*) &addr, sizeof(addr)) == -1)
+	{
+		LOG_WARN("link: unable to connect to peer hub socket %s", path);
+		net_close(sd);
+		return;
+	}
+	if (link_attach_fd(hub, sd, 1, path))
+		LOG_INFO("link: connected to peer hub on unix socket %s", path);
+}
+
 static void link_connect(struct hub_info* hub, const char* peer)
 {
 	char host[256];
@@ -615,12 +765,42 @@ void link_start(struct hub_info* hub)
 		LOG_INFO("link: cluster coordinator (node 0 of %d); leasing SID windows on request", g_win_count);
 	}
 
+	/* Inbound links: a TCP listener already exists on the client port (probe.c
+	   detects "LCHA"); additionally listen on a Unix socket if configured, for
+	   same-host worker-to-worker links that bypass the shared client port. */
+	if (*cfg->link_socket)
+		link_uds_listen(hub, cfg->link_socket);
+
+	/* link_peer may be a comma-separated list of peers (to form a mesh of
+	   worker processes); connect to each. A peer beginning with "/" is a Unix
+	   socket path, otherwise host:port over TCP. */
 	if (*cfg->link_peer)
 	{
 		if (!*cfg->link_secret)
+		{
 			LOG_ERROR("link_peer is set but link_secret is empty; not linking");
+		}
 		else
-			link_connect(hub, cfg->link_peer);
+		{
+			char* list = hub_strdup(cfg->link_peer);
+			char* save = 0;
+			char* peer;
+			if (list)
+			{
+				for (peer = strtok_r(list, ",", &save); peer; peer = strtok_r(0, ",", &save))
+				{
+					while (*peer == ' ' || *peer == '\t')
+						peer++;
+					if (!*peer)
+						continue;
+					if (peer[0] == '/')
+						link_uds_connect(hub, peer);
+					else
+						link_connect(hub, peer);
+				}
+				hub_free(list);
+			}
+		}
 	}
 }
 
@@ -637,6 +817,17 @@ void link_stop(struct hub_info* hub)
 
 	list_destroy(g_links);
 	g_links = 0;
+
+	if (g_uds_listen)
+	{
+		net_con_close(g_uds_listen);
+		g_uds_listen = 0;
+	}
+	if (*g_uds_path)
+	{
+		unlink(g_uds_path);
+		g_uds_path[0] = 0;
+	}
 
 	hub_free(g_win_used);
 	g_win_used = 0;

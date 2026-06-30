@@ -193,6 +193,18 @@ extern int net_set_reuseaddress(int fd, int toggle);
 extern int net_get_socket_error(int fd);
 
 /**
+ * Set or clear the SO_REUSEPORT socket option, which lets several processes
+ * bind the same address/port; the kernel then load-balances incoming
+ * connections across them. Used to run one logical hub as N worker processes
+ * sharing the client-facing port.
+ *
+ * @param fd socket descriptor
+ * @param toggle Set SO_REUSEPORT if non-zero, otherwise unset it.
+ * @return -1 on error (including platforms without SO_REUSEPORT), 0 on success
+ */
+extern int net_set_reuseport(int fd, int toggle);
+
+/**
  * Set the send buffer size for the socket.
  * @param fd socket descriptor
  * @param size size to set
