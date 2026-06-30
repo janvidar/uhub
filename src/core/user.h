@@ -143,6 +143,14 @@ struct hub_user
 	struct flood_control flood_search;
 	struct flood_control flood_update;
 	struct flood_control flood_extras;
+
+	/* Master-slave auth (auth_proxy): while a login is being proxied to the
+	   master, the BINF is held here and resumed when the master's reply
+	   arrives. auth_proxy_resolved becomes 1 once the credential lookup (LACR)
+	   has returned. */
+	int auth_proxy_resolved;
+	enum auth_credentials auth_proxy_cred;
+	struct adc_message *auth_pending_inf;
 };
 
 /**

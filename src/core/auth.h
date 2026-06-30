@@ -69,5 +69,13 @@ extern int acl_user_unban_cid(struct acl_handle* handle, const char* cid);
 extern int acl_password_verify(struct hub_info* hub, struct hub_user* user, const char* password);
 extern const char* acl_password_generate_challenge(struct hub_info* hub, struct hub_user* user);
 
+/**
+ * Verify a password challenge-response without a hub_user: given the stored
+ * plaintext password, the base32 challenge that was issued, and the client's
+ * base32 response, return 1 if the response is correct. Used by the auth master
+ * to verify a login proxied from a slave (which holds no passwords).
+ */
+extern int acl_password_verify_raw(const char* password, const char* challenge, const char* response);
+
 
 #endif /* HAVE_UHUB_ACL_H */

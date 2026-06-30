@@ -366,6 +366,22 @@ int hub_handle_password(struct hub_info* hub, struct hub_user* u, struct adc_mes
 
 	if (u->state == state_verify)
 	{
+		if (hub->config->auth_proxy)
+		{
+			/* Slave: forward the challenge-response to the master to verify
+			   (the master holds the password). The login completes in
+			   hub_auth_proxy_verified() when the master replies (LVRS). */
+			if (password && link_auth_proxy_verify(hub, u, acl_password_generate_challenge(hub, u), password))
+			{
+				hub_free(password);
+				return 0; /* paused until LVRS */
+			}
+			/* No master link reachable -- cannot verify. */
+			on_login_failure(hub, u, status_msg_auth_invalid_password);
+			hub_free(password);
+			return -1;
+		}
+
 		if (acl_password_verify(hub, u, password))
 		{
 			/* Another login may have claimed this CID/nick while we were
@@ -390,6 +406,29 @@ int hub_handle_password(struct hub_info* hub, struct hub_user* u, struct adc_mes
 
 	hub_free(password);
 	return ret;
+}
+
+/*
+ * Master-slave auth (slave side): the master verified (or rejected) a proxied
+ * login (LVRS). Complete the login that paused in hub_handle_password().
+ */
+void hub_auth_proxy_verified(struct hub_info* hub, struct hub_user* user, int ok)
+{
+	if (user->state != state_verify)
+		return; /* stale (user disconnected or already resolved) */
+
+	if (ok)
+	{
+		int status = check_duplicate_logins_ok(hub, user);
+		if (!status)
+			on_login_success(hub, user);
+		else
+			on_login_failure(hub, user, (enum status_message) status);
+	}
+	else
+	{
+		on_login_failure(hub, user, status_msg_auth_invalid_password);
+	}
 }
 
 
@@ -1597,6 +1636,10 @@ void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason
 	{
 		return;
 	}
+
+	/* Drop the user from the master-auth pending registry (if proxying) before
+	   it is freed, so a late LACR/LVRS never dereferences it. */
+	link_auth_pending_forget(user);
 
 	/* Best-effort flush of queued output before closing. Writes are normally
 	   deferred to route_flush_dirty() at end of the event-loop iteration, but a

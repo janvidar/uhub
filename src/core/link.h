@@ -94,6 +94,20 @@ extern void link_broadcast_description(struct hub_info* hub, const char* escaped
  */
 extern void link_broadcast_ban(struct hub_info* hub, const char* cid, const char* nick);
 
+struct hub_user;
+
+/**
+ * Master-slave auth (slave side). link_auth_query() asks the master whether a
+ * nick is registered; link_auth_proxy_verify() forwards a password
+ * challenge-response to the master to verify. Both return 1 if the request was
+ * sent over a master link (the login should pause), 0 if no master is reachable.
+ * link_auth_pending_forget() drops a user from the pending registry when it is
+ * disconnected before the master replies.
+ */
+extern int link_auth_query(struct hub_info* hub, struct hub_user* user, const char* nick);
+extern int link_auth_proxy_verify(struct hub_info* hub, struct hub_user* user, const char* challenge, const char* response);
+extern void link_auth_pending_forget(struct hub_user* user);
+
 struct adc_message;
 struct hub_link;
 

@@ -731,18 +731,29 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 static int set_credentials(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	int ret = 0;
-	struct auth_info* info = acl_get_access_info(hub, user->id.nick);
 
-	if (info)
+	if (hub->config->auth_proxy)
 	{
-		user->credentials = info->credentials;
-		ret = 1;
+		/* Slave: the credential was resolved by the master (LACR). A non-guest
+		   credential means the account is registered and must prove a password
+		   (verified via the master in hub_handle_password). */
+		user->credentials = user->auth_proxy_resolved ? user->auth_proxy_cred : auth_cred_guest;
+		ret = (user->credentials > auth_cred_guest) ? 1 : 0;
 	}
 	else
 	{
-		user->credentials = auth_cred_guest;
+		struct auth_info* info = acl_get_access_info(hub, user->id.nick);
+		if (info)
+		{
+			user->credentials = info->credentials;
+			ret = 1;
+		}
+		else
+		{
+			user->credentials = auth_cred_guest;
+		}
+		hub_free(info);
 	}
-	hub_free(info);
 
 	switch (user->credentials)
 	{
@@ -921,6 +932,47 @@ int hub_handle_info_login(struct hub_info* hub, struct hub_user* user, struct ad
 }
 
 /*
+ * Run the login checks for a connecting user's BINF and either fail the login
+ * or post the join event. Takes ownership of cmd (frees it). Factored so it can
+ * be invoked both inline and when resuming a master-proxied login.
+ */
+int hub_complete_inf_login(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
+{
+	int ret = hub_handle_info_login(hub, user, cmd);
+	if (ret < 0)
+	{
+		on_login_failure(hub, user, ret);
+		adc_msg_free(cmd);
+		return -1;
+	}
+	else
+	{
+		struct event_data post;
+		memset(&post, 0, sizeof(post));
+		post.id    = UHUB_EVENT_USER_JOIN;
+		post.ptr   = user;
+		post.flags = ret; /* 0 - all OK, 1 - need authentication */
+		event_queue_post(hub->queue, &post);
+		adc_msg_free(cmd);
+		return 0;
+	}
+}
+
+/*
+ * Master-slave auth: the master replied (LACR) with this nick's credential.
+ * Record it and resume the paused login using the held BINF.
+ */
+void hub_auth_proxy_resolve(struct hub_info* hub, struct hub_user* user, enum auth_credentials cred)
+{
+	struct adc_message* inf = user->auth_pending_inf;
+	user->auth_proxy_cred = cred;
+	user->auth_proxy_resolved = 1;
+	user->auth_pending_inf = NULL;
+	if (inf)
+		hub_complete_inf_login(hub, user, inf); /* takes ownership */
+}
+
+/*
  * If user is in the connecting state, we need to do fairly
  * strict checking of all arguments.
  * This means we disconnect users when they provide invalid data
@@ -958,25 +1010,31 @@ int hub_handle_info(struct hub_info* hub, struct hub_user* user, const struct ad
 			return 0;
 		}
 
-		ret = hub_handle_info_login(hub, user, cmd);
-		if (ret < 0)
+		/*
+		 * Master-slave auth: a slave holds no accounts, so it must ask the
+		 * master whether this nick is registered before deciding to challenge.
+		 * Pause the login (holding the BINF) until the master replies (LACR),
+		 * at which point hub_auth_proxy_resolve() resumes it. If there is no
+		 * master link, fall through and log in locally (as a guest).
+		 */
+		if (hub->config->auth_proxy && !user->auth_proxy_resolved)
 		{
-			on_login_failure(hub, user, ret);
-			adc_msg_free(cmd);
-			return -1;
+			/* The nick isn't validated/stored on the user yet (that happens in
+			   the login checks), so pull it from the BINF for the master query. */
+			char* tmp = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_NICK);
+			char* nick = tmp ? adc_msg_unescape(tmp) : NULL;
+			int sent = nick ? link_auth_query(hub, user, nick) : 0;
+			hub_free(tmp);
+			hub_free(nick);
+			if (sent)
+			{
+				user->auth_pending_inf = adc_msg_copy(cmd);
+				adc_msg_free(cmd);
+				return 0;
+			}
 		}
-		else
-		{
-			/* Post a message, the user has joined */
-			struct event_data post;
-			memset(&post, 0, sizeof(post));
-			post.id    = UHUB_EVENT_USER_JOIN;
-			post.ptr   = user;
-			post.flags = ret; /* 0 - all OK, 1 - need authentication */
-			event_queue_post(hub->queue, &post);
-			adc_msg_free(cmd);
-			return 0;
-		}
+
+		return hub_complete_inf_login(hub, user, cmd);
 	}
 	else
 	{
