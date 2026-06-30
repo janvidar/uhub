@@ -761,6 +761,8 @@ static void hub_event_dispatcher(void* callback_data, struct event_data* message
 		{
 			uman_remove(hub->users, user);
 			uman_send_quit_message(hub, hub->users, user);
+			/* Propagate the local user's departure to linked hubs. */
+			link_broadcast_local_quit(hub, user);
 			on_logout_user(hub, user);
 			hub_schedule_destroy_user(hub, user);
 			break;
@@ -1005,7 +1007,7 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	hub->config = config;
 	hub->users = NULL;
 
-	hub->users = uman_init();
+	hub->users = uman_init(config->node_id, config->node_count);
 	if (!hub->users)
 	{
 		net_con_close(hub->server);

@@ -68,8 +68,20 @@ extern int link_auth_verify(const char* secret, const char* nonce, const char* r
 extern int link_make_nonce(char* out);
 
 struct hub_info;
+struct hub_user;
 struct net_connection;
 struct ip_addr_encap;
+
+/**
+ * Forward a local user's INF to every established link (a live join, or an INF
+ * update). No-op if the user is remote or no links exist.
+ */
+extern void link_broadcast_local_inf(struct hub_info* hub, struct hub_user* user);
+
+/**
+ * Forward a local user's departure (LQUIT) to every established link.
+ */
+extern void link_broadcast_local_quit(struct hub_info* hub, struct hub_user* user);
 
 /**
  * Take over a probed incoming connection whose first bytes were the link

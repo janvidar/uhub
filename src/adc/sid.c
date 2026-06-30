@@ -159,6 +159,19 @@ sid_t sid_alloc(struct sid_pool* pool, struct hub_user* user)
 	return 0; /* unreachable while count < window */
 }
 
+int sid_pool_insert(struct sid_pool* pool, sid_t sid, struct hub_user* user)
+{
+	/* Register a user at a specific, already-assigned SID -- used for remote
+	   users learned over a link, whose SID comes from the peer node's window
+	   (outside this node's local [min, max], so pool->count is untouched). */
+	if (!sid || sid >= pool->map_size)
+		return 0; /* out of range */
+	if (pool->map[sid])
+		return 0; /* SID already in use */
+	pool->map[sid] = user;
+	return 1;
+}
+
 void sid_free(struct sid_pool* pool, sid_t sid)
 {
 	if (!sid || sid >= pool->map_size)

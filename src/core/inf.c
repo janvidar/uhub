@@ -29,6 +29,7 @@
 #include "core/hbri.h"
 #include "core/hubevent.h"
 #include "core/inf.h"
+#include "core/link.h"
 #include "core/route.h"
 #include "network/connection.h"
 #include "core/usermanager.h"
@@ -1018,6 +1019,8 @@ int hub_handle_info(struct hub_info* hub, struct hub_user* user, const struct ad
 		if (!adc_msg_is_empty(cmd))
 		{
 			route_message(hub, user, cmd);
+			/* Propagate the updated INF to linked hubs. */
+			link_broadcast_local_inf(hub, user);
 		}
 
 		adc_msg_free(cmd);

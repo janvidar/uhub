@@ -148,6 +148,26 @@
 		<since>0.6.2</since>
 	</option>
 
+	<option name="node_count" type="int" default="1">
+		<check min="1" max="1048576" />
+		<short>Number of linked hubs sharing one logical SID space</short>
+		<description><![CDATA[
+			Total number of nodes in a linked cluster. The ~1M ADC SID space is split into this many
+			disjoint windows so each node allocates globally-unique SIDs without coordination. 1 = stand-alone.
+		]]></description>
+		<since>0.6.2</since>
+	</option>
+
+	<option name="node_id" type="int" default="0">
+		<check min="0" max="1048575" />
+		<short>This node's index within the linked cluster (0-based)</short>
+		<description><![CDATA[
+			Zero-based index of this hub within the cluster; must be unique per node and less than node_count.
+			Selects which SID window this node allocates from. Ignored when node_count is 1.
+		]]></description>
+		<since>0.6.2</since>
+	</option>
+
 	<option name="hbri_enable" type="boolean" default="0">
 		<short>Enable HBRI hybrid IPv4/IPv6 connectivity</short>
 		<description><![CDATA[

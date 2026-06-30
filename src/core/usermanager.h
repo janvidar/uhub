@@ -46,9 +46,15 @@ struct hub_user_manager
 
 /**
  * Initializes the user manager.
- * @return 0 on success, or -1 if error (out of memory).
+ *
+ * @param node_id    this node's 0-based index in a linked cluster.
+ * @param node_count total nodes in the cluster (1 = stand-alone). When > 1,
+ *                   local SIDs are allocated from this node's disjoint window
+ *                   of the shared SID space; the lookup map spans the whole
+ *                   space so remote users resolve too.
+ * @return the user manager, or NULL on error (out of memory).
  */
-extern struct hub_user_manager* uman_init();
+extern struct hub_user_manager* uman_init(int node_id, int node_count);
 
 /**
  * Shuts down the user manager.
@@ -80,6 +86,20 @@ extern int uman_add(struct hub_user_manager* users, struct hub_user* user);
  * @return 0 if successfully removed, -1 if error.
  */
 extern int uman_remove(struct hub_user_manager* users, struct hub_user* user);
+
+/**
+ * Add a remote user (learned over a federation link) whose SID is already
+ * assigned from a peer node's window: inserts the SID and adds to the maps.
+ * @return 0 on success, -1 on a SID/nick/CID collision.
+ */
+extern int uman_add_remote(struct hub_user_manager* users, struct hub_user* user);
+
+/**
+ * Remove a remote user: drops it from the maps/list/count and releases its
+ * SID slot. The caller is responsible for freeing the user struct.
+ * @return 0 on success, -1 on error.
+ */
+extern int uman_remove_remote(struct hub_user_manager* users, struct hub_user* user);
 
 /**
  * Returns and allocates an unused session ID (SID).

@@ -238,6 +238,46 @@ EXO_TEST(sid_range_free_and_reuse, {
 	return ok;
 });
 
+/* sid_pool_insert: register a remote user at a peer-assigned SID outside the
+   local window. part_pool window is [256,511]; insert at 100. */
+EXO_TEST(sid_insert_remote, {
+	struct dummy_user* u = hub_malloc_zero(sizeof(struct dummy_user));
+	int ok;
+	u->sid = 100;
+	ok = sid_pool_insert(part_pool, 100, (struct hub_user*) u);
+	return ok == 1 && (struct dummy_user*) sid_lookup(part_pool, 100) == u;
+});
+
+EXO_TEST(sid_insert_does_not_disturb_window, {
+	/* A local allocation still comes from [256,511], not near the inserted slot. */
+	struct dummy_user* u = hub_malloc_zero(sizeof(struct dummy_user));
+	sid_t s = sid_alloc(part_pool, (struct hub_user*) u);
+	int ok = (s >= 256 && s <= 511);
+	sid_free(part_pool, s);
+	hub_free(u);
+	return ok;
+});
+
+EXO_TEST(sid_insert_rejects_taken, {
+	struct dummy_user u;
+	return sid_pool_insert(part_pool, 100, (struct hub_user*) &u) == 0;
+});
+
+EXO_TEST(sid_insert_rejects_out_of_range, {
+	struct dummy_user u;
+	int a = sid_pool_insert(part_pool, 0, (struct hub_user*) &u);
+	int b = sid_pool_insert(part_pool, 1024, (struct hub_user*) &u);
+	int c = sid_pool_insert(part_pool, 99999, (struct hub_user*) &u);
+	return a == 0 && b == 0 && c == 0;
+});
+
+EXO_TEST(sid_insert_free, {
+	struct dummy_user* u = (struct dummy_user*) sid_lookup(part_pool, 100);
+	sid_free(part_pool, 100);
+	hub_free(u);
+	return sid_lookup(part_pool, 100) == NULL;
+});
+
 EXO_TEST(sid_range_destroy, {
 	sid_pool_destroy(part_pool);
 	part_pool = 0;

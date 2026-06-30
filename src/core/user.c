@@ -20,6 +20,7 @@
 #include "util/log.h"
 #include "util/memory.h"
 #include "adc/message.h"
+#include "adc/adcconst.h"
 #include "network/connection.h"
 #include "core/ioqueue.h"
 #include "core/netevent.h"
@@ -345,6 +346,64 @@ int user_is_disconnecting(struct hub_user* user)
 	if (user->state == state_cleanup || user->state == state_disconnected)
 		return 1;
 	return 0;
+}
+
+int user_is_remote(struct hub_user* user)
+{
+	return user->origin_link != NULL;
+}
+
+struct hub_user* user_create_remote(struct hub_info* hub, struct hub_link* link, struct adc_message* info)
+{
+	struct hub_user* user;
+	char* nick_raw;
+	char* nick;
+	char* cid;
+
+	if (!info || !info->source)
+		return NULL;
+
+	nick_raw = adc_msg_get_named_argument(info, ADC_INF_FLAG_NICK);
+	cid = adc_msg_get_named_argument(info, ADC_INF_FLAG_CLIENT_ID);
+	if (!nick_raw || !cid || strlen(cid) != MAX_CID_LEN)
+	{
+		hub_free(nick_raw);
+		hub_free(cid);
+		return NULL;
+	}
+	nick = adc_msg_unescape(nick_raw);
+	hub_free(nick_raw);
+	if (!nick || strlen(nick) > MAX_NICK_LEN)
+	{
+		hub_free(nick);
+		hub_free(cid);
+		return NULL;
+	}
+
+	user = (struct hub_user*) hub_malloc_zero(sizeof(struct hub_user));
+	if (!user)
+	{
+		hub_free(nick);
+		hub_free(cid);
+		return NULL;
+	}
+
+	user->hub = hub;
+	user->origin_link = link;          /* marks the user as remote */
+	user->connection = NULL;           /* no local socket */
+	user->id.sid = info->source;       /* peer-assigned SID (peer's window) */
+	memcpy(user->id.nick, nick, strlen(nick));
+	user->id.nick[strlen(nick)] = 0;
+	memcpy(user->id.cid, cid, MAX_CID_LEN);
+	user->id.cid[MAX_CID_LEN] = 0;
+	user->credentials = auth_cred_guest;
+	user->info = adc_msg_incref(info); /* the BINF we re-broadcast locally */
+	user->tm_connected = time(NULL);
+	user_set_state(user, state_normal);
+
+	hub_free(nick);
+	hub_free(cid);
+	return user;
 }
 
 int user_is_protected(struct hub_user* user)

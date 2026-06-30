@@ -92,7 +92,7 @@ int LLVMFuzzerInitialize(int* argc, char*** argv)
 	g_hub = hub_malloc_zero(sizeof(struct hub_info));
 	g_cbase = command_initialize(g_hub);
 	g_hub->commands = g_cbase;
-	g_hub->users = uman_init();
+	g_hub->users = uman_init(0, 1);
 
 	memset(&g_user, 0, sizeof(g_user));
 	g_user.id.sid = 1;

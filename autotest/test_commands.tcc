@@ -22,7 +22,7 @@ EXO_TEST(setup, {
 	hub = hub_malloc_zero(sizeof(struct hub_info));
 	cbase = command_initialize(hub);
 	hub->commands = cbase;
-	hub->users = uman_init();
+	hub->users = uman_init(0, 1);
 	return cbase && hub && hub->users;
 });
 

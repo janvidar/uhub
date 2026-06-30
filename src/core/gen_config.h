@@ -19,6 +19,8 @@ struct hub_config
 	int   dns_thread_pool_size;            /*<<< Number of worker threads for asynchronous DNS lookups (default: 4) */
 	char* link_peer;                       /*<<< Upstream hub to link to (host:port) (default: "") */
 	char* link_secret;                     /*<<< Shared secret authenticating hub-to-hub links (default: "") */
+	int   node_count;                      /*<<< Number of linked hubs sharing one logical SID space (default: 1) */
+	int   node_id;                         /*<<< This node's index within the linked cluster (0-based) (default: 0) */
 	int   hbri_enable;                     /*<<< Enable HBRI hybrid IPv4/IPv6 connectivity (default: 0) */
 	char* hbri_address4;                   /*<<< Hub's reachable IPv4 address for HBRI validation (default: "") */
 	char* hbri_address6;                   /*<<< Hub's reachable IPv6 address for HBRI validation (default: "") */
