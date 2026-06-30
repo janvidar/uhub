@@ -278,6 +278,24 @@ extern void hub_shutdown_service(struct hub_info* hub);
 extern void hub_set_variables(struct hub_info* hub, struct acl_handle* acl);
 
 /**
+ * Update the hub description (topic): replace it in the hub's IINF and announce
+ * the change to local clients. When propagate is non-zero, also forward it to
+ * linked hubs so a topic set on one node/worker appears on all of them; a
+ * description received from a link is applied with propagate = 0.
+ *
+ * @param escaped_desc the new description, already ADC-escaped.
+ */
+extern void hub_update_description(struct hub_info* hub, const char* escaped_desc, int propagate);
+
+/**
+ * Ban a user cluster-wide: add the cid/nick to this node's runtime ACL,
+ * disconnect a matching locally-connected user, and (when propagate is set)
+ * forward the ban to linked hubs so it applies on every node. A ban received
+ * over a link is applied with propagate = 0.
+ */
+extern void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, int propagate);
+
+/**
  * This frees the configuration of the hub.
  */
 extern void hub_free_variables(struct hub_info* hub);
