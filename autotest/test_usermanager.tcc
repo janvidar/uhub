@@ -178,3 +178,21 @@ EXO_TEST(um_partition_node1_window, {
 	uman_shutdown(p);
 	return ok;
 });
+
+/* Dynamic lease (node_id = -1): no SIDs until a window is leased, then SIDs
+   come from the leased window. */
+EXO_TEST(um_dynamic_lease, {
+	struct hub_user_manager* p = uman_init(-1, 4); /* pending lease */
+	struct hub_user u;
+	sid_t before;
+	sid_t after;
+	int ok;
+	if (!p) return 0;
+	memset(&u, 0, sizeof(u));
+	before = uman_get_free_sid(p, &u);          /* no window yet -> 0 */
+	uman_set_sid_window(p, 262144, 524287);     /* lease node-1's window */
+	after = uman_get_free_sid(p, &u);
+	ok = (before == 0) && (after >= 262144 && after <= 524287);
+	uman_shutdown(p);
+	return ok;
+});

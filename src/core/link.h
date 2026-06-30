@@ -79,7 +79,7 @@ struct ip_addr_encap;
 extern void link_broadcast_local_inf(struct hub_info* hub, struct hub_user* user);
 
 /**
- * Forward a local user's departure (LQUIT) to every established link.
+ * Forward a local user's departure (LQUI) to every established link.
  */
 extern void link_broadcast_local_quit(struct hub_info* hub, struct hub_user* user);
 

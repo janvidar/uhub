@@ -57,6 +57,13 @@ struct hub_user_manager
 extern struct hub_user_manager* uman_init(int node_id, int node_count);
 
 /**
+ * Apply a SID window leased dynamically from the cluster (node_id = -1 startup).
+ * Until this is called, a leasing node's pool has an empty window and hands out
+ * no local SIDs.
+ */
+extern void uman_set_sid_window(struct hub_user_manager* users, sid_t min, sid_t max);
+
+/**
  * Shuts down the user manager.
  * All users will be disconnected and deleted as part of this.
  *

@@ -40,6 +40,14 @@ extern struct sid_pool* sid_pool_create(sid_t max);
  */
 extern struct sid_pool* sid_pool_create_range(sid_t map_size, sid_t min, sid_t max);
 
+/**
+ * Set (or replace) the local allocation window of an existing pool — used to
+ * apply a SID window leased dynamically from the cluster after startup. The
+ * lookup map is unchanged. Intended for a pool created with an empty window
+ * (min=1, max=0), before any local SIDs have been allocated.
+ */
+extern void sid_pool_set_window(struct sid_pool*, sid_t min, sid_t max);
+
 extern void sid_pool_destroy(struct sid_pool*);
 
 extern sid_t sid_alloc(struct sid_pool*, struct hub_user*);

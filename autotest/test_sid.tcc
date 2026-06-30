@@ -283,3 +283,37 @@ EXO_TEST(sid_range_destroy, {
 	part_pool = 0;
 	return 1;
 });
+
+/* Dynamic lease: a pending pool has an empty window until sid_pool_set_window()
+   applies a leased range. */
+static struct sid_pool* lease_pool = 0;
+
+EXO_TEST(sid_lease_create_empty, {
+	lease_pool = sid_pool_create_range(1024, 1, 0); /* empty window */
+	return lease_pool != 0;
+});
+
+EXO_TEST(sid_lease_alloc_before_lease_fails, {
+	struct dummy_user u;
+	return sid_alloc(lease_pool, (struct hub_user*) &u) == 0; /* no window yet */
+});
+
+EXO_TEST(sid_lease_set_window, {
+	sid_pool_set_window(lease_pool, 256, 511);
+	return 1;
+});
+
+EXO_TEST(sid_lease_alloc_after_lease, {
+	struct dummy_user* u = hub_malloc_zero(sizeof(struct dummy_user));
+	sid_t s = sid_alloc(lease_pool, (struct hub_user*) u);
+	int ok = (s >= 256 && s <= 511);
+	sid_free(lease_pool, s);
+	hub_free(u);
+	return ok;
+});
+
+EXO_TEST(sid_lease_destroy, {
+	sid_pool_destroy(lease_pool);
+	lease_pool = 0;
+	return 1;
+});
