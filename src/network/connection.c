@@ -179,6 +179,7 @@ struct net_connect_job
 	struct net_connect_handle* handle;
 	struct sockaddr_storage addr;
 	struct net_connect_job* next;
+	int connecting; /* 0 = connect() not yet issued, 1 = in progress */
 };
 
 struct net_connect_handle
@@ -238,29 +239,53 @@ static int net_connect_job_check(struct net_connect_job* job)
 	struct net_connection* con = job->con;
 	int af = job->addr.ss_family;
 	enum net_connect_status status;
+	int sockerr;
 
-	int ret = net_connect(net_con_get_sd(con), (struct sockaddr*) &job->addr, af == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6));
-	if (ret == 0 || (ret == -1 && net_error() == EISCONN))
+	if (!job->connecting)
 	{
-		LOG_TRACE("net_connect_job_check(): Socket connected!");
-		job->con = NULL;
-		net_con_clear_timeout(con);
-		net_connect_callback(job->handle, net_connect_status_ok, con);
-		return 1;
+		/* Initial attempt: issue the non-blocking connect once. */
+		int ret = net_connect(net_con_get_sd(con), (struct sockaddr*) &job->addr, af == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6));
+		job->connecting = 1;
+		if (ret == 0)
+		{
+			LOG_TRACE("net_connect_job_check(): Socket connected!");
+			job->con = NULL;
+			net_con_clear_timeout(con);
+			net_connect_callback(job->handle, net_connect_status_ok, con);
+			return 1;
+		}
+		if (ret == -1 && (net_error() == EALREADY || net_error() == EINPROGRESS || net_error() == EWOULDBLOCK || net_error() == EINTR))
+			return 0; /* in progress -- wait for the socket to become writable */
+		sockerr = net_error();
 	}
-	else if (ret == -1 && (net_error() == EALREADY || net_error() == EINPROGRESS || net_error() == EWOULDBLOCK || net_error() == EINTR))
+	else
 	{
-		return 0;
+		/* The attempt has completed (the socket is writable). Retrieve the
+		   result with SO_ERROR: re-calling connect() does not reliably report
+		   the connection error on BSD/macOS (it may return EINVAL/EISCONN). */
+		sockerr = net_get_socket_error(net_con_get_sd(con));
+		if (sockerr == 0)
+		{
+			LOG_TRACE("net_connect_job_check(): Socket connected!");
+			job->con = NULL;
+			net_con_clear_timeout(con);
+			net_connect_callback(job->handle, net_connect_status_ok, con);
+			return 1;
+		}
 	}
-	LOG_TRACE("net_connect_job_check(): Socket error!");
+	LOG_TRACE("net_connect_job_check(): Socket error (%d)!", sockerr);
 
-	switch (net_error())
+	switch (sockerr)
 	{
 		case ECONNREFUSED:
 			status = net_connect_status_refused;
 			break;
 		case ENETUNREACH:
+		case EHOSTUNREACH:
 			status = net_connect_status_unreachable;
+			break;
+		case ETIMEDOUT:
+			status = net_connect_status_timeout;
 			break;
 
 		default:

@@ -170,6 +170,17 @@ extern int net_set_linger(int fd, int toggle);
 extern int net_set_reuseaddress(int fd, int toggle);
 
 /**
+ * Return the pending socket error (SO_ERROR) for a socket, e.g. to retrieve the
+ * result of a non-blocking connect() once the socket becomes writable. This is
+ * the portable way to obtain that result -- re-calling connect() does not
+ * reliably report the error on BSD/macOS.
+ *
+ * @param fd socket descriptor
+ * @return 0 if no error, otherwise the errno-style error code.
+ */
+extern int net_get_socket_error(int fd);
+
+/**
  * Set the send buffer size for the socket.
  * @param fd socket descriptor
  * @param size size to set

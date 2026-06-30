@@ -178,6 +178,15 @@ static int net_getsockopt(int fd, int level, int opt, void* optval, socklen_t* o
 	return ret;
 }
 
+int net_get_socket_error(int fd)
+{
+	int err = 0;
+	socklen_t len = sizeof(err);
+	if (net_getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &len) == -1)
+		return net_error();
+	return err;
+}
+
 
 int net_set_nonblocking(int fd, int toggle)
 {

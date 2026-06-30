@@ -96,33 +96,31 @@ EXO_TEST(connect_init, {
 });
 
 /*
- * Every address fails: connect to a loopback port that is bound but not
- * listening, so the kernel refuses immediately. The machinery must exhaust the
- * (single) address and invoke the callback exactly once with
- * net_connect_status_refused and no connection.
+ * Every address fails: connect to a loopback port with no listener, so the
+ * kernel refuses immediately. The machinery must exhaust the (single) address
+ * and invoke the callback exactly once with net_connect_status_refused and no
+ * connection.
  */
 EXO_TEST(connect_refused_reports_once, {
 	uint16_t port = 0;
 	struct net_connect_handle* h;
-	int closed = 0;
-	/* A bound-but-not-listening socket gives a stable "connection refused"
-	   target that no other process can start listening on mid-test. */
+	/* Bind an ephemeral loopback port, then release it: connecting to a port
+	   with no socket gets a RST -> ECONNREFUSED on both Linux and macOS. (A
+	   bound-but-not-listening socket is NOT portable here -- macOS leaves the
+	   SYN unanswered and the connect times out instead of refusing.) Grabbing
+	   the port first makes it very unlikely another process holds that exact
+	   ephemeral port in the microseconds before we connect. */
 	int sd = ct_make_socket(0, &port);
 	if (sd == -1)
 		return 0;
+	close(sd);
 
 	ct_reset();
 	h = net_con_connect("127.0.0.1", port, ct_callback, &ct_state);
 	if (!h)
-	{
-		close(sd);
 		return 0;
-	}
 
 	ct_pump_until_done();
-	close(sd);
-	closed = 1;
-	(void) closed;
 
 	return ct_state.calls == 1
 		&& ct_state.status == net_connect_status_refused
