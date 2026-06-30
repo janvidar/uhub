@@ -306,6 +306,9 @@ if(UNIX)
 	if (ADC_STRESS)
 		add_executable(adcrush ${UHUB_SOURCE_DIR}/tools/adcrush.c ${adcclient_SOURCES})
 		target_link_libraries(adcrush adcclient adc network utils pthread)
+
+		add_executable(linktest ${UHUB_SOURCE_DIR}/tools/linktest.c ${adcclient_SOURCES})
+		target_link_libraries(linktest adcclient adc network utils pthread)
 	endif()
 endif()
 
@@ -337,6 +340,7 @@ target_link_libraries(mod_welcome ${SSL_LIBS})
 target_link_libraries(mod_logging ${SSL_LIBS})
 if (ADC_STRESS)
 	target_link_libraries(adcrush ${SSL_LIBS})
+	target_link_libraries(linktest ${SSL_LIBS})
 endif()
 
 if (SYSTEMD_SUPPORT)

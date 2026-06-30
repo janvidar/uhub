@@ -22,6 +22,7 @@
 #include "core/config.h"
 #include "core/hub.h"
 #include "core/ioqueue.h"
+#include "core/link.h"
 #include "core/netevent.h"
 #include "core/route.h"
 #include "core/usermanager.h"
@@ -34,6 +35,7 @@ int route_message(struct hub_info* hub, struct hub_user* u, struct adc_message* 
 	{
 		case 'B': /* Broadcast to all logged in clients */
 			route_to_all(hub, msg);
+			link_relay_broadcast(hub, msg); /* + linked hubs (chat/search only) */
 			break;
 
 		case 'D':
@@ -55,6 +57,7 @@ int route_message(struct hub_info* hub, struct hub_user* u, struct adc_message* 
 
 		case 'F':
 			route_to_subscribers(hub, msg);
+			link_relay_broadcast(hub, msg); /* + linked hubs (feature-cast chat/search) */
 			break;
 
 		default:
@@ -118,6 +121,19 @@ int route_to_user(struct hub_info* hub, struct hub_user* user, struct adc_messag
 	LOG_PROTO("send %s: \"%s\"", sid_to_string(user->id.sid), data);
 	free(data);
 #endif
+
+	/* Remote user (federation): no local socket. Forward only directed (D/E)
+	   messages over the owning link; the peer delivers to its local target.
+	   Broadcasts/presence reaching a remote user here are not relayed per-user
+	   -- presence goes via the B3 delta path, and broadcast chat/search relay
+	   is a separate per-link follow-up -- which avoids duplicate fan-out. */
+	if (user_is_remote(user))
+	{
+		char type = msg->cache ? msg->cache[0] : 0;
+		if (type == 'D' || type == 'E')
+			link_forward_message(user->origin_link, msg);
+		return 1;
+	}
 
 	if (!user->connection)
 		return 0;

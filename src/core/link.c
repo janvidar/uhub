@@ -141,6 +141,7 @@ static void link_send_inf(struct hub_link* link, struct hub_user* user);
 static void link_send_roster(struct hub_link* link);
 static void link_handle_remote_inf(struct hub_link* link, const char* binf);
 static void link_handle_remote_quit(struct hub_link* link, const char* sidstr);
+static void link_handle_route(struct hub_link* link, const char* adcstr);
 static void link_remove_remote_users(struct hub_link* link);
 
 static void link_disconnect(struct hub_link* link)
@@ -205,6 +206,14 @@ static int link_process_line(struct hub_link* link, const char* line)
 		if (link->state != link_state_established)
 			return -1;
 		link_handle_remote_quit(link, line + 6);
+		return 0;
+	}
+
+	if (strncmp(line, "LROUTE ", 7) == 0)
+	{
+		if (link->state != link_state_established)
+			return -1;
+		link_handle_route(link, line + 7);
 		return 0;
 	}
 
@@ -426,14 +435,26 @@ static void link_connect(struct hub_info* hub, const char* peer)
 
 void link_start(struct hub_info* hub)
 {
+	struct hub_config* cfg = hub->config;
 	g_links = list_create();
 
-	if (*hub->config->link_peer)
+	/* Federation config sanity: if this hub participates in linking at all
+	   (connects out, or accepts links via a shared secret) but its SIDs are not
+	   partitioned, local SIDs from different hubs overlap and collide when
+	   rosters are exchanged. Warn loudly -- set node_count to the cluster size
+	   and a unique node_id on every node. (node_id >= node_count is caught
+	   separately in uman_init.) */
+	if ((*cfg->link_peer || *cfg->link_secret) && cfg->node_count <= 1)
+		LOG_WARN("Hub linking is configured but node_count is 1: SIDs are not "
+		         "partitioned and will collide across linked hubs. Set node_count "
+		         "to the cluster size and a unique node_id on each node.");
+
+	if (*cfg->link_peer)
 	{
-		if (!*hub->config->link_secret)
+		if (!*cfg->link_secret)
 			LOG_ERROR("link_peer is set but link_secret is empty; not linking");
 		else
-			link_connect(hub, hub->config->link_peer);
+			link_connect(hub, cfg->link_peer);
 	}
 }
 
@@ -576,6 +597,79 @@ static void link_handle_remote_quit(struct hub_link* link, const char* sidstr)
 	uman_send_quit_message(link->hub, link->hub->users, user);
 	uman_remove_remote(link->hub->users, user);
 	user_destroy(user);
+}
+
+/* Forward a directed ADC message to the peer that owns the target user. */
+void link_forward_message(struct hub_link* link, struct adc_message* msg)
+{
+	if (!link || link->state != link_state_established || !msg || !msg->cache)
+		return;
+	LOG_DEBUG("link: forwarding directed message to %s", link->peer_desc);
+	/* "LROUTE " + the full ADC message (which ends in '\n'). */
+	net_con_send(link->connection, "LROUTE ", 7);
+	net_con_send(link->connection, msg->cache, msg->length);
+}
+
+/* Relay a locally-originated public chat/search broadcast to every link, once
+   each. Presence (INF/QUI) is excluded -- it uses the B3 delta path -- and
+   messages whose source is a remote user are not relayed (loop prevention: a
+   broadcast that arrived over a link is delivered locally only). */
+void link_relay_broadcast(struct hub_info* hub, struct adc_message* msg)
+{
+	struct hub_user* src;
+	struct hub_link* link;
+
+	switch (msg->cmd)
+	{
+		case ADC_CMD_BMSG:
+		case ADC_CMD_FMSG:
+		case ADC_CMD_BSCH:
+		case ADC_CMD_FSCH:
+			break;
+		default:
+			return; /* not a relayable broadcast (e.g. BINF presence) */
+	}
+
+	if (!g_links)
+		return;
+
+	src = uman_get_user_by_sid(hub->users, msg->source);
+	if (!src || user_is_remote(src))
+		return; /* only relay messages that originated on this hub */
+
+	LIST_FOREACH(struct hub_link*, link, g_links,
+	{
+		if (link->state == link_state_established)
+			link_forward_message(link, msg);
+	});
+}
+
+/* A peer forwarded a directed message whose target is on our side: re-route it
+   locally. The original sender is a remote user we already hold. */
+static void link_handle_route(struct hub_link* link, const char* adcstr)
+{
+	struct adc_message* msg = adc_msg_parse(adcstr, strlen(adcstr));
+	struct hub_user* sender;
+
+	if (!msg)
+	{
+		LOG_WARN("link: malformed routed message from %s", link->peer_desc);
+		return;
+	}
+
+	/* route_message() dereferences the source user for echo (E) messages, so a
+	   known sender is required; it is the remote user we learned over a link. */
+	sender = uman_get_user_by_sid(link->hub->users, msg->source);
+	if (sender)
+	{
+		LOG_DEBUG("link: delivering routed message from sid %s (via %s)",
+			sid_to_string(msg->source), link->peer_desc);
+		route_message(link->hub, sender, msg);
+	}
+	else
+		LOG_WARN("link: routed message from unknown sid via %s", link->peer_desc);
+
+	adc_msg_free(msg);
 }
 
 /* Remove every remote user learned over `link` (netsplit / link teardown). */

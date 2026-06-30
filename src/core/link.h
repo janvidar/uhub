@@ -83,6 +83,23 @@ extern void link_broadcast_local_inf(struct hub_info* hub, struct hub_user* user
  */
 extern void link_broadcast_local_quit(struct hub_info* hub, struct hub_user* user);
 
+struct adc_message;
+struct hub_link;
+
+/**
+ * Forward a directed ADC message (PM, search result, connect, ...) over a link
+ * to the peer hub that owns the target user. The peer re-routes it to its local
+ * target. No-op if the link is not established.
+ */
+extern void link_forward_message(struct hub_link* link, struct adc_message* msg);
+
+/**
+ * Relay a locally-originated public chat/search broadcast to all established
+ * links (once each). No-op for presence messages or messages that originated
+ * on another hub (loop prevention).
+ */
+extern void link_relay_broadcast(struct hub_info* hub, struct adc_message* msg);
+
 /**
  * Take over a probed incoming connection whose first bytes were the link
  * handshake ("LCHA ..."), and run the server side of the link handshake.
