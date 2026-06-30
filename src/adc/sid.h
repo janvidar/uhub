@@ -43,6 +43,15 @@ extern struct sid_pool* sid_pool_create_range(sid_t map_size, sid_t min, sid_t m
 extern void sid_pool_destroy(struct sid_pool*);
 
 extern sid_t sid_alloc(struct sid_pool*, struct hub_user*);
+
+/**
+ * Register a user at a specific, already-assigned SID (e.g. a remote user
+ * learned over a link, whose SID belongs to a peer node's window). Does not
+ * consume from the local allocation window.
+ * @return 1 on success, 0 if the SID is out of range or already in use.
+ */
+extern int sid_pool_insert(struct sid_pool*, sid_t sid, struct hub_user*);
+
 extern void sid_free(struct sid_pool*, sid_t);
 extern struct hub_user* sid_lookup(struct sid_pool*, sid_t);
 

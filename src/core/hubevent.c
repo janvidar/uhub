@@ -22,6 +22,7 @@
 #include "core/hbri.h"
 #include "core/hub.h"
 #include "core/hubevent.h"
+#include "core/link.h"
 #include "core/netevent.h"
 #include "core/plugininvoke.h"
 #include "core/route.h"
@@ -68,7 +69,11 @@ void on_login_success(struct hub_info* hub, struct hub_user* u)
 
 	/* Announce new user to all connected users */
 	if (user_is_logged_in(u))
+	{
 		route_info_message(hub, u);
+		/* Propagate the new local user to linked hubs (live join). */
+		link_broadcast_local_inf(hub, u);
+	}
 
 	plugin_log_user_login_success(hub, u);
 	hub->metrics.logins++;

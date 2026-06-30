@@ -5,10 +5,11 @@
 
 static struct hub_user_manager* uman = 0;
 static struct hub_user um_user[MAX_USERS];
+static struct hub_user remote_user;
 
 EXO_TEST(um_init_1, {
 	sid_t s;
-	uman = uman_init();
+	uman = uman_init(0, 1);
 
 	for (s = 0; s < MAX_USERS; s++)
 	{
@@ -29,7 +30,7 @@ EXO_TEST(um_shutdown_2, {
 });
 
 EXO_TEST(um_init_2, {
-	uman = uman_init();
+	uman = uman_init(0, 1);
 	return !!uman;
 });
 
@@ -96,7 +97,84 @@ EXO_TEST(um_remove_2, {
 
 
 
-/* Last test */
+/* Remote users (federation): injected with a peer-assigned SID, appear in the
+   maps/list/count and resolve via all lookups, then removed cleanly. */
+EXO_TEST(um_remote_add, {
+	memset(&remote_user, 0, sizeof(remote_user));
+	remote_user.id.sid = 64; /* distinct from local um_user 0..63, in range */
+	snprintf(remote_user.id.nick, sizeof(remote_user.id.nick), "remoteNick");
+	snprintf(remote_user.id.cid, sizeof(remote_user.id.cid), "REMOTECID");
+	remote_user.origin_link = (struct hub_link*) &remote_user; /* non-NULL marker */
+	return uman_add_remote(uman, &remote_user) == 0;
+});
+
+EXO_TEST(um_remote_count, {
+	return uman->count == 1;
+});
+
+EXO_TEST(um_remote_is_remote, {
+	return user_is_remote(&remote_user) == 1 && user_is_remote(&um_user[0]) == 0;
+});
+
+EXO_TEST(um_remote_lookup_sid, {
+	return uman_get_user_by_sid(uman, 64) == &remote_user;
+});
+
+EXO_TEST(um_remote_lookup_nick, {
+	return uman_get_user_by_nick(uman, "remoteNick") == &remote_user;
+});
+
+EXO_TEST(um_remote_lookup_cid, {
+	return uman_get_user_by_cid(uman, "REMOTECID") == &remote_user;
+});
+
+EXO_TEST(um_remote_add_dup_sid, {
+	/* A second remote with the same SID must be rejected (collision). */
+	static struct hub_user dup;
+	memset(&dup, 0, sizeof(dup));
+	dup.id.sid = 64;
+	snprintf(dup.id.nick, sizeof(dup.id.nick), "otherNick");
+	snprintf(dup.id.cid, sizeof(dup.id.cid), "OTHERCID");
+	dup.origin_link = (struct hub_link*) &dup;
+	return uman_add_remote(uman, &dup) == -1 && uman->count == 1;
+});
+
+EXO_TEST(um_remote_remove, {
+	uman_remove_remote(uman, &remote_user);
+	return uman_get_user_by_sid(uman, 64) == 0
+	    && uman_get_user_by_nick(uman, "remoteNick") == 0
+	    && uman_get_user_by_cid(uman, "REMOTECID") == 0
+	    && uman->count == 0;
+});
+
 EXO_TEST(um_shutdown_4, {
 	return uman_shutdown(uman) == 0;
+});
+
+/* SID partitioning: a federated node allocates local SIDs only from its
+   disjoint window of the shared 1,048,576-SID space (window = MAX/node_count). */
+EXO_TEST(um_partition_node0_window, {
+	struct hub_user_manager* p = uman_init(0, 4); /* window [1, 262143] */
+	struct hub_user u;
+	sid_t s;
+	int ok;
+	if (!p) return 0;
+	memset(&u, 0, sizeof(u));
+	s = uman_get_free_sid(p, &u);
+	ok = (s >= 1 && s <= 262143);
+	uman_shutdown(p);
+	return ok;
+});
+
+EXO_TEST(um_partition_node1_window, {
+	struct hub_user_manager* p = uman_init(1, 4); /* window [262144, 524287] */
+	struct hub_user u;
+	sid_t s;
+	int ok;
+	if (!p) return 0;
+	memset(&u, 0, sizeof(u));
+	s = uman_get_free_sid(p, &u);
+	ok = (s >= 262144 && s <= 524287);
+	uman_shutdown(p);
+	return ok;
 });

@@ -17,6 +17,7 @@
  *
  */
 
+#include "util/log.h"
 #include "util/memory.h"
 #include "util/rbtree.h"
 #include "adc/message.h"
@@ -51,7 +52,7 @@ static int uman_map_compare(const void* a, const void* b)
 }
 
 
-struct hub_user_manager* uman_init()
+struct hub_user_manager* uman_init(int node_id, int node_count)
 {
 	struct hub_user_manager* users = (struct hub_user_manager*) hub_malloc_zero(sizeof(struct hub_user_manager));
 	if (!users)
@@ -60,7 +61,37 @@ struct hub_user_manager* uman_init()
 	users->list = list_create();
 	users->nickmap = rb_tree_create(uman_map_compare, NULL, NULL);
 	users->cidmap = rb_tree_create(uman_map_compare, NULL, NULL);
-	users->sids = sid_pool_create(net_get_max_sockets());
+
+	if (node_count > 1)
+	{
+		/* Federated cluster: split the shared ~1M SID space into node_count
+		   disjoint windows and allocate local SIDs only from this node's
+		   window, so SIDs stay globally unique without coordination. The map
+		   spans the whole space so remote users (other nodes' windows) resolve
+		   through the same table. */
+		sid_t window;
+		sid_t base;
+		sid_t min;
+		sid_t max;
+
+		if (node_id < 0 || node_id >= node_count)
+		{
+			LOG_ERROR("node_id %d out of range for node_count %d; using node 0", node_id, node_count);
+			node_id = 0;
+		}
+
+		window = SID_MAX / (sid_t) node_count;
+		base   = (sid_t) node_id * window;
+		min    = base ? base : 1;          /* SID 0 is reserved for the hub */
+		max    = base + window - 1;
+		users->sids = sid_pool_create_range(SID_MAX, min, max);
+		LOG_INFO("SID partitioning: node %d/%d owns SID window [%u, %u]",
+			node_id, node_count, (unsigned) min, (unsigned) max);
+	}
+	else
+	{
+		users->sids = sid_pool_create(net_get_max_sockets());
+	}
 
 	return users;
 }
@@ -136,6 +167,38 @@ int uman_remove(struct hub_user_manager* users, struct hub_user* user)
 	return 0;
 }
 
+
+int uman_add_remote(struct hub_user_manager* users, struct hub_user* user)
+{
+	if (!users || !user)
+		return -1;
+
+	/* A remote user arrives with a SID already assigned from the peer node's
+	   window, so insert it (not allocate). Roll back the SID slot if the
+	   nick/CID maps reject it (a cluster-wide collision -- handled by B5). */
+	if (!sid_pool_insert(users->sids, user->id.sid, user))
+		return -1;
+
+	if (uman_add(users, user) != 0)
+	{
+		sid_free(users->sids, user->id.sid);
+		return -1;
+	}
+	return 0;
+}
+
+int uman_remove_remote(struct hub_user_manager* users, struct hub_user* user)
+{
+	if (!users || !user)
+		return -1;
+
+	/* Mirror of uman_add_remote: drop the maps/list/count (uman_remove) and
+	   release the SID slot. Freeing the user struct is the caller's job, as
+	   with local users. */
+	uman_remove(users, user);
+	sid_free(users->sids, user->id.sid);
+	return 0;
+}
 
 struct hub_user* uman_get_user_by_sid(struct hub_user_manager* users, sid_t sid)
 {

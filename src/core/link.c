@@ -100,10 +100,15 @@ int link_make_nonce(char* out)
 #include <stdarg.h>
 #include "util/log.h"
 #include "util/list.h"
+#include "adc/message.h"
+#include "adc/sid.h"
 #include "network/connection.h"
 #include "network/ipcalc.h"
 #include "core/config.h"
 #include "core/hub.h"
+#include "core/user.h"
+#include "core/usermanager.h"
+#include "core/route.h"
 
 #define LINK_RECV_MAX 1024
 #define LINK_TIMEOUT  30
@@ -132,8 +137,18 @@ struct hub_link
 /* All active links (singleton hub), for teardown. */
 static struct linked_list* g_links = 0;
 
+static void link_send_inf(struct hub_link* link, struct hub_user* user);
+static void link_send_roster(struct hub_link* link);
+static void link_handle_remote_inf(struct hub_link* link, const char* binf);
+static void link_handle_remote_quit(struct hub_link* link, const char* sidstr);
+static void link_remove_remote_users(struct hub_link* link);
+
 static void link_disconnect(struct hub_link* link)
 {
+	/* Netsplit: drop every remote user we learned over this link before the
+	   link struct goes away, telling local clients those users have quit. */
+	link_remove_remote_users(link);
+
 	if (link->connect_job)
 	{
 		net_connect_destroy(link->connect_job);
@@ -175,6 +190,24 @@ static int link_process_line(struct hub_link* link, const char* line)
 {
 	const char* secret = link->hub->config->link_secret;
 
+	if (strncmp(line, "LINF ", 5) == 0)
+	{
+		/* Roster entry / INF update from the peer. Only valid once the link is
+		   authenticated. */
+		if (link->state != link_state_established)
+			return -1;
+		link_handle_remote_inf(link, line + 5);
+		return 0;
+	}
+
+	if (strncmp(line, "LQUIT ", 6) == 0)
+	{
+		if (link->state != link_state_established)
+			return -1;
+		link_handle_remote_quit(link, line + 6);
+		return 0;
+	}
+
 	if (strncmp(line, "LCHA ", 5) == 0)
 	{
 		char resp[LINK_AUTH_RESPONSE_LEN + 1];
@@ -214,6 +247,9 @@ static int link_process_line(struct hub_link* link, const char* line)
 		net_con_clear_timeout(link->connection);
 		LOG_INFO("link established with %s (%s)", link->peer_desc,
 			link->is_client ? "outbound" : "inbound");
+
+		/* Send our local roster snapshot so the peer learns our users. */
+		link_send_roster(link);
 	}
 	return 0;
 }
@@ -414,4 +450,160 @@ void link_stop(struct hub_info* hub)
 
 	list_destroy(g_links);
 	g_links = 0;
+}
+
+/* Send one user's INF to the peer as "LINF <binf>". user->info->cache is a
+   complete "BINF <sid> ...\n" line, so it terminates the LINF line itself. */
+static void link_send_inf(struct hub_link* link, struct hub_user* user)
+{
+	if (!user->info || !user->info->cache)
+		return;
+	net_con_send(link->connection, "LINF ", 5);
+	net_con_send(link->connection, user->info->cache, user->info->length);
+}
+
+/* Send a snapshot of our local users to the peer (one LINF per user). Remote
+   users are never relayed (avoids loops in a >2-node mesh; that's B4). */
+static void link_send_roster(struct hub_link* link)
+{
+	struct hub_user* user;
+	LIST_FOREACH(struct hub_user*, user, link->hub->users->list,
+	{
+		if (user_is_logged_in(user) && !user_is_remote(user))
+			link_send_inf(link, user);
+	});
+}
+
+/* Forward a local user's INF (join or update) to every established link. */
+void link_broadcast_local_inf(struct hub_info* hub, struct hub_user* user)
+{
+	struct hub_link* link;
+	(void) hub;
+	if (!g_links || user_is_remote(user))
+		return;
+	LIST_FOREACH(struct hub_link*, link, g_links,
+	{
+		if (link->state == link_state_established)
+			link_send_inf(link, user);
+	});
+}
+
+/* Forward a local user's departure to every established link. */
+void link_broadcast_local_quit(struct hub_info* hub, struct hub_user* user)
+{
+	struct hub_link* link;
+	char buf[64];
+	int n;
+	(void) hub;
+	if (!g_links || user_is_remote(user))
+		return;
+	n = snprintf(buf, sizeof(buf), "LQUIT %s\n", sid_to_string(user->id.sid));
+	if (n <= 0 || n >= (int) sizeof(buf))
+		return;
+	LIST_FOREACH(struct hub_link*, link, g_links,
+	{
+		if (link->state == link_state_established)
+			net_con_send(link->connection, buf, (size_t) n);
+	});
+}
+
+/* Inject a remote user from a peer's INF, and announce it to local clients. */
+static void link_handle_remote_inf(struct hub_link* link, const char* binf)
+{
+	struct adc_message* info = adc_msg_parse(binf, strlen(binf));
+	struct hub_user* user;
+
+	if (!info)
+	{
+		LOG_WARN("link: malformed remote INF from %s", link->peer_desc);
+		return;
+	}
+
+	/* Existing SID -> this is an INF update for a remote user we already hold. */
+	user = uman_get_user_by_sid(link->hub->users, info->source);
+	if (user)
+	{
+		if (user->origin_link != link)
+		{
+			/* SID owned by a local user or another link -- ignore (B5). */
+			adc_msg_free(info);
+			return;
+		}
+		adc_msg_free(user->info);
+		user->info = adc_msg_incref(info);
+		adc_msg_free(info);
+		route_info_message(link->hub, user); /* relay the update to local clients */
+		return;
+	}
+
+	user = user_create_remote(link->hub, link, info);
+	if (!user)
+	{
+		adc_msg_free(info);
+		return;
+	}
+
+	if (uman_add_remote(link->hub->users, user) != 0)
+	{
+		/* SID/nick/CID already in use across the cluster (B5 will resolve such
+		   collisions; for now we just drop the duplicate). */
+		LOG_WARN("link: remote user %s (sid %s) rejected as duplicate from %s",
+			user->id.nick, sid_to_string(user->id.sid), link->peer_desc);
+		user_destroy(user);
+		adc_msg_free(info);
+		return;
+	}
+	adc_msg_free(info); /* user holds its own reference */
+
+	LOG_INFO("link: injected remote user %s (sid %s) from %s",
+		user->id.nick, sid_to_string(user->id.sid), link->peer_desc);
+
+	/* Announce the federated user to our local clients. */
+	route_info_message(link->hub, user);
+}
+
+/* A remote user (sid) has left the peer hub: remove it locally. */
+static void link_handle_remote_quit(struct hub_link* link, const char* sidstr)
+{
+	sid_t sid = string_to_sid(sidstr);
+	struct hub_user* user = sid ? uman_get_user_by_sid(link->hub->users, sid) : NULL;
+
+	if (!user || user->origin_link != link)
+		return; /* unknown SID or not learned over this link */
+
+	LOG_INFO("link: remote user %s (sid %s) left, from %s",
+		user->id.nick, sidstr, link->peer_desc);
+	uman_send_quit_message(link->hub, link->hub->users, user);
+	uman_remove_remote(link->hub->users, user);
+	user_destroy(user);
+}
+
+/* Remove every remote user learned over `link` (netsplit / link teardown). */
+static void link_remove_remote_users(struct hub_link* link)
+{
+	struct linked_list* doomed;
+	struct hub_user* user;
+
+	if (!link->hub || !link->hub->users)
+		return;
+
+	doomed = list_create();
+	if (!doomed)
+		return;
+
+	LIST_FOREACH(struct hub_user*, user, link->hub->users->list,
+	{
+		if (user->origin_link == link)
+			list_append(doomed, user);
+	});
+
+	while ((user = (struct hub_user*) list_get_first(doomed)) != NULL)
+	{
+		list_remove(doomed, user);
+		LOG_INFO("link: removing remote user %s (link to %s lost)", user->id.nick, link->peer_desc);
+		uman_send_quit_message(link->hub, link->hub->users, user);
+		uman_remove_remote(link->hub->users, user);
+		user_destroy(user);
+	}
+	list_destroy(doomed);
 }

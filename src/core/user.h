@@ -37,6 +37,7 @@ struct net_connection;
 struct hub_info;
 struct hub_iobuf;
 struct flood_control;
+struct hub_link;
 
 enum user_state
 {
@@ -130,9 +131,10 @@ struct hub_user
 	struct linked_list *feature_cast;  /** Features supported by feature cast */
 	struct adc_message *info;		   /** ADC 'INF' message (broadcasted to everyone joining the hub) */
 	struct hub_info *hub;			   /** The hub instance this user belong to */
+	struct hub_link *origin_link;	   /** NULL for a local user; the owning link for a remote user learned over federation. */
 	struct ioq_recv *recv_queue;
 	struct ioq_send *send_queue;
-	struct net_connection *connection; /** Connection data */
+	struct net_connection *connection; /** Connection data (NULL for remote users) */
 	struct hub_user_limits limits;	   /** Data used for limitation */
 	enum user_quit_reason quit_reason; /** Quit reason (see user_quit_reason) */
 
@@ -154,6 +156,14 @@ struct hub_user
  * @return User object or NULL if not enough memory is available.
  */
 extern struct hub_user *user_create(struct hub_info *hub, struct net_connection *con, struct ip_addr_encap *addr);
+
+/**
+ * Create a remote user (no local connection) from an INF received over a
+ * federation link. The user's SID is taken from the INF source (the peer
+ * node's window), nick/CID from the INF flags, and a reference to `info` is
+ * retained as the broadcast INF. Returns NULL on a malformed INF or OOM.
+ */
+extern struct hub_user *user_create_remote(struct hub_info *hub, struct hub_link *link, struct adc_message *info);
 
 /**
  * Delete a user.
@@ -205,6 +215,12 @@ extern int user_is_connecting(struct hub_user *user);
  * Returns 1 only if the user is in state_cleanup or state_disconnected.
  */
 extern int user_is_disconnecting(struct hub_user *user);
+
+/**
+ * Returns 1 if the user is a remote user learned over a federation link
+ * (no local connection), 0 if it is a locally-connected user.
+ */
+extern int user_is_remote(struct hub_user *user);
 
 /**
  * Returns 1 if a user is protected, which includes users

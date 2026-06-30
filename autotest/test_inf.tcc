@@ -22,7 +22,7 @@ static void inf_create_hub()
 	net_initialize();
 	inf_hub = (struct hub_info*) hub_malloc_zero(sizeof(struct hub_info));
 	
-	inf_hub->users = uman_init();
+	inf_hub->users = uman_init(0, 1);
 	inf_hub->acl = (struct acl_handle*) hub_malloc_zero(sizeof(struct acl_handle));
 	inf_hub->config = (struct hub_config*) hub_malloc_zero(sizeof(struct hub_config));
 	
