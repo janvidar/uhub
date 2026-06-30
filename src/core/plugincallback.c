@@ -223,17 +223,12 @@ static void cbfunc_set_hub_name(struct plugin_handle* plugin, const char* str)
 static void cbfunc_set_hub_description(struct plugin_handle* plugin, const char* str)
 {
 	struct hub_info* hub = plugin_get_hub(plugin);
-	struct adc_message* command;
 	char* new_str = adc_msg_escape(str ? str : hub->config->hub_description);
 
-	adc_msg_replace_named_argument(hub->command_info, ADC_INF_FLAG_DESCRIPTION, new_str);
+	/* Update the local IINF + announce to local clients, and propagate the topic
+	   to linked hubs so the whole logical hub shows the same description. */
+	hub_update_description(hub, new_str, 1);
 
-	// Broadcast hub description
-	command = adc_msg_construct(ADC_CMD_IINF, (strlen(new_str) + 8));
-	adc_msg_add_named_argument(command, ADC_INF_FLAG_DESCRIPTION, new_str);
-	route_to_all(hub, command);
-
-	adc_msg_free(command);
 	hub_free(new_str);
 }
 

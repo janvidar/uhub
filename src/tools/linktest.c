@@ -44,14 +44,17 @@
 
 static int running = 1;
 
-static const char* opt_uri     = NULL;
-static const char* opt_nick    = "linktest";
-static const char* opt_pm_nick = NULL;
-static const char* opt_pm_text = "hello-from-linktest";
-static const char* opt_say     = NULL;
-static int opt_seconds         = 8;
+static const char* opt_uri      = NULL;
+static const char* opt_nick     = "linktest";
+static const char* opt_pm_nick  = NULL;
+static const char* opt_pm_text  = "hello-from-linktest";
+static const char* opt_say      = NULL;
+static const char* opt_password = NULL;
+static const char* opt_command  = NULL;
+static int opt_seconds          = 8;
 
 static int sent_pm = 0;
+static int sent_command = 0;
 static int recv_count = 0;
 
 static void deadline_cb(struct timeout_evt* t)
@@ -66,6 +69,22 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 	{
 		case ADC_CLIENT_LOGGED_IN:
 			printf("LINKTEST %s: logged in (sid %s)\n", opt_nick, sid_to_string(ADC_client_get_sid(client)));
+			if (opt_command && !sent_command)
+			{
+				/* Hub commands arrive as a main-chat message starting with '!'. */
+				char* esc = adc_msg_escape(opt_command);
+				struct adc_message* m = adc_msg_construct_source(ADC_CMD_BMSG,
+					ADC_client_get_sid(client), esc ? strlen(esc) : 0);
+				if (m && esc)
+				{
+					adc_msg_add_argument(m, esc);
+					ADC_client_send(client, m);
+					sent_command = 1;
+					printf("LINKTEST %s: ran command: %s\n", opt_nick, opt_command);
+				}
+				adc_msg_free(m);
+				hub_free(esc);
+			}
 			if (opt_say)
 			{
 				char* esc = adc_msg_escape(opt_say);
@@ -115,6 +134,21 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 			}
 			break;
 
+		case ADC_CLIENT_HUB_INFO:
+			if (data && data->hubinfo && data->hubinfo->description)
+				printf("LINKTEST %s: topic: %s\n", opt_nick, data->hubinfo->description);
+			break;
+
+		case ADC_CLIENT_LOGIN_ERROR:
+			printf("LINKTEST %s: login rejected\n", opt_nick);
+			running = 0;
+			break;
+
+		case ADC_CLIENT_DISCONNECTED:
+			printf("LINKTEST %s: disconnected\n", opt_nick);
+			running = 0;
+			break;
+
 		default:
 			break;
 	}
@@ -140,6 +174,10 @@ static int parse_args(int argc, char** argv)
 			opt_pm_text = argv[++i];
 		else if (!strcmp(argv[i], "--say") && i + 1 < argc)
 			opt_say = argv[++i];
+		else if (!strcmp(argv[i], "--password") && i + 1 < argc)
+			opt_password = argv[++i];
+		else if (!strcmp(argv[i], "--command") && i + 1 < argc)
+			opt_command = argv[++i];
 		else if (!strcmp(argv[i], "--seconds") && i + 1 < argc)
 			opt_seconds = atoi(argv[++i]);
 		else
@@ -155,7 +193,7 @@ int main(int argc, char** argv)
 
 	if (!parse_args(argc, argv))
 	{
-		fprintf(stderr, "Usage: %s adc[s]://host:port [--nick NAME] [--pm-nick TARGET] [--pm-text TEXT] [--seconds N]\n", argv[0]);
+		fprintf(stderr, "Usage: %s adc[s]://host:port [--nick NAME] [--password PASS] [--command \"!cmd args\"] [--pm-nick TARGET] [--pm-text TEXT] [--say TEXT] [--seconds N]\n", argv[0]);
 		return 1;
 	}
 
@@ -168,6 +206,8 @@ int main(int argc, char** argv)
 
 	client = ADC_client_create(opt_nick, "linktest", NULL);
 	ADC_client_set_callback(client, handle);
+	if (opt_password)
+		ADC_client_set_password(client, opt_password);
 	ADC_client_connect(client, opt_uri);
 
 	while (running && net_backend_process())

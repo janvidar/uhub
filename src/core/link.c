@@ -278,6 +278,35 @@ static int link_process_line(struct hub_link* link, const char* line)
 		return 0;
 	}
 
+	if (strncmp(line, "LDSC ", 5) == 0)
+	{
+		/* Hub description (topic) change from a peer. Apply locally without
+		   re-propagating (loop-safe on a full mesh). */
+		if (link->state != link_state_established)
+			return -1;
+		hub_update_description(link->hub, line + 5, 0);
+		return 0;
+	}
+
+	if (strncmp(line, "LBAN ", 5) == 0)
+	{
+		/* Cluster-wide ban from a peer: "LBAN <cid> <nick>". Apply locally
+		   (ban + disconnect a matching local user) without re-propagating. */
+		const char* p = line + 5;
+		const char* sp = strchr(p, ' ');
+		char cid[MAX_CID_LEN + 1];
+		size_t clen;
+		if (link->state != link_state_established || !sp)
+			return -1;
+		clen = (size_t) (sp - p);
+		if (clen > MAX_CID_LEN)
+			clen = MAX_CID_LEN;
+		memcpy(cid, p, clen);
+		cid[clen] = 0;
+		hub_apply_ban(link->hub, cid, sp + 1, 0);
+		return 0;
+	}
+
 	if (strncmp(line, "LRTE ", 5) == 0)
 	{
 		if (link->state != link_state_established)
@@ -880,6 +909,47 @@ void link_broadcast_local_quit(struct hub_info* hub, struct hub_user* user)
 	if (!g_links || user_is_remote(user))
 		return;
 	n = snprintf(buf, sizeof(buf), "LQUI %s\n", sid_to_string(user->id.sid));
+	if (n <= 0 || n >= (int) sizeof(buf))
+		return;
+	LIST_FOREACH(struct hub_link*, link, g_links,
+	{
+		if (link->state == link_state_established)
+			net_con_send(link->connection, buf, (size_t) n);
+	});
+}
+
+/* Propagate a hub description (topic) change to every established link. The
+   description is already ADC-escaped, so it has no spaces or newlines and is
+   safe to send as a single LDSC token. */
+void link_broadcast_description(struct hub_info* hub, const char* escaped_desc)
+{
+	struct hub_link* link;
+	(void) hub;
+	if (!g_links || !escaped_desc)
+		return;
+	LIST_FOREACH(struct hub_link*, link, g_links,
+	{
+		if (link->state == link_state_established)
+		{
+			net_con_send(link->connection, "LDSC ", 5);
+			net_con_send(link->connection, escaped_desc, strlen(escaped_desc));
+			net_con_send(link->connection, "\n", 1);
+		}
+	});
+}
+
+/* Propagate a ban to every established link. Format: "LBAN <cid> <nick>", with
+   the CID first (fixed-width base32, no spaces) and the nick taking the rest of
+   the line (it may legitimately contain spaces). */
+void link_broadcast_ban(struct hub_info* hub, const char* cid, const char* nick)
+{
+	struct hub_link* link;
+	char buf[256];
+	int n;
+	(void) hub;
+	if (!g_links)
+		return;
+	n = snprintf(buf, sizeof(buf), "LBAN %s %s\n", cid ? cid : "", nick ? nick : "");
 	if (n <= 0 || n >= (int) sizeof(buf))
 		return;
 	LIST_FOREACH(struct hub_link*, link, g_links,

@@ -1135,6 +1135,63 @@ void hub_plugins_unload(struct hub_info* hub)
 	}
 }
 
+void hub_update_description(struct hub_info* hub, const char* escaped_desc, int propagate)
+{
+	struct adc_message* command;
+
+	if (!hub->command_info || !escaped_desc)
+		return;
+
+	/* Update the hub's own IINF and announce the change to local clients. */
+	adc_msg_replace_named_argument(hub->command_info, ADC_INF_FLAG_DESCRIPTION, escaped_desc);
+	command = adc_msg_construct(ADC_CMD_IINF, (int) (strlen(escaped_desc) + 8));
+	if (command)
+	{
+		adc_msg_add_named_argument(command, ADC_INF_FLAG_DESCRIPTION, escaped_desc);
+		route_to_all(hub, command);
+		adc_msg_free(command);
+	}
+
+	/* Propagate to linked hubs so a topic set on one node (or worker) shows on
+	   all of them. A description applied from a link is not re-propagated, which
+	   keeps a full mesh loop-free. */
+	if (propagate)
+		link_broadcast_description(hub, escaped_desc);
+}
+
+void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, int propagate)
+{
+	struct hub_user* u;
+
+	/* Add to this node's runtime ACL so the user cannot reconnect here
+	   (check_acl consults acl_is_*_banned at login). */
+	if (cid && *cid)
+		acl_user_ban_cid(hub->acl, cid);
+	if (nick && *nick)
+		acl_user_ban_nick(hub->acl, nick);
+
+	/* Disconnect a matching locally-connected user. The session lives on exactly
+	   one node; that node drops it here, while remote-user records on other nodes
+	   are cleaned up by the owning node's LQUI. */
+	if (cid && *cid)
+	{
+		u = uman_get_user_by_cid(hub->users, cid);
+		if (u && !user_is_remote(u))
+			hub_disconnect_user(hub, u, quit_banned);
+	}
+	if (nick && *nick)
+	{
+		u = uman_get_user_by_nick(hub->users, nick);
+		if (u && !user_is_remote(u))
+			hub_disconnect_user(hub, u, quit_banned);
+	}
+
+	/* Propagate cluster-wide so the ban applies on every node. A ban received
+	   over a link is applied with propagate = 0 (loop-free on a full mesh). */
+	if (propagate)
+		link_broadcast_ban(hub, cid, nick);
+}
+
 void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 {
 	char* tmp;

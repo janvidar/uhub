@@ -83,6 +83,17 @@ extern void link_broadcast_local_inf(struct hub_info* hub, struct hub_user* user
  */
 extern void link_broadcast_local_quit(struct hub_info* hub, struct hub_user* user);
 
+/**
+ * Propagate a hub description (topic) change to every established link. The
+ * description must already be ADC-escaped.
+ */
+extern void link_broadcast_description(struct hub_info* hub, const char* escaped_desc);
+
+/**
+ * Propagate a cluster-wide ban (cid and/or nick) to every established link.
+ */
+extern void link_broadcast_ban(struct hub_info* hub, const char* cid, const char* nick);
+
 struct adc_message;
 struct hub_link;
 
