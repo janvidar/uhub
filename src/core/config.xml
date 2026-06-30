@@ -159,11 +159,13 @@
 	</option>
 
 	<option name="node_id" type="int" default="0">
-		<check min="0" max="1048575" />
-		<short>This node's index within the linked cluster (0-based)</short>
+		<check min="-1" max="1048575" />
+		<short>This node's index within the linked cluster (0-based, or -1 to lease dynamically)</short>
 		<description><![CDATA[
 			Zero-based index of this hub within the cluster; must be unique per node and less than node_count.
 			Selects which SID window this node allocates from. Ignored when node_count is 1.
+			Set to -1 to lease a SID window dynamically from the cluster over the link instead of
+			configuring a fixed index (the node defers local logins until the lease is granted).
 		]]></description>
 		<since>0.6.2</since>
 	</option>

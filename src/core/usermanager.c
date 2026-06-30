@@ -62,9 +62,17 @@ struct hub_user_manager* uman_init(int node_id, int node_count)
 	users->nickmap = rb_tree_create(uman_map_compare, NULL, NULL);
 	users->cidmap = rb_tree_create(uman_map_compare, NULL, NULL);
 
-	if (node_count > 1)
+	if (node_id < 0)
 	{
-		/* Federated cluster: split the shared ~1M SID space into node_count
+		/* Dynamic: lease the SID window from the cluster coordinator later, over
+		   the link (uman_set_sid_window). Full-space map, empty window -- no
+		   local SIDs are handed out until the lease is granted. */
+		users->sids = sid_pool_create_range(SID_MAX, 1, 0);
+		LOG_INFO("SID window: pending dynamic lease from cluster coordinator");
+	}
+	else if (node_count > 1)
+	{
+		/* Static partition: split the shared ~1M SID space into node_count
 		   disjoint windows and allocate local SIDs only from this node's
 		   window, so SIDs stay globally unique without coordination. The map
 		   spans the whole space so remote users (other nodes' windows) resolve
@@ -74,7 +82,7 @@ struct hub_user_manager* uman_init(int node_id, int node_count)
 		sid_t min;
 		sid_t max;
 
-		if (node_id < 0 || node_id >= node_count)
+		if (node_id >= node_count)
 		{
 			LOG_ERROR("node_id %d out of range for node_count %d; using node 0", node_id, node_count);
 			node_id = 0;
@@ -94,6 +102,14 @@ struct hub_user_manager* uman_init(int node_id, int node_count)
 	}
 
 	return users;
+}
+
+void uman_set_sid_window(struct hub_user_manager* users, sid_t min, sid_t max)
+{
+	if (!users)
+		return;
+	sid_pool_set_window(users->sids, min, max);
+	LOG_INFO("SID window leased: [%u, %u]", (unsigned) min, (unsigned) max);
 }
 
 

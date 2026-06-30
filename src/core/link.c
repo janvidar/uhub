@@ -91,13 +91,14 @@ int link_make_nonce(char* out)
  *
  *   ->  LCHA <nonce>        (each side challenges the other)
  *   <-  LRES <response>     response = base32(tiger(secret || peer_nonce))
- *   <-  LOK                 sent once we have verified the peer's LRES
+ *   <-  LACK                sent once we have verified the peer's LRES
  *
  * A side is "established" once it has both verified the peer's LRES (the peer
- * knows the secret) and received the peer's LOK (the peer verified ours).
+ * knows the secret) and received the peer's LACK (the peer verified ours).
  * ------------------------------------------------------------------------- */
 
 #include <stdarg.h>
+#include <stdlib.h>
 #include "util/log.h"
 #include "util/list.h"
 #include "adc/message.h"
@@ -127,15 +128,77 @@ struct hub_link
 	enum link_state state;
 	int is_client;                          /* 1 = we initiated, 0 = we accepted */
 	int peer_verified;                      /* we verified the peer's LRES */
-	int got_ok;                             /* we received the peer's LOK */
+	int got_ok;                             /* we received the peer's LACK */
 	char nonce[LINK_NONCE_LEN + 1];         /* the challenge WE sent */
 	char recvbuf[LINK_RECV_MAX];
 	size_t recvlen;
 	char* peer_desc;                        /* for logging */
+	int granted_node_id;                    /* coordinator side: window index granted to this link, or -1 */
 };
 
 /* All active links (singleton hub), for teardown. */
 static struct linked_list* g_links = 0;
+
+/* Coordinator side (this hub is node 0 of a cluster): bitmap of which window
+   indices [0, g_win_count) are in use, so we can lease free windows to members
+   that connect with node_id = -1. NULL on a non-coordinator. */
+static char* g_win_used = 0;
+static int   g_win_count = 0;
+
+/* Reserve the lowest free window index (>0; 0 is the coordinator's own); mark it
+   used and return it, or -1 if the cluster is full / we are not a coordinator. */
+static int link_grant_window(void)
+{
+	int i;
+	if (!g_win_used)
+		return -1;
+	for (i = 1; i < g_win_count; i++)
+	{
+		if (!g_win_used[i])
+		{
+			g_win_used[i] = 1;
+			return i;
+		}
+	}
+	return -1;
+}
+
+static void link_release_window(int idx)
+{
+	if (g_win_used && idx > 0 && idx < g_win_count)
+		g_win_used[idx] = 0;
+}
+
+/* Coordinator election: each participating node has an election id -- 0 for a
+   forced coordinator (node_id == 0), a random value for an electing node
+   (node_id == -1). On each link the lower id wins and coordinates; the loser
+   leases. g_window_set is 1 once this node holds a usable SID window. */
+static uint64_t g_election_id = 0;
+static int      g_window_set  = 0;
+
+/* This node won the election: ensure it owns window 0 and can grant windows. */
+static void link_become_coordinator(struct hub_info* hub)
+{
+	int n = hub->config->node_count;
+	if (n < 2)
+		n = 2;
+
+	if (!g_win_used)
+	{
+		g_win_count = n;
+		g_win_used = (char*) hub_malloc_zero((size_t) g_win_count);
+		if (g_win_used)
+			g_win_used[0] = 1; /* window 0 is the coordinator's own */
+	}
+	if (!g_window_set)
+	{
+		/* We were pending (node_id = -1): claim window 0 for ourselves. */
+		sid_t w = SID_MAX / (sid_t) g_win_count;
+		uman_set_sid_window(hub->users, 1, w - 1);
+		g_window_set = 1;
+	}
+	LOG_INFO("link: won SID-window election -> coordinator (window 0 of %d)", g_win_count);
+}
 
 static void link_send_inf(struct hub_link* link, struct hub_user* user);
 static void link_send_roster(struct hub_link* link);
@@ -149,6 +212,9 @@ static void link_disconnect(struct hub_link* link)
 	/* Netsplit: drop every remote user we learned over this link before the
 	   link struct goes away, telling local clients those users have quit. */
 	link_remove_remote_users(link);
+
+	/* Coordinator side: return this member's leased window to the free pool. */
+	link_release_window(link->granted_node_id);
 
 	if (link->connect_job)
 	{
@@ -201,19 +267,89 @@ static int link_process_line(struct hub_link* link, const char* line)
 		return 0;
 	}
 
-	if (strncmp(line, "LQUIT ", 6) == 0)
+	if (strncmp(line, "LQUI ", 5) == 0)
 	{
 		if (link->state != link_state_established)
 			return -1;
-		link_handle_remote_quit(link, line + 6);
+		link_handle_remote_quit(link, line + 5);
 		return 0;
 	}
 
-	if (strncmp(line, "LROUTE ", 7) == 0)
+	if (strncmp(line, "LRTE ", 5) == 0)
 	{
 		if (link->state != link_state_established)
 			return -1;
-		link_handle_route(link, line + 7);
+		link_handle_route(link, line + 5);
+		return 0;
+	}
+
+	if (strncmp(line, "LELC ", 5) == 0)
+	{
+		/* Coordinator election: compare ids; the lower one coordinates. */
+		uint64_t peerid;
+		uint64_t myid;
+		int i_win;
+		if (link->state != link_state_established)
+			return -1;
+		peerid = strtoull(line + 5, NULL, 16);
+		myid = (link->hub->config->node_id == 0) ? 0 : g_election_id;
+		/* Lower id wins; an exact tie (astronomically unlikely) is broken by
+		   the link role so both ends agree -- the acceptor coordinates. */
+		i_win = (myid < peerid) || (myid == peerid && link->is_client == 0);
+		if (i_win)
+		{
+			link_become_coordinator(link->hub);
+		}
+		else if (!g_window_set)
+		{
+			/* We lost and still need a window: lease one from the winner. */
+			link_sendf(link, "LWRQ\n");
+		}
+		return 0;
+	}
+
+	if (strcmp(line, "LWRQ") == 0)
+	{
+		/* Coordinator: a member is requesting a SID window lease. */
+		int idx;
+		sid_t w, lo, hi;
+		if (link->state != link_state_established)
+			return -1;
+		idx = link_grant_window();
+		if (idx < 0)
+		{
+			LOG_WARN("link: no free SID window to lease to %s", link->peer_desc);
+			link_sendf(link, "LERR\n");
+			return -1;
+		}
+		w  = SID_MAX / (sid_t) g_win_count;
+		lo = (sid_t) idx * w;
+		if (lo == 0) lo = 1; /* SID 0 reserved */
+		hi = (sid_t) idx * w + w - 1;
+		link->granted_node_id = idx;
+		link_sendf(link, "LWIN %u %u\n", (unsigned) lo, (unsigned) hi);
+		LOG_INFO("link: leased SID window [%u, %u] (node %d) to %s",
+			(unsigned) lo, (unsigned) hi, idx, link->peer_desc);
+		return 0;
+	}
+
+	if (strncmp(line, "LWIN ", 5) == 0)
+	{
+		/* Member: the coordinator granted us a window; apply it. */
+		char* end;
+		unsigned long lo, hi;
+		if (link->state != link_state_established)
+			return -1;
+		lo = strtoul(line + 5, &end, 10);
+		hi = strtoul(end, &end, 10);
+		if (hi <= lo)
+		{
+			LOG_WARN("link: invalid window grant from %s", link->peer_desc);
+			return -1;
+		}
+		uman_set_sid_window(link->hub->users, (sid_t) lo, (sid_t) hi);
+		g_window_set = 1;
+		LOG_INFO("link: leased SID window [%lu, %lu] from %s", lo, hi, link->peer_desc);
 		return 0;
 	}
 
@@ -232,10 +368,10 @@ static int link_process_line(struct hub_link* link, const char* line)
 			return -1;
 		}
 		link->peer_verified = 1;
-		if (link_sendf(link, "LOK\n") < 0)
+		if (link_sendf(link, "LACK\n") < 0)
 			return -1;
 	}
-	else if (strcmp(line, "LOK") == 0)
+	else if (strcmp(line, "LACK") == 0)
 	{
 		link->got_ok = 1;
 	}
@@ -259,6 +395,13 @@ static int link_process_line(struct hub_link* link, const char* line)
 
 		/* Send our local roster snapshot so the peer learns our users. */
 		link_send_roster(link);
+
+		/* Coordinator election: nodes that participate (forced coordinator
+		   node_id == 0, or electing node_id == -1) announce their election id.
+		   The lower id wins and coordinates; see the LELC handler. The window
+		   lease (LWRQ) is deferred until the election decides who is member. */
+		if (link->hub->config->node_id <= 0)
+			link_sendf(link, "LELC %016llx\n", (unsigned long long) g_election_id);
 	}
 	return 0;
 }
@@ -333,6 +476,7 @@ static struct hub_link* link_create_internal(struct hub_info* hub, int is_client
 	link->hub = hub;
 	link->is_client = is_client;
 	link->state = link_state_handshake;
+	link->granted_node_id = -1;
 	link->peer_desc = hub_strdup(desc ? desc : "?");
 	if (g_links)
 		list_append(g_links, link);
@@ -438,16 +582,38 @@ void link_start(struct hub_info* hub)
 	struct hub_config* cfg = hub->config;
 	g_links = list_create();
 
+	/* Election state. A forced coordinator (node_id == 0) uses id 0 and always
+	   wins; an electing node (node_id == -1) uses a random id. Both announce
+	   their id over each link (LELC) and the lower wins. g_window_set is true
+	   for any node that already holds a window (statically configured node_id
+	   >= 0); an electing node starts pending until it wins or leases. */
+	g_window_set = (cfg->node_id >= 0) ? 1 : 0;
+	g_election_id = 0;
+	if (cfg->node_id < 0)
+		RAND_bytes((unsigned char*) &g_election_id, sizeof(g_election_id));
+
 	/* Federation config sanity: if this hub participates in linking at all
 	   (connects out, or accepts links via a shared secret) but its SIDs are not
 	   partitioned, local SIDs from different hubs overlap and collide when
 	   rosters are exchanged. Warn loudly -- set node_count to the cluster size
 	   and a unique node_id on every node. (node_id >= node_count is caught
 	   separately in uman_init.) */
-	if ((*cfg->link_peer || *cfg->link_secret) && cfg->node_count <= 1)
+	if ((*cfg->link_peer || *cfg->link_secret) && cfg->node_count <= 1 && cfg->node_id >= 0)
 		LOG_WARN("Hub linking is configured but node_count is 1: SIDs are not "
 		         "partitioned and will collide across linked hubs. Set node_count "
-		         "to the cluster size and a unique node_id on each node.");
+		         "to the cluster size and a unique node_id on each node "
+		         "(or node_id = -1 to lease a window dynamically).");
+
+	/* Coordinator (node 0 of a cluster): track window usage so members that
+	   connect with node_id = -1 can lease a free window. Window 0 is ours. */
+	if (cfg->node_id == 0 && cfg->node_count > 1)
+	{
+		g_win_count = cfg->node_count;
+		g_win_used = (char*) hub_malloc_zero((size_t) g_win_count);
+		if (g_win_used)
+			g_win_used[0] = 1;
+		LOG_INFO("link: cluster coordinator (node 0 of %d); leasing SID windows on request", g_win_count);
+	}
 
 	if (*cfg->link_peer)
 	{
@@ -471,6 +637,10 @@ void link_stop(struct hub_info* hub)
 
 	list_destroy(g_links);
 	g_links = 0;
+
+	hub_free(g_win_used);
+	g_win_used = 0;
+	g_win_count = 0;
 }
 
 /* Send one user's INF to the peer as "LINF <binf>". user->info->cache is a
@@ -518,7 +688,7 @@ void link_broadcast_local_quit(struct hub_info* hub, struct hub_user* user)
 	(void) hub;
 	if (!g_links || user_is_remote(user))
 		return;
-	n = snprintf(buf, sizeof(buf), "LQUIT %s\n", sid_to_string(user->id.sid));
+	n = snprintf(buf, sizeof(buf), "LQUI %s\n", sid_to_string(user->id.sid));
 	if (n <= 0 || n >= (int) sizeof(buf))
 		return;
 	LIST_FOREACH(struct hub_link*, link, g_links,
@@ -605,8 +775,8 @@ void link_forward_message(struct hub_link* link, struct adc_message* msg)
 	if (!link || link->state != link_state_established || !msg || !msg->cache)
 		return;
 	LOG_DEBUG("link: forwarding directed message to %s", link->peer_desc);
-	/* "LROUTE " + the full ADC message (which ends in '\n'). */
-	net_con_send(link->connection, "LROUTE ", 7);
+	/* "LRTE " + the full ADC message (which ends in '\n'). */
+	net_con_send(link->connection, "LRTE ", 5);
 	net_con_send(link->connection, msg->cache, msg->length);
 }
 

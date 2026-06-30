@@ -127,8 +127,21 @@ struct sid_pool* sid_pool_create_range(sid_t map_size, sid_t min, sid_t max)
 {
 	/* Federated node: allocate local SIDs from [min, max] within a map that
 	   spans the whole cluster SID space, so remote users inserted later by the
-	   link layer resolve through the same lookup table. */
+	   link layer resolve through the same lookup table. A pending node that will
+	   lease its window dynamically is created with an empty window (min=1,
+	   max=0): sid_alloc() then returns 0 until sid_pool_set_window() is called. */
 	return sid_pool_alloc(map_size, min, max);
+}
+
+void sid_pool_set_window(struct sid_pool* pool, sid_t min, sid_t max)
+{
+	/* Apply a SID window obtained dynamically (a lease from the cluster
+	   coordinator). The map already spans the whole space; this only sets which
+	   slice this node allocates local SIDs from. Intended for a pool created
+	   with an empty window, before any local users have been allocated. */
+	pool->min    = (min < 1) ? 1 : min;
+	pool->max    = (max >= pool->map_size) ? (pool->map_size - 1) : max;
+	pool->cursor = 0;
 }
 
 void sid_pool_destroy(struct sid_pool* pool)

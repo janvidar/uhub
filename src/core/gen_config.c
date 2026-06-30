@@ -247,7 +247,7 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 
 	if (!strcmp(key, "node_id"))
 	{
-		min = 0;
+		min = -1;
 		max = 1048575;
 		if (!apply_integer(key, data, &config->node_id, &min, &max))
 		{
