@@ -4,6 +4,9 @@ uhub is single-threaded and handles network and timer events using a
 hand-rolled reactor in src/network/backend.c, which selects epoll, kqueue,
 or select at compile time (see USE_EPOLL / USE_KQUEUE / USE_SELECT in
 system.h, generated from system.h.in).
+
+For the hub-to-hub link protocol (federating several hubs into one logical
+hub), see linking.txt.
 For each state there is a read event (and sometimes a write event) and timeout
 event in case an expected read (or write) event does not occur.
 

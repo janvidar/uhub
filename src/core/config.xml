@@ -111,6 +111,54 @@
 		<since>0.6.1</since>
 	</option>
 
+	<option name="workers" type="int" default="1">
+		<check min="0" max="256" />
+		<short>Run one logical hub as this many worker processes</short>
+		<description><![CDATA[
+			<p>
+			Number of worker processes to run as a single logical hub on a multi-core machine. With
+			workers greater than 1, the hub forks that many processes that share the client port
+			(SO_REUSEPORT, so the kernel spreads connections across cores) and link to each other over
+			Unix sockets, presenting one unified roster and SID space to clients. Each worker is a normal
+			single-threaded hub, so this scales the CPU-bound work (especially TLS) across cores without
+			any threading.
+			</p>
+			<p>
+			1 (the default) runs a single process. 0 means auto: one worker per online CPU. The master
+			process only supervises the workers (restarting any that exit); it serves no clients itself.
+			</p>
+		]]></description>
+		<since>0.6.2</since>
+	</option>
+
+	<option name="worker_socket_dir" type="string" default="/tmp">
+		<short>Directory for inter-worker link sockets</short>
+		<description><![CDATA[
+			Directory in which the master creates the Unix domain sockets that worker processes use to
+			link to each other (one per worker). Must be a short path (the socket path is limited to about
+			108 bytes) on a local filesystem, and should be private to the hub user. Only used when
+			workers is greater than 1.
+		]]></description>
+		<since>0.6.2</since>
+	</option>
+
+	<option name="server_reuseport" type="boolean" default="0">
+		<short>Allow several hub processes to share the server port</short>
+		<description><![CDATA[
+			<p>
+			Set SO_REUSEPORT on the listening socket so that multiple hub processes can bind the same
+			server_port; the kernel then load-balances incoming client connections across them. This is
+			the basis for running one logical hub as several worker processes on a multi-core machine
+			(linked together so they share one roster and SID space).
+			</p>
+			<p>
+			Enabled automatically when "workers" is greater than 1. Only set it by hand if you supervise
+			the worker processes yourself (e.g. a systemd template).
+			</p>
+		]]></description>
+		<since>0.6.2</since>
+	</option>
+
 	<option name="dns_thread_pool_size" type="int" default="4" advanced="true" >
 		<check min="1" max="64" />
 		<short>Number of worker threads for asynchronous DNS lookups</short>
@@ -145,6 +193,25 @@
 			Shared secret that both ends of a link must hold. Links authenticate by proving knowledge of
 			this secret via a nonce challenge-response; the secret itself is never sent over the wire.
 		]]></description>
+		<since>0.6.2</since>
+	</option>
+
+	<option name="link_socket" type="string" default="">
+		<short>Unix socket path to accept hub-to-hub links on</short>
+		<description><![CDATA[
+			<p>
+			Path to a Unix domain socket this hub listens on for inbound links from other hub processes
+			on the same machine. Used to link worker processes of one logical hub without routing link
+			traffic through the shared client port. Empty disables the Unix-socket listener (TCP links on
+			the normal port still work). A link_peer that begins with "/" connects to such a socket.
+			</p>
+			<p>
+			Protect the socket with filesystem permissions; it grants the same privileges as any link.
+			</p>
+		]]></description>
+		<example><![CDATA[
+			link_socket = /run/uhub/worker-0.sock
+		]]></example>
 		<since>0.6.2</since>
 	</option>
 

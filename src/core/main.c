@@ -20,11 +20,20 @@
 #include "system.h"
 #include "uhub_limits.h"
 #include "util/log.h"
+#include "util/memory.h"
 #include "network/network.h"
 #include "core/auth.h"
 #include "core/config.h"
 #include "core/hub.h"
 #include "core/regserver.h"
+
+#ifndef WIN32
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <signal.h>
+#include <errno.h>
+#include <openssl/rand.h>
+#endif
 
 #ifdef SYSTEMD
 #include <systemd/sd-daemon.h>
@@ -110,12 +119,203 @@ void shutdown_signal_handlers(struct hub_info* hub)
 #endif /* !WIN32 */
 
 
+#ifndef WIN32
+/* --------------------------------------------------------------------------
+ * Multi-process "logical hub" launcher.
+ *
+ * When `workers` > 1 the top-level process becomes a master that forks N worker
+ * processes. Each worker is a normal single-threaded hub, but with config
+ * overridden so the workers share the client port (SO_REUSEPORT) and link to
+ * one another over Unix sockets in a private runtime directory, presenting one
+ * roster and SID space. The master serves no clients; it only supervises and
+ * restarts workers, and tears them down on exit.
+ * -------------------------------------------------------------------------- */
+
+static int   g_worker_index = -1; /* >= 0 inside a worker, else master/single */
+static int   g_worker_count = 0;
+static char  g_worker_secret[33] = {0};
+static char  g_worker_dir[80] = {0};
+static pid_t* g_worker_pids = 0;
+static volatile sig_atomic_t g_master_stop = 0;
+
+static int resolve_worker_count(int configured)
+{
+	if (configured == 0)
+	{
+		long n = sysconf(_SC_NPROCESSORS_ONLN);
+		return (n > 0) ? (int) n : 1;
+	}
+	return configured;
+}
+
+static void set_config_str(char** field, const char* value)
+{
+	hub_free(*field);
+	*field = hub_strdup(value);
+}
+
+/* In a worker: override config so this process is node g_worker_index of a
+   g_worker_count cluster, sharing the port and meshed over Unix sockets. */
+static void apply_worker_overrides(struct hub_config* cfg)
+{
+	char path[80];
+	char peers[8192];
+	int j;
+
+	if (g_worker_index < 0)
+		return;
+
+	cfg->server_reuseport = 1;
+	cfg->node_count = g_worker_count;
+	cfg->node_id = g_worker_index;
+	set_config_str(&cfg->link_secret, g_worker_secret);
+
+	snprintf(path, sizeof(path), "%s/w%d.sock", g_worker_dir, g_worker_index);
+	set_config_str(&cfg->link_socket, path);
+
+	/* Connect only to lower-indexed workers, so each pair is linked once. */
+	peers[0] = 0;
+	for (j = 0; j < g_worker_index; j++)
+	{
+		char one[96];
+		snprintf(one, sizeof(one), "%s%s/w%d.sock", (j ? "," : ""), g_worker_dir, j);
+		strncat(peers, one, sizeof(peers) - strlen(peers) - 1);
+	}
+	set_config_str(&cfg->link_peer, peers);
+}
+
+static void master_signal(int sig)
+{
+	(void) sig;
+	g_master_stop = 1;
+}
+
+static pid_t spawn_worker(int index, int count);
+
+int main_loop(); /* forward */
+
+static int run_master(int n)
+{
+	struct hub_config cfg;
+	char dir[80];
+	unsigned char rnd[16];
+	struct sigaction act;
+	int i;
+
+	if (read_config(arg_config, &cfg, !arg_have_config) == -1)
+		return -1;
+	snprintf(dir, sizeof(dir), "%s/uhub-%d", cfg.worker_socket_dir, (int) getpid());
+	free_config(&cfg);
+
+	/* Private runtime directory for the inter-worker sockets. */
+	if (mkdir(dir, 0700) == -1 && errno != EEXIST)
+	{
+		LOG_FATAL("Unable to create worker socket directory %s: %s", dir, strerror(errno));
+		return -1;
+	}
+	strncpy(g_worker_dir, dir, sizeof(g_worker_dir) - 1);
+
+	/* Ephemeral shared link secret (memory only), hex-encoded. */
+	if (RAND_bytes(rnd, sizeof(rnd)) != 1)
+	{
+		LOG_FATAL("Unable to generate worker link secret");
+		return -1;
+	}
+	for (i = 0; i < (int) sizeof(rnd); i++)
+		snprintf(g_worker_secret + i * 2, 3, "%02x", rnd[i]);
+
+	g_worker_pids = (pid_t*) calloc((size_t) n, sizeof(pid_t));
+	if (!g_worker_pids)
+		return -1;
+
+	memset(&act, 0, sizeof(act));
+	act.sa_handler = master_signal;
+	sigaction(SIGTERM, &act, 0);
+	sigaction(SIGINT, &act, 0);
+
+	LOG_INFO("Starting logical hub with %d worker processes (sockets in %s)", n, dir);
+	for (i = 0; i < n; i++)
+		g_worker_pids[i] = spawn_worker(i, n);
+
+	while (!g_master_stop)
+	{
+		int status;
+		pid_t dead = waitpid(-1, &status, 0);
+		if (dead < 0)
+		{
+			if (errno == EINTR)
+				continue;
+			break;
+		}
+		if (g_master_stop)
+			break;
+		for (i = 0; i < n; i++)
+		{
+			if (g_worker_pids[i] == dead)
+			{
+				LOG_WARN("worker %d (pid %d) exited; restarting", i, (int) dead);
+				g_worker_pids[i] = spawn_worker(i, n);
+				break;
+			}
+		}
+	}
+
+	LOG_INFO("Shutting down %d workers...", n);
+	for (i = 0; i < n; i++)
+		if (g_worker_pids[i] > 0)
+			kill(g_worker_pids[i], SIGTERM);
+	for (i = 0; i < n; i++)
+		if (g_worker_pids[i] > 0)
+			waitpid(g_worker_pids[i], 0, 0);
+
+	free(g_worker_pids);
+	g_worker_pids = 0;
+	rmdir(dir);
+	return 0;
+}
+
+static pid_t spawn_worker(int index, int count)
+{
+	pid_t pid = fork();
+	if (pid == 0)
+	{
+		/* Worker: reset the master's signal disposition (main_loop installs the
+		   hub's own handlers) and re-enter as a hub with overridden config. */
+		signal(SIGTERM, SIG_DFL);
+		signal(SIGINT, SIG_DFL);
+		g_worker_index = index;
+		g_worker_count = count;
+		exit(main_loop());
+	}
+	if (pid < 0)
+		LOG_ERROR("fork failed for worker %d: %s", index, strerror(errno));
+	return pid;
+}
+#endif /* !WIN32 */
+
 int main_loop()
 {
 	struct hub_config configuration;
 	struct acl_handle acl;
 	struct hub_info* hub = 0;
 	int announce_pending = 0;
+
+#ifndef WIN32
+	/* Top-level process: if configured for multiple workers, become the master
+	   supervisor instead of serving directly. Workers (g_worker_index >= 0)
+	   skip this and run as normal hubs below. */
+	if (g_worker_index < 0)
+	{
+		struct hub_config cfg;
+		int n;
+		if (read_config(arg_config, &cfg, !arg_have_config) == -1)
+			return -1;
+		n = resolve_worker_count(cfg.workers);
+		free_config(&cfg);
+		if (n > 1)
+			return run_master(n);
+	}
+#endif
 
 	if (net_initialize() == -1)
 		return -1;
@@ -135,6 +335,10 @@ int main_loop()
 
 		if (read_config(arg_config, &configuration, !arg_have_config) == -1)
 			return -1;
+
+#ifndef WIN32
+		apply_worker_overrides(&configuration);
+#endif
 
 		if (acl_initialize(&configuration, &acl) == -1)
 			return -1;

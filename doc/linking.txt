@@ -1,0 +1,263 @@
+= Hub linking (federation) =
+
+uhub can link several hub instances together so that they appear to clients as
+one logical hub: users connected to any node see a single unified user list and
+can chat, search, send private messages and set up peer-to-peer connections
+across node boundaries.
+
+This document describes the hub-to-hub link protocol and the SID-space
+partitioning it depends on. It reflects the current implementation, which is
+EXPERIMENTAL -- see "Status and limitations" at the end before deploying.
+
+Links are a separate concern from the client-facing ADC protocol described in
+architecture.txt. A linked peer is treated as a privileged node, not as a
+client: it can inject users into the local roster, so links must only be made
+between trusted hubs (see "Security").
+
+
+== Topology ==
+
+The intended model is IRC-style server linking over a full mesh: every node
+holds a persistent authenticated link to every other node, and exchanges
+presence and messages so the whole cluster shares one roster and one SID
+namespace.
+
+The current implementation is validated for two nodes (and a star of members
+linking to one coordinator). Multi-hop relay across a 3+ node mesh is not yet
+implemented -- a message is forwarded at most one hop.
+
+The hard ceiling is the ADC SID: it is 20 bits, so the entire logical hub --
+local users plus every linked node's users -- shares a single space of
+1,048,576 session IDs (SID 0 is reserved for the hub). This bounds a cluster
+to roughly 1M users total regardless of node count.
+
+
+== Transport and detection ==
+
+A link reuses the hub's normal listening port; there is no separate link port.
+The connecting node opens an ordinary TCP connection and sends "LCHA" as its
+first bytes. The probe in src/core/probe.c recognises this prefix -- exactly as
+it recognises "HSUP" for an ADC client or a TLS ClientHello -- and hands the
+connection to link_accept() instead of the client login path.
+
+Messages are newline-terminated text. Every command is a four-character code
+("FOURCC"), mirroring ADC's framing of one context character ('L' for link)
+plus a three-letter command, optionally followed by a space and arguments.
+
+
+== Authentication handshake ==
+
+Both endpoints authenticate each other with a symmetric mutual
+challenge-response keyed on a shared secret (the "link_secret" config option).
+Neither side trusts the other until both directions have been verified.
+
+  response = base32( tiger( secret || peer_nonce ) )
+
+Each side generates a random nonce, challenges the peer with it, answers the
+peer's challenge, and acknowledges a verified answer. The exchange (shown for
+one direction; both sides do the same concurrently):
+
+    ----------------------              ----------------------
+    | connect (TCP)      |  ----------> | probe sees "LCHA",  |
+    | send LCHA <nonceA> |              | calls link_accept() |
+    ----------------------              ----------------------
+              |                                   |
+              |    <----  LCHA <nonceB>  ---------+   (peer challenges us)
+              |                                   |
+              +----  LRES base32(tiger(secret||nonceB))  ----->
+              |                                   |
+              |    <----  LRES base32(tiger(secret||nonceA))
+              |          verify against nonceA    |
+              |                                   |
+              +----  LACK  (we verified peer) --------------->
+              |    <----  LACK  (peer verified us)
+              V                                   V
+       ------------------------------------------------
+       | ESTABLISHED: peer_verified && got_ok == true |
+       ------------------------------------------------
+
+A node is "established" only once it has BOTH verified the peer's LRES (proving
+the peer knows the secret) AND received the peer's LACK (proving the peer
+verified our answer). A failed verification sends LERR and closes the link.
+
+The response is compared in constant time. The nonce is drawn from the TLS
+library CSPRNG. nonce and response are base32, MAX_CID_LEN characters each.
+
+
+== Command reference ==
+
+  Command            Direction   Meaning
+  -----------------  ----------  -------------------------------------------
+  LCHA <nonce>       both        Challenge: authenticate me with this nonce.
+  LRES <response>    both        Response to the peer's challenge.
+  LACK               both        Peer's response verified; ack.
+  LERR               both        Authentication failed / request refused.
+  LELC <id>          both        Election id (16 hex digits); lower wins.
+  LWRQ               member->    Request a SID-window lease.
+  LWIN <min> <max>   coord->     Grant the SID window [min,max] (decimal).
+  LINF <binf>        both        Roster entry / presence: a user's BINF.
+  LQUI <sid>         both        A user left (4-char base32 SID).
+  LRTE <adc-message> both        Forward an ADC message to be re-routed.
+
+All post-handshake commands (everything except LCHA/LRES/LACK/LERR) are only
+accepted on an established link.
+
+
+== SID-space partitioning ==
+
+Because the whole cluster shares one 1M SID space, each node must allocate
+local SIDs from a disjoint slice ("window") so that two nodes never hand out
+the same SID. The space is divided into "node_count" equal windows of
+SID_MAX / node_count SIDs each; window 0 starts at SID 1 (SID 0 is reserved).
+A node's lookup map still spans the whole space, so remote users from other
+windows resolve through the same table.
+
+There are three ways a node obtains its window, selected by the "node_id"
+config option:
+
+  node_id >= 0   Static. The node owns window node_id and allocates from it
+                 immediately. Every node must agree on node_count and use a
+                 unique node_id. node_id 0 is the cluster coordinator.
+
+  node_id = -1   Dynamic. The node starts PENDING: it has an empty window and
+                 accepts no local logins until it leases a window over a link
+                 (see below). node_count still sets the window size.
+
+A coordinator (the election winner, see below) tracks which windows are in use
+and leases free ones to members:
+
+    member (pending)                    coordinator
+         |                                   |
+         |  ------------  LWRQ  ----------->  |  pick lowest free window k
+         |                                   |  mark k used
+         |  <--------  LWIN <min> <max>  ---  |  [min,max] = window k
+         |  apply window; accept logins      |
+         |                                   |
+         (on link drop, the coordinator returns window k to the free pool)
+
+If no window is free the coordinator answers LERR and the member stays pending.
+
+=== Coordinator election ===
+
+The coordinator is not statically pinned: nodes elect one per link. Each
+participating node has a 64-bit election id, exchanged with LELC right after
+the handshake; the LOWER id wins and acts as coordinator for that link, the
+loser leases from it.
+
+  node_id = 0    election id 0 -- always wins (a deterministic, "forced"
+                 coordinator, for clusters that want a fixed leader).
+  node_id = -1   a random election id -- elects dynamically.
+  node_id > 0    does not participate (it has a fixed static window).
+
+A pending winner (node_id = -1 that wins) claims window 0 for itself at
+election time, then grants the other windows. This lets an entire cluster come
+up with NO node designated as coordinator: give every node node_id = -1,
+node_count = N and a shared link_secret, and they elect among themselves.
+
+
+== Roster synchronisation and remote users ==
+
+On establishing a link, each node streams its local roster to the peer: one
+"LINF <binf>" per locally-connected user, carrying that user's full BINF. The
+receiver injects each as a REMOTE user -- it appears in the SID map, the nick
+and CID maps, the user list and the user count, exactly like a local user, but
+has no socket of its own; it exists only as presence state owned by the link it
+arrived on.
+
+Live changes propagate as deltas over the same commands:
+
+  - a local user joining or updating its INF   -> LINF to every link
+  - a local user leaving                        -> LQUI <sid> to every link
+
+An LINF for a SID already known on the receiver is treated as an update; an
+LQUI removes the remote user and tells local clients it quit.
+
+
+== Message routing across links ==
+
+Directed messages (ADC 'D'/'E' context: private messages, search results,
+connect/RCM, NAT traversal) to a user that is remote are forwarded over the
+link that owns the target, wrapped in LRTE:
+
+  LRTE <full ADC message including its trailing newline>
+
+The receiving node parses the wrapped message and re-routes it locally with the
+normal routing path, delivering it to the target's socket.
+
+Locally-originated broadcasts (ADC 'B'/'F' context: public chat and searches)
+are relayed once over every link, also via LRTE. Presence (BINF) is excluded --
+it uses the LINF/LQUI roster path above. To prevent loops, a node never
+re-relays a broadcast whose source is a remote user: a broadcast that arrived
+over a link is delivered to local clients only. This is loop-safe for two hops.
+
+
+== Netsplit ==
+
+When a link drops, the node removes every remote user it learned over that link
+and broadcasts a quit (IQUI) for each to its local clients -- the classic IRC
+netsplit. Window leases granted over that link are returned to the free pool.
+Rosters re-synchronise when the link is re-established.
+
+
+== Configuration ==
+
+Relevant uhub.conf options:
+
+  link_peer     Address of a peer to connect to (host:port). When set, the
+                node makes an outbound link on start-up. Empty = accept only.
+  link_secret   Shared secret for the mutual challenge-response. Must match on
+                both ends. Empty disables linking.
+  node_count    Number of windows the SID space is divided into (cluster size,
+                or a fixed over-provisioned ceiling). Must agree across nodes.
+  node_id       This node's window index: >= 0 static, 0 = forced coordinator,
+                -1 = lease a window dynamically (and participate in election).
+
+Recommended deployment: pick a generous fixed node_count ceiling (e.g. 64) on
+every node so windows never need re-slicing as the cluster grows, and either
+assign unique static node_ids or set node_id = -1 everywhere and let the nodes
+elect and lease.
+
+If linking is configured but node_count is 1 (and node_id >= 0), the hub warns
+at start-up that SIDs are not partitioned and will collide.
+
+
+== Security ==
+
+A link is highly privileged: a peer can inject arbitrary users into the local
+roster. Treat the link as a trust boundary.
+
+The shared-secret handshake is a v1 baseline with the same weaknesses as a
+shared password: one secret for the whole cluster, no per-hub identity, no
+rotation or revocation, and it sits in the config file. Run links only over a
+trusted/private network.
+
+The intended production posture is mutual TLS with per-peer certificate pinning
+(each hub has a keypair; peers pin each other's fingerprint), giving per-node
+identity and revocation with nothing secret on the wire or at rest. Do not
+treat the shared secret as the recommended long-term mechanism.
+
+
+== Status and limitations ==
+
+Implemented and tested (two nodes / star-to-a-coordinator):
+  - probe-based link detection and the mutual LCHA/LRES/LACK handshake
+  - static and dynamic SID partitioning; window leasing (LWRQ/LWIN)
+  - coordinator election (LELC)
+  - roster snapshot and live join/update/quit deltas (LINF/LQUI)
+  - directed and broadcast routing across one hop (LRTE)
+  - netsplit cleanup on link drop
+
+Not yet implemented:
+  - Multi-hop relay and loop tags for a 3+ node mesh (only 2 hops are
+    loop-safe today).
+  - Globally consistent election across a mesh (election is per-link).
+  - Coordinator failover: window leases are held in memory, so a coordinator
+    restart forgets them; there is no lease persistence or re-lease protocol.
+  - TLS-wrapped links: detection is plaintext-only; a TLS link needs a
+    post-handshake re-probe.
+  - Reconnect/backoff: a failed outbound link is attempted once.
+  - Cluster-wide nick/CID collision precedence (the propagation-window race),
+    aggregate hub counts across nodes, and topic/ACL/history propagation.
+  - mutual-TLS / certificate-pinned link authentication.
+
+See the source in src/core/link.c and src/core/probe.c.

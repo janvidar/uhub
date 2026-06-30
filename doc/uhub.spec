@@ -57,7 +57,7 @@ install -m644 mod_*.so $RPM_BUILD_ROOT/usr/lib/uhub
 
 %files
 %defattr(-,root,root)
-%doc AUTHORS BUGS COPYING ChangeLog README TODO doc/Doxyfile doc/architecture.txt doc/compile.txt doc/extensions.txt doc/getstarted.txt doc/uhub.dot
+%doc AUTHORS BUGS COPYING ChangeLog README TODO doc/Doxyfile doc/architecture.txt doc/compile.txt doc/extensions.txt doc/getstarted.txt doc/linking.txt doc/uhub.dot
 %config(noreplace) /etc/uhub/uhub.conf
 #%{_sysconfdir}/uhub/uhub.conf
 %config(noreplace) %{_sysconfdir}/uhub/users.conf
