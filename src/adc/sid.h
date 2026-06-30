@@ -32,6 +32,14 @@ extern char* sid_to_string(sid_t sid_);
 extern sid_t string_to_sid(const char* sid);
 
 extern struct sid_pool* sid_pool_create(sid_t max);
+
+/**
+ * Create a SID pool for a federated node: local SIDs are allocated from the
+ * window [min, max], while `map_size` covers the whole shared cluster SID space
+ * (so remote SIDs inserted by the link layer resolve through the same table).
+ */
+extern struct sid_pool* sid_pool_create_range(sid_t map_size, sid_t min, sid_t max);
+
 extern void sid_pool_destroy(struct sid_pool*);
 
 extern sid_t sid_alloc(struct sid_pool*, struct hub_user*);

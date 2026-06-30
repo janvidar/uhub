@@ -23,6 +23,7 @@
 #include "network/connection.h"
 #include "core/config.h"
 #include "core/hub.h"
+#include "core/link.h"
 #include "core/metrics.h"
 #include "core/probe.h"
 #include "probe.h"
@@ -114,6 +115,16 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 					if (probe->tls)
 						net_con_callback(con, NET_EVENT_READ);
 				}
+				probe_destroy(probe);
+				return;
+			}
+			else if (memcmp(probe_recvbuf, "LCHA", 4) == 0)
+			{
+				/* Hub-to-hub link handshake (see link.c). Links reuse the
+				   normal hub port; hand the connection to the link layer. */
+				LOG_TRACE("Probed hub link connection from %s", ip_convert_to_string(&probe->addr));
+				if (link_accept(probe->hub, probe->connection, &probe->addr))
+					probe->connection = 0; /* ownership transferred to the link */
 				probe_destroy(probe);
 				return;
 			}

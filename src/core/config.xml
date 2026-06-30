@@ -128,6 +128,26 @@
 		<since>0.6.1</since>
 	</option>
 
+	<option name="link_peer" type="string" default="">
+		<short>Upstream hub to link to (host:port)</short>
+		<description><![CDATA[
+			Address (host:port) of an upstream hub to establish a persistent link to. Empty disables outbound linking.
+		]]></description>
+		<example><![CDATA[
+			link_peer = hub2.example.org:1512
+		]]></example>
+		<since>0.6.2</since>
+	</option>
+
+	<option name="link_secret" type="string" default="">
+		<short>Shared secret authenticating hub-to-hub links</short>
+		<description><![CDATA[
+			Shared secret that both ends of a link must hold. Links authenticate by proving knowledge of
+			this secret via a nonce challenge-response; the secret itself is never sent over the wire.
+		]]></description>
+		<since>0.6.2</since>
+	</option>
+
 	<option name="hbri_enable" type="boolean" default="0">
 		<short>Enable HBRI hybrid IPv4/IPv6 connectivity</short>
 		<description><![CDATA[

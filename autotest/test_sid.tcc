@@ -175,3 +175,71 @@ EXO_TEST(sid_destroy_pool, {
 	sid_pool = 0;
 	return sid_pool == 0;
 });
+
+/*
+ * Partitioned pool (federation): a node owns a disjoint window [min, max]
+ * inside a map that spans the whole shared SID space.
+ */
+static struct sid_pool* part_pool = 0;
+static sid_t part_sids[256];
+
+EXO_TEST(sid_range_create, {
+	/* Node 1 of 4 over a 1024-SID space owns the window [256, 511]. */
+	part_pool = sid_pool_create_range(1024, 256, 511);
+	return part_pool != 0;
+});
+
+EXO_TEST(sid_range_alloc_in_window, {
+	int i = 0;
+	int ok = 1;
+	for (i = 0; i < 256; i++)
+	{
+		struct dummy_user* u = hub_malloc_zero(sizeof(struct dummy_user));
+		part_sids[i] = sid_alloc(part_pool, (struct hub_user*) u);
+		u->sid = part_sids[i];
+		if (part_sids[i] < 256 || part_sids[i] > 511)
+			ok = 0;
+	}
+	return ok;
+});
+
+EXO_TEST(sid_range_window_exhausted, {
+	struct dummy_user u;
+	/* All 256 window slots are taken; the next local alloc must fail. */
+	return sid_alloc(part_pool, (struct hub_user*) &u) == 0;
+});
+
+EXO_TEST(sid_range_lookup_bounds, {
+	/* In-window allocated SID resolves; a slot outside the window is a valid
+	   map index but empty (no remote user yet); past map_size returns NULL. */
+	return sid_lookup(part_pool, 511) != 0
+	    && sid_lookup(part_pool, 100) == 0
+	    && sid_lookup(part_pool, 1024) == 0
+	    && sid_lookup(part_pool, 0) == 0;
+});
+
+EXO_TEST(sid_range_free_and_reuse, {
+	int i = 0;
+	int ok = 1;
+	for (i = 0; i < 256; i++)
+	{
+		struct dummy_user* u = (struct dummy_user*) sid_lookup(part_pool, part_sids[i]);
+		sid_free(part_pool, part_sids[i]);
+		hub_free(u);
+		if (sid_lookup(part_pool, part_sids[i]) != 0)
+			ok = 0;
+	}
+	/* Window empty again: allocation succeeds and stays in range. */
+	struct dummy_user* u = hub_malloc_zero(sizeof(struct dummy_user));
+	sid_t s = sid_alloc(part_pool, (struct hub_user*) u);
+	ok = ok && (s >= 256 && s <= 511);
+	sid_free(part_pool, s);
+	hub_free(u);
+	return ok;
+});
+
+EXO_TEST(sid_range_destroy, {
+	sid_pool_destroy(part_pool);
+	part_pool = 0;
+	return 1;
+});
