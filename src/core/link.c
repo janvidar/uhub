@@ -110,9 +110,13 @@ int link_make_nonce(char* out)
 #include <unistd.h>
 #include "core/config.h"
 #include "core/hub.h"
+#include "core/inf.h"
 #include "core/user.h"
 #include "core/usermanager.h"
 #include "core/route.h"
+#include "core/auth.h"
+#include "util/credentials.h"
+#include "plugin_api/types.h"
 
 #define LINK_RECV_MAX 1024
 #define LINK_TIMEOUT  30
@@ -141,6 +145,11 @@ struct hub_link
 
 /* All active links (singleton hub), for teardown. */
 static struct linked_list* g_links = 0;
+
+/* Slave side of master-slave auth: connecting users whose login is paused
+   awaiting a master reply (LACR/LVRS), found by SID when the reply arrives. */
+static struct linked_list* g_auth_pending = 0;
+static struct hub_user* link_auth_pending_take(const char* sidstr);
 
 /* Coordinator side (this hub is node 0 of a cluster): bitmap of which window
    indices [0, g_win_count) are in use, so we can lease free windows to members
@@ -254,6 +263,21 @@ static int link_sendf(struct hub_link* link, const char* fmt, ...)
 	return (w == n) ? 0 : -1;
 }
 
+/* Copy the next space-delimited token from p into out, returning a pointer to
+   the remainder (after the space), or to the end if there was no space. Used to
+   parse the fixed leading fields of auth-proxy messages, leaving a trailing
+   field (e.g. a nick that may contain spaces) as the remainder. */
+static const char* link_tok(const char* p, char* out, size_t outsz)
+{
+	const char* sp = strchr(p, ' ');
+	size_t n = sp ? (size_t) (sp - p) : strlen(p);
+	if (n >= outsz)
+		n = outsz - 1;
+	memcpy(out, p, n);
+	out[n] = 0;
+	return sp ? sp + 1 : p + strlen(p);
+}
+
 /* Process one complete handshake line (NUL-terminated, no newline).
    Returns 0 to continue, -1 to close the link (caller disconnects). */
 static int link_process_line(struct hub_link* link, const char* line)
@@ -304,6 +328,90 @@ static int link_process_line(struct hub_link* link, const char* line)
 		memcpy(cid, p, clen);
 		cid[clen] = 0;
 		hub_apply_ban(link->hub, cid, sp + 1, 0);
+		return 0;
+	}
+
+	if (strncmp(line, "LACQ ", 5) == 0)
+	{
+		/* Auth master: a slave asks whether <nick> is registered. Reply
+		   "LACR <sid> <cred>" (cred = "guest" if unknown). sid echoes the
+		   slave's pending user so it can match the reply. */
+		char sid[16];
+		const char* nick;
+		struct auth_info* info;
+		const char* cred = auth_cred_to_string(auth_cred_guest);
+		if (link->state != link_state_established)
+			return -1;
+		nick = link_tok(line + 5, sid, sizeof(sid));
+		info = acl_get_access_info(link->hub, nick);
+		if (info)
+			cred = auth_cred_to_string(info->credentials);
+		link_sendf(link, "LACR %s %s\n", sid, cred);
+		hub_free(info);
+		return 0;
+	}
+
+	if (strncmp(line, "LVFY ", 5) == 0)
+	{
+		/* Auth master: verify a slave's proxied login. "LVFY <sid> <challenge>
+		   <response> <nick>". Reply "LVRS <sid> <ok> <cred>". The password
+		   never leaves this node. */
+		char sid[16], chal[64], resp[64];
+		const char* nick;
+		struct auth_info* info;
+		int ok = 0;
+		const char* cred = auth_cred_to_string(auth_cred_guest);
+		if (link->state != link_state_established)
+			return -1;
+		nick = link_tok(line + 5, sid, sizeof(sid));
+		nick = link_tok(nick, chal, sizeof(chal));
+		nick = link_tok(nick, resp, sizeof(resp));
+		info = acl_get_access_info(link->hub, nick);
+		if (info)
+		{
+			ok = acl_password_verify_raw(info->password, chal, resp);
+			if (ok)
+				cred = auth_cred_to_string(info->credentials);
+		}
+		link_sendf(link, "LVRS %s %d %s\n", sid, ok, cred);
+		hub_free(info);
+		return 0;
+	}
+
+	if (strncmp(line, "LACR ", 5) == 0)
+	{
+		/* Auth slave: the master answered our LACQ with the nick's credential.
+		   Resume the paused login. */
+		char sid[16];
+		const char* credstr;
+		struct hub_user* user;
+		enum auth_credentials cred = auth_cred_guest;
+		if (link->state != link_state_established)
+			return -1;
+		credstr = link_tok(line + 5, sid, sizeof(sid));
+		user = link_auth_pending_take(sid);
+		if (!user)
+			return 0; /* user gone */
+		auth_string_to_cred(credstr, &cred);
+		hub_auth_proxy_resolve(link->hub, user, cred);
+		return 0;
+	}
+
+	if (strncmp(line, "LVRS ", 5) == 0)
+	{
+		/* Auth slave: the master verified (or rejected) our LVFY. Complete the
+		   paused login. */
+		char sid[16], okstr[8];
+		const char* rest;
+		struct hub_user* user;
+		if (link->state != link_state_established)
+			return -1;
+		rest = link_tok(line + 5, sid, sizeof(sid));
+		link_tok(rest, okstr, sizeof(okstr));
+		user = link_auth_pending_take(sid);
+		if (!user)
+			return 0;
+		hub_auth_proxy_verified(link->hub, user, atoi(okstr));
 		return 0;
 	}
 
@@ -760,6 +868,7 @@ void link_start(struct hub_info* hub)
 {
 	struct hub_config* cfg = hub->config;
 	g_links = list_create();
+	g_auth_pending = list_create();
 
 	/* Election state. A forced coordinator (node_id == 0) uses id 0 and always
 	   wins; an electing node (node_id == -1) uses a random id. Both announce
@@ -846,6 +955,13 @@ void link_stop(struct hub_info* hub)
 
 	list_destroy(g_links);
 	g_links = 0;
+
+	if (g_auth_pending)
+	{
+		list_clear(g_auth_pending, NULL); /* entries are users owned elsewhere */
+		list_destroy(g_auth_pending);
+		g_auth_pending = 0;
+	}
 
 	if (g_uds_listen)
 	{
@@ -957,6 +1073,77 @@ void link_broadcast_ban(struct hub_info* hub, const char* cid, const char* nick)
 		if (link->state == link_state_established)
 			net_con_send(link->connection, buf, (size_t) n);
 	});
+}
+
+/* The upstream (master) link for a slave: the first established outbound link. */
+static struct hub_link* link_master(void)
+{
+	struct hub_link* link;
+	if (!g_links)
+		return 0;
+	LIST_FOREACH(struct hub_link*, link, g_links,
+	{
+		if (link->state == link_state_established && link->is_client)
+			return link;
+	});
+	return 0;
+}
+
+/* Slave: ask the master whether `user`'s nick is registered (LACQ). Returns 1
+   if sent (login should pause), 0 if no master link is available. */
+int link_auth_query(struct hub_info* hub, struct hub_user* user, const char* nick)
+{
+	struct hub_link* master = link_master();
+	(void) hub;
+	if (!master || !nick)
+		return 0;
+	if (g_auth_pending)
+		list_append(g_auth_pending, user);
+	link_sendf(master, "LACQ %s %s\n", sid_to_string(user->id.sid), nick);
+	return 1;
+}
+
+/* Slave: forward the password challenge-response to the master to verify
+   (LVFY). Returns 1 if sent (login should pause), 0 if no master link. */
+int link_auth_proxy_verify(struct hub_info* hub, struct hub_user* user, const char* challenge, const char* response)
+{
+	struct hub_link* master = link_master();
+	(void) hub;
+	if (!master || !challenge || !response)
+		return 0;
+	if (g_auth_pending)
+		list_append(g_auth_pending, user);
+	link_sendf(master, "LVFY %s %s %s %s\n", sid_to_string(user->id.sid), challenge, response, user->id.nick);
+	return 1;
+}
+
+/* Remove a user from the pending-auth registry (on disconnect/destroy). */
+void link_auth_pending_forget(struct hub_user* user)
+{
+	if (g_auth_pending)
+		list_remove(g_auth_pending, user);
+}
+
+/* Find and remove the pending user matching `sidstr` (the SID echoed in the
+   master's reply). NULL if it is gone (e.g. disconnected meanwhile). */
+static struct hub_user* link_auth_pending_take(const char* sidstr)
+{
+	sid_t sid = string_to_sid(sidstr);
+	struct hub_user* user;
+	struct hub_user* found = 0;
+	if (!g_auth_pending)
+		return 0;
+	LIST_FOREACH(struct hub_user*, user, g_auth_pending,
+	{
+		if (user->id.sid == sid)
+		{
+			found = user;
+			break;
+		}
+	});
+	if (found)
+		list_remove(g_auth_pending, found);
+	return found;
 }
 
 /* Inject a remote user from a peer's INF, and announce it to local clients. */

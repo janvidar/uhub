@@ -514,15 +514,42 @@ static int const_time_equal_ci(const char* a, const char* b, size_t len)
 	return diff == 0;
 }
 
-int acl_password_verify(struct hub_info* hub, struct hub_user* user, const char* password)
+int acl_password_verify_raw(const char* password, const char* challenge, const char* response)
 {
 	char buf[1024];
-	struct auth_info* access;
-	const char* challenge;
 	char raw_challenge[64];
 	char password_calc[64];
 	uint64_t tiger_res[3];
 	size_t password_len;
+
+	if (!password || !challenge || !response || strlen(response) != MAX_CID_LEN)
+		return 0;
+
+	base32_decode(challenge, (unsigned char*) raw_challenge, MAX_CID_LEN);
+
+	/* password may be a fixed-size field with a terminator at the end; use
+	 * strnlen so an unterminated field does not walk past it. */
+	password_len = strnlen(password, MAX_PASS_LEN);
+	if (password_len + TIGERSIZE > sizeof(buf))
+		return 0;
+
+	memcpy(&buf[0], password, password_len);
+	memcpy(&buf[password_len], raw_challenge, TIGERSIZE);
+
+	tiger((uint64_t*) buf, TIGERSIZE + password_len, (uint64_t*) tiger_res);
+	base32_encode((unsigned char*) tiger_res, TIGERSIZE, password_calc);
+	password_calc[MAX_CID_LEN] = 0;
+
+	/* response is verified to be exactly MAX_CID_LEN long above, and
+	 * password_calc is MAX_CID_LEN base32 chars; compare in constant time so
+	 * the running time does not leak how far a guessed response matched. */
+	return const_time_equal_ci(response, password_calc, MAX_CID_LEN);
+}
+
+int acl_password_verify(struct hub_info* hub, struct hub_user* user, const char* password)
+{
+	struct auth_info* access;
+	int ok;
 
 	if (!password || !user || strlen(password) != MAX_CID_LEN)
 		return 0;
@@ -531,34 +558,7 @@ int acl_password_verify(struct hub_info* hub, struct hub_user* user, const char*
 	if (!access)
 		return 0;
 
-	challenge = acl_password_generate_challenge(hub, user);
-
-	base32_decode(challenge, (unsigned char*) raw_challenge, MAX_CID_LEN);
-
-	/* access->password is a fixed-size field (MAX_PASS_LEN+1) with a
-	 * terminator at the end; use strnlen so a plugin that returned the
-	 * field unterminated does not cause us to walk past it. */
-	password_len = strnlen(access->password, sizeof(access->password));
-	if (password_len + TIGERSIZE > sizeof(buf))
-	{
-		hub_free(access);
-		return 0;
-	}
-
-	memcpy(&buf[0], access->password, password_len);
-	memcpy(&buf[password_len], raw_challenge, TIGERSIZE);
-
-	tiger((uint64_t*) buf, TIGERSIZE+password_len, (uint64_t*) tiger_res);
-	base32_encode((unsigned char*) tiger_res, TIGERSIZE, password_calc);
-	password_calc[MAX_CID_LEN] = 0;
-
+	ok = acl_password_verify_raw(access->password, acl_password_generate_challenge(hub, user), password);
 	hub_free(access);
-
-	/* password is verified to be exactly MAX_CID_LEN long above, and
-	 * password_calc is MAX_CID_LEN base32 chars; compare in constant time. */
-	if (const_time_equal_ci(password, password_calc, MAX_CID_LEN))
-	{
-		return 1;
-	}
-	return 0;
+	return ok;
 }

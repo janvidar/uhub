@@ -296,6 +296,12 @@ extern void hub_update_description(struct hub_info* hub, const char* escaped_des
 extern void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, int propagate);
 
 /**
+ * Master-slave auth (slave side): complete a login that was paused waiting for
+ * the master to verify the password (LVRS). ok != 0 admits the user.
+ */
+extern void hub_auth_proxy_verified(struct hub_info* hub, struct hub_user* user, int ok);
+
+/**
  * This frees the configuration of the hub.
  */
 extern void hub_free_variables(struct hub_info* hub);

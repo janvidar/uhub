@@ -98,6 +98,7 @@ void user_destroy(struct hub_user* user)
 	}
 
 	adc_msg_free(user->info);
+	adc_msg_free(user->auth_pending_inf);
 	user_clear_feature_cast_support(user);
 	hub_free(user);
 }

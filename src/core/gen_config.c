@@ -22,6 +22,7 @@ void config_defaults(struct hub_config* config)
 	config->dns_thread_pool_size = 4;
 	config->link_peer = hub_strdup("");
 	config->link_secret = hub_strdup("");
+	config->auth_proxy = 0;
 	config->link_socket = hub_strdup("");
 	config->node_count = 1;
 	config->node_id = 0;
@@ -262,6 +263,16 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 	if (!strcmp(key, "link_secret"))
 	{
 		if (!apply_string(key, data, &config->link_secret, NULL))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "auth_proxy"))
+	{
+		if (!apply_boolean(key, data, &config->auth_proxy))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -1408,6 +1419,9 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 
 	if (!ignore_defaults || strcmp(config->link_secret, "") != 0)
 		fprintf(stdout, "link_secret = \"%s\"\n", config->link_secret);
+
+	if (!ignore_defaults || config->auth_proxy != 0)
+		fprintf(stdout, "auth_proxy = %s\n", config->auth_proxy ? "yes" : "no");
 
 	if (!ignore_defaults || strcmp(config->link_socket, "") != 0)
 		fprintf(stdout, "link_socket = \"%s\"\n", config->link_socket);

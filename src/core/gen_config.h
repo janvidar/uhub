@@ -22,6 +22,7 @@ struct hub_config
 	int   dns_thread_pool_size;            /*<<< Number of worker threads for asynchronous DNS lookups (default: 4) */
 	char* link_peer;                       /*<<< Upstream hub to link to (host:port) (default: "") */
 	char* link_secret;                     /*<<< Shared secret authenticating hub-to-hub links (default: "") */
+	int   auth_proxy;                      /*<<< Proxy registered-user authentication to the upstream (master) hub (default: 0) */
 	char* link_socket;                     /*<<< Unix socket path to accept hub-to-hub links on (default: "") */
 	int   node_count;                      /*<<< Number of linked hubs sharing one logical SID space (default: 1) */
 	int   node_id;                         /*<<< This node's index within the linked cluster (0-based, or -1 to lease dynamically) (default: 0) */

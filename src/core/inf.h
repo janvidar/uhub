@@ -20,6 +20,8 @@
 #ifndef HAVE_UHUB_INF_PARSER_H
 #define HAVE_UHUB_INF_PARSER_H
 
+#include "util/credentials.h"
+
 struct hub_info;
 struct hub_user;
 struct adc_message;
@@ -52,6 +54,18 @@ enum nick_status
  * @return 0 on success, -1 on error
  */
 extern int hub_handle_info(struct hub_info* hub, struct hub_user* u, const struct adc_message* cmd);
+
+/**
+ * Run the login checks for a connecting user's BINF and post the join event (or
+ * fail the login). Takes ownership of cmd.
+ */
+extern int hub_complete_inf_login(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd);
+
+/**
+ * Master-slave auth (slave side): the master replied with the credential for a
+ * proxied login; record it and resume the paused login.
+ */
+extern void hub_auth_proxy_resolve(struct hub_info* hub, struct hub_user* user, enum auth_credentials cred);
 
 
 #endif /* HAVE_UHUB_INF_PARSER_H */

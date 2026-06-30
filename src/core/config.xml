@@ -196,6 +196,24 @@
 		<since>0.6.2</since>
 	</option>
 
+	<option name="auth_proxy" type="boolean" default="0">
+		<short>Proxy registered-user authentication to the upstream (master) hub</short>
+		<description><![CDATA[
+			<p>
+			Master-slave authentication for linked hubs. When enabled this node is an auth slave: it holds
+			no user accounts of its own and defers registered-user login to its upstream linked hub (the
+			master), which keeps the only copy of the account database. The slave asks the master whether a
+			nick is registered, and forwards the password challenge-response to the master to verify, so
+			passwords never leave the master.
+			</p>
+			<p>
+			Leave disabled on the master (the hub that loads the auth plugin with the accounts). Guests are
+			unaffected and log in locally.
+			</p>
+		]]></description>
+		<since>0.6.2</since>
+	</option>
+
 	<option name="link_socket" type="string" default="">
 		<short>Unix socket path to accept hub-to-hub links on</short>
 		<description><![CDATA[
