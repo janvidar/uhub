@@ -38,6 +38,7 @@
 #include "core/hubevent.h"
 #include "core/inf.h"
 #include "core/ioqueue.h"
+#include "core/link.h"
 #include "core/netevent.h"
 #include "core/plugininvoke.h"
 #include "core/pluginloader.h"
@@ -1041,6 +1042,11 @@ struct hub_info* hub_start_service(struct hub_config* config)
 
 	hub->status = hub_status_running;
 
+	/* Start hub-to-hub linking (outbound). Incoming links are detected on the
+	   normal hub port by probe.c. Done after the hub is running so the reactor
+	   is ready to drive the outbound connect. */
+	link_start(hub);
+
 	g_hub = hub;
 
 	if (net_backend_get_timeout_queue())
@@ -1060,6 +1066,8 @@ struct hub_info* hub_start_service(struct hub_config* config)
 void hub_shutdown_service(struct hub_info* hub)
 {
 	LOG_DEBUG("hub_shutdown_service()");
+
+	link_stop(hub);
 
 	regserver_cleanup(hub);
 

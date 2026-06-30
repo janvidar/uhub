@@ -71,101 +71,109 @@ sid_t string_to_sid(const char* sid)
 }
 
 /*
- * Session IDs are heavily reused, since they are a fairly scarce
- * resource. Only one (2^10)-1 exist, since it is a four byte base32-encoded
- * value and 'AAAA' (0) is reserved for the hub.
+ * SIDs are a four-character base32 value, so the whole space is 32^4 ≈ 1M
+ * (SID_MAX); 'AAAA' (0) is reserved for the hub and never handed out. They are
+ * a scarce, heavily-reused resource, so the pool is a direct-indexed table.
  *
- * Initialize with sid_initialize(), which sets min and max to one, and count to 0.
+ * The pool separates the lookup MAP from the allocation WINDOW:
+ *  - map_size    entries in `map`, indexable by any SID in [1, map_size).
+ *  - [min, max]  the window this node allocates its own (local) SIDs from.
  *
- * When allocating a session ID:
- * - If 'count' is less than the pool size (max-min), then allocate within the pool
- * - Increase the pool size (see below)
- * - If unable to do that, hub is really full - don't let anyone in!
- *
- * When freeing a session ID:
- * - If the session ID being freed is 'max', then decrease the pool size by one.
- *
+ * For a stand-alone hub the window spans the whole map (sid_pool_create). For a
+ * linked/federated node, each node owns a disjoint window of the shared space
+ * (sid_pool_create_range) so SIDs stay globally unique across the cluster,
+ * while the full map still resolves remote SIDs that the link layer inserts
+ * outside the local window. `count` tracks only local (in-window) allocations,
+ * and `cursor` rotates the probe so allocation is amortized O(1).
  */
 
 struct sid_pool
 {
-	sid_t min;
-	sid_t max;
-	sid_t count;
+	sid_t map_size; /* number of entries in `map` */
+	sid_t min;      /* first allocatable (local) SID, inclusive */
+	sid_t max;      /* last allocatable (local) SID, inclusive */
+	sid_t count;    /* SIDs currently allocated within [min, max] */
+	sid_t cursor;   /* rotating probe offset within the [min, max] window */
 	struct hub_user** map;
 };
 
-
-struct sid_pool* sid_pool_create(sid_t max)
+static struct sid_pool* sid_pool_alloc(sid_t map_size, sid_t min, sid_t max)
 {
 	struct sid_pool* pool = hub_malloc(sizeof(struct sid_pool));
 	if (!pool)
 		return 0;
 
-	pool->min = 1;
-	pool->max = max + 1;
-	pool->count = 0;
-	pool->map = hub_malloc_zero(sizeof(struct hub_user*) * pool->max);
+	pool->map_size = map_size;
+	pool->min      = (min < 1) ? 1 : min; /* SID 0 is reserved for the hub */
+	pool->max      = (max >= map_size) ? (map_size - 1) : max;
+	pool->count    = 0;
+	pool->cursor   = 0;
+	pool->map = hub_malloc_zero(sizeof(struct hub_user*) * map_size);
 	if (!pool->map)
 	{
 		hub_free(pool);
 		return 0;
 	}
-	pool->map[0] = (struct hub_user*) pool; /* hack to reserve the first sid. */
-
-#ifdef DEBUG_SID
-	LOG_DUMP("SID_POOL:  max=%d", (int) pool->max);
-#endif
 	return pool;
+}
+
+struct sid_pool* sid_pool_create(sid_t max)
+{
+	/* Stand-alone hub: map sized to match, window spans SIDs 1..max. */
+	return sid_pool_alloc(max + 1, 1, max);
+}
+
+struct sid_pool* sid_pool_create_range(sid_t map_size, sid_t min, sid_t max)
+{
+	/* Federated node: allocate local SIDs from [min, max] within a map that
+	   spans the whole cluster SID space, so remote users inserted later by the
+	   link layer resolve through the same lookup table. */
+	return sid_pool_alloc(map_size, min, max);
 }
 
 void sid_pool_destroy(struct sid_pool* pool)
 {
-#ifdef DEBUG_SID
-	LOG_DUMP("SID_POOL:  destroying, current allocs=%d", (int) pool->count);
-#endif
 	hub_free(pool->map);
 	hub_free(pool);
 }
 
 sid_t sid_alloc(struct sid_pool* pool, struct hub_user* user)
 {
-	sid_t n;
-	if (pool->count >= (pool->max - pool->min))
+	sid_t window = pool->max - pool->min + 1;
+	sid_t i;
+
+	if (pool->count >= window)
+		return 0; /* local window exhausted */
+
+	for (i = 0; i < window; i++)
 	{
-#ifdef DEBUG_SID
-		LOG_DUMP("SID_POOL:  alloc, sid pool is full.");
-#endif
-		return 0;
+		sid_t sid = pool->min + ((pool->cursor + i) % window);
+		if (!pool->map[sid])
+		{
+			pool->map[sid] = user;
+			pool->cursor = (pool->cursor + i + 1) % window;
+			pool->count++;
+			return sid;
+		}
 	}
-
-	n = (++pool->count);
-	for (; (pool->map[n % pool->max]); n++) ;
-
-#ifdef DEBUG_SID
-	LOG_DUMP("SID_ALLOC: %d, user=%p", (int) n, user);
-#endif
-	n = n % pool->max;
-	pool->map[n] = user;
-	return n;
+	return 0; /* unreachable while count < window */
 }
 
 void sid_free(struct sid_pool* pool, sid_t sid)
 {
-#ifdef DEBUG_SID
-	LOG_DUMP("SID_FREE:  %d", (int) sid);
-#endif
-	if (!sid || sid >= pool->max)
+	if (!sid || sid >= pool->map_size)
 		return;
 	if (!pool->map[sid])
 		return;
 	pool->map[sid] = 0;
-	pool->count--;
+	/* Only local (in-window) allocations are counted; remote SIDs are not. */
+	if (sid >= pool->min && sid <= pool->max)
+		pool->count--;
 }
 
 struct hub_user* sid_lookup(struct sid_pool* pool, sid_t sid)
 {
-	if (!sid || (sid >= pool->max))
+	if (!sid || sid >= pool->map_size)
 		return 0;
 	return pool->map[sid];
 }
