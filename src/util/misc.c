@@ -203,7 +203,7 @@ void base32_decode(const char* src, unsigned char* dst, size_t len) {
 
 int string_split(const char* string, const char* split, void* data, string_split_handler_t handler)
 {
-	char* buf = strdup(string);
+	char* buf = hub_strdup(string);
 	char* start;
 	char* pos;
 	int count = 0;
