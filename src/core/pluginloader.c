@@ -30,6 +30,10 @@
 
 #include "plugin_api/handle.h"
 
+#ifdef HAVE_DLOPEN
+#include <sys/stat.h> /* stat(), S_ISREG, S_IWGRP/S_IWOTH for the plugin perm check */
+#endif
+
 struct plugin_callback_data;
 
 struct plugin_hub_internals* get_internals(struct plugin_handle* handle)
@@ -44,6 +48,33 @@ struct uhub_plugin* plugin_open(const char* filename)
 {
 	struct uhub_plugin* plugin;
 	LOG_PLUGIN("plugin_open: \"%s\"", filename);
+
+#ifdef HAVE_DLOPEN
+	/*
+	 * The plugin is loaded into the hub's own address space, so a .so that any
+	 * non-owner can rewrite is a local code-execution vector. Refuse to load
+	 * one that is group- or world-writable (a correctly installed plugin is
+	 * 0644/0755). Also require it to be a regular file.
+	 */
+	{
+		struct stat st;
+		if (stat(filename, &st) != 0)
+		{
+			LOG_ERROR("Unable to stat plugin %s: %s", filename, strerror(errno));
+			return 0;
+		}
+		if (!S_ISREG(st.st_mode))
+		{
+			LOG_ERROR("Refusing to load plugin %s: not a regular file.", filename);
+			return 0;
+		}
+		if (st.st_mode & (S_IWGRP | S_IWOTH))
+		{
+			LOG_ERROR("Refusing to load plugin %s: it is group- or world-writable.", filename);
+			return 0;
+		}
+	}
+#endif
 
 	plugin = (struct uhub_plugin*) hub_malloc_zero(sizeof(struct uhub_plugin));
 	if (!plugin)
