@@ -235,6 +235,18 @@ struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const
 	LOG_TRACE("Disabling SSL compression.");
 	flags |= SSL_OP_NO_COMPRESSION;
 
+	/* Honour the server's cipher ordering rather than the client's, so the
+	 * strongest mutually-supported suite is chosen instead of the client's
+	 * preference. Ignored on client contexts. */
+	flags |= SSL_OP_CIPHER_SERVER_PREFERENCE;
+
+	/* Refuse client-initiated renegotiation (a DoS/again amplification vector).
+	 * TLS 1.3 has no renegotiation; this covers 1.2. Not defined on every
+	 * supported provider, so guard it. */
+#ifdef SSL_OP_NO_RENEGOTIATION
+	flags |= SSL_OP_NO_RENEGOTIATION;
+#endif
+
 	SSL_CTX_set_options(ctx->ssl, flags);
 
 	/* Set the preferred TLS 1.2 (and earlier) cipher list. */
