@@ -156,6 +156,23 @@ void hub_set_log_verbosity(int verb)
 	verbosity = verb;
 }
 
+/*
+ * Replace control characters in a formatted log line with '?'. Log messages
+ * embed attacker-controlled fields (nick, CID, user agent); without this a
+ * newline could forge a second log line (log injection) and an ESC could smuggle
+ * a terminal escape sequence to whoever reads the log. The timestamp and level
+ * prefix are added by the caller after this, so no legitimate content is harmed.
+ */
+static void log_sanitize(char* s)
+{
+	for (; *s; s++)
+	{
+		unsigned char c = (unsigned char) *s;
+		if (c < 0x20 || c == 0x7f)
+			*s = '?';
+	}
+}
+
 void hub_log(int log_verbosity, const char *format, ...)
 {
 	char logmsg[1024];
@@ -199,6 +216,7 @@ void hub_log(int log_verbosity, const char *format, ...)
 		va_start(args, format);
 		vsnprintf(logmsg, 1024, format, args);
 		va_end(args);
+		log_sanitize(logmsg);
 
 		if (logfile)
 		{
@@ -222,6 +240,7 @@ void hub_log(int log_verbosity, const char *format, ...)
 		va_start(args, format);
 		vsnprintf(logmsg, 1024, format, args);
 		va_end(args);
+		log_sanitize(logmsg);
 
 		switch (log_verbosity)
 		{
