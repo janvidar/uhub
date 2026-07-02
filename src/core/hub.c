@@ -995,6 +995,12 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		return 0;
 	}
 
+	/* The metrics endpoint checks its bearer token over whatever transport the
+	 * request arrives on. With TLS off, a scrape (token included) crosses the
+	 * network in cleartext -- warn so it is only scraped over loopback/TLS. */
+	if (config->metrics_enable && *config->metrics_token && !config->tls_enable)
+		LOG_WARN("Metrics endpoint is enabled without TLS: the bearer token is sent in cleartext. Scrape only over loopback or a TLS-enabled port.");
+
 	hub->config = config;
 	hub->users = NULL;
 
