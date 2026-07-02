@@ -361,6 +361,10 @@ ssize_t net_con_ssl_accept(struct net_connection* con)
 	ssize_t ret;
 	net_ssl_set_state(handle, tls_st_accepting);
 
+	/* Clear the thread error queue first so SSL_get_error() (via
+	 * handle_openssl_error) reflects only this call and does not misread a
+	 * stale error left by an earlier operation. */
+	ERR_clear_error();
 	ret = SSL_accept(handle->ssl);
 	LOG_PROTO("SSL_accept() ret=%d", ret);
 	if (ret > 0)
@@ -379,6 +383,8 @@ ssize_t net_con_ssl_connect(struct net_connection* con)
 	ssize_t ret;
 	net_ssl_set_state(handle, tls_st_connecting);
 
+	/* Clear the thread error queue first (see net_con_ssl_accept). */
+	ERR_clear_error();
 	ret = SSL_connect(handle->ssl);
 	LOG_PROTO("SSL_connect() ret=%d", ret);
 
