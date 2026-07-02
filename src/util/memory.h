@@ -26,10 +26,12 @@
 
 #define hub_malloc     debug_mem_malloc
 #define hub_free       debug_mem_free
+#define hub_realloc    debug_mem_realloc
 #define hub_strdup     debug_mem_strdup
 #define hub_strndup    debug_mem_strndup
 extern void* debug_mem_malloc(size_t size);
 extern void  debug_mem_free(void* ptr);
+extern void* debug_mem_realloc(void* ptr, size_t size);
 extern char* debug_mem_strdup(const char* s);
 extern char* debug_mem_strndup(const char* s, size_t n);
 

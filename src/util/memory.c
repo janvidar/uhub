@@ -19,6 +19,7 @@
 
 #include "system.h"
 #include "util/memory.h"
+#include "util/log.h" /* LOG_MEMORY, used throughout the MEMORY_DEBUG allocator */
 
 #ifdef MEMORY_DEBUG
 
@@ -190,6 +191,42 @@ void* debug_mem_malloc(size_t size)
 void debug_mem_free(void *ptr)
 {
 	internal_debug_mem_free(ptr);
+}
+
+void* debug_mem_realloc(void* ptr, size_t size)
+{
+	if (!ptr)
+		return internal_debug_mem_malloc(size, "realloc");
+
+#ifdef REALTIME_MALLOC_TRACKING
+	{
+		size_t n = 0;
+		for (; n < UHUB_MAX_ALLOCS; n++)
+		{
+			if (hub_allocs[n].ptr == ptr)
+			{
+				void* newptr = realloc(ptr, size);
+				if (!newptr)
+				{
+					LOG_MEMORY("realloc *** OOM for %d bytes", (int) size);
+					hub_alloc_oom++;
+					return 0; /* original ptr still valid and tracked */
+				}
+				hub_alloc_size += size - hub_allocs[n].size;
+				hub_allocs[n].ptr  = newptr;
+				hub_allocs[n].size = size;
+				hub_alloc_peak_size = MAX(hub_alloc_size, hub_alloc_peak_size);
+				LOG_MEMORY("realloc %p -> %p (%d bytes) {allocs: %d, size: " PRINTF_SIZE_T "}", ptr, newptr, (int) size, hub_alloc_count, hub_alloc_size);
+				return newptr;
+			}
+		}
+		/* realloc of a pointer we never handed out: same fatal contract as free. */
+		abort();
+		return 0;
+	}
+#else
+	return realloc(ptr, size);
+#endif /* REALTIME_MALLOC_TRACKING */
 }
 
 
