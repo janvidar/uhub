@@ -237,6 +237,11 @@ pub fn build(b: *std.Build) void {
     // PIE is set per-executable below.
     flags.append("-fstack-protector-strong") catch @panic("OOM");
     if (optimize != .Debug) flags.append("-D_FORTIFY_SOURCE=2") catch @panic("OOM");
+    // Give defined behaviour to the two things the code relies on that are
+    // otherwise UB: signed overflow (-fwrapv) and cast-based type punning
+    // (-fno-strict-aliasing). This is what makes sanitize_c=off below safe --
+    // the code no longer depends on the compiler declining to exploit the UB.
+    flags.appendSlice(&.{ "-fwrapv", "-fno-strict-aliasing" }) catch @panic("OOM");
     if (!release) flags.append("-DDEBUG") catch @panic("OOM");
     if (lowlevel_debug) flags.append("-DLOWLEVEL_DEBUG") catch @panic("OOM");
     if (systemd) flags.append("-DSYSTEMD") catch @panic("OOM");

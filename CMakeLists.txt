@@ -57,6 +57,15 @@ elseif (NOT MSVC)
 	add_compile_options(-O2)
 endif()
 
+# Give the codebase defined behaviour for the two things it relies on that are
+# otherwise UB: signed integer overflow (-fwrapv, wrap instead of UB) and
+# type-punning through casts (-fno-strict-aliasing). This makes the build
+# correct regardless of optimization level rather than depending on the
+# compiler not exploiting the UB.
+if (NOT MSVC)
+	add_compile_options(-fwrapv -fno-strict-aliasing)
+endif()
+
 # --- Binary hardening -------------------------------------------------------
 # Standard exploit-mitigation flags on GCC/Clang: stack canaries, FORTIFY,
 # full RELRO + BIND_NOW, a non-executable stack, and a position-independent
