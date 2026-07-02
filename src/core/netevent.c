@@ -239,6 +239,16 @@ void net_on_accept(struct net_connection* con, int event, void *arg)
 
 		plugin_log_connection_accepted(hub, &ipaddr);
 
+		/*
+		 * Enable (tuned) TCP keepalive so a dead or half-open client -- one
+		 * that completed login and then vanished without a FIN -- is reaped in
+		 * a few minutes rather than lingering indefinitely. There is no
+		 * post-login idle timeout (idle lurkers are supported by design), so
+		 * this is what bounds abandoned connections past the handshake phase.
+		 * Best-effort: failure is non-fatal.
+		 */
+		net_set_keepalive(fd, 1);
+
 		probe = probe_create(hub, fd, &ipaddr);
 		if (!probe)
 		{

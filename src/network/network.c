@@ -25,6 +25,10 @@
 #include "network/network.h"
 #include "network/tls.h"
 
+#ifndef WINSOCK
+#include <netinet/tcp.h> /* TCP_KEEPIDLE / TCP_KEEPALIVE / TCP_KEEPINTVL / TCP_KEEPCNT */
+#endif
+
 static int is_ipv6_supported = -1; /* -1 = CHECK, 0 = NO, 1 = YES */
 static int net_initialized = 0;
 
@@ -272,7 +276,32 @@ int net_set_keepalive(int fd, int toggle)
 	if (ret == -1)
 	{
 		net_error_out(fd, "net_set_keepalive");
+		return ret;
 	}
+
+#ifndef WINSOCK
+	/*
+	 * Tune the per-socket keepalive timers so a dead peer is detected in a few
+	 * minutes instead of the OS default of ~2 hours. Best-effort: a platform
+	 * that lacks one of these options simply keeps its default, so the return
+	 * values are intentionally ignored (no error spam). The idle option is
+	 * TCP_KEEPIDLE on Linux and TCP_KEEPALIVE on the BSDs/macOS.
+	 */
+	if (toggle)
+	{
+#if defined(TCP_KEEPIDLE)
+		{ int v = KEEPALIVE_IDLE;  (void) setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE,  &v, sizeof(v)); }
+#elif defined(TCP_KEEPALIVE)
+		{ int v = KEEPALIVE_IDLE;  (void) setsockopt(fd, IPPROTO_TCP, TCP_KEEPALIVE, &v, sizeof(v)); }
+#endif
+#if defined(TCP_KEEPINTVL)
+		{ int v = KEEPALIVE_INTVL; (void) setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &v, sizeof(v)); }
+#endif
+#if defined(TCP_KEEPCNT)
+		{ int v = KEEPALIVE_CNT;   (void) setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT,   &v, sizeof(v)); }
+#endif
+	}
+#endif
 	return ret;
 }
 

@@ -55,6 +55,21 @@
 #define TIMEOUT_QUEUE_MAX 120
 
 /*
+ * TCP keepalive tuning for accepted client connections (net_set_keepalive()):
+ * after KEEPALIVE_IDLE seconds of silence begin probing, KEEPALIVE_INTVL apart,
+ * up to KEEPALIVE_CNT times before the OS declares the peer dead (~4 min here).
+ * This reaps genuinely dead / half-open connections -- a crashed client, a
+ * yanked network -- that would otherwise linger indefinitely once past the
+ * login handshake timeout, since there is no post-login idle timeout (idle
+ * lurkers are supported by design). It probes only silent connections and never
+ * disconnects a live one, and being an OS-level timer it is independent of the
+ * timeout wheel above (so unbounded by TIMEOUT_QUEUE_MAX).
+ */
+#define KEEPALIVE_IDLE    120
+#define KEEPALIVE_INTVL   30
+#define KEEPALIVE_CNT     4
+
+/*
  * Reconnect-delay hints (seconds) advertised to clients in the QUI "TL" flag,
  * telling them how long to wait before reconnecting after a fatal status.
  */

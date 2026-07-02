@@ -162,6 +162,18 @@ extern int net_set_close_on_exec(int fd, int toggle);
 extern int net_set_linger(int fd, int toggle);
 
 /**
+ * Enable or disable TCP keepalive. When enabling, the per-socket keepalive
+ * timers are also tuned (see KEEPALIVE_* in uhub_limits.h) so a dead or
+ * half-open peer is detected in a few minutes rather than the OS default of
+ * ~2 hours; the tuning is best-effort per platform. Only the SO_KEEPALIVE
+ * toggle itself is reported via the return value.
+ * @param fd socket descriptor
+ * @param toggle Enable keepalive if non-zero, otherwise disable it.
+ * @return -1 on error, 0 on success
+ */
+extern int net_set_keepalive(int fd, int toggle);
+
+/**
  * This will set or unset the SO_REUSEADDR flag.
  * @param fd socket descriptor
  * @param toggle Set SO_REUSEADDR if non-zero, otherwise unset it.
