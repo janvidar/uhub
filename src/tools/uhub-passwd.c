@@ -21,6 +21,9 @@
 #include "adc/adctypes.h"
 #include "util/misc.h"
 #include <sqlite3.h>
+#ifndef WIN32
+#include <sys/stat.h> /* chmod(), S_IRUSR/S_IWUSR for restricting the password DB */
+#endif
 
 // #define DEBUG_SQL
 
@@ -183,6 +186,14 @@ static int create(size_t argc, const char** argv)
 	}
 
 	sqlite3_close(db);
+
+#ifndef WIN32
+	/* The database stores passwords in cleartext (the ADC challenge-response
+	 * needs them), so it is a secret-at-rest: restrict it to the owner. */
+	if (chmod(filename, S_IRUSR | S_IWUSR) != 0)
+		fprintf(stderr, "Warning: unable to restrict permissions on %s: %s\n", filename, strerror(errno));
+#endif
+
 	return 0;
 }
 
