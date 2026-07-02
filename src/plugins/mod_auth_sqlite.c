@@ -17,252 +17,204 @@
  *
  */
 
-#include "plugin_api/handle.h"
 #include "plugin_api/command_api.h"
-#include <sqlite3.h>
-#include "util/memory.h"
-#include "util/list.h"
-#include "util/misc.h"
-#include "util/log.h"
+#include "plugin_api/handle.h"
 #include "util/cbuffer.h"
 #include "util/config_token.h"
+#include "util/memory.h"
+#include "util/misc.h"
+#include <sqlite3.h>
 
-#define DEBUG_SQL
-
-static void set_error_message(struct plugin_handle *plugin, const char *msg)
-{
-	plugin->error_msg = msg;
+static void set_error_message(struct plugin_handle *plugin, const char *msg) {
+    plugin->error_msg = msg;
 }
 
-struct sql_data
-{
-	int exclusive;
-	int self_register;
-	sqlite3 *db;
-	struct plugin_command_handle* cmd_regme;
-	struct plugin_command_handle* cmd_passwd;
+struct sql_data {
+    int exclusive;
+    int self_register;
+    sqlite3 *db;
+    struct plugin_command_handle *cmd_regme;
+    struct plugin_command_handle *cmd_passwd;
 };
 
-static int null_callback(void *ptr, int argc, char **argv, char **colName) { return 0; }
-
-static int sql_execute(struct sql_data *sql, int (*callback)(void *ptr, int argc, char **argv, char **colName), void *ptr, const char *sql_fmt, ...)
-{
-	va_list args;
-	char query[1024];
-	char *errMsg;
-	int rc;
-
-	va_start(args, sql_fmt);
-	vsnprintf(query, sizeof(query), sql_fmt, args);
-
-#ifdef DEBUG_SQL
-	printf("SQL: %s\n", query);
-#endif
-
-	rc = sqlite3_exec(sql->db, query, callback, ptr, &errMsg);
-	if (rc != SQLITE_OK)
-	{
-#ifdef DEBUG_SQL
-		fprintf(stderr, "ERROR: %s\n", errMsg);
-#endif
-		sqlite3_free(errMsg);
-		return -rc;
-	}
-
-	rc = sqlite3_changes(sql->db);
-	return rc;
+static int null_callback(void *ptr, int argc, char **argv, char **colName) {
+    return 0;
 }
 
-static struct sql_data *parse_config(const char *line, struct plugin_handle *plugin)
-{
-	struct sql_data *data = (struct sql_data *)hub_malloc_zero(sizeof(struct sql_data));
-	struct cfg_tokens *tokens = cfg_tokenize(line);
-	char *token = cfg_token_get_first(tokens);
+static int sql_execute(struct sql_data *sql, int (*callback)(void *ptr, int argc, char **argv, char **colName), void *ptr, const char *sql_fmt, ...) {
+    va_list args;
+    char query[1024];
+    char *errMsg;
+    int rc;
 
-	if (!data)
-		return 0;
+    va_start(args, sql_fmt);
+    vsnprintf(query, sizeof(query), sql_fmt, args);
 
-	while (token)
-	{
-		struct cfg_settings *setting = cfg_settings_split(token);
+    rc = sqlite3_exec(sql->db, query, callback, ptr, &errMsg);
+    if (rc != SQLITE_OK) {
+        sqlite3_free(errMsg);
+        return -rc;
+    }
 
-		if (!setting)
-		{
-			set_error_message(plugin, "Unable to parse startup parameters");
-			cfg_tokens_free(tokens);
-			hub_free(data);
-			return 0;
-		}
-
-		if (strcmp(cfg_settings_get_key(setting), "file") == 0)
-		{
-			if (!data->db)
-			{
-				if (sqlite3_open(cfg_settings_get_value(setting), &data->db))
-				{
-					cfg_tokens_free(tokens);
-					cfg_settings_free(setting);
-					hub_free(data);
-					set_error_message(plugin, "Unable to open database file");
-					return 0;
-				}
-			}
-		}
-		else if (strcmp(cfg_settings_get_key(setting), "exclusive") == 0)
-		{
-			if (!string_to_boolean(cfg_settings_get_value(setting), &data->exclusive))
-				data->exclusive = 1;
-		}
-		else if (strcmp(cfg_settings_get_key(setting), "self_register") == 0)
-		{
-			if (!string_to_boolean(cfg_settings_get_value(setting), &data->self_register))
-				data->self_register = 1;
-		}
-		else
-		{
-			set_error_message(plugin, "Unknown startup parameters given");
-			cfg_tokens_free(tokens);
-			cfg_settings_free(setting);
-			hub_free(data);
-			return 0;
-		}
-
-		cfg_settings_free(setting);
-		token = cfg_token_get_next(tokens);
-	}
-	cfg_tokens_free(tokens);
-
-	if (!data->db)
-	{
-		set_error_message(plugin, "No database file is given, use file=<database>");
-		hub_free(data);
-		return 0;
-	}
-	return data;
+    rc = sqlite3_changes(sql->db);
+    return rc;
 }
 
-static plugin_st get_user(struct plugin_handle* plugin, const char* nickname, struct auth_info* data)
-{
-	struct sql_data* sql = (struct sql_data*) plugin->ptr;
-	sqlite3_stmt* stmt;
-	int rc;
-	int found = 0;
+static struct sql_data *parse_config(const char *line, struct plugin_handle *plugin) {
+    struct sql_data *data = (struct sql_data *)hub_malloc_zero(sizeof(struct sql_data));
+    struct cfg_tokens *tokens = cfg_tokenize(line);
+    char *token = cfg_token_get_first(tokens);
 
-	memset(data, 0, sizeof(struct auth_info));
+    if (!data)
+        return 0;
 
-#ifdef DEBUG_SQL
-	printf("SQL: SELECT * FROM users WHERE nickname=?\n");
-#endif
+    while (token) {
+        struct cfg_settings *setting = cfg_settings_split(token);
 
-	rc = sqlite3_prepare_v2(sql->db, "SELECT nickname, password, credentials FROM users WHERE nickname=?;", -1, &stmt, NULL);
-	if (rc != SQLITE_OK)
-	{
-#ifdef DEBUG_SQL
-		fprintf(stderr, "SQL: ERROR: %s\n", sqlite3_errmsg(sql->db));
-#endif
-		return st_default;
-	}
+        if (!setting) {
+            set_error_message(plugin, "Unable to parse startup parameters");
+            cfg_tokens_free(tokens);
+            hub_free(data);
+            return 0;
+        }
 
-	sqlite3_bind_text(stmt, 1, nickname, -1, SQLITE_STATIC);
+        if (strcmp(cfg_settings_get_key(setting), "file") == 0) {
+            if (!data->db) {
+                if (sqlite3_open(cfg_settings_get_value(setting), &data->db)) {
+                    cfg_tokens_free(tokens);
+                    cfg_settings_free(setting);
+                    hub_free(data);
+                    set_error_message(plugin, "Unable to open database file");
+                    return 0;
+                }
+            }
+        } else if (strcmp(cfg_settings_get_key(setting), "exclusive") == 0) {
+            if (!string_to_boolean(cfg_settings_get_value(setting), &data->exclusive))
+                data->exclusive = 1;
+        } else if (strcmp(cfg_settings_get_key(setting), "self_register") == 0) {
+            if (!string_to_boolean(cfg_settings_get_value(setting), &data->self_register))
+                data->self_register = 1;
+        } else {
+            set_error_message(plugin, "Unknown startup parameters given");
+            cfg_tokens_free(tokens);
+            cfg_settings_free(setting);
+            hub_free(data);
+            return 0;
+        }
 
-	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW)
-	{
-		const char* nick = (const char*) sqlite3_column_text(stmt, 0);
-		const char* pass = (const char*) sqlite3_column_text(stmt, 1);
-		const char* cred = (const char*) sqlite3_column_text(stmt, 2);
+        cfg_settings_free(setting);
+        token = cfg_token_get_next(tokens);
+    }
+    cfg_tokens_free(tokens);
 
-		if (nick)
-		{
-			strncpy(data->nickname, nick, MAX_NICK_LEN);
-			data->nickname[MAX_NICK_LEN] = '\0';
-		}
-		if (pass)
-		{
-			strncpy(data->password, pass, MAX_PASS_LEN);
-			data->password[MAX_PASS_LEN] = '\0';
-		}
-		if (cred)
-		{
-			auth_string_to_cred(cred, &data->credentials);
-			found = 1;
-		}
-
-#ifdef DEBUG_SQL
-		printf("SQL: nickname=%s, password=%s, credentials=%s\n", data->nickname, data->password, auth_cred_to_string(data->credentials));
-#endif
-	}
-
-	sqlite3_finalize(stmt);
-
-	if (found)
-		return st_allow;
-	return st_default;
+    if (!data->db) {
+        set_error_message(plugin, "No database file is given, use file=<database>");
+        hub_free(data);
+        return 0;
+    }
+    return data;
 }
 
-static plugin_st register_user(struct plugin_handle *plugin, struct auth_info *user)
-{
-	struct sql_data* sql = (struct sql_data*) plugin->ptr;
-	sqlite3_stmt* stmt;
-	const char* cred = auth_cred_to_string(user->credentials);
-	int rc;
+static plugin_st get_user(struct plugin_handle *plugin, const char *nickname, struct auth_info *data) {
+    struct sql_data *sql = (struct sql_data *)plugin->ptr;
+    sqlite3_stmt *stmt;
+    int rc;
+    int found = 0;
 
-	rc = sqlite3_prepare_v2(sql->db, "INSERT INTO users (nickname, password, credentials) VALUES(?, ?, ?);", -1, &stmt, NULL);
-	if (rc != SQLITE_OK)
-	{
-		fprintf(stderr, "Unable to add user \"%s\": %s\n", user->nickname, sqlite3_errmsg(sql->db));
-		return st_deny;
-	}
+    memset(data, 0, sizeof(struct auth_info));
 
-	sqlite3_bind_text(stmt, 1, user->nickname, -1, SQLITE_STATIC);
-	sqlite3_bind_text(stmt, 2, user->password, -1, SQLITE_STATIC);
-	sqlite3_bind_text(stmt, 3, cred, -1, SQLITE_STATIC);
+    rc = sqlite3_prepare_v2(sql->db, "SELECT nickname, password, credentials FROM users WHERE nickname=?;", -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        return st_default;
+    }
 
-	rc = sqlite3_step(stmt);
-	sqlite3_finalize(stmt);
+    sqlite3_bind_text(stmt, 1, nickname, -1, SQLITE_STATIC);
 
-	if (rc != SQLITE_DONE)
-	{
-		fprintf(stderr, "Unable to add user \"%s\"\n", user->nickname);
-		return st_deny;
-	}
-	return st_allow;
+    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        const char *nick = (const char *)sqlite3_column_text(stmt, 0);
+        const char *pass = (const char *)sqlite3_column_text(stmt, 1);
+        const char *cred = (const char *)sqlite3_column_text(stmt, 2);
+
+        if (nick) {
+            strncpy(data->nickname, nick, MAX_NICK_LEN);
+            data->nickname[MAX_NICK_LEN] = '\0';
+        }
+
+        if (pass) {
+            strncpy(data->password, pass, MAX_PASS_LEN);
+            data->password[MAX_PASS_LEN] = '\0';
+        }
+
+        if (cred) {
+            auth_string_to_cred(cred, &data->credentials);
+            found = 1;
+        }
+    }
+
+    sqlite3_finalize(stmt);
+
+    if (found)
+        return st_allow;
+    return st_default;
 }
 
-static plugin_st update_user(struct plugin_handle *plugin, struct auth_info *user)
-{
-	struct sql_data* sql = (struct sql_data*) plugin->ptr;
-	sqlite3_stmt* stmt;
-	const char* cred = auth_cred_to_string(user->credentials);
-	int rc;
+static plugin_st register_user(struct plugin_handle *plugin, struct auth_info *user) {
+    struct sql_data *sql = (struct sql_data *)plugin->ptr;
+    sqlite3_stmt *stmt;
+    const char *cred = auth_cred_to_string(user->credentials);
+    int rc;
 
-	rc = sqlite3_prepare_v2(sql->db, "UPDATE users SET password=?, credentials=? WHERE nickname=?;", -1, &stmt, NULL);
-	if (rc != SQLITE_OK)
-	{
-		fprintf(stderr, "Unable to update user \"%s\": %s\n", user->nickname, sqlite3_errmsg(sql->db));
-		return st_deny;
-	}
+    rc = sqlite3_prepare_v2(sql->db, "INSERT INTO users (nickname, password, credentials) VALUES(?, ?, ?);", -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Unable to add user \"%s\": %s\n", user->nickname, sqlite3_errmsg(sql->db));
+        return st_deny;
+    }
 
-	sqlite3_bind_text(stmt, 1, user->password, -1, SQLITE_STATIC);
-	sqlite3_bind_text(stmt, 2, cred, -1, SQLITE_STATIC);
-	sqlite3_bind_text(stmt, 3, user->nickname, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 1, user->nickname, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, user->password, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, cred, -1, SQLITE_STATIC);
 
-	rc = sqlite3_step(stmt);
-	sqlite3_finalize(stmt);
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
 
-	if (rc != SQLITE_DONE)
-	{
-		fprintf(stderr, "Unable to update user \"%s\"\n", user->nickname);
-		return st_deny;
-	}
-	return st_allow;
+    if (rc != SQLITE_DONE) {
+        fprintf(stderr, "Unable to add user \"%s\"\n", user->nickname);
+        return st_deny;
+    }
+    return st_allow;
 }
 
-static plugin_st delete_user(struct plugin_handle *plugin, struct auth_info *user)
-{
-	struct sql_data *sql = (struct sql_data *)plugin->ptr;
-	if (sql->exclusive)
-		return st_deny;
-	return st_default;
+static plugin_st update_user(struct plugin_handle *plugin, struct auth_info *user) {
+    struct sql_data *sql = (struct sql_data *)plugin->ptr;
+    sqlite3_stmt *stmt;
+    const char *cred = auth_cred_to_string(user->credentials);
+    int rc;
+
+    rc = sqlite3_prepare_v2(sql->db, "UPDATE users SET password=?, credentials=? WHERE nickname=?;", -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Unable to update user \"%s\": %s\n", user->nickname, sqlite3_errmsg(sql->db));
+        return st_deny;
+    }
+
+    sqlite3_bind_text(stmt, 1, user->password, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, cred, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, user->nickname, -1, SQLITE_STATIC);
+
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+
+    if (rc != SQLITE_DONE) {
+        fprintf(stderr, "Unable to update user \"%s\"\n", user->nickname);
+        return st_deny;
+    }
+    return st_allow;
+}
+
+static plugin_st delete_user(struct plugin_handle *plugin, struct auth_info *user) {
+    struct sql_data *sql = (struct sql_data *)plugin->ptr;
+    if (sql->exclusive)
+        return st_deny;
+    return st_default;
 }
 
 /**
@@ -270,162 +222,162 @@ static plugin_st delete_user(struct plugin_handle *plugin, struct auth_info *use
  * The 'p' command argument type already rejects whitespace, so we only need
  * to guard against an empty password or one that exceeds the storage limit.
  */
-static int valid_password(const char* pass)
-{
-	size_t len;
-	if (!pass)
-		return 0;
-	len = strlen(pass);
-	if (len == 0 || len > MAX_PASS_LEN)
-		return 0;
-	return 1;
+static int valid_password(const char *pass) {
+    size_t len;
+    if (!pass)
+        return 0;
+    len = strlen(pass);
+    if (len == 0 || len > MAX_PASS_LEN)
+        return 0;
+    return 1;
 }
 
-static int command_regme_handler(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_command* cmd)
-{
-	struct cbuffer* buf = cbuf_create(256);
-	struct plugin_command_arg_data* arg = plugin->hub.command_arg_next(plugin, cmd, plugin_cmd_arg_type_string);
-	const char* pass = arg ? arg->data.string : NULL;
-	struct auth_info info;
+static int command_regme_handler(struct plugin_handle *plugin, struct plugin_user *user, struct plugin_command *cmd) {
+    struct cbuffer *buf = cbuf_create(256);
+    struct plugin_command_arg_data *arg = plugin->hub.command_arg_next(plugin, cmd, plugin_cmd_arg_type_string);
+    const char *pass = arg ? arg->data.string : NULL;
+    struct auth_info info;
 
-	if (!valid_password(pass))
-	{
-		cbuf_append_format(buf, "*** %s: Password must be 1-%d characters and contain no spaces.", cmd->prefix, MAX_PASS_LEN);
-		plugin->hub.send_message(plugin, user, cbuf_get(buf));
-		cbuf_destroy(buf);
-		return 0;
-	}
+    if (!valid_password(pass)) {
+        cbuf_append_format(buf, "*** %s: Password must be 1-%d characters and contain no spaces.", cmd->prefix, MAX_PASS_LEN);
+        plugin->hub.send_message(plugin, user, cbuf_get(buf));
+        cbuf_destroy(buf);
+        return 0;
+    }
 
-	if (user->credentials >= auth_cred_user)
-	{
-		cbuf_append_format(buf, "*** %s: You are already logged in as a registered user.", cmd->prefix);
-		plugin->hub.send_message(plugin, user, cbuf_get(buf));
-		cbuf_destroy(buf);
-		return 0;
-	}
+    if (user->credentials >= auth_cred_user) {
+        cbuf_append_format(buf, "*** %s: You are already logged in as a registered user.", cmd->prefix);
+        plugin->hub.send_message(plugin, user, cbuf_get(buf));
+        cbuf_destroy(buf);
+        return 0;
+    }
 
-	if (get_user(plugin, user->nick, &info) == st_allow)
-	{
-		cbuf_append_format(buf, "*** %s: The nick \"%s\" is already registered.", cmd->prefix, user->nick);
-		plugin->hub.send_message(plugin, user, cbuf_get(buf));
-		cbuf_destroy(buf);
-		return 0;
-	}
+    if (get_user(plugin, user->nick, &info) == st_allow) {
+        cbuf_append_format(buf, "*** %s: The nick \"%s\" is already registered.", cmd->prefix, user->nick);
+        plugin->hub.send_message(plugin, user, cbuf_get(buf));
+        cbuf_destroy(buf);
+        return 0;
+    }
 
-	memset(&info, 0, sizeof(info));
-	strncpy(info.nickname, user->nick, MAX_NICK_LEN);
-	info.nickname[MAX_NICK_LEN] = '\0';
-	strncpy(info.password, pass, MAX_PASS_LEN);
-	info.password[MAX_PASS_LEN] = '\0';
-	info.credentials = auth_cred_user;
+    memset(&info, 0, sizeof(info));
+    strncpy(info.nickname, user->nick, MAX_NICK_LEN);
+    info.nickname[MAX_NICK_LEN] = '\0';
+    strncpy(info.password, pass, MAX_PASS_LEN);
+    info.password[MAX_PASS_LEN] = '\0';
+    info.credentials = auth_cred_user;
 
-	if (register_user(plugin, &info) == st_allow)
-	{
-		cbuf_append_format(buf, "*** %s: Registered nick \"%s\". To log in: set this password in your client, then disconnect and reconnect to the hub.", cmd->prefix, user->nick);
-	}
-	else
-	{
-		cbuf_append_format(buf, "*** %s: Registration failed. Please try again later or contact an operator.", cmd->prefix);
-	}
-	plugin->hub.send_message(plugin, user, cbuf_get(buf));
-	cbuf_destroy(buf);
-	return 0;
+    if (register_user(plugin, &info) == st_allow) {
+        cbuf_append_format(buf,
+            "*** %s: Registered nick \"%s\". To log in: set this password in your "
+            "client, then disconnect and reconnect to the hub.",
+            cmd->prefix, user->nick);
+    } else {
+    cbuf_append_format(buf,
+            "*** %s: Registration failed. Please try again later or "
+            "contact an operator.",
+            cmd->prefix);
+    }
+    plugin->hub.send_message(plugin, user, cbuf_get(buf));
+    cbuf_destroy(buf);
+    return 0;
 }
 
-static int command_passwd_handler(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_command* cmd)
-{
-	struct cbuffer* buf = cbuf_create(256);
-	struct plugin_command_arg_data* arg = plugin->hub.command_arg_next(plugin, cmd, plugin_cmd_arg_type_string);
-	const char* pass = arg ? arg->data.string : NULL;
-	struct auth_info info;
+static int command_passwd_handler(struct plugin_handle *plugin, struct plugin_user *user, struct plugin_command *cmd) {
+    struct cbuffer *buf = cbuf_create(256);
+    struct plugin_command_arg_data *arg = plugin->hub.command_arg_next(plugin, cmd, plugin_cmd_arg_type_string);
+    const char *pass = arg ? arg->data.string : NULL;
+    struct auth_info info;
 
-	if (user->credentials < auth_cred_user)
-	{
-		cbuf_append_format(buf, "*** %s: Only registered users can change their password.", cmd->prefix);
-		plugin->hub.send_message(plugin, user, cbuf_get(buf));
-		cbuf_destroy(buf);
-		return 0;
-	}
+    if (user->credentials < auth_cred_user) {
+        cbuf_append_format(
+            buf, "*** %s: Only registered users can change their password.",
+            cmd->prefix);
+        plugin->hub.send_message(plugin, user, cbuf_get(buf));
+        cbuf_destroy(buf);
+        return 0;
+    }
 
-	if (!valid_password(pass))
-	{
-		cbuf_append_format(buf, "*** %s: Password must be 1-%d characters and contain no spaces.", cmd->prefix, MAX_PASS_LEN);
-		plugin->hub.send_message(plugin, user, cbuf_get(buf));
-		cbuf_destroy(buf);
-		return 0;
-	}
+    if (!valid_password(pass)) {
+        cbuf_append_format(
+            buf, "*** %s: Password must be 1-%d characters and contain no spaces.",
+            cmd->prefix, MAX_PASS_LEN);
+        plugin->hub.send_message(plugin, user, cbuf_get(buf));
+        cbuf_destroy(buf);
+        return 0;
+    }
 
-	/* Load the existing record so the credential level is preserved across the update. */
-	if (get_user(plugin, user->nick, &info) != st_allow)
-	{
-		cbuf_append_format(buf, "*** %s: Could not find your registration. Contact an operator.", cmd->prefix);
-		plugin->hub.send_message(plugin, user, cbuf_get(buf));
-		cbuf_destroy(buf);
-		return 0;
-	}
+    /* Load the existing record so the credential level is preserved across the
+    * update. */
+    if (get_user(plugin, user->nick, &info) != st_allow) {
+        cbuf_append_format(
+            buf, "*** %s: Could not find your registration. Contact an operator.",
+            cmd->prefix);
+        plugin->hub.send_message(plugin, user, cbuf_get(buf));
+        cbuf_destroy(buf);
+        return 0;
+    }
 
-	strncpy(info.password, pass, MAX_PASS_LEN);
-	info.password[MAX_PASS_LEN] = '\0';
+    strncpy(info.password, pass, MAX_PASS_LEN);
+    info.password[MAX_PASS_LEN] = '\0';
 
-	if (update_user(plugin, &info) == st_allow)
-	{
-		cbuf_append_format(buf, "*** %s: Password updated. Use the new password the next time you log in.", cmd->prefix);
-	}
-	else
-	{
-		cbuf_append_format(buf, "*** %s: Password change failed. Please try again later.", cmd->prefix);
-	}
-	plugin->hub.send_message(plugin, user, cbuf_get(buf));
-	cbuf_destroy(buf);
-	return 0;
+    if (update_user(plugin, &info) == st_allow) {
+        cbuf_append_format(buf,
+            "*** %s: Password updated. Use the new password the "
+            "next time you log in.",
+            cmd->prefix);
+    } else {
+        cbuf_append_format(
+            buf, "*** %s: Password change failed. Please try again later.",
+            cmd->prefix);
+    }
+    plugin->hub.send_message(plugin, user, cbuf_get(buf));
+    cbuf_destroy(buf);
+    return 0;
 }
 
-int plugin_register(struct plugin_handle *plugin, const char *config)
-{
-	PLUGIN_INITIALIZE(plugin, "SQLite authentication plugin", "1.0", "Authenticate users based on a SQLite database.");
+int plugin_register(struct plugin_handle *plugin, const char *config) {
+    PLUGIN_INITIALIZE(plugin, "SQLite authentication plugin", "1.0", "Authenticate users based on a SQLite database.");
 
-	// Authentication actions.
-	plugin->funcs.auth_get_user = get_user;
-	plugin->funcs.auth_register_user = register_user;
-	plugin->funcs.auth_update_user = update_user;
-	plugin->funcs.auth_delete_user = delete_user;
+    // Authentication actions.
+    plugin->funcs.auth_get_user = get_user;
+    plugin->funcs.auth_register_user = register_user;
+    plugin->funcs.auth_update_user = update_user;
+    plugin->funcs.auth_delete_user = delete_user;
 
-	plugin->ptr = parse_config(config, plugin);
-	if (!plugin->ptr)
-		return -1;
+    plugin->ptr = parse_config(config, plugin);
+    if (!plugin->ptr)
+        return -1;
 
-	// Self-service commands, only when explicitly enabled in the config.
-	{
-		struct sql_data* sql = (struct sql_data*) plugin->ptr;
-		if (sql->self_register)
-		{
-			sql->cmd_regme = (struct plugin_command_handle*) hub_malloc_zero(sizeof(struct plugin_command_handle));
-			sql->cmd_passwd = (struct plugin_command_handle*) hub_malloc_zero(sizeof(struct plugin_command_handle));
-			PLUGIN_COMMAND_INITIALIZE(sql->cmd_regme, plugin, "regme", "p", auth_cred_guest, command_regme_handler, "Register your current nick with a password.");
-			PLUGIN_COMMAND_INITIALIZE(sql->cmd_passwd, plugin, "passwd", "p", auth_cred_user, command_passwd_handler, "Change the password of your registered nick.");
-			plugin->hub.command_add(plugin, sql->cmd_regme);
-			plugin->hub.command_add(plugin, sql->cmd_passwd);
-		}
-	}
-	return 0;
+    // Self-service commands, only when explicitly enabled in the config.
+    {
+        struct sql_data *sql = (struct sql_data *)plugin->ptr;
+        if (sql->self_register) {
+            sql->cmd_regme = (struct plugin_command_handle *)hub_malloc_zero(sizeof(struct plugin_command_handle));
+            sql->cmd_passwd = (struct plugin_command_handle *)hub_malloc_zero(sizeof(struct plugin_command_handle));
+            PLUGIN_COMMAND_INITIALIZE(sql->cmd_regme, plugin, "regme", "p", auth_cred_guest, command_regme_handler, "Register your current nick with a password.");
+            PLUGIN_COMMAND_INITIALIZE(sql->cmd_passwd, plugin, "passwd", "p", auth_cred_user, command_passwd_handler, "Change the password of your registered nick.");
+            plugin->hub.command_add(plugin, sql->cmd_regme);
+            plugin->hub.command_add(plugin, sql->cmd_passwd);
+        }
+    }
+    return 0;
 }
 
-int plugin_unregister(struct plugin_handle *plugin)
-{
-	struct sql_data *sql;
-	set_error_message(plugin, 0);
-	sql = (struct sql_data *)plugin->ptr;
-	if (sql->cmd_regme)
-	{
-		plugin->hub.command_del(plugin, sql->cmd_regme);
-		hub_free(sql->cmd_regme);
-	}
-	if (sql->cmd_passwd)
-	{
-		plugin->hub.command_del(plugin, sql->cmd_passwd);
-		hub_free(sql->cmd_passwd);
-	}
-	sqlite3_close(sql->db);
-	hub_free(sql);
-	return 0;
+int plugin_unregister(struct plugin_handle *plugin) {
+    struct sql_data *sql;
+    set_error_message(plugin, 0);
+    sql = (struct sql_data *)plugin->ptr;
+
+    if (sql->cmd_regme) {
+        plugin->hub.command_del(plugin, sql->cmd_regme);
+        hub_free(sql->cmd_regme);
+    }
+
+    if (sql->cmd_passwd) {
+        plugin->hub.command_del(plugin, sql->cmd_passwd);
+        hub_free(sql->cmd_passwd);
+    }
+    sqlite3_close(sql->db);
+    hub_free(sql);
+    return 0;
 }
