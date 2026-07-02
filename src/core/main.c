@@ -443,6 +443,41 @@ int drop_privileges()
 		}
 	}
 
+	/*
+	 * Verify the drop actually took effect. setgid/setuid can appear to
+	 * succeed yet leave a privileged id reachable (e.g. only the effective id
+	 * changed, or a saved-set uid lingers), so confirm both the real and
+	 * effective ids are the target and that root can no longer be regained. A
+	 * silent half-drop is worse than not dropping at all -- abort rather than
+	 * run on with more privilege than intended.
+	 */
+	if (arg_gid || (arg_uid && !gid_ok))
+	{
+		if (getgid() != perm_gid || getegid() != perm_gid)
+		{
+			LOG_FATAL("Group privilege drop did not take effect (gid is %d, wanted %d).",
+				(int) getgid(), (int) perm_gid);
+			return -1;
+		}
+	}
+
+	if (arg_uid)
+	{
+		if (getuid() != perm_uid || geteuid() != perm_uid)
+		{
+			LOG_FATAL("User privilege drop did not take effect (uid is %d, wanted %d).",
+				(int) getuid(), (int) perm_uid);
+			return -1;
+		}
+
+		/* If we dropped away from root, root must no longer be reachable. */
+		if (perm_uid != 0 && setuid(0) != -1)
+		{
+			LOG_FATAL("Able to regain root after dropping privileges; refusing to continue.");
+			return -1;
+		}
+	}
+
 	return 0;
 }
 
