@@ -189,6 +189,14 @@ static int command_history(struct plugin_handle* plugin, struct plugin_user* use
 	else
 		maxlines = data->history_default;
 
+	/* Clamp the user-supplied count to [0, history_max]. A negative value is
+	 * "no limit" to SQLite's LIMIT clause, so "!history -1" would otherwise
+	 * dump the entire table -- a memory-amplification lever. */
+	if (maxlines < 0)
+		maxlines = 0;
+	else if ((size_t) maxlines > data->history_max)
+		maxlines = (int) data->history_max;
+
 	sql_execute(data, get_messages_callback, found, "SELECT from_nick,message, datetime(time, 'localtime') as time FROM chat_history ORDER BY time DESC LIMIT 0,%d;", maxlines);
 
 	size_t linecount = list_size(found);
