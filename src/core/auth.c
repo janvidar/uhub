@@ -492,6 +492,28 @@ const char* acl_password_generate_challenge(struct hub_info* hub, struct hub_use
 }
 
 
+/*
+ * Constant-time, case-insensitive comparison of two length-len buffers. It
+ * always inspects all len bytes, so the running time does not reveal how far a
+ * guessed password response matched -- closing the timing side channel that a
+ * short-circuiting strcasecmp() opens. base32 is case-insensitive, hence the
+ * ASCII case fold (the inputs are base32-encoded Tiger digests).
+ */
+static int const_time_equal_ci(const char* a, const char* b, size_t len)
+{
+	unsigned char diff = 0;
+	size_t i;
+	for (i = 0; i < len; i++)
+	{
+		unsigned char ca = (unsigned char) a[i];
+		unsigned char cb = (unsigned char) b[i];
+		if (ca >= 'A' && ca <= 'Z') ca = (unsigned char) (ca + 32);
+		if (cb >= 'A' && cb <= 'Z') cb = (unsigned char) (cb + 32);
+		diff |= (unsigned char) (ca ^ cb);
+	}
+	return diff == 0;
+}
+
 int acl_password_verify(struct hub_info* hub, struct hub_user* user, const char* password)
 {
 	char buf[1024];
@@ -532,7 +554,9 @@ int acl_password_verify(struct hub_info* hub, struct hub_user* user, const char*
 
 	hub_free(access);
 
-	if (strcasecmp(password, password_calc) == 0)
+	/* password is verified to be exactly MAX_CID_LEN long above, and
+	 * password_calc is MAX_CID_LEN base32 chars; compare in constant time. */
+	if (const_time_equal_ci(password, password_calc, MAX_CID_LEN))
 	{
 		return 1;
 	}
