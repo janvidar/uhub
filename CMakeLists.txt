@@ -50,7 +50,63 @@ endif()
 
 if (NOT RELEASE)
 	add_compile_definitions(DEBUG)
+elseif (NOT MSVC)
+	# Optimize release builds. Besides the obvious, this is a prerequisite for
+	# _FORTIFY_SOURCE (added by the hardening block below): the fortified libc
+	# checks are compiled in only when optimization is enabled.
+	add_compile_options(-O2)
 endif()
+
+# --- Binary hardening -------------------------------------------------------
+# Standard exploit-mitigation flags on GCC/Clang: stack canaries, FORTIFY,
+# full RELRO + BIND_NOW, a non-executable stack, and a position-independent
+# executable (ASLR for the main binary, not just the PIC libs). Every flag is
+# feature-probed, so a toolchain/linker that lacks one (e.g. the macOS linker
+# has no "-z relro") simply skips it rather than failing the build. Skipped for
+# MSVC (different model) and for fuzzing builds (the sanitizer runtime brings
+# its own hardening and FORTIFY conflicts with the ASan interceptors).
+if (NOT MSVC AND NOT FUZZING)
+	include(CheckCCompilerFlag)
+	include(CheckLinkerFlag)
+	include(CheckPIESupported)
+
+	check_pie_supported(LANGUAGES C)
+	if (CMAKE_C_LINK_PIE_SUPPORTED)
+		set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+	endif()
+
+	# On clang a flag that is recognized but does nothing for the target (e.g.
+	# -fstack-clash-protection on arm64 macOS) only warns "argument unused", so
+	# the probe would pass and then spam that warning on every TU. Promote it to
+	# an error during the probe so such flags are dropped instead of added.
+	set(_hardening_probe_flags "")
+	if (CMAKE_C_COMPILER_ID MATCHES "Clang")
+		set(_hardening_probe_flags "-Werror=unused-command-line-argument")
+	endif()
+	foreach (_flag -fstack-protector-strong -fstack-clash-protection)
+		string(MAKE_C_IDENTIFIER "HAVE_CFLAG_${_flag}" _var)
+		set(CMAKE_REQUIRED_FLAGS "${_hardening_probe_flags}")
+		check_c_compiler_flag("${_flag}" ${_var})
+		unset(CMAKE_REQUIRED_FLAGS)
+		if (${_var})
+			add_compile_options("${_flag}")
+		endif()
+	endforeach()
+
+	if (RELEASE)
+		# Redefinition is harmless but noisy if the toolchain predefines it.
+		add_compile_options(-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2)
+	endif()
+
+	foreach (_lflag "-Wl,-z,relro" "-Wl,-z,now" "-Wl,-z,noexecstack")
+		string(MAKE_C_IDENTIFIER "HAVE_LDFLAG_${_lflag}" _var)
+		check_linker_flag(C "${_lflag}" ${_var})
+		if (${_var})
+			add_link_options("${_lflag}")
+		endif()
+	endforeach()
+endif()
+# ---------------------------------------------------------------------------
 
 if (FUZZING)
 	if (NOT CMAKE_C_COMPILER_ID STREQUAL "Clang")

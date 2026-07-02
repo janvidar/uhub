@@ -230,6 +230,13 @@ pub fn build(b: *std.Build) void {
     // Assemble the common C flags applied to every translation unit.
     var flags = std.array_list.Managed([]const u8).init(b.allocator);
     flags.appendSlice(&.{ "-std=gnu23", "-pedantic", "-Wall", "-W", "-D_GNU_SOURCE" }) catch @panic("OOM");
+    // Binary hardening, mirroring CMakeLists.txt: a stack canary always, and
+    // _FORTIFY_SOURCE when optimizing (the fortified libc checks compile in only
+    // under optimization, so it is inert -- and warns -- in a Debug build).
+    // RELRO, BIND_NOW and a non-executable stack are the Zig linker defaults;
+    // PIE is set per-executable below.
+    flags.append("-fstack-protector-strong") catch @panic("OOM");
+    if (optimize != .Debug) flags.append("-D_FORTIFY_SOURCE=2") catch @panic("OOM");
     if (!release) flags.append("-DDEBUG") catch @panic("OOM");
     if (lowlevel_debug) flags.append("-DLOWLEVEL_DEBUG") catch @panic("OOM");
     if (systemd) flags.append("-DSYSTEMD") catch @panic("OOM");
@@ -337,6 +344,7 @@ pub fn build(b: *std.Build) void {
     ctx.linkExternal(uhub_mod);
     const uhub = b.addExecutable(.{ .name = "uhub", .root_module = uhub_mod });
     uhub.rdynamic = true; // export symbols for dlopen'd plugins
+    uhub.pie = true; // ASLR for the executable itself, not just the PIC libs
     b.installArtifact(uhub);
 
     // autotest-bin
@@ -347,6 +355,7 @@ pub fn build(b: *std.Build) void {
     ctx.linkExternal(autotest_mod);
     const autotest = b.addExecutable(.{ .name = "autotest-bin", .root_module = autotest_mod });
     autotest.rdynamic = true;
+    autotest.pie = true;
     b.installArtifact(autotest);
 
     // uhub-passwd (needs SQLite for the password database)
@@ -356,6 +365,7 @@ pub fn build(b: *std.Build) void {
     passwd_mod.linkLibrary(common);
     ctx.linkExternal(passwd_mod);
     const passwd = b.addExecutable(.{ .name = "uhub-passwd", .root_module = passwd_mod });
+    passwd.pie = true;
     b.installArtifact(passwd);
 
     // UNIX-only tools (CMake guards these with if(UNIX)).
@@ -369,6 +379,7 @@ pub fn build(b: *std.Build) void {
         admin_mod.linkLibrary(common);
         ctx.linkExternal(admin_mod);
         const admin = b.addExecutable(.{ .name = "uhub-admin", .root_module = admin_mod });
+        admin.pie = true;
         b.installArtifact(admin);
 
         if (adc_stress) {
@@ -381,6 +392,7 @@ pub fn build(b: *std.Build) void {
             adcrush_mod.linkLibrary(common);
             ctx.linkExternal(adcrush_mod);
             const adcrush = b.addExecutable(.{ .name = "adcrush", .root_module = adcrush_mod });
+            adcrush.pie = true;
             b.installArtifact(adcrush);
         }
     }
