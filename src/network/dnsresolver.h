@@ -79,17 +79,9 @@ typedef int (*net_dns_job_cb)(struct net_dns_job*, const struct net_dns_result* 
 extern struct net_dns_job* net_dns_gethostbyname(const char* host, int af, net_dns_job_cb callback, void* ptr);
 
 /**
- * Perform a reverse DNS lookup for a given IP address.
- *
- * @see net_dns_gethostbyname()
- * @return A resolve job handle if the job has successfully started or NULL if unable to start resolving.
- */
-extern struct net_dns_job* net_dns_gethostbyaddr(struct ip_addr_encap* ipaddr, net_dns_job_cb callback, void* ptr);
-
-/**
  * Cancel a DNS lookup job.
  *
- * It is only allowed to call this once after a job has been started (@see net_dns_gethostbyname(), @see net_dns_gethostbyaddr())
+ * It is only allowed to call this once after a job has been started (@see net_dns_gethostbyname())
  * but before it has finished and delivered a to the callback address (@see net_dns_job_cb).
  *
  * @returns 1 if cancelled, or 0 if not cancelled (because the job was not found!)
@@ -99,7 +91,7 @@ extern int net_dns_job_cancel(struct net_dns_job* job);
 /**
  * Wait in a synchronous manner for a running DNS job to finished and
  * return the result here.
- * The job must be started with net_dns_gethostbyaddr/net_dns_gethostbyname
+ * The job must be started with net_dns_gethostbyname
  * and not finished or cancelled.
  *
  * If this function is invoked then the callback function will not be called and

@@ -406,18 +406,6 @@ extern struct net_dns_job* net_dns_gethostbyname(const char* host, int af, net_d
 
 
 
-extern struct net_dns_job* net_dns_gethostbyaddr(struct ip_addr_encap* ipaddr, net_dns_job_cb callback, void* ptr)
-{
-	struct net_dns_job* job = (struct net_dns_job*) hub_malloc_zero(sizeof(struct net_dns_job));
-// 	job->host = strdup(addr);
-	job->af = ipaddr->af;
-	job->callback = callback;
-	job->ptr = ptr;
-
-	// FIXME: reverse lookups are not implemented; the job is never queued.
-	return job;
-}
-
 // NOTE: mutex must be locked first!
 static struct net_dns_result* find_and_remove_result(struct net_dns_job* job)
 {
