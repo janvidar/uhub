@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>uhub — Monitoring with Prometheus</title>
+	<meta name="description" content="Monitor a uhub ADC hub with Prometheus: enable the metrics endpoint and scrape it from a local Prometheus instance." />
+	<link rel="icon" href="../assets/img/favicon.ico" />
+	<link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+	<div class="container nav">
+		<a class="brand" href="../index.html">
+			<img src="../assets/img/logo.svg" alt="uhub logo" />
+			<span>uhub</span>
+			<span class="slogan">High performance ADC hub</span>
+		</a>
+		<button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+		<ul class="nav-links">
+			<li><a href="../index.html">About</a></li>
+			<li><a href="../news.html">News</a></li>
+			<li><a href="../download.html">Download</a></li>
+			<li><a href="index.html" class="active">Documentation</a></li>
+		</ul>
+	</div>
+</header>
+
+<div class="container doc-layout">
+	<aside class="doc-sidebar">
+		<h4>Users</h4>
+		<ul>
+			<li><a href="getstarted.html">Getting started</a></li>
+			<li><a href="config-example.html">Example configuration</a></li>
+			<li><a href="config.html">Configuration reference</a></li>
+			<li><a href="plugins/index.html">Plug-ins</a></li>
+			<li><a href="config-ssl.html">SSL / TLS</a></li>
+			<li><a href="metrics.html" class="active">Monitoring</a></li>
+		</ul>
+		<h4>Developers</h4>
+		<ul>
+			<li><a href="developers.html">Contributors</a></li>
+			<li><a href="compile.html">Compiling</a></li>
+			<li><a href="architecture.html">Architecture</a></li>
+			<li><a href="plugin-api.html">Plug-in API</a></li>
+		</ul>
+		<h4>Resources</h4>
+		<ul>
+			<li><a href="adc.html">What is ADC?</a></li>
+			<li><a href="coredumps.html">Core dumps</a></li>
+		</ul>
+	</aside>
+
+	<main class="doc-content">
+		<div class="prose">
+			<h1>Monitoring with Prometheus</h1>
+			<p class="lead-sub">uhub can export runtime metrics in the Prometheus text format so you can scrape, graph and alert on your hub.</p>
+
+			<div class="callout">
+				<p>
+					The metrics endpoint is served on the <strong>same port as ADC</strong> — there is no
+					separate listener. The hub demultiplexes ADC, TLS and HTTP on <code>server_port</code>, so
+					an HTTP <code>GET</code> for the metrics path returns the metrics document while ADC clients
+					keep using the same port. It is available from <strong>uhub 0.7.0</strong> and is off by
+					default.
+				</p>
+			</div>
+
+			<h2>1. Enable the endpoint</h2>
+			<p>Add these directives to <code>uhub.conf</code> and restart the hub:</p>
+			<pre><code>metrics_enable = yes
+metrics_token  = "a-long-random-secret"
+metrics_path   = "/metrics"</code></pre>
+			<p>
+				A non-empty <code>metrics_token</code> is <strong>required</strong> — if no token is set the
+				endpoint stays disabled even with <code>metrics_enable = yes</code>. Scrapers must present the
+				token in an <code>Authorization: Bearer &lt;token&gt;</code> header; any request without it, or to
+				a different path, is rejected. Generate a token with, for example:
+			</p>
+			<pre><code>openssl rand -hex 32</code></pre>
+
+			<div class="callout warn">
+				<p>
+					<strong>The token is a shared secret.</strong> On a hub with <code>tls_enable = yes</code>
+					the same port also answers HTTPS, so scrape over <code>https://</code> to keep the token
+					confidential. Over plain HTTP the token travels in clear text — only acceptable over
+					loopback or a trusted private network, which is exactly the localhost case below.
+				</p>
+			</div>
+
+			<h2>2. Check it by hand</h2>
+			<p>
+				With the hub running locally on the default port (1511), confirm the endpoint answers before
+				pointing Prometheus at it:
+			</p>
+			<pre><code>curl -H "Authorization: Bearer a-long-random-secret" \
+     http://localhost:1511/metrics</code></pre>
+			<p>You should see a block of metrics in the Prometheus exposition format:</p>
+			<pre><code># HELP uhub_users Currently logged-in users.
+# TYPE uhub_users gauge
+uhub_users 3
+# HELP uhub_uptime_seconds Seconds since the hub started.
+# TYPE uhub_uptime_seconds gauge
+uhub_uptime_seconds 4210
+...</code></pre>
+			<p>
+				A missing or wrong token returns <code>403 Forbidden</code>; a request for any path other than
+				<code>metrics_path</code> returns <code>404 Not Found</code>; anything but <code>GET</code>
+				returns <code>405 Method Not Allowed</code>.
+			</p>
+
+			<h2>3. Point Prometheus at it</h2>
+			<p>
+				Install Prometheus (<code>apt install prometheus</code>, <code>brew install prometheus</code>, or
+				the tarball from <a href="https://prometheus.io/download/">prometheus.io</a>) and add a scrape
+				job to <code>prometheus.yml</code>. The bearer token goes in the job configuration:
+			</p>
+			<pre><code>scrape_configs:
+  - job_name: uhub
+    metrics_path: /metrics
+    scheme: http
+    authorization:
+      type: Bearer
+      credentials: "a-long-random-secret"
+    static_configs:
+      - targets: ["localhost:1511"]</code></pre>
+			<p>Start Prometheus with that configuration:</p>
+			<pre><code>prometheus --config.file=prometheus.yml</code></pre>
+			<p>
+				Open <code>http://localhost:9090</code>, go to <em>Status → Targets</em>, and the
+				<code>uhub</code> target should read <strong>UP</strong>. You can now query any metric — try
+				<code>uhub_users</code> or <code>rate(uhub_chat_messages_total[5m])</code> in the expression
+				browser.
+			</p>
+
+			<div class="callout">
+				<p>
+					If your hub runs with TLS, set <code>scheme: https</code> instead. For a self-signed
+					certificate add <code>tls_config:</code> with <code>insecure_skip_verify: true</code> (or
+					point <code>ca_file</code> at your certificate) under the same job.
+				</p>
+			</div>
+
+			<h2>What is exposed</h2>
+			<p>
+				Every metric is prefixed <code>uhub_</code>. Counters only ever increase (use
+				<code>rate()</code> to graph them); gauges reflect the value at scrape time.
+			</p>
+
+			<h3>Users and shares</h3>
+			<table>
+				<tr><th>Metric</th><th>Type</th><th>Meaning</th></tr>
+				<tr><td><code>uhub_users</code></td><td>gauge</td><td>Currently logged-in users.</td></tr>
+				<tr><td><code>uhub_users_peak</code></td><td>gauge</td><td>Peak number of logged-in users.</td></tr>
+				<tr><td><code>uhub_users_max</code></td><td>gauge</td><td>Configured <code>max_users</code>.</td></tr>
+				<tr><td><code>uhub_users_ipv4</code> / <code>uhub_users_ipv6</code></td><td>gauge</td><td>Users connected over IPv4 / IPv6.</td></tr>
+				<tr><td><code>uhub_users_active</code> / <code>uhub_users_passive</code></td><td>gauge</td><td>Users that do / do not advertise a routable address.</td></tr>
+				<tr><td><code>uhub_users_by_credential</code></td><td>gauge</td><td>Users by class, labelled <code>credential="guest|registered|bot|operator|admin"</code>.</td></tr>
+				<tr><td><code>uhub_shared_bytes</code> / <code>uhub_shared_files</code></td><td>gauge</td><td>Total bytes / files shared by connected users.</td></tr>
+			</table>
+
+			<h3>Activity counters</h3>
+			<table>
+				<tr><th>Metric</th><th>Type</th><th>Meaning</th></tr>
+				<tr><td><code>uhub_logins_total</code></td><td>counter</td><td>Successful user logins.</td></tr>
+				<tr><td><code>uhub_login_failures_total</code></td><td>counter</td><td>Rejected or failed login attempts.</td></tr>
+				<tr><td><code>uhub_logouts_total</code></td><td>counter</td><td>Logged-in users that disconnected.</td></tr>
+				<tr><td><code>uhub_chat_messages_total</code></td><td>counter</td><td>Public chat messages accepted for routing.</td></tr>
+				<tr><td><code>uhub_private_messages_total</code></td><td>counter</td><td>Private messages accepted for routing.</td></tr>
+				<tr><td><code>uhub_searches_total</code> / <code>uhub_search_results_total</code></td><td>counter</td><td>Search requests accepted / results relayed.</td></tr>
+				<tr><td><code>uhub_connect_requests_total</code> / <code>uhub_rev_connect_requests_total</code></td><td>counter</td><td>Active (CTM) / passive (RCM) connect requests.</td></tr>
+				<tr><td><code>uhub_broadcasts_total</code> / <code>uhub_feature_casts_total</code></td><td>counter</td><td>Messages broadcast to all / feature-cast to subscribers.</td></tr>
+			</table>
+
+			<h3>Network and TLS</h3>
+			<table>
+				<tr><th>Metric</th><th>Type</th><th>Meaning</th></tr>
+				<tr><td><code>uhub_uptime_seconds</code></td><td>gauge</td><td>Seconds since the hub started.</td></tr>
+				<tr><td><code>uhub_net_tx_bytes_total</code> / <code>uhub_net_rx_bytes_total</code></td><td>counter</td><td>Total bytes transmitted / received.</td></tr>
+				<tr><td><code>uhub_net_tx_rate_bytes</code> / <code>uhub_net_rx_rate_bytes</code></td><td>gauge</td><td>Current send / receive rate (bytes/sec); <code>_peak</code> variants hold the maxima.</td></tr>
+				<tr><td><code>uhub_send_queue_bytes</code></td><td>gauge</td><td>Total bytes queued for sending across all users.</td></tr>
+				<tr><td><code>uhub_connections_accepted_total</code> / <code>_closed_total</code> / <code>_errors_total</code></td><td>counter</td><td>Connection lifecycle counts.</td></tr>
+				<tr><td><code>uhub_tls_accept_total</code> / <code>_connect_total</code> / <code>_close_total</code> / <code>_error_total</code></td><td>counter</td><td>TLS handshake and error counts.</td></tr>
+				<tr><td><code>uhub_event_loop_seconds</code></td><td>histogram</td><td>Event-loop processing time per iteration (excludes the idle poll wait) — a direct measure of main-thread saturation.</td></tr>
+			</table>
+
+			<h2>Useful queries</h2>
+			<p>A few starting points for the Prometheus expression browser or a Grafana panel:</p>
+			<ul>
+				<li><code>uhub_users</code> — current online users, and <code>uhub_users / uhub_users_max</code> for hub fullness.</li>
+				<li><code>rate(uhub_chat_messages_total[5m])</code> — chat messages per second.</li>
+				<li><code>rate(uhub_login_failures_total[5m])</code> — a rising rate can indicate a brute-force attempt.</li>
+				<li><code>rate(uhub_net_tx_bytes_total[1m])</code> — outbound throughput in bytes/sec.</li>
+				<li><code>histogram_quantile(0.99, rate(uhub_event_loop_seconds_bucket[5m]))</code> — 99th-percentile event-loop latency; watch this to spot the hub becoming CPU-bound.</li>
+			</ul>
+
+			<p>
+				See the <a href="config.html">configuration reference</a> for the full description of the
+				<code>metrics_enable</code>, <code>metrics_token</code> and <code>metrics_path</code> directives.
+			</p>
+		</div>
+	</main>
+</div>
+
+<footer class="site-footer">
+	<div class="container footer-inner">
+		<div>uhub &copy; 2007–2026 Jan Vidar Krey</div>
+		<ul class="footer-links">
+			<li><a href="https://github.com/janvidar/uhub/">GitHub</a></li>
+			<li><a href="https://github.com/janvidar/uhub/issues">Issues</a></li>
+			<li><a href="index.html">Documentation</a></li>
+			<li><a href="https://www.gnu.org/licenses/gpl-3.0.html">License</a></li>
+		</ul>
+	</div>
+</footer>
+
+<script src="../assets/js/main.js"></script>
+</body>
+</html>
