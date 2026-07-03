@@ -130,9 +130,14 @@ void cbuf_append_format(struct cbuffer* buf, const char* format, ...)
 void cbuf_append_strftime(struct cbuffer* buf, const char* format, const struct tm* tm)
 {
 	static char tmp[MAX_MSG_LEN];
-	int bytes;
+	size_t bytes;
 	uhub_assert(buf->flags == 0);
 	bytes = strftime(tmp, sizeof(tmp), format, tm);
+	/* strftime() returns 0 if the result (including the terminating NUL) did
+	   not fit in tmp; nothing usable was written, so append nothing. Otherwise
+	   the count is already < sizeof(tmp) and safe to append. */
+	if (bytes == 0)
+		return;
 	cbuf_append_bytes(buf, tmp, bytes);
 }
 
