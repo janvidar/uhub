@@ -41,25 +41,6 @@ static int null_callback(void *ptr, int argc, char **argv, char **colName) {
     return 0;
 }
 
-static int sql_execute(struct sql_data *sql, int (*callback)(void *ptr, int argc, char **argv, char **colName), void *ptr, const char *sql_fmt, ...) {
-    va_list args;
-    char query[1024];
-    char *errMsg;
-    int rc;
-
-    va_start(args, sql_fmt);
-    vsnprintf(query, sizeof(query), sql_fmt, args);
-
-    rc = sqlite3_exec(sql->db, query, callback, ptr, &errMsg);
-    if (rc != SQLITE_OK) {
-        sqlite3_free(errMsg);
-        return -rc;
-    }
-
-    rc = sqlite3_changes(sql->db);
-    return rc;
-}
-
 static struct sql_data *parse_config(const char *line, struct plugin_handle *plugin) {
     struct sql_data *data = (struct sql_data *)hub_malloc_zero(sizeof(struct sql_data));
     struct cfg_tokens *tokens = cfg_tokenize(line);
