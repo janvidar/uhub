@@ -84,7 +84,7 @@ int net_backend_poll_select(struct net_backend* data, int ms)
 		if (net_error() == EINTR)
 			return 0;
 
-		printf("Error: %d\n", net_error());
+		LOG_ERROR("select() failed: %d %s", net_error(), net_error_string(net_error()));
 	}
 
 	return res;
