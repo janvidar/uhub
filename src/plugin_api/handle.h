@@ -116,9 +116,13 @@ struct plugin_command_arg_data;
 typedef int (*hfunc_send_message)(struct plugin_handle*, struct plugin_user* user, const char* message);
 typedef int (*hfunc_send_broadcast_message)(struct plugin_handle*, const char* message);
 typedef int (*hfunc_send_status)(struct plugin_handle*, struct plugin_user* to, int code, const char* message);
+typedef int (*hfunc_send_user_command)(struct plugin_handle*, struct plugin_user* user, const char* name, int context, const char* command);
 typedef int (*hfunc_user_disconnect)(struct plugin_handle*, struct plugin_user* user);
 typedef int (*hfunc_command_add)(struct plugin_handle*, struct plugin_command_handle*);
 typedef int (*hfunc_command_del)(struct plugin_handle*, struct plugin_command_handle*);
+
+typedef void (*hfunc_command_foreach_callback)(struct plugin_handle*, const struct plugin_command_info*, void* ptr);
+typedef void (*hfunc_command_foreach)(struct plugin_handle*, enum auth_credentials credentials, hfunc_command_foreach_callback callback, void* ptr);
 
 typedef size_t (*hfunc_command_arg_reset)(struct plugin_handle*, struct plugin_command*);
 typedef struct plugin_command_arg_data* (*hfunc_command_arg_next)(struct plugin_handle*, struct plugin_command*, enum plugin_command_arg_type);
@@ -139,9 +143,11 @@ struct plugin_hub_funcs
 	hfunc_send_message send_message;
 	hfunc_send_broadcast_message send_broadcast_message;
 	hfunc_send_status send_status_message;
+	hfunc_send_user_command send_user_command;
 	hfunc_user_disconnect user_disconnect;
 	hfunc_command_add command_add;
 	hfunc_command_del command_del;
+	hfunc_command_foreach command_foreach;
 	hfunc_command_arg_reset command_arg_reset;
 	hfunc_command_arg_next command_arg_next;
 	hfunc_get_usercount get_usercount;

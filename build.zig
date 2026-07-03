@@ -113,6 +113,7 @@ const plugins = [_]Plugin{
     .{ .name = "mod_chat_history_sqlite", .sqlite = true },
     .{ .name = "mod_chat_only" },
     .{ .name = "mod_topic" },
+    .{ .name = "mod_ucmd" },
     .{ .name = "mod_no_guest_downloads" },
     .{ .name = "mod_flood" },
 };
