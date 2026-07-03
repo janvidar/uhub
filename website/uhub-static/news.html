@@ -33,6 +33,30 @@
 		<p class="section-sub">Release announcements and project updates.</p>
 
 		<article class="news-entry">
+			<h2>uhub 0.7.0 released <span class="tag">release</span></h2>
+			<div class="news-meta">2026-07-03 by Jan Vidar Krey</div>
+			<p>
+				uhub 0.7.0 is available as platform-independent source. This release adds
+				<strong>hub linking and federation</strong> — multiple uhubs can be joined into a single
+				logical hub with a partitioned SID space, a dedicated authenticated hub-to-hub protocol, a
+				synchronised cluster roster, and cross-hub routing of chat, private messages, searches and
+				connect requests. A new multi-process mode forks <code>workers=N</code> processes that share
+				the client port to spread load across CPU cores.
+			</p>
+			<p>
+				Performance work coalesces broadcast writes into a single <code>writev()</code>/<code>SSL_write()</code>
+				per connection each event-loop iteration, and the DNS resolver now uses a worker-thread pool.
+				New features include a bearer-token-gated <strong>Prometheus metrics endpoint</strong> served on
+				the existing port, ADC NATT NAT-traversal support, experimental HBRI hybrid IPv4/IPv6
+				connectivity, and mod_auth_sqlite <code>!regme</code> / <code>!passwd</code> self-service commands.
+				The release also brings extensive security hardening (binary-hardening flags, constant-time
+				password comparison, log-injection sanitising and more) and numerous BSD/macOS portability fixes.
+				See the <a href="download.html">download page</a> to get the sources and the
+				<a href="doc/getstarted.html">getting started guide</a> to run your first hub.
+			</p>
+		</article>
+
+		<article class="news-entry">
 			<h2>uhub 0.6.0 released <span class="tag">release</span></h2>
 			<div class="news-meta">2026-06-18 by Jan Vidar Krey</div>
 			<p>
