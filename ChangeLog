@@ -1,3 +1,56 @@
+0.7.0:
+Federation and scaling:
+- Hub linking: multiple uhubs can be linked into a single logical hub with a partitioned SID space, a dedicated hub-to-hub link protocol (challenge-response authenticated with a shared secret), and cross-hub routing of chat, private messages, searches, results and connect requests. Links reuse the normal client port and are auto-detected.
+- Cluster roster sync: linked hubs exchange their user lists and live join/quit/INF updates so every client sees one unified user list; a netsplit cleanly removes the far side's users.
+- Dynamic SID-window leasing and coordinator election, so nodes can join a cluster without a statically assigned node id.
+- Linked hubs propagate the topic and cluster-wide bans.
+- Master-slave authentication for linked hubs: a slave hub proxies login lookups and password verification to the master, so passwords live in one place (see doc/linking.txt).
+- Multi-process mode: with workers=N the hub forks N worker processes that share the client port and run as one logical hub across CPU cores.
+- New link/federation options: link_peer, link_secret, node_id, node_count, workers, worker_socket_dir, auth_proxy (see doc/linking.txt).
+
+Performance:
+- Broadcast writes are deferred and coalesced: queued messages are flushed once per event-loop iteration and gathered into a single writev()/SSL_write() per connection, collapsing the login/presence storm from ~M*N syscalls toward ~N.
+- The DNS resolver now uses a configurable worker-thread pool instead of spawning one thread per lookup.
+- The hard per-user send-queue limit scales with the number of connected users.
+
+New features:
+- Prometheus metrics endpoint served over the existing port (off by default, bearer-token gated), with message-type counters, per-user gauges and an event-loop processing-time histogram.
+- ADC NATT extension (NAT traversal) support.
+- Experimental HBRI hybrid IPv4/IPv6 connectivity (issue #79).
+- The hub can announce itself to an ADC registration server at startup and advertises a complete adc(s):// URL with port (issue #105), plus the HH/WS/NE/OW hub-info fields for the ADC PING extension.
+- Added limit_min_search to reject overly short substring searches (issue #71).
+- mod_auth_sqlite: added !regme / !passwd self-service commands (fixes #84).
+- Flood control is now a detect-in-core / act-in-plugin event, so plugins can decide how to respond to detected floods.
+
+Security and hardening:
+- Removed a debug build flag (DEBUG_SQL) that logged nicknames and plaintext passwords to stdout on every SQLite-backed login.
+- Enabled binary-hardening flags (stack protector, FORTIFY, full RELRO/BIND_NOW, non-executable stack, PIE) in both build systems.
+- Verify that the privilege drop actually took effect (real/effective ids changed and root cannot be regained) and abort otherwise.
+- Reap dead/half-open client connections with tuned TCP keepalive.
+- Hardened the TLS server: honour server cipher preference and refuse client-initiated renegotiation; clear the OpenSSL error queue before handshake calls.
+- Compare password responses in constant time.
+- Refuse to load group- or world-writable plugins.
+- uhub-passwd now creates the password database mode 0600.
+- Sanitize control characters in log lines to prevent log injection.
+- Clamp the !history count, warn when the metrics endpoint runs without TLS, and bound the accumulated -v/-q verbosity.
+- Derive the login password challenge from the per-hub secret.
+- Give defined behaviour to signed overflow and type punning (-fwrapv, -fno-strict-aliasing).
+
+Portability and bug fixes:
+- Fixed non-blocking connect result retrieval on BSD/macOS (getsockopt(SO_ERROR) instead of re-calling connect()), and only report connect failure once all resolved addresses are exhausted.
+- Fixed the kqueue backend on the BSDs and macOS, and stopped surfacing spurious "not a socket" errors for pipes on macOS.
+- Made the HBRI address regexes portable (fixes BSD/macOS regcomp) and validate string config values against a POSIX regex on load.
+- Cap concurrent connections and bounds-check the fd-indexed backend tables.
+- Fixed a login send-queue crash and several out-of-memory NULL-dereferences on the login path; added defensive guards to ADC message unescape / named-argument handling.
+- Strip the ADC0 support flag for non-TLS client connections, and skip no-op fields in INF updates.
+- !broadcast is now sent as a private message from the hub rather than from the sender.
+- Applied Debian packaging patches for GNU Hurd and RISC-V.
+
+Build system and tests:
+- The Zig build now builds a bundled LibreSSL and SQLite from package dependencies, making it self-contained; adapted to Zig 0.16.
+- The autotest driver (autotest/test.c) is generated at build time from the .tcc sources; added test_config and test_auth coverage.
+- Removed the god-header "uhub.h" and the dead thirdparty/sqlite submodule; always export compile_commands.json; assorted CMake and compiler-warning cleanups.
+
 0.6.0:
 - TLS is now mandatory: the SSL_SUPPORT build option is gone and a TLS library (OpenSSL or LibreSSL) is always required.
 - LibreSSL is now a first-class, supported TLS provider alongside OpenSSL.

@@ -2,8 +2,8 @@ const std = @import("std");
 
 // Keep these in sync with CMakeLists.txt (UHUB_VERSION_*).
 const version_major = 0;
-const version_minor = 6;
-const version_patch = 1;
+const version_minor = 7;
+const version_patch = 0;
 
 // Shared source sets, mirroring the static libraries CMakeLists.txt builds
 // (adc / network / utils). They are compiled once into a single static

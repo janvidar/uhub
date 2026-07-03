@@ -86,7 +86,7 @@
 			loopback/a trusted network, or use HTTPS.
 			</p>
 		]]></description>
-		<since>0.6.1</since>
+		<since>0.7.0</since>
 	</option>
 
 	<option name="metrics_token" type="string" default="">
@@ -98,7 +98,7 @@
 		<example><![CDATA[
 			metrics_token = "a-long-random-secret"
 		]]></example>
-		<since>0.6.1</since>
+		<since>0.7.0</since>
 	</option>
 
 	<option name="metrics_path" type="string" default="/metrics">
@@ -108,7 +108,7 @@
 			The HTTP path that returns metrics. Requests for any other path receive 404. Change this
 			to obscure the endpoint if desired. Must begin with a slash.
 		]]></description>
-		<since>0.6.1</since>
+		<since>0.7.0</since>
 	</option>
 
 	<option name="workers" type="int" default="1">
@@ -128,7 +128,7 @@
 			process only supervises the workers (restarting any that exit); it serves no clients itself.
 			</p>
 		]]></description>
-		<since>0.6.2</since>
+		<since>0.7.0</since>
 	</option>
 
 	<option name="worker_socket_dir" type="string" default="/tmp">
@@ -139,7 +139,7 @@
 			108 bytes) on a local filesystem, and should be private to the hub user. Only used when
 			workers is greater than 1.
 		]]></description>
-		<since>0.6.2</since>
+		<since>0.7.0</since>
 	</option>
 
 	<option name="server_reuseport" type="boolean" default="0">
@@ -156,7 +156,7 @@
 			the worker processes yourself (e.g. a systemd template).
 			</p>
 		]]></description>
-		<since>0.6.2</since>
+		<since>0.7.0</since>
 	</option>
 
 	<option name="dns_thread_pool_size" type="int" default="4" advanced="true" >
@@ -173,7 +173,7 @@
 			must run concurrently. Changing this value takes effect on restart, not on a configuration reload.
 			</p>
 		]]></description>
-		<since>0.6.1</since>
+		<since>0.7.0</since>
 	</option>
 
 	<option name="link_peer" type="string" default="">
@@ -184,7 +184,7 @@
 		<example><![CDATA[
 			link_peer = hub2.example.org:1512
 		]]></example>
-		<since>0.6.2</since>
+		<since>0.7.0</since>
 	</option>
 
 	<option name="link_secret" type="string" default="">
@@ -193,7 +193,7 @@
 			Shared secret that both ends of a link must hold. Links authenticate by proving knowledge of
 			this secret via a nonce challenge-response; the secret itself is never sent over the wire.
 		]]></description>
-		<since>0.6.2</since>
+		<since>0.7.0</since>
 	</option>
 
 	<option name="auth_proxy" type="boolean" default="0">
@@ -211,7 +211,7 @@
 			unaffected and log in locally.
 			</p>
 		]]></description>
-		<since>0.6.2</since>
+		<since>0.7.0</since>
 	</option>
 
 	<option name="link_socket" type="string" default="">
@@ -230,7 +230,7 @@
 		<example><![CDATA[
 			link_socket = /run/uhub/worker-0.sock
 		]]></example>
-		<since>0.6.2</since>
+		<since>0.7.0</since>
 	</option>
 
 	<option name="node_count" type="int" default="1">
@@ -240,7 +240,7 @@
 			Total number of nodes in a linked cluster. The ~1M ADC SID space is split into this many
 			disjoint windows so each node allocates globally-unique SIDs without coordination. 1 = stand-alone.
 		]]></description>
-		<since>0.6.2</since>
+		<since>0.7.0</since>
 	</option>
 
 	<option name="node_id" type="int" default="0">
@@ -252,7 +252,7 @@
 			Set to -1 to lease a SID window dynamically from the cluster over the link instead of
 			configuring a fixed index (the node defers local logins until the lease is granted).
 		]]></description>
-		<since>0.6.2</since>
+		<since>0.7.0</since>
 	</option>
 
 	<option name="hbri_enable" type="boolean" default="0">
@@ -270,7 +270,7 @@
 			hbri_address6 to be configured. If either is empty, HBRI is not advertised.
 			</p>
 		]]></description>
-		<since>0.6.1</since>
+		<since>0.7.0</since>
 	</option>
 
 	<option name="hbri_address4" type="string" default="">
@@ -284,7 +284,7 @@
 		<example><![CDATA[
 			hbri_address4 = "192.0.2.10"
 		]]></example>
-		<since>0.6.1</since>
+		<since>0.7.0</since>
 	</option>
 
 	<option name="hbri_address6" type="string" default="">
@@ -298,7 +298,7 @@
 		<example><![CDATA[
 			hbri_address6 = "2001:db8::10"
 		]]></example>
-		<since>0.6.1</since>
+		<since>0.7.0</since>
 	</option>
 
 	<option name="show_banner" type="boolean" default="1">
@@ -398,7 +398,7 @@
 		missing port (server_port) are filled in automatically, so a bare host is
 		accepted. Leave empty to omit.
 		]]></description>
-		<since>0.6.1</since>
+		<since>0.7.0</since>
 		<example><![CDATA[
 			hub_address = "adc://hub.example.com:1511"
 			A bare host such as "hub.example.com" is expanded to adc(s)://hub.example.com:&lt;server_port&gt;.
@@ -411,7 +411,7 @@
 		The hub's website. Sent to clients that support the ADC PING extension
 		(the "WS" field). Leave empty to omit.
 		]]></description>
-		<since>0.6.1</since>
+		<since>0.7.0</since>
 		<example><![CDATA[
 			hub_website = "https://www.example.com"
 		]]></example>
@@ -423,7 +423,7 @@
 		The name of the network this hub belongs to. Sent to clients that support
 		the ADC PING extension (the "NE" field). Leave empty to omit.
 		]]></description>
-		<since>0.6.1</since>
+		<since>0.7.0</since>
 		<example><![CDATA[
 			hub_network = "Example Network"
 		]]></example>
@@ -435,7 +435,7 @@
 		The name of the hub owner. Sent to clients that support the ADC PING
 		extension (the "OW" field). Leave empty to omit.
 		]]></description>
-		<since>0.6.1</since>
+		<since>0.7.0</since>
 		<example><![CDATA[
 			hub_owner = "Jane Doe"
 		]]></example>
@@ -456,7 +456,7 @@
 		and a missing port (server_port) are filled in automatically. No retries
 		are attempted; the outcome is logged.
 		]]></description>
-		<since>0.6.1</since>
+		<since>0.7.0</since>
 		<example><![CDATA[
 			reg_server_url = "http://adcreg.dchublist.org:8080/register"
 		]]></example>
@@ -656,7 +656,7 @@
 		searches from operators and above are never restricted.
 		]]></description>
 		<syntax>0 = off</syntax>
-		<since>0.6.1</since>
+		<since>0.7.0</since>
 		<example><![CDATA[
 			To require search terms to be at least 3 characters long:<br />
 			limit_min_search = 3
@@ -1019,7 +1019,7 @@
 
 	<option name="msg_search_too_short" type="message" default="Search term is too short.">
 		<description><![CDATA[This message is sent to users whose search term is shorter than limit_min_search.]]></description>
-		<since>0.6.1</since>
+		<since>0.7.0</since>
 	</option>
 
 	<option name="msg_user_flood_update" type="message" default="Update flood detected.">
