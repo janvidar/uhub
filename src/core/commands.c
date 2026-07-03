@@ -118,6 +118,17 @@ struct command_handle* command_handler_lookup(struct command_base* cbase, const 
 }
 
 
+void command_foreach(struct command_base* cbase, enum auth_credentials credentials, command_handle_enum handler, void* ptr)
+{
+	struct command_handle* command = NULL;
+	LIST_FOREACH(struct command_handle*, command, cbase->handlers,
+	{
+		if (command_is_available(command, credentials))
+			handler(command, ptr);
+	});
+}
+
+
 void command_get_syntax(struct command_handle* handler, struct cbuffer* buf)
 {
 	size_t n, arg_count;

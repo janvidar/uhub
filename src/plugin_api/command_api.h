@@ -60,6 +60,20 @@ struct plugin_command_arg_data
 
 typedef int (*plugin_command_handler)(struct plugin_handle*, struct plugin_user* to, struct plugin_command*);
 
+/**
+ * Read-only view of a registered command, as passed to the enumeration
+ * callback of the command_foreach() hub function. Mirrors the public fields of
+ * the core command_handle without exposing the hub-internal ones.
+ */
+struct plugin_command_info
+{
+	const char* prefix;             /**<<< "Command prefix, e.g. 'kick' for the !kick command." */
+	const char* args;               /**<<< "Argument codes (see argument documentation above)." */
+	enum auth_credentials cred;     /**<<< "Minimum access level required to use the command." */
+	const char* description;        /**<<< "Human-readable description of the command." */
+	const char* origin;             /**<<< "Name of the module the command originates from." */
+};
+
 struct plugin_command_handle
 {
 	void* internal_handle;          /**<<< "Internal used by the hub only" */

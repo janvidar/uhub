@@ -256,6 +256,7 @@ add_library(mod_chat_history MODULE ${UHUB_SOURCE_DIR}/plugins/mod_chat_history.
 add_library(mod_chat_history_sqlite MODULE ${UHUB_SOURCE_DIR}/plugins/mod_chat_history_sqlite.c)
 add_library(mod_chat_only MODULE ${UHUB_SOURCE_DIR}/plugins/mod_chat_only.c)
 add_library(mod_topic MODULE ${UHUB_SOURCE_DIR}/plugins/mod_topic.c)
+add_library(mod_ucmd MODULE ${UHUB_SOURCE_DIR}/plugins/mod_ucmd.c)
 add_library(mod_no_guest_downloads MODULE ${UHUB_SOURCE_DIR}/plugins/mod_no_guest_downloads.c)
 add_library(mod_flood MODULE ${UHUB_SOURCE_DIR}/plugins/mod_flood.c)
 add_library(mod_auth_sqlite MODULE ${UHUB_SOURCE_DIR}/plugins/mod_auth_sqlite.c)
@@ -272,6 +273,7 @@ set_target_properties(
 	mod_no_guest_downloads
 	mod_flood
 	mod_topic
+	mod_ucmd
 	PROPERTIES PREFIX "")
 
 target_link_libraries(uhub ${CMAKE_DL_LIBS} adc network utils)
@@ -288,6 +290,7 @@ target_link_libraries(mod_flood utils)
 target_link_libraries(mod_chat_only utils)
 target_link_libraries(mod_logging network utils)
 target_link_libraries(mod_topic utils)
+target_link_libraries(mod_ucmd utils)
 
 if(WIN32)
 	target_link_libraries(uhub ws2_32)

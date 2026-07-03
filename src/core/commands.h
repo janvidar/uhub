@@ -108,6 +108,17 @@ int command_is_available(struct command_handle* handle, enum auth_credentials cr
  */
 struct command_handle* command_handler_lookup(struct command_base* cbase, const char* prefix);
 
+/**
+ * Callback type for command_foreach().
+ */
+typedef void (*command_handle_enum)(struct command_handle*, void* ptr);
+
+/**
+ * Invoke @p handler once for every registered command that is available to a
+ * user holding the given @p credentials (as per command_is_available()).
+ */
+void command_foreach(struct command_base* cbase, enum auth_credentials credentials, command_handle_enum handler, void* ptr);
+
 extern void commands_builtin_add(struct command_base*);
 extern void commands_builtin_remove(struct command_base*);
 

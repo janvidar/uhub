@@ -132,6 +132,25 @@ static int cbfunc_send_status(struct plugin_handle* plugin, struct plugin_user* 
 	return 1;
 }
 
+static int cbfunc_send_user_command(struct plugin_handle* plugin, struct plugin_user* user, const char* name, int context, const char* command)
+{
+	char* esc_name = adc_msg_escape(name);
+	struct adc_message* msg = adc_msg_construct(ADC_CMD_ICMD, strlen(esc_name) + (command ? strlen(command) : 0) + 32);
+	adc_msg_add_argument(msg, esc_name);                 /* positional: menu name (submenus split by '/') */
+	if (command)
+	{
+		char* esc_cmd = adc_msg_escape(command);
+		adc_msg_add_named_argument(msg, "TT", esc_cmd);  /* TT: the line the client sends when chosen */
+		hub_free(esc_cmd);
+	}
+	if (context)
+		adc_msg_add_named_argument_int(msg, "CT", context); /* CT: context bitfield (1=hub 2=user 4=search 8=file) */
+	route_to_user(plugin_get_hub(plugin), as_hub_user(user), msg);
+	adc_msg_free(msg);
+	hub_free(esc_name);
+	return 1;
+}
+
 static int cbfunc_user_disconnect(struct plugin_handle* plugin, struct plugin_user* user)
 {
 	hub_disconnect_user(plugin_get_hub(plugin), as_hub_user(user), quit_kicked);
@@ -167,6 +186,36 @@ static int cbfunc_command_del(struct plugin_handle* plugin, struct plugin_comman
 	hub_free(command);
 	cmdh->internal_handle = NULL;
 	return 0;
+}
+
+struct command_foreach_data
+{
+	struct plugin_handle* plugin;
+	hfunc_command_foreach_callback callback;
+	void* ptr;
+};
+
+static void command_foreach_trampoline(struct command_handle* command, void* ptr)
+{
+	struct command_foreach_data* data = (struct command_foreach_data*) ptr;
+	struct plugin_command_info info;
+
+	info.prefix = command->prefix;
+	info.args = command->args;
+	info.cred = command->cred;
+	info.description = command->description;
+	info.origin = command->origin;
+
+	data->callback(data->plugin, &info, data->ptr);
+}
+
+static void cbfunc_command_foreach(struct plugin_handle* plugin, enum auth_credentials credentials, hfunc_command_foreach_callback callback, void* ptr)
+{
+	struct command_foreach_data data;
+	data.plugin = plugin;
+	data.callback = callback;
+	data.ptr = ptr;
+	command_foreach(plugin_get_hub(plugin)->commands, credentials, command_foreach_trampoline, &data);
 }
 
 size_t cbfunc_command_arg_reset(struct plugin_handle* plugin, struct plugin_command* cmd)
@@ -237,9 +286,11 @@ void plugin_register_callback_functions(struct plugin_handle* handle)
 	handle->hub.send_message = cbfunc_send_message;
 	handle->hub.send_broadcast_message = cbfunc_send_broadcast;
 	handle->hub.send_status_message = cbfunc_send_status;
+	handle->hub.send_user_command = cbfunc_send_user_command;
 	handle->hub.user_disconnect = cbfunc_user_disconnect;
 	handle->hub.command_add = cbfunc_command_add;
 	handle->hub.command_del = cbfunc_command_del;
+	handle->hub.command_foreach = cbfunc_command_foreach;
 	handle->hub.command_arg_reset = cbfunc_command_arg_reset;
 	handle->hub.command_arg_next = cbfunc_command_arg_next;
 	handle->hub.get_usercount = cbfunc_get_usercount;
