@@ -289,6 +289,16 @@
 						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
 					</table></div>
 				</details>
+				<details class="directive" data-name="limit_min_search" data-desc="Minimum length in bytes of a substring search term. Searches whose longest term is shorter are rejected, cutting the traffic caused by overly broad searches. Exact (TTH) searches and operators are never restricted.">
+					<summary>limit_min_search<span class="badge">default: 0</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Minimum length (in bytes) of a substring search term. Searches whose longest term is shorter than this are rejected. Very short terms match a huge number of files and generate a lot of traffic, so requiring a few characters keeps searches precise and reduces load. Exact (TTH) searches and searches from operators and above are never restricted.</td></tr>
+						<tr><th>Type</th><td>number, 0 = disabled</td></tr>
+						<tr><th>Default</th><td><code>0</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+						<tr><th>Example</th><td><code>limit_min_search = 3</code></td></tr>
+					</table></div>
+				</details>
 				<details class="directive" data-name="tls_certificate" data-desc="Path to a TLS/SSL certificate (PEM format).">
 					<summary>tls_certificate<span class="badge">no default</span></summary>
 					<div class="directive-body"><table>
@@ -321,6 +331,218 @@
 						<tr><th>Type</th><td>boolean</td></tr>
 						<tr><th>Default</th><td><code>yes</code></td></tr>
 						<tr><th>Since</th><td>uhub 0.3.0</td></tr>
+					</table></div>
+				</details>
+			</div>
+			<div class="config-group">
+				<h2>Hub information</h2>
+				<p class="lead-sub">Optional descriptive fields advertised to clients that support the ADC PING extension and to a registration server. Leave any of them empty to omit that field.</p>
+				<details class="directive" data-name="hub_address" data-desc="The DNS name or IP address clients use to reach this hub (the HH field). Normalized to a complete adc:// or adcs:// URL with a port, so a bare host is accepted.">
+					<summary>hub_address<span class="badge">default: &quot;&quot;</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>The DNS name or IP address clients use to reach this hub. Sent to clients that support the ADC PING extension and to a registration server (the "HH" field). It is normalized to a complete adc:// or adcs:// URL with a port: a missing scheme (adcs:// when tls_enable is set, otherwise adc://) and a missing port (server_port) are filled in automatically, so a bare host is accepted.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+						<tr><th>Example</th><td><code>hub_address = &quot;adc://hub.example.com:1511&quot;</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="hub_website" data-desc="The hub&#x27;s website, sent to clients that support the ADC PING extension (the WS field).">
+					<summary>hub_website<span class="badge">default: &quot;&quot;</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>The hub's website. Sent to clients that support the ADC PING extension (the "WS" field).</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+						<tr><th>Example</th><td><code>hub_website = &quot;https://www.example.com&quot;</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="hub_network" data-desc="The name of the network this hub belongs to, sent to clients that support the ADC PING extension (the NE field).">
+					<summary>hub_network<span class="badge">default: &quot;&quot;</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>The name of the network this hub belongs to. Sent to clients that support the ADC PING extension (the "NE" field).</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+						<tr><th>Example</th><td><code>hub_network = &quot;Example Network&quot;</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="hub_owner" data-desc="The name of the hub owner, sent to clients that support the ADC PING extension (the OW field).">
+					<summary>hub_owner<span class="badge">default: &quot;&quot;</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>The name of the hub owner. Sent to clients that support the ADC PING extension (the "OW" field).</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+						<tr><th>Example</th><td><code>hub_owner = &quot;Jane Doe&quot;</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="reg_server_url" data-desc="URL of an ADC hub-list registration server. When set, the hub POSTs its IINF to this URL at startup so hub lists pick it up automatically. Empty disables it; also set hub_address for a usable address.">
+					<summary>reg_server_url<span class="badge">default: &quot;&quot;</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>The HTTP/HTTPS URL of an ADC hub-list registration server. When set, the hub sends a single POST request to this URL at startup with its own IINF line as the body, so hub lists can pick the hub up automatically. Leave empty (the default) to disable. The path defaults to /register and the port to 80 (http) or 443 (https). Also configure hub_address (the HH field) so the announce carries a usable address.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+						<tr><th>Example</th><td><code>reg_server_url = &quot;http://adcreg.dchublist.org:8080/register&quot;</code></td></tr>
+					</table></div>
+				</details>
+			</div>
+			<div class="config-group">
+				<h2>Metrics</h2>
+				<p class="lead-sub">A Prometheus <code>/metrics</code> endpoint served on the regular server port(s); off by default and gated by a bearer token. Scrape it over HTTPS (or loopback) so the token is not exposed on an untrusted network.</p>
+				<details class="directive" data-name="metrics_enable" data-desc="Enable the Prometheus metrics endpoint. The hub answers HTTP GET on the metrics path over the regular server port(s); a metrics_token must be set or the endpoint stays disabled.">
+					<summary>metrics_enable<span class="badge">default: no</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>When enabled, the hub answers HTTP <code>GET</code> requests for the metrics path (see metrics_path) on the regular server port(s) with a Prometheus text-exposition document. A valid bearer token (metrics_token) is required; if no token is configured the endpoint stays disabled. It is served both over plain HTTP and, when tls_enable is set, over HTTPS on the same port &mdash; scrape over HTTPS (or loopback) so the bearer token is not exposed on an untrusted network.</td></tr>
+						<tr><th>Type</th><td>boolean</td></tr>
+						<tr><th>Default</th><td><code>no</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="metrics_token" data-desc="Bearer token scrapers must present in an Authorization: Bearer header. The endpoint is refused unless this is set to a non-empty value.">
+					<summary>metrics_token<span class="badge">default: &quot;&quot;</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>The token that scrapers must present in an <code>Authorization: Bearer &lt;token&gt;</code> request header. The metrics endpoint is refused unless this is set to a non-empty value.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+						<tr><th>Example</th><td><code>metrics_token = &quot;a-long-random-secret&quot;</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="metrics_path" data-desc="The HTTP path that returns metrics. Requests for any other path receive 404. Must begin with a slash; change it to obscure the endpoint if desired.">
+					<summary>metrics_path<span class="badge">default: &quot;/metrics&quot;</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>The HTTP path that returns metrics. Requests for any other path receive 404. Change this to obscure the endpoint if desired. Must begin with a slash.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;/metrics&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+					</table></div>
+				</details>
+			</div>
+			<div class="config-group">
+				<h2>Federation &amp; scaling</h2>
+				<p class="lead-sub">Options for linking several uhubs into one logical hub, running one hub as several worker processes across CPU cores, and HBRI hybrid IPv4/IPv6 connectivity. See <code>doc/linking.txt</code> for the full picture.</p>
+				<details class="directive" data-name="workers" data-desc="Run one logical hub as this many worker processes on a multi-core machine. They share the client port and link over Unix sockets, presenting one roster and SID space. 1 = single process, 0 = one per CPU.">
+					<summary>workers<span class="badge">default: 1</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Number of worker processes to run as a single logical hub on a multi-core machine. With workers greater than 1, the hub forks that many processes that share the client port (SO_REUSEPORT, so the kernel spreads connections across cores) and link to each other over Unix sockets, presenting one unified roster and SID space to clients. This scales the CPU-bound work (especially TLS) across cores without any threading. 1 (the default) runs a single process; 0 means auto: one worker per online CPU.</td></tr>
+						<tr><th>Type</th><td>number, 0 = auto</td></tr>
+						<tr><th>Default</th><td><code>1</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+						<tr><th>Example</th><td><code>workers = 4</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="worker_socket_dir" data-desc="Directory in which the master creates the Unix domain sockets worker processes use to link to each other. Must be a short, local, private path. Only used when workers is greater than 1.">
+					<summary>worker_socket_dir<span class="badge">default: &quot;/tmp&quot;</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Directory in which the master creates the Unix domain sockets that worker processes use to link to each other (one per worker). Must be a short path (the socket path is limited to about 108 bytes) on a local filesystem, and should be private to the hub user. Only used when workers is greater than 1.</td></tr>
+						<tr><th>Type</th><td>String (directory)</td></tr>
+						<tr><th>Default</th><td><code>&quot;/tmp&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="server_reuseport" data-desc="Set SO_REUSEPORT so several hub processes can bind the same server_port and the kernel load-balances connections. Enabled automatically when workers is greater than 1.">
+					<summary>server_reuseport<span class="badge">default: no</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Set SO_REUSEPORT on the listening socket so that multiple hub processes can bind the same server_port; the kernel then load-balances incoming client connections across them. This is the basis for running one logical hub as several worker processes on a multi-core machine. Enabled automatically when workers is greater than 1; only set it by hand if you supervise the worker processes yourself (e.g. a systemd template).</td></tr>
+						<tr><th>Type</th><td>boolean</td></tr>
+						<tr><th>Default</th><td><code>no</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="link_peer" data-desc="Address (host:port) of an upstream hub to establish a persistent link to. A path beginning with / connects to a Unix socket instead. Empty disables outbound linking.">
+					<summary>link_peer<span class="badge">default: &quot;&quot;</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Address (host:port) of an upstream hub to establish a persistent link to. A value that begins with "/" connects to a Unix domain socket instead (see link_socket). Empty disables outbound linking.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+						<tr><th>Example</th><td><code>link_peer = hub2.example.org:1512</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="link_secret" data-desc="Shared secret both ends of a link must hold. Links authenticate by proving knowledge of it via a nonce challenge-response; the secret itself is never sent over the wire.">
+					<summary>link_secret<span class="badge">default: &quot;&quot;</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Shared secret that both ends of a link must hold. Links authenticate by proving knowledge of this secret via a nonce challenge-response; the secret itself is never sent over the wire.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="link_socket" data-desc="Path to a Unix domain socket this hub listens on for inbound links from other hub processes on the same machine. Empty disables the Unix-socket listener. Protect it with filesystem permissions.">
+					<summary>link_socket<span class="badge">default: &quot;&quot;</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Path to a Unix domain socket this hub listens on for inbound links from other hub processes on the same machine. Used to link worker processes of one logical hub without routing link traffic through the shared client port. Empty disables the Unix-socket listener (TCP links on the normal port still work). A link_peer that begins with "/" connects to such a socket. Protect the socket with filesystem permissions; it grants the same privileges as any link.</td></tr>
+						<tr><th>Type</th><td>String (path)</td></tr>
+						<tr><th>Default</th><td><code>&quot;&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+						<tr><th>Example</th><td><code>link_socket = /run/uhub/worker-0.sock</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="auth_proxy" data-desc="Master-slave authentication for linked hubs. When enabled this node is an auth slave: it holds no accounts and defers registered-user login to the upstream master, so passwords live in one place. Leave disabled on the master.">
+					<summary>auth_proxy<span class="badge">default: no</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Master-slave authentication for linked hubs. When enabled this node is an auth slave: it holds no user accounts of its own and defers registered-user login to its upstream linked hub (the master), which keeps the only copy of the account database. The slave asks the master whether a nick is registered and forwards the password challenge-response to the master to verify, so passwords never leave the master. Leave disabled on the master (the hub that loads the auth plugin with the accounts). Guests are unaffected and log in locally.</td></tr>
+						<tr><th>Type</th><td>boolean</td></tr>
+						<tr><th>Default</th><td><code>no</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="node_count" data-desc="Total number of nodes in a linked cluster. The ~1M ADC SID space is split into this many disjoint windows so each node allocates globally-unique SIDs without coordination. 1 = stand-alone.">
+					<summary>node_count<span class="badge">default: 1</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Total number of nodes in a linked cluster. The ~1M ADC SID space is split into this many disjoint windows so each node allocates globally-unique SIDs without coordination. 1 = stand-alone.</td></tr>
+						<tr><th>Type</th><td>number</td></tr>
+						<tr><th>Default</th><td><code>1</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="node_id" data-desc="Zero-based index of this hub within the cluster; must be unique and less than node_count. Selects which SID window this node uses. Set to -1 to lease a window dynamically over the link.">
+					<summary>node_id<span class="badge">default: 0</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Zero-based index of this hub within the cluster; must be unique per node and less than node_count. Selects which SID window this node allocates from. Ignored when node_count is 1. Set to -1 to lease a SID window dynamically from the cluster over the link instead of configuring a fixed index (the node defers local logins until the lease is granted).</td></tr>
+						<tr><th>Type</th><td>number, -1 = lease dynamically</td></tr>
+						<tr><th>Default</th><td><code>0</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="hbri_enable" data-desc="Enable HBRI hybrid IPv4/IPv6 connectivity. Dual-stack clients prove reachability on both protocols via a short-lived secondary connection, so their INF carries both an I4 and an I6 address. Requires hbri_address4 and hbri_address6.">
+					<summary>hbri_enable<span class="badge">default: no</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>When enabled, the hub advertises the HBRI extension and lets dual-stack clients prove reachability on both IPv4 and IPv6. After a client logs in over one protocol, the hub asks it to open a short-lived secondary connection over the other; on success the client's INF carries both an IPv4 (I4) and an IPv6 (I6) address, so users behind either protocol can connect to each other. Requires the hub to be reachable on both protocols and both hbri_address4 and hbri_address6 configured; if either is empty, HBRI is not advertised.</td></tr>
+						<tr><th>Type</th><td>boolean</td></tr>
+						<tr><th>Default</th><td><code>no</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="hbri_address4" data-desc="The public IPv4 address clients connect to for HBRI secondary-protocol validation. Must be an address the hub listens on (it shares server_port). Empty disables HBRI.">
+					<summary>hbri_address4<span class="badge">default: &quot;&quot;</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>The public IPv4 address clients should connect to for HBRI secondary-protocol validation. Must be an address the hub actually listens on (it shares server_port). Leave empty to disable HBRI.</td></tr>
+						<tr><th>Type</th><td>String (IPv4 address)</td></tr>
+						<tr><th>Default</th><td><code>&quot;&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+						<tr><th>Example</th><td><code>hbri_address4 = &quot;192.0.2.10&quot;</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="hbri_address6" data-desc="The public IPv6 address clients connect to for HBRI secondary-protocol validation. Must be an address the hub listens on (it shares server_port). Empty disables HBRI.">
+					<summary>hbri_address6<span class="badge">default: &quot;&quot;</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>The public IPv6 address clients should connect to for HBRI secondary-protocol validation. Must be an address the hub actually listens on (it shares server_port). Leave empty to disable HBRI.</td></tr>
+						<tr><th>Type</th><td>String (IPv6 address)</td></tr>
+						<tr><th>Default</th><td><code>&quot;&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+						<tr><th>Example</th><td><code>hbri_address6 = &quot;2001:db8::10&quot;</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="dns_thread_pool_size" data-desc="Number of worker threads for asynchronous DNS lookups (used by hub linking and registration-server announcements) so the main event loop never blocks on a slow lookup. Takes effect on restart.">
+					<summary>dns_thread_pool_size<span class="badge">default: 4</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Hostname resolution (for hub linking and registration server announcements) runs on a pool of background threads so the main event loop never blocks on a slow DNS lookup. This option sets the number of worker threads in that pool. A small pool is plenty for a typical hub; raise it only if a large number of outbound lookups must run concurrently. Changing this value takes effect on restart, not on a configuration reload.</td></tr>
+						<tr><th>Type</th><td>number</td></tr>
+						<tr><th>Default</th><td><code>4</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
 					</table></div>
 				</details>
 			</div>
@@ -647,6 +869,15 @@
 						<tr><th>Since</th><td>uhub 0.2.0</td></tr>
 					</table></div>
 				</details>
+				<details class="directive" data-name="msg_search_too_short" data-desc="Sent to users whose search term is shorter than limit_min_search.">
+					<summary>msg_search_too_short<span class="badge">string</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Sent to users whose search term is shorter than <code>limit_min_search</code>.</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;Search term is too short.&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
+					</table></div>
+				</details>
 			</div>
 			<div class="config-group">
 				<h2>Advanced</h2>
@@ -690,7 +921,7 @@
 
 <footer class="site-footer">
 	<div class="container footer-inner">
-		<div>uhub &copy; 2007–2025 Jan Vidar Krey</div>
+		<div>uhub &copy; 2007–2026 Jan Vidar Krey</div>
 		<ul class="footer-links">
 			<li><a href="https://github.com/janvidar/uhub/">GitHub</a></li>
 			<li><a href="https://github.com/janvidar/uhub/issues">Issues</a></li>
