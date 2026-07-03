@@ -37,6 +37,7 @@
 			<li><a href="plugins/index.html">Plug-ins</a></li>
 			<li><a href="config-ssl.html">SSL / TLS</a></li>
 			<li><a href="metrics.html">Monitoring</a></li>
+			<li><a href="linking.html">Hub linking</a></li>
 		</ul>
 		<h4>Developers</h4>
 		<ul>
@@ -92,7 +93,31 @@ INFO: Starting server, listening on :::1511...</code></pre>
 				</p>
 			</div>
 
-			<p style="margin-top:24px;">Your mileage may vary — good luck!</p>
+			<h2>5. Use all CPU cores (optional)</h2>
+				<p>
+					uhub is single-threaded, so a single process uses one CPU core. On a multi-core
+					machine you can run the hub as several linked <strong>worker processes</strong> that
+					share the client port and together present one logical hub. Set in
+					<code>uhub.conf</code>:
+				</p>
+				<pre><code>workers = 4      # number of worker processes, or 0 for one per CPU core</code></pre>
+				<p>
+					The top-level process then becomes a <em>master</em> that forks the workers, supervises
+					them (restarting any that exit) and serves no clients itself. Each worker binds
+					<code>server_port</code> with <code>SO_REUSEPORT</code>, so the kernel load-balances
+					incoming connections across cores, and the workers link to each other over Unix sockets
+					in <code>worker_socket_dir</code> (default <code>/tmp</code>) to share one user list and
+					SID space. This mainly speeds up the CPU-bound per-connection work — notably TLS.
+				</p>
+				<div class="callout">
+					<p>
+						Running one hub across cores is a special case of <a href="linking.html">hub linking
+						(federation)</a>, which can also join hubs across separate machines. See that guide for
+						the full picture and the trade-offs.
+					</p>
+				</div>
+
+				<p style="margin-top:24px;">Your mileage may vary — good luck!</p>
 		</div>
 	</main>
 </div>
