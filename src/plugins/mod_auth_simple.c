@@ -42,6 +42,11 @@ static void insert_user(struct linked_list* users, const char* nick, const char*
 	struct auth_info* data = (struct auth_info*) hub_malloc_zero(sizeof(struct auth_info));
 	strncpy(data->nickname, nick, MAX_NICK_LEN);
 	strncpy(data->password, pass, MAX_PASS_LEN);
+	/* strncpy does not terminate when the source is >= the limit. The fields
+	   are MAX_*_LEN+1, so terminate the last byte explicitly rather than
+	   relying on the zero-init of hub_malloc_zero. */
+	data->nickname[MAX_NICK_LEN] = '\0';
+	data->password[MAX_PASS_LEN] = '\0';
 	data->credentials = cred;
 	list_append(users, data);
 }
