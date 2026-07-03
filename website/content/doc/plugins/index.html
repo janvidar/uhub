@@ -1,0 +1,43 @@
+title: uhub — Plug-ins
+description: The official plug-ins bundled with uhub and how to configure them.
+layout: doc
+nav: documentation
+sidebar: plugins
+---
+			<h1>Plug-ins</h1>
+			<p class="lead-sub">
+				uhub ships with a set of loadable C plug-ins. Enable them in <code>plugins.conf</code> by
+				pointing at the built <code>.so</code> file with an optional configuration string.
+			</p>
+
+			<p>On Unix systems, a plug-in is loaded like this:</p>
+			<pre><code>plugin /var/lib/uhub/mod_logging.so "file=/var/log/uhub/uhub.log"</code></pre>
+			<p>On Windows, point at the <code>.dll</code> instead:</p>
+			<pre><code>plugin c:\path\to\mod_logging.dll "file=c:\uhub\uhub.log"</code></pre>
+
+			<h2>Bundled plug-ins</h2>
+			<table class="table">
+				<tr><th>Module</th><th>Description</th></tr>
+				<tr><td><code>mod_auth_simple</code></td><td>Authenticate users based on a read-only text file.</td></tr>
+				<tr><td><code>mod_auth_sqlite</code></td><td>Authenticate users based on a SQLite database.</td></tr>
+				<tr><td><code>mod_logging</code></td><td>Logs users entering and leaving the hub.</td></tr>
+				<tr><td><code>mod_welcome</code></td><td>Sends a welcome message (and rules / MOTD) to users when they log in.</td></tr>
+				<tr><td><code>mod_chat_history</code></td><td>Provides a global chat history log.</td></tr>
+				<tr><td><code>mod_chat_history_sqlite</code></td><td>Provides a global chat history log backed by SQLite.</td></tr>
+				<tr><td><code>mod_chat_only</code></td><td>Chat-only hub: disables connection setup, search and results.</td></tr>
+				<tr><td><code>mod_chat_is_privileged</code></td><td>Only registered users can send messages in the main chat.</td></tr>
+				<tr><td><code>mod_topic</code></td><td>Adds commands for changing the hub topic (description).</td></tr>
+				<tr><td><code>mod_no_guest_downloads</code></td><td>Only registered users can search and initiate transfers.</td></tr>
+				<tr><td><code>mod_example</code></td><td>A simple example plug-in to base your own on.</td></tr>
+			</table>
+
+			<h2>Example configuration</h2>
+			<p>A typical <code>plugins.conf</code> combining several modules:</p>
+			<pre><code>plugin /var/lib/uhub/mod_auth_sqlite.so "file=/etc/uhub/users.db"
+plugin /var/lib/uhub/mod_logging.so "file=/var/log/uhub/uhub.log"
+plugin /var/lib/uhub/mod_welcome.so "motd=/etc/uhub/motd.txt rules=/etc/uhub/rules.txt"
+plugin /var/lib/uhub/mod_chat_history.so "history_max=200 history_default=10 history_connect=5"</code></pre>
+
+			<p>
+				Want to write your own? See the <a href="../plugin-api.html">plug-in API</a> documentation.
+			</p>

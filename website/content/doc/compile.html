@@ -1,0 +1,51 @@
+title: uhub — Compiling
+description: How to compile uhub from source with CMake.
+layout: doc
+nav: documentation
+sidebar: compile
+---
+			<h1>Compiling</h1>
+			<p class="lead-sub">Build uhub from source with CMake.</p>
+
+			<h2>Prerequisites</h2>
+			<ul>
+				<li>CMake 3.21 or newer</li>
+				<li>A C compiler — GCC, Clang or MinGW</li>
+				<li>OpenSSL 3.0+ or LibreSSL 3.4+ (TLS is mandatory)</li>
+				<li>SQLite3</li>
+			</ul>
+
+			<h2>Linux, macOS, BSD, Solaris</h2>
+			<p>An out-of-tree build is recommended:</p>
+			<pre><code>mkdir -p build &amp;&amp; cd build
+cmake ..
+make -j
+make install</code></pre>
+
+			<p>Default install directories:</p>
+			<table class="table">
+				<tr><th>Binaries</th><td><code>/usr/local/bin/</code></td></tr>
+				<tr><th>Configuration files</th><td><code>/etc/uhub/</code></td></tr>
+				<tr><th>Plug-ins</th><td><code>/usr/lib/uhub/</code></td></tr>
+				<tr><th>Manual pages</th><td><code>/usr/share/man/man1/</code></td></tr>
+			</table>
+
+			<h2>Debian &amp; Ubuntu</h2>
+			<p>Install the dependencies:</p>
+			<pre><code>sudo apt-get install cmake make gcc git libsqlite3-dev libssl-dev</code></pre>
+			<p>Check out the source code:</p>
+			<pre><code>git clone https://github.com/janvidar/uhub.git</code></pre>
+			<p>Then build as described above.</p>
+
+			<h2>Building against LibreSSL</h2>
+			<p>If both OpenSSL and LibreSSL are installed, point CMake at the LibreSSL prefix:</p>
+			<pre><code>cmake -DOPENSSL_ROOT_DIR=/path/to/libressl ..</code></pre>
+			<p>The configure output prints the detected TLS provider, e.g. <code>TLS provider: LibreSSL 3.5.3</code>.</p>
+
+			<div class="callout">
+				<p>
+					For a sanitizer build that catches bounds bugs, configure with
+					<code>-DCMAKE_C_FLAGS="-fsanitize=address -g -O1"</code> and
+					<code>-DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"</code>.
+				</p>
+			</div>

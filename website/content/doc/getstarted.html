@@ -1,0 +1,69 @@
+title: uhub — Getting started
+description: Get a uhub ADC hub up and running in a few simple steps.
+layout: doc
+nav: documentation
+sidebar: getstarted
+---
+			<h1>Getting started</h1>
+			<p class="lead-sub">From zero to a running hub in a few simple steps.</p>
+
+			<h2>1. Build uhub</h2>
+			<p>
+				<a href="../download.html">Download</a> the sources and
+				<a href="compile.html">compile</a> them. On most systems this is just CMake and make.
+			</p>
+
+			<h2>2. Create a configuration file</h2>
+			<p>
+				This step is optional — if no configuration files are present, uhub starts with sensible
+				defaults. To customise the hub, edit <code>/etc/uhub/uhub.conf</code> as root:
+			</p>
+			<pre><code>hub_name = My Public Hub
+hub_description = Yet another ADC hub
+
+server_port = 1511
+server_bind_addr = any
+max_users = 150</code></pre>
+
+			<h2>3. Start the hub</h2>
+			<p>Run uhub in the foreground for the first time. Stop it with <code>Ctrl+C</code>.</p>
+			<pre><code>$ uhub
+INFO: Starting server, listening on :::1511...</code></pre>
+
+			<h2>4. Connect with a client</h2>
+			<p>
+				Point an ADC client at <code>adc://localhost:1511</code>, replacing <code>localhost</code>
+				with the correct hostname or IP address.
+			</p>
+			<div class="callout warn">
+				<p>
+					<strong>Note:</strong> the <code>adc://</code> prefix <em>and</em> the port number are required
+					when connecting with DC++ and other ADC clients.
+				</p>
+			</div>
+
+			<h2>5. Use all CPU cores (optional)</h2>
+				<p>
+					uhub is single-threaded, so a single process uses one CPU core. On a multi-core
+					machine you can run the hub as several linked <strong>worker processes</strong> that
+					share the client port and together present one logical hub. Set in
+					<code>uhub.conf</code>:
+				</p>
+				<pre><code>workers = 4      # number of worker processes, or 0 for one per CPU core</code></pre>
+				<p>
+					The top-level process then becomes a <em>master</em> that forks the workers, supervises
+					them (restarting any that exit) and serves no clients itself. Each worker binds
+					<code>server_port</code> with <code>SO_REUSEPORT</code>, so the kernel load-balances
+					incoming connections across cores, and the workers link to each other over Unix sockets
+					in <code>worker_socket_dir</code> (default <code>/tmp</code>) to share one user list and
+					SID space. This mainly speeds up the CPU-bound per-connection work — notably TLS.
+				</p>
+				<div class="callout">
+					<p>
+						Running one hub across cores is a special case of <a href="linking.html">hub linking
+						(federation)</a>, which can also join hubs across separate machines. See that guide for
+						the full picture and the trade-offs.
+					</p>
+				</div>
+
+				<p style="margin-top:24px;">Your mileage may vary — good luck!</p>

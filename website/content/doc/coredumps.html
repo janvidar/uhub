@@ -1,0 +1,23 @@
+title: uhub — Core dumps
+description: How to enable core dumps to help debug uhub crashes.
+layout: doc
+nav: documentation
+sidebar: coredumps
+---
+			<h1>Core dumps</h1>
+			<p class="lead-sub">Capture a crash so it can be debugged.</p>
+
+			<p>On Linux, enable core dumps before starting uhub:</p>
+			<pre><code>$ ulimit -c unlimited
+$ uhub</code></pre>
+
+			<p>
+				If uhub crashes, a file called <code>core</code> is written to disk. This can be used to debug
+				the problem further. Please compress <strong>both</strong> the core file and the uhub binary:
+			</p>
+			<pre><code>tar czvf coredump.tar.gz uhub core</code></pre>
+
+			<p>
+				Then file a bug report and attach <code>coredump.tar.gz</code> in the
+				<a href="https://github.com/janvidar/uhub/issues">bug tracker</a>.
+			</p>

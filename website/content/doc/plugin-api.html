@@ -1,0 +1,84 @@
+title: uhub — Plug-in API
+description: Introduction to the uhub event-driven C plug-in API.
+layout: doc
+nav: documentation
+sidebar: plugin-api
+---
+			<h1>Plug-in API</h1>
+			<p class="lead-sub">An event-driven C API for extending the hub.</p>
+
+			<p>
+				Each plug-in registers a set of callback functions for handling events when it is loaded.
+				Plug-ins can also register user commands that show up in the hub for users to interact with —
+				see the
+				<a href="https://github.com/janvidar/uhub/blob/master/src/plugins/mod_example.c">example plug-in</a>
+				for how. The full API is defined
+				<a href="https://github.com/janvidar/uhub/tree/master/src/plugin_api">in the source code</a>.
+			</p>
+
+			<h2>Creating a plug-in</h2>
+			<p>A plug-in must implement at least two functions, called when loading and unloading it:</p>
+			<pre><code><span class="c">/**
+ * Implemented by the plugin.
+ *
+ * @param handle[out] Sets all information by the plugin
+ * @param config      A configuration string
+ * @return 0 on success, -1 on error.
+ */</span>
+<span class="k">int</span> plugin_register(<span class="k">struct</span> plugin_handle* handle, <span class="k">const char</span>* config);
+
+<span class="c">/** @return 0 on success, -1 on error. */</span>
+<span class="k">int</span> plugin_unregister(<span class="k">struct</span> plugin_handle*);</code></pre>
+			<p>The configuration string is passed verbatim from the <a href="plugins/index.html">plug-in configuration</a> file.</p>
+
+			<h2>struct plugin_handle</h2>
+			<p>
+				The <code>plugin_handle</code> struct is passed to every callback. It exposes hub functions
+				(<code>hub</code>) for the plug-in to use, and a data pointer (<code>ptr</code>) to anchor
+				memory the plug-in allocates.
+			</p>
+			<pre><code><span class="k">struct</span> plugin_handle
+{
+    <span class="k">struct</span> uhub_plugin* handle;
+    <span class="k">const char</span>* name;
+    <span class="k">const char</span>* version;
+    <span class="k">const char</span>* description;
+    <span class="k">void</span>* ptr;
+    <span class="k">const char</span>* error_msg;
+    <span class="k">size_t</span> plugin_api_version;
+    <span class="k">size_t</span> plugin_funcs_size;
+    <span class="k">struct</span> plugin_funcs funcs;
+    <span class="k">struct</span> plugin_hub_funcs hub;
+};</code></pre>
+
+			<p>
+				<code>plugin_register()</code> is the only function allowed to modify most of the struct,
+				conveniently done with the <code>PLUGIN_INITIALIZE</code> macro:
+			</p>
+			<pre><code><span class="k">int</span> plugin_register(<span class="k">struct</span> plugin_handle* handle, <span class="k">const char</span>* config)
+{
+    PLUGIN_INITIALIZE(handle, <span class="s">"test"</span>, <span class="s">"1.0"</span>, <span class="s">"A simple test plug-in"</span>);
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+
+			<h2>Registering callbacks</h2>
+			<p>
+				Set the relevant function pointer in the <code>funcs</code> member of <code>plugin_handle</code>.
+				For example, a plug-in that prints to the console when users join the hub:
+			</p>
+			<pre><code><span class="k">static void</span> event_user_login(<span class="k">struct</span> plugin_handle* plugin, <span class="k">struct</span> plugin_user* user)
+{
+    printf(<span class="s">"User \"%s\" logged in.\n"</span>, user->nick);
+}
+
+<span class="k">int</span> plugin_register(<span class="k">struct</span> plugin_handle* handle, <span class="k">const char</span>* config)
+{
+    PLUGIN_INITIALIZE(handle, <span class="s">"test"</span>, <span class="s">"1.0"</span>, <span class="s">"A simple test plug-in"</span>);
+    plugin->funcs.on_user_login = event_user_login;
+    <span class="k">return</span> <span class="n">0</span>;
+}</code></pre>
+
+			<p>
+				See the full list of available callbacks in
+				<a href="https://github.com/janvidar/uhub/blob/master/src/plugin_api/handle.h"><code>struct plugin_funcs</code></a>.
+			</p>

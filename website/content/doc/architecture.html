@@ -1,0 +1,39 @@
+title: uhub — Architecture
+description: An overview of uhub's single-threaded, event-driven architecture.
+layout: doc
+nav: documentation
+sidebar: architecture
+---
+			<h1>Architecture</h1>
+			<p class="lead-sub">A single-threaded, event-driven design built for throughput.</p>
+
+			<h2>Overview</h2>
+			<p>
+				uhub is a primarily single-threaded, event-driven hub, developed mainly for Linux and Unix
+				systems while also supporting Windows.
+			</p>
+			<p>
+				It maintains non-blocking connections to all users, and routes and multiplexes ADC messages
+				between them. Each ADC message (<a href="https://github.com/janvidar/uhub/blob/master/src/adc/message.h">struct adc_message</a>)
+				is reference-counted, and each user has a send queue of messages to be delivered.
+			</p>
+
+			<h2>Event notification</h2>
+			<p>
+				Network event notification uses <code>epoll()</code> on Linux, <code>kqueue()</code> on
+				macOS/BSD, and a fallback <code>select()</code> on other systems — chosen at configure time.
+			</p>
+
+			<h2>Timers</h2>
+			<p>
+				Timer handling is low-precision and low-resolution, which allows for constant-time inserts
+				and removals.
+			</p>
+
+			<h2>The login pipeline</h2>
+			<p>
+				New connections pass through a central login pipeline
+				(<code>check_cid → check_nick → check_network → check_user_agent → check_acl → check_logged_in</code>)
+				that enforces validation and access control before a user is trusted. The wire-format parser
+				in <code>src/adc/</code> runs even earlier, against attacker-controlled bytes.
+			</p>

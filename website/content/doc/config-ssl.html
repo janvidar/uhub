@@ -1,0 +1,53 @@
+title: uhub — SSL / TLS
+description: Set up a secure uhub ADC hub with TLS/SSL certificates.
+layout: doc
+nav: documentation
+sidebar: config-ssl
+---
+			<h1>Setting up a secure hub</h1>
+			<p class="lead-sub">Protect your hub with TLS so clients can connect over <code>adcs://</code>.</p>
+
+			<div class="callout">
+				<p>
+					uhub requires a modern TLS library — <strong>OpenSSL 3.0+</strong> or
+					<strong>LibreSSL 3.4+</strong> — and supports TLS 1.2 (default) and TLS 1.3.
+				</p>
+			</div>
+
+			<h2>Configuring uhub</h2>
+			<p>Once you have a certificate and private key, set these directives in <code>uhub.conf</code>:</p>
+			<pre><code>tls_private_key = "/path/to/domainname.key"
+tls_certificate = "/path/to/domainname.crt"
+tls_enable = yes
+tls_require = yes</code></pre>
+			<p>Clients can now connect using the <code>adcs://</code> protocol handle.</p>
+
+			<h2>Creating a self-signed certificate</h2>
+			<p>Generate a 2048-bit RSA private key:</p>
+			<pre><code>openssl genrsa -out domainname.key 2048</code></pre>
+			<p>Then create a certificate valid for 365 days:</p>
+			<pre><code>openssl req -new -x509 -nodes -sha256 -days 365 \
+        -key domainname.key &gt; domainname.crt</code></pre>
+			<p>You will be prompted for the certificate data described below.</p>
+
+			<h2>Using a certificate authority</h2>
+			<p>Generate a private key:</p>
+			<pre><code>openssl genrsa -out domainname.key 2048</code></pre>
+			<p>Create a certificate signing request (CSR):</p>
+			<pre><code>openssl req -new -key domainname.key -out domainname.csr</code></pre>
+			<p>
+				Send <code>domainname.csr</code> to your CA for signing. When you receive the signed
+				certificate back, save it as <code>domainname.crt</code>.
+			</p>
+
+			<h2>Certificate data</h2>
+			<p>When creating a certificate you are asked a series of questions:</p>
+			<ul>
+				<li><strong>Country</strong> — two-letter code, e.g. <code>DE</code>.</li>
+				<li><strong>State or Province</strong> — e.g. Bavaria.</li>
+				<li><strong>Locality</strong> — e.g. Munich.</li>
+				<li><strong>Organization</strong> — your organization or your own name.</li>
+				<li><strong>Organizational Unit</strong> — your department (can be left blank).</li>
+				<li><strong>Common Name</strong> — the hostname of your server, e.g. <code>secure.example.org</code>.</li>
+				<li><strong>E-mail address</strong>.</li>
+			</ul>

@@ -1,0 +1,79 @@
+			<div class="config-group">
+				<h2>Access control (users.conf)</h2>
+				<p class="lead-sub">These directives live in the ACL file (the <code>file_acl</code> path), not in <code>uhub.conf</code>.</p>
+				<details class="directive" data-name="user_admin" data-desc="An administrator user with full access to configure the hub, plus operator privileges.">
+					<summary>user_admin<span class="badge">username:password</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>An administrator user with full access to configure the hub, plus operator privileges.</td></tr>
+						<tr><th>Syntax</th><td><code>user_admin username:password</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.2</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="user_super" data-desc="A super user with more privileges than an operator but fewer than an administrator.">
+					<summary>user_super<span class="badge">username:password</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>A super user with more privileges than an operator but fewer than an administrator.</td></tr>
+						<tr><th>Syntax</th><td><code>user_super username:password</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.1</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="user_op" data-desc="An operator who can kick and ban users from the hub.">
+					<summary>user_op<span class="badge">username:password</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>An operator who can kick and ban users from the hub.</td></tr>
+						<tr><th>Syntax</th><td><code>user_op username:password</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.2</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="user_reg" data-desc="A registered user with no special privileges, but a password-protected username that can enter registered-only hubs.">
+					<summary>user_reg<span class="badge">username:password</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>A registered user with no special privileges, but a password-protected username that can enter registered-only hubs.</td></tr>
+						<tr><th>Syntax</th><td><code>user_reg username:password</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.2</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="deny_nick" data-desc="A denied username. Any user identifying with this nickname is denied access.">
+					<summary>deny_nick<span class="badge">username</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>A denied username. Any user identifying with this nickname is denied access.</td></tr>
+						<tr><th>Syntax</th><td><code>deny_nick username</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.2</td></tr>
+						<tr><th>Example</th><td><code>deny_nick Administrator<br />deny_nick root<br />deny_nick Hub-Security</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="ban_nick" data-desc="A user banned by nickname. Differs from deny_nick in the message the user receives.">
+					<summary>ban_nick<span class="badge">username</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>A user banned by nickname. Differs from deny_nick in the message the user receives.</td></tr>
+						<tr><th>Syntax</th><td><code>ban_nick username</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="ban_cid" data-desc="A user banned by CID (a 39-byte base32-encoded client identifier).">
+					<summary>ban_cid<span class="badge">cid</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>A user banned by CID (a 39-byte base32-encoded client identifier).</td></tr>
+						<tr><th>Syntax</th><td><code>ban_cid cid</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.2</td></tr>
+						<tr><th>Example</th><td><code>ban_cid FOIL5EK2UDZYAXT7UIUFEKL4SEBEAJE3INJDKAY</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="deny_ip" data-desc="Deny access to users from certain IP addresses, given as ranges or address/bitmask. Works for IPv6 too.">
+					<summary>deny_ip<span class="badge">ip range/mask</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Deny access to users from certain IP addresses, given as ranges or address/bitmask. Works for IPv6 too.</td></tr>
+						<tr><th>Syntax</th><td><code>deny_ip ip range/mask</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.1.2</td></tr>
+						<tr><th>Example</th><td><code>deny_ip 192.168.0.0/24<br />deny_ip ::1/128</code></td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="nat_ip" data-desc="Allow users behind the same NAT router as the hub to advertise a public IP. The hub rewrites IPs for other users on the same NATed network. IPv4 only.">
+					<summary>nat_ip<span class="badge">ip range/mask</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Allow users behind the same NAT router as the hub to advertise a public IP. The hub rewrites IPs for other users on the same NATed network. IPv4 only.</td></tr>
+						<tr><th>Syntax</th><td><code>nat_ip ip range/mask</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.2.1</td></tr>
+						<tr><th>Example</th><td><code>nat_ip 192.168.1.0/24</code></td></tr>
+					</table></div>
+				</details>
+			</div>
