@@ -284,7 +284,7 @@ void parse_command_line(int argc, char** argv)
 				break;
 
 			case 'q':
-				arg_verbose -= 99;
+				arg_verbose = 0;
 				break;
 
 			case 'f':
@@ -345,6 +345,13 @@ void parse_command_line(int argc, char** argv)
 	{
 		arg_config = SERVER_CONFIG;
 	}
+
+	/* Clamp the accumulated verbosity to the valid log-level range so repeated
+	   -v cannot drive the threshold past the highest level (log_plugin). */
+	if (arg_verbose < 0)
+		arg_verbose = 0;
+	else if (arg_verbose > log_plugin + 1)
+		arg_verbose = log_plugin + 1;
 
 	hub_log_initialize(arg_log, arg_log_syslog);
 	hub_set_log_verbosity(arg_verbose);
