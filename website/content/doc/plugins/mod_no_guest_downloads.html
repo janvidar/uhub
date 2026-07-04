@@ -1,0 +1,21 @@
+title: uhub — mod_no_guest_downloads
+description: mod_no_guest_downloads restricts searching and transfers to registered users only.
+layout: doc
+nav: documentation
+sidebar: plugins
+---
+			<h1>mod_no_guest_downloads</h1>
+			<p class="lead-sub">Restrict downloads to registered users. Part of the bundled <a href="index.html">plug-ins</a>.</p>
+
+			<p>
+				<code>mod_no_guest_downloads</code> lets guests chat, but reserves searching and file transfers
+				for registered users: only users with a registered account (or higher) may search, receive
+				search results and set up connections. It takes no configuration string — just load it:
+			</p>
+			<pre><code>plugin /var/lib/uhub/mod_no_guest_downloads.so</code></pre>
+
+			<p>
+				This is useful for a public chat hub that still offers file sharing as a perk of registering.
+				To disable transfers for <em>everyone</em> instead, use
+				<a href="mod_chat_only.html">mod_chat_only</a>.
+			</p>

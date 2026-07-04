@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>uhub — mod_auth_simple</title>
+	<meta name="description" content="mod_auth_simple authenticates uhub users from a plain read-only text file." />
+	<link rel="icon" href="../../assets/img/favicon.ico" />
+	<link rel="stylesheet" href="../../assets/css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+	<div class="container nav">
+		<a class="brand" href="../../index.html">
+			<img src="../../assets/img/logo.svg" alt="uhub logo" />
+			<span>uhub</span>
+			<span class="slogan">High performance ADC hub</span>
+		</a>
+		<button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+		<ul class="nav-links">
+			<li><a href="../../index.html">About</a></li>
+			<li><a href="../../news.html">News</a></li>
+			<li><a href="../../download.html">Download</a></li>
+			<li><a href="../index.html" class="active">Documentation</a></li>
+		</ul>
+	</div>
+</header>
+
+<div class="container doc-layout">
+	<aside class="doc-sidebar">
+		<h4>Users</h4>
+		<ul>
+			<li><a href="../getstarted.html">Getting started</a></li>
+			<li><a href="../config-example.html">Example configuration</a></li>
+			<li><a href="../config.html">Configuration reference</a></li>
+			<li><a href="index.html" class="active">Plug-ins</a></li>
+			<li><a href="../config-ssl.html">SSL / TLS</a></li>
+			<li><a href="../metrics.html">Monitoring</a></li>
+			<li><a href="../linking.html">Hub linking</a></li>
+		</ul>
+		<h4>Developers</h4>
+		<ul>
+			<li><a href="../developers.html">Contributors</a></li>
+			<li><a href="../compile.html">Compiling</a></li>
+			<li><a href="../architecture.html">Architecture</a></li>
+			<li><a href="../plugin-api.html">Plug-in API</a></li>
+		</ul>
+		<h4>Resources</h4>
+		<ul>
+			<li><a href="../adc.html">What is ADC?</a></li>
+			<li><a href="../coredumps.html">Core dumps</a></li>
+		</ul>
+	</aside>
+
+	<main class="doc-content">
+		<div class="prose">
+			<h1>mod_auth_simple</h1>
+			<p class="lead-sub">Authenticate users from a plain text file. Part of the bundled <a href="index.html">plug-ins</a>.</p>
+
+			<p>
+				<code>mod_auth_simple</code> reads registered accounts from a flat text file. It is the
+				simplest way to add a handful of registered users, operators and admins without a database.
+			</p>
+
+			<h2>Loading</h2>
+			<pre><code>plugin /var/lib/uhub/mod_auth_simple.so "file=/etc/uhub/users.conf"</code></pre>
+
+			<h2>Configuration</h2>
+			<table>
+				<tr><th>Option</th><th>Default</th><th>Description</th></tr>
+				<tr><td><code>file</code></td><td>—</td><td>Path to the accounts file (required).</td></tr>
+				<tr><td><code>readonly</code></td><td><code>yes</code></td><td>The hub never writes back to the file; registration/update/delete are refused.</td></tr>
+				<tr><td><code>exclusive</code></td><td><code>no</code></td><td>When enabled, only accounts listed in this file may log in — any other nick is denied instead of being passed on to the hub's own ACL.</td></tr>
+			</table>
+
+			<h2>File format</h2>
+			<p>One account per line, whitespace-separated:</p>
+			<pre><code>credential username password</code></pre>
+			<p>
+				<code>credential</code> is one of <code>admin</code>, <code>super</code>, <code>op</code>,
+				<code>reg</code>/<code>user</code> or a bot class — the same credential keywords used in the
+				hub's <a href="../config.html">ACL file</a>. For example:
+			</p>
+			<pre><code>admin alice s3cr3t
+op    bob   hunter2
+reg   carol passw0rd</code></pre>
+
+			<p>
+				For a database-backed store with self-service registration instead, see
+				<a href="mod_auth_sqlite.html">mod_auth_sqlite</a>.
+			</p>
+		</div>
+	</main>
+</div>
+
+<footer class="site-footer">
+	<div class="container footer-inner">
+		<div>uhub &copy; 2007–2026 Jan Vidar Krey</div>
+		<ul class="footer-links">
+			<li><a href="https://github.com/janvidar/uhub/">GitHub</a></li>
+			<li><a href="https://github.com/janvidar/uhub/issues">Issues</a></li>
+			<li><a href="../index.html">Documentation</a></li>
+			<li><a href="https://www.gnu.org/licenses/gpl-3.0.html">License</a></li>
+		</ul>
+	</div>
+</footer>
+
+<script src="../../assets/js/main.js"></script>
+</body>
+</html>

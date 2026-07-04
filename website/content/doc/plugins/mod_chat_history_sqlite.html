@@ -1,0 +1,32 @@
+title: uhub — mod_chat_history_sqlite
+description: mod_chat_history_sqlite keeps a persistent global main-chat history in a SQLite database.
+layout: doc
+nav: documentation
+sidebar: plugins
+---
+			<h1>mod_chat_history_sqlite</h1>
+			<p class="lead-sub">Persistent main-chat history in SQLite. Part of the bundled <a href="index.html">plug-ins</a>.</p>
+
+			<p>
+				<code>mod_chat_history_sqlite</code> works like
+				<a href="mod_chat_history.html">mod_chat_history</a>, but stores the log in a SQLite database
+				so it survives hub restarts.
+			</p>
+
+			<h2>Loading</h2>
+			<pre><code>plugin /var/lib/uhub/mod_chat_history_sqlite.so "file=/etc/uhub/history.db history_connect=5 history_max=200"</code></pre>
+
+			<h2>Configuration</h2>
+			<table>
+				<tr><th>Option</th><th>Default</th><th>Description</th></tr>
+				<tr><td><code>file</code></td><td>—</td><td>Path to the SQLite database (required).</td></tr>
+				<tr><td><code>history_max</code></td><td><code>200</code></td><td>Maximum number of messages returned / retained.</td></tr>
+				<tr><td><code>history_default</code></td><td><code>25</code></td><td>Number of lines <code>!history</code> shows when called without an argument.</td></tr>
+				<tr><td><code>history_connect</code></td><td><code>5</code></td><td>Number of recent lines sent automatically when a user logs in (0 disables).</td></tr>
+			</table>
+
+			<h2>Commands</h2>
+			<table>
+				<tr><th>Command</th><th>Access</th><th>Description</th></tr>
+				<tr><td><code>!history [N]</code></td><td>guest</td><td>Show the last <code>N</code> messages (or <code>history_default</code> if omitted).</td></tr>
+			</table>

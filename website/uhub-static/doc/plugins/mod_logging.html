@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>uhub — mod_logging</title>
+	<meta name="description" content="mod_logging records logins, logouts, nick changes and login errors to a file or syslog." />
+	<link rel="icon" href="../../assets/img/favicon.ico" />
+	<link rel="stylesheet" href="../../assets/css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+	<div class="container nav">
+		<a class="brand" href="../../index.html">
+			<img src="../../assets/img/logo.svg" alt="uhub logo" />
+			<span>uhub</span>
+			<span class="slogan">High performance ADC hub</span>
+		</a>
+		<button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+		<ul class="nav-links">
+			<li><a href="../../index.html">About</a></li>
+			<li><a href="../../news.html">News</a></li>
+			<li><a href="../../download.html">Download</a></li>
+			<li><a href="../index.html" class="active">Documentation</a></li>
+		</ul>
+	</div>
+</header>
+
+<div class="container doc-layout">
+	<aside class="doc-sidebar">
+		<h4>Users</h4>
+		<ul>
+			<li><a href="../getstarted.html">Getting started</a></li>
+			<li><a href="../config-example.html">Example configuration</a></li>
+			<li><a href="../config.html">Configuration reference</a></li>
+			<li><a href="index.html" class="active">Plug-ins</a></li>
+			<li><a href="../config-ssl.html">SSL / TLS</a></li>
+			<li><a href="../metrics.html">Monitoring</a></li>
+			<li><a href="../linking.html">Hub linking</a></li>
+		</ul>
+		<h4>Developers</h4>
+		<ul>
+			<li><a href="../developers.html">Contributors</a></li>
+			<li><a href="../compile.html">Compiling</a></li>
+			<li><a href="../architecture.html">Architecture</a></li>
+			<li><a href="../plugin-api.html">Plug-in API</a></li>
+		</ul>
+		<h4>Resources</h4>
+		<ul>
+			<li><a href="../adc.html">What is ADC?</a></li>
+			<li><a href="../coredumps.html">Core dumps</a></li>
+		</ul>
+	</aside>
+
+	<main class="doc-content">
+		<div class="prose">
+			<h1>mod_logging</h1>
+			<p class="lead-sub">Log users entering and leaving the hub. Part of the bundled <a href="index.html">plug-ins</a>.</p>
+
+			<p>
+				<code>mod_logging</code> records a line for every successful login, failed login, logout and
+				nick change, to a log file or to the system log.
+			</p>
+
+			<h2>Loading</h2>
+			<p>Log to a file:</p>
+			<pre><code>plugin /var/lib/uhub/mod_logging.so "file=/var/log/uhub/uhub.log"</code></pre>
+			<p>Or to syslog (Unix only):</p>
+			<pre><code>plugin /var/lib/uhub/mod_logging.so "syslog=1"</code></pre>
+
+			<h2>Configuration</h2>
+			<table>
+				<tr><th>Option</th><th>Default</th><th>Description</th></tr>
+				<tr><td><code>file</code></td><td>—</td><td>Path to the log file. Required unless <code>syslog</code> is used; the file is opened for append.</td></tr>
+				<tr><td><code>syslog</code></td><td><code>0</code></td><td>When <code>1</code>, log to the system log (as <code>uhub</code>) instead of a file. Not available on Windows.</td></tr>
+			</table>
+
+			<h2>Log format</h2>
+			<p>Each line records the event, the user's SID/CID, IP address, nick, credentials (or the reason on errors) and the client's user-agent, for example:</p>
+			<pre><code>LoginOK     AAAB/CID... 203.0.113.7 "alice" (user) "DC++ 0.868"
+Logout      AAAB/CID... 203.0.113.7 "alice" (quit) "DC++ 0.868"
+NickChange  AAAC/CID... 198.51.100.4 "bob" -> "bobby"</code></pre>
+		</div>
+	</main>
+</div>
+
+<footer class="site-footer">
+	<div class="container footer-inner">
+		<div>uhub &copy; 2007–2026 Jan Vidar Krey</div>
+		<ul class="footer-links">
+			<li><a href="https://github.com/janvidar/uhub/">GitHub</a></li>
+			<li><a href="https://github.com/janvidar/uhub/issues">Issues</a></li>
+			<li><a href="../index.html">Documentation</a></li>
+			<li><a href="https://www.gnu.org/licenses/gpl-3.0.html">License</a></li>
+		</ul>
+	</div>
+</footer>
+
+<script src="../../assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>uhub — mod_example</title>
+	<meta name="description" content="mod_example is a minimal example plug-in to base your own on." />
+	<link rel="icon" href="../../assets/img/favicon.ico" />
+	<link rel="stylesheet" href="../../assets/css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+	<div class="container nav">
+		<a class="brand" href="../../index.html">
+			<img src="../../assets/img/logo.svg" alt="uhub logo" />
+			<span>uhub</span>
+			<span class="slogan">High performance ADC hub</span>
+		</a>
+		<button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+		<ul class="nav-links">
+			<li><a href="../../index.html">About</a></li>
+			<li><a href="../../news.html">News</a></li>
+			<li><a href="../../download.html">Download</a></li>
+			<li><a href="../index.html" class="active">Documentation</a></li>
+		</ul>
+	</div>
+</header>
+
+<div class="container doc-layout">
+	<aside class="doc-sidebar">
+		<h4>Users</h4>
+		<ul>
+			<li><a href="../getstarted.html">Getting started</a></li>
+			<li><a href="../config-example.html">Example configuration</a></li>
+			<li><a href="../config.html">Configuration reference</a></li>
+			<li><a href="index.html" class="active">Plug-ins</a></li>
+			<li><a href="../config-ssl.html">SSL / TLS</a></li>
+			<li><a href="../metrics.html">Monitoring</a></li>
+			<li><a href="../linking.html">Hub linking</a></li>
+		</ul>
+		<h4>Developers</h4>
+		<ul>
+			<li><a href="../developers.html">Contributors</a></li>
+			<li><a href="../compile.html">Compiling</a></li>
+			<li><a href="../architecture.html">Architecture</a></li>
+			<li><a href="../plugin-api.html">Plug-in API</a></li>
+		</ul>
+		<h4>Resources</h4>
+		<ul>
+			<li><a href="../adc.html">What is ADC?</a></li>
+			<li><a href="../coredumps.html">Core dumps</a></li>
+		</ul>
+	</aside>
+
+	<main class="doc-content">
+		<div class="prose">
+			<h1>mod_example</h1>
+			<p class="lead-sub">A minimal starting point for your own plug-in. Part of the bundled <a href="index.html">plug-ins</a>.</p>
+
+			<p>
+				<code>mod_example</code> is a tiny reference plug-in. It registers a single command and is meant
+				to be read and copied as the skeleton for a plug-in of your own. It takes no configuration
+				string:
+			</p>
+			<pre><code>plugin /var/lib/uhub/mod_example.so</code></pre>
+
+			<h2>Commands</h2>
+			<table>
+				<tr><th>Command</th><th>Access</th><th>Description</th></tr>
+				<tr><td><code>!example</code></td><td>guest</td><td>Replies with <em>“Hello from mod_example.”</em></td></tr>
+			</table>
+
+			<p>
+				The source is <code>src/plugins/mod_example.c</code>. See the
+				<a href="../plugin-api.html">plug-in API</a> for the callbacks and hub functions a plug-in can use.
+			</p>
+		</div>
+	</main>
+</div>
+
+<footer class="site-footer">
+	<div class="container footer-inner">
+		<div>uhub &copy; 2007–2026 Jan Vidar Krey</div>
+		<ul class="footer-links">
+			<li><a href="https://github.com/janvidar/uhub/">GitHub</a></li>
+			<li><a href="https://github.com/janvidar/uhub/issues">Issues</a></li>
+			<li><a href="../index.html">Documentation</a></li>
+			<li><a href="https://www.gnu.org/licenses/gpl-3.0.html">License</a></li>
+		</ul>
+	</div>
+</footer>
+
+<script src="../../assets/js/main.js"></script>
+</body>
+</html>

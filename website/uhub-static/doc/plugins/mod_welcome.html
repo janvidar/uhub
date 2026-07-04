@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>uhub — mod_welcome</title>
+	<meta name="description" content="mod_welcome sends a message of the day and rules to users on login, with !motd and !rules commands." />
+	<link rel="icon" href="../../assets/img/favicon.ico" />
+	<link rel="stylesheet" href="../../assets/css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+	<div class="container nav">
+		<a class="brand" href="../../index.html">
+			<img src="../../assets/img/logo.svg" alt="uhub logo" />
+			<span>uhub</span>
+			<span class="slogan">High performance ADC hub</span>
+		</a>
+		<button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+		<ul class="nav-links">
+			<li><a href="../../index.html">About</a></li>
+			<li><a href="../../news.html">News</a></li>
+			<li><a href="../../download.html">Download</a></li>
+			<li><a href="../index.html" class="active">Documentation</a></li>
+		</ul>
+	</div>
+</header>
+
+<div class="container doc-layout">
+	<aside class="doc-sidebar">
+		<h4>Users</h4>
+		<ul>
+			<li><a href="../getstarted.html">Getting started</a></li>
+			<li><a href="../config-example.html">Example configuration</a></li>
+			<li><a href="../config.html">Configuration reference</a></li>
+			<li><a href="index.html" class="active">Plug-ins</a></li>
+			<li><a href="../config-ssl.html">SSL / TLS</a></li>
+			<li><a href="../metrics.html">Monitoring</a></li>
+			<li><a href="../linking.html">Hub linking</a></li>
+		</ul>
+		<h4>Developers</h4>
+		<ul>
+			<li><a href="../developers.html">Contributors</a></li>
+			<li><a href="../compile.html">Compiling</a></li>
+			<li><a href="../architecture.html">Architecture</a></li>
+			<li><a href="../plugin-api.html">Plug-in API</a></li>
+		</ul>
+		<h4>Resources</h4>
+		<ul>
+			<li><a href="../adc.html">What is ADC?</a></li>
+			<li><a href="../coredumps.html">Core dumps</a></li>
+		</ul>
+	</aside>
+
+	<main class="doc-content">
+		<div class="prose">
+			<h1>mod_welcome</h1>
+			<p class="lead-sub">Greet users with a message of the day. Part of the bundled <a href="index.html">plug-ins</a>.</p>
+
+			<p>
+				<code>mod_welcome</code> sends a message of the day (MOTD) to each user when they log in, and
+				optionally publishes hub rules. Each configured file also gets a command so users can re-read
+				it on demand.
+			</p>
+
+			<h2>Loading</h2>
+			<pre><code>plugin /var/lib/uhub/mod_welcome.so "motd=/etc/uhub/motd.txt rules=/etc/uhub/rules.txt"</code></pre>
+
+			<h2>Configuration</h2>
+			<table>
+				<tr><th>Option</th><th>Default</th><th>Description</th></tr>
+				<tr><td><code>motd</code></td><td>—</td><td>File whose contents are sent to each user on login. Enables the <code>!motd</code> command.</td></tr>
+				<tr><td><code>rules</code></td><td>—</td><td>File with the hub rules. Enables the <code>!rules</code> command (not sent automatically).</td></tr>
+			</table>
+
+			<h2>Commands</h2>
+			<table>
+				<tr><th>Command</th><th>Access</th><th>Description</th></tr>
+				<tr><td><code>!motd</code></td><td>guest</td><td>Show the message of the day (when <code>motd</code> is configured).</td></tr>
+				<tr><td><code>!rules</code></td><td>guest</td><td>Show the hub rules (when <code>rules</code> is configured).</td></tr>
+			</table>
+
+			<h2>Substitutions</h2>
+			<p>The following placeholders are expanded in the MOTD and rules text:</p>
+			<table>
+				<tr><th>Token</th><th>Expands to</th></tr>
+				<tr><td><code>%n</code></td><td>the user's nick</td></tr>
+				<tr><td><code>%a</code></td><td>the user's IP address</td></tr>
+				<tr><td><code>%c</code></td><td>the user's credentials (guest, user, operator, …)</td></tr>
+				<tr><td><code>%%</code></td><td>a literal percent sign</td></tr>
+				<tr><td><code>%H %I %M %S %p %P</code></td><td>current time fields (hour 24h / hour 12h / minute / second / am-pm)</td></tr>
+			</table>
+		</div>
+	</main>
+</div>
+
+<footer class="site-footer">
+	<div class="container footer-inner">
+		<div>uhub &copy; 2007–2026 Jan Vidar Krey</div>
+		<ul class="footer-links">
+			<li><a href="https://github.com/janvidar/uhub/">GitHub</a></li>
+			<li><a href="https://github.com/janvidar/uhub/issues">Issues</a></li>
+			<li><a href="../index.html">Documentation</a></li>
+			<li><a href="https://www.gnu.org/licenses/gpl-3.0.html">License</a></li>
+		</ul>
+	</div>
+</footer>
+
+<script src="../../assets/js/main.js"></script>
+</body>
+</html>

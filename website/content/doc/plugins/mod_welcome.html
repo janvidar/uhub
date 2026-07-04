@@ -1,0 +1,42 @@
+title: uhub — mod_welcome
+description: mod_welcome sends a message of the day and rules to users on login, with !motd and !rules commands.
+layout: doc
+nav: documentation
+sidebar: plugins
+---
+			<h1>mod_welcome</h1>
+			<p class="lead-sub">Greet users with a message of the day. Part of the bundled <a href="index.html">plug-ins</a>.</p>
+
+			<p>
+				<code>mod_welcome</code> sends a message of the day (MOTD) to each user when they log in, and
+				optionally publishes hub rules. Each configured file also gets a command so users can re-read
+				it on demand.
+			</p>
+
+			<h2>Loading</h2>
+			<pre><code>plugin /var/lib/uhub/mod_welcome.so "motd=/etc/uhub/motd.txt rules=/etc/uhub/rules.txt"</code></pre>
+
+			<h2>Configuration</h2>
+			<table>
+				<tr><th>Option</th><th>Default</th><th>Description</th></tr>
+				<tr><td><code>motd</code></td><td>—</td><td>File whose contents are sent to each user on login. Enables the <code>!motd</code> command.</td></tr>
+				<tr><td><code>rules</code></td><td>—</td><td>File with the hub rules. Enables the <code>!rules</code> command (not sent automatically).</td></tr>
+			</table>
+
+			<h2>Commands</h2>
+			<table>
+				<tr><th>Command</th><th>Access</th><th>Description</th></tr>
+				<tr><td><code>!motd</code></td><td>guest</td><td>Show the message of the day (when <code>motd</code> is configured).</td></tr>
+				<tr><td><code>!rules</code></td><td>guest</td><td>Show the hub rules (when <code>rules</code> is configured).</td></tr>
+			</table>
+
+			<h2>Substitutions</h2>
+			<p>The following placeholders are expanded in the MOTD and rules text:</p>
+			<table>
+				<tr><th>Token</th><th>Expands to</th></tr>
+				<tr><td><code>%n</code></td><td>the user's nick</td></tr>
+				<tr><td><code>%a</code></td><td>the user's IP address</td></tr>
+				<tr><td><code>%c</code></td><td>the user's credentials (guest, user, operator, …)</td></tr>
+				<tr><td><code>%%</code></td><td>a literal percent sign</td></tr>
+				<tr><td><code>%H %I %M %S %p %P</code></td><td>current time fields (hour 24h / hour 12h / minute / second / am-pm)</td></tr>
+			</table>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>uhub — mod_topic</title>
+	<meta name="description" content="mod_topic adds commands for operators to set, reset and show the hub topic." />
+	<link rel="icon" href="../../assets/img/favicon.ico" />
+	<link rel="stylesheet" href="../../assets/css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+	<div class="container nav">
+		<a class="brand" href="../../index.html">
+			<img src="../../assets/img/logo.svg" alt="uhub logo" />
+			<span>uhub</span>
+			<span class="slogan">High performance ADC hub</span>
+		</a>
+		<button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+		<ul class="nav-links">
+			<li><a href="../../index.html">About</a></li>
+			<li><a href="../../news.html">News</a></li>
+			<li><a href="../../download.html">Download</a></li>
+			<li><a href="../index.html" class="active">Documentation</a></li>
+		</ul>
+	</div>
+</header>
+
+<div class="container doc-layout">
+	<aside class="doc-sidebar">
+		<h4>Users</h4>
+		<ul>
+			<li><a href="../getstarted.html">Getting started</a></li>
+			<li><a href="../config-example.html">Example configuration</a></li>
+			<li><a href="../config.html">Configuration reference</a></li>
+			<li><a href="index.html" class="active">Plug-ins</a></li>
+			<li><a href="../config-ssl.html">SSL / TLS</a></li>
+			<li><a href="../metrics.html">Monitoring</a></li>
+			<li><a href="../linking.html">Hub linking</a></li>
+		</ul>
+		<h4>Developers</h4>
+		<ul>
+			<li><a href="../developers.html">Contributors</a></li>
+			<li><a href="../compile.html">Compiling</a></li>
+			<li><a href="../architecture.html">Architecture</a></li>
+			<li><a href="../plugin-api.html">Plug-in API</a></li>
+		</ul>
+		<h4>Resources</h4>
+		<ul>
+			<li><a href="../adc.html">What is ADC?</a></li>
+			<li><a href="../coredumps.html">Core dumps</a></li>
+		</ul>
+	</aside>
+
+	<main class="doc-content">
+		<div class="prose">
+			<h1>mod_topic</h1>
+			<p class="lead-sub">Change the hub topic from chat. Part of the bundled <a href="index.html">plug-ins</a>.</p>
+
+			<p>
+				<code>mod_topic</code> adds commands for setting the hub topic (its description) at runtime. It
+				takes no configuration string — just load it:
+			</p>
+			<pre><code>plugin /var/lib/uhub/mod_topic.so</code></pre>
+
+			<h2>Commands</h2>
+			<table>
+				<tr><th>Command</th><th>Access</th><th>Description</th></tr>
+				<tr><td><code>!topic &lt;text&gt;</code></td><td>operator</td><td>Set a new hub topic.</td></tr>
+				<tr><td><code>!resettopic</code></td><td>operator</td><td>Reset the topic to the configured default.</td></tr>
+				<tr><td><code>!showtopic</code></td><td>guest</td><td>Show the current topic.</td></tr>
+			</table>
+
+			<p>
+				In a <a href="../linking.html">linked cluster</a>, a topic change propagates to every node, so
+				all clients see the same topic.
+			</p>
+		</div>
+	</main>
+</div>
+
+<footer class="site-footer">
+	<div class="container footer-inner">
+		<div>uhub &copy; 2007–2026 Jan Vidar Krey</div>
+		<ul class="footer-links">
+			<li><a href="https://github.com/janvidar/uhub/">GitHub</a></li>
+			<li><a href="https://github.com/janvidar/uhub/issues">Issues</a></li>
+			<li><a href="../index.html">Documentation</a></li>
+			<li><a href="https://www.gnu.org/licenses/gpl-3.0.html">License</a></li>
+		</ul>
+	</div>
+</footer>
+
+<script src="../../assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+title: uhub — mod_flood
+description: mod_flood disconnects users after repeated hub-detected floods.
+layout: doc
+nav: documentation
+sidebar: plugins
+---
+			<h1>mod_flood</h1>
+			<p class="lead-sub">Act on repeated floods. Part of the bundled <a href="index.html">plug-ins</a>.</p>
+
+			<p>
+				Flood detection lives in the hub core (the <a href="../config.html">flood_ctl_*</a> options),
+				which decides <em>when</em> a user is flooding; a plug-in decides <em>what to do</em> about it.
+				<code>mod_flood</code> is that action: it counts how many times the hub flags a user for
+				flooding and disconnects them once they cross a grace threshold.
+			</p>
+
+			<h2>Loading</h2>
+			<pre><code>plugin /var/lib/uhub/mod_flood.so "grace=3 operator_override=1"</code></pre>
+
+			<h2>Configuration</h2>
+			<table>
+				<tr><th>Option</th><th>Default</th><th>Description</th></tr>
+				<tr><td><code>grace</code></td><td><code>3</code></td><td>Number of detected floods a user is allowed before being disconnected (minimum 1). Below the threshold the hub applies its built-in drop-and-warn.</td></tr>
+				<tr><td><code>operator_override</code></td><td><code>1</code></td><td>When enabled, operators and above are exempt from being disconnected.</td></tr>
+			</table>
+
+			<h2>Behaviour</h2>
+			<p>
+				Each hub-detected flood adds a strike to the offending user. Once the strike count reaches
+				<code>grace</code>, the user is sent <em>“Disconnected: repeated &lt;type&gt; flooding.”</em>
+				and dropped. The strike count resets on logout. Configure the sensitivity of detection itself
+				with the core <code>flood_ctl_*</code> directives.
+			</p>

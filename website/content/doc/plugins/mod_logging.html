@@ -1,0 +1,32 @@
+title: uhub — mod_logging
+description: mod_logging records logins, logouts, nick changes and login errors to a file or syslog.
+layout: doc
+nav: documentation
+sidebar: plugins
+---
+			<h1>mod_logging</h1>
+			<p class="lead-sub">Log users entering and leaving the hub. Part of the bundled <a href="index.html">plug-ins</a>.</p>
+
+			<p>
+				<code>mod_logging</code> records a line for every successful login, failed login, logout and
+				nick change, to a log file or to the system log.
+			</p>
+
+			<h2>Loading</h2>
+			<p>Log to a file:</p>
+			<pre><code>plugin /var/lib/uhub/mod_logging.so "file=/var/log/uhub/uhub.log"</code></pre>
+			<p>Or to syslog (Unix only):</p>
+			<pre><code>plugin /var/lib/uhub/mod_logging.so "syslog=1"</code></pre>
+
+			<h2>Configuration</h2>
+			<table>
+				<tr><th>Option</th><th>Default</th><th>Description</th></tr>
+				<tr><td><code>file</code></td><td>—</td><td>Path to the log file. Required unless <code>syslog</code> is used; the file is opened for append.</td></tr>
+				<tr><td><code>syslog</code></td><td><code>0</code></td><td>When <code>1</code>, log to the system log (as <code>uhub</code>) instead of a file. Not available on Windows.</td></tr>
+			</table>
+
+			<h2>Log format</h2>
+			<p>Each line records the event, the user's SID/CID, IP address, nick, credentials (or the reason on errors) and the client's user-agent, for example:</p>
+			<pre><code>LoginOK     AAAB/CID... 203.0.113.7 "alice" (user) "DC++ 0.868"
+Logout      AAAB/CID... 203.0.113.7 "alice" (quit) "DC++ 0.868"
+NickChange  AAAC/CID... 198.51.100.4 "bob" -> "bobby"</code></pre>

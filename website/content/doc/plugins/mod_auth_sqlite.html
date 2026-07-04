@@ -1,0 +1,43 @@
+title: uhub — mod_auth_sqlite
+description: mod_auth_sqlite authenticates uhub users from a SQLite database, with optional self-service registration.
+layout: doc
+nav: documentation
+sidebar: plugins
+---
+			<h1>mod_auth_sqlite</h1>
+			<p class="lead-sub">Authenticate users from a SQLite database. Part of the bundled <a href="index.html">plug-ins</a>.</p>
+
+			<p>
+				<code>mod_auth_sqlite</code> stores registered accounts in a SQLite database. It scales past a
+				hand-edited text file and can optionally let users register and change their own passwords.
+				The <a href="../getstarted.html">uhub-passwd</a> tool creates and manages the database.
+			</p>
+
+			<h2>Loading</h2>
+			<pre><code>plugin /var/lib/uhub/mod_auth_sqlite.so "file=/etc/uhub/users.db"</code></pre>
+
+			<h2>Configuration</h2>
+			<table>
+				<tr><th>Option</th><th>Default</th><th>Description</th></tr>
+				<tr><td><code>file</code></td><td>—</td><td>Path to the SQLite database (required).</td></tr>
+				<tr><td><code>exclusive</code></td><td><code>no</code></td><td>When enabled, only accounts in this database may log in — any other nick is denied rather than passed to the hub's own ACL.</td></tr>
+				<tr><td><code>self_register</code></td><td><code>no</code></td><td>Enables the <code>!regme</code> and <code>!passwd</code> self-service commands below.</td></tr>
+			</table>
+
+			<h2>Commands</h2>
+			<p>Registered only when <code>self_register</code> is enabled:</p>
+			<table>
+				<tr><th>Command</th><th>Access</th><th>Description</th></tr>
+				<tr><td><code>!regme &lt;password&gt;</code></td><td>guest</td><td>Register your current nick with the given password.</td></tr>
+				<tr><td><code>!passwd &lt;password&gt;</code></td><td>registered</td><td>Change the password of your registered nick.</td></tr>
+			</table>
+			<p>Passwords must be 1–64 characters and contain no spaces.</p>
+
+			<div class="callout">
+				<p>
+					<code>self_register</code> lets anyone claim a nick — enable it only where that is
+					acceptable, and consider pairing it with a registered-users-only or moderated policy.
+				</p>
+			</div>
+
+			<p>For a simple file-based store without a database, see <a href="mod_auth_simple.html">mod_auth_simple</a>.</p>

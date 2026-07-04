@@ -1,0 +1,26 @@
+title: uhub — mod_example
+description: mod_example is a minimal example plug-in to base your own on.
+layout: doc
+nav: documentation
+sidebar: plugins
+---
+			<h1>mod_example</h1>
+			<p class="lead-sub">A minimal starting point for your own plug-in. Part of the bundled <a href="index.html">plug-ins</a>.</p>
+
+			<p>
+				<code>mod_example</code> is a tiny reference plug-in. It registers a single command and is meant
+				to be read and copied as the skeleton for a plug-in of your own. It takes no configuration
+				string:
+			</p>
+			<pre><code>plugin /var/lib/uhub/mod_example.so</code></pre>
+
+			<h2>Commands</h2>
+			<table>
+				<tr><th>Command</th><th>Access</th><th>Description</th></tr>
+				<tr><td><code>!example</code></td><td>guest</td><td>Replies with <em>“Hello from mod_example.”</em></td></tr>
+			</table>
+
+			<p>
+				The source is <code>src/plugins/mod_example.c</code>. See the
+				<a href="../plugin-api.html">plug-in API</a> for the callbacks and hub functions a plug-in can use.
+			</p>

@@ -1,0 +1,41 @@
+title: uhub — mod_auth_simple
+description: mod_auth_simple authenticates uhub users from a plain read-only text file.
+layout: doc
+nav: documentation
+sidebar: plugins
+---
+			<h1>mod_auth_simple</h1>
+			<p class="lead-sub">Authenticate users from a plain text file. Part of the bundled <a href="index.html">plug-ins</a>.</p>
+
+			<p>
+				<code>mod_auth_simple</code> reads registered accounts from a flat text file. It is the
+				simplest way to add a handful of registered users, operators and admins without a database.
+			</p>
+
+			<h2>Loading</h2>
+			<pre><code>plugin /var/lib/uhub/mod_auth_simple.so "file=/etc/uhub/users.conf"</code></pre>
+
+			<h2>Configuration</h2>
+			<table>
+				<tr><th>Option</th><th>Default</th><th>Description</th></tr>
+				<tr><td><code>file</code></td><td>—</td><td>Path to the accounts file (required).</td></tr>
+				<tr><td><code>readonly</code></td><td><code>yes</code></td><td>The hub never writes back to the file; registration/update/delete are refused.</td></tr>
+				<tr><td><code>exclusive</code></td><td><code>no</code></td><td>When enabled, only accounts listed in this file may log in — any other nick is denied instead of being passed on to the hub's own ACL.</td></tr>
+			</table>
+
+			<h2>File format</h2>
+			<p>One account per line, whitespace-separated:</p>
+			<pre><code>credential username password</code></pre>
+			<p>
+				<code>credential</code> is one of <code>admin</code>, <code>super</code>, <code>op</code>,
+				<code>reg</code>/<code>user</code> or a bot class — the same credential keywords used in the
+				hub's <a href="../config.html">ACL file</a>. For example:
+			</p>
+			<pre><code>admin alice s3cr3t
+op    bob   hunter2
+reg   carol passw0rd</code></pre>
+
+			<p>
+				For a database-backed store with self-service registration instead, see
+				<a href="mod_auth_sqlite.html">mod_auth_sqlite</a>.
+			</p>

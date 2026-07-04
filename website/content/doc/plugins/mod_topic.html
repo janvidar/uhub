@@ -1,0 +1,27 @@
+title: uhub — mod_topic
+description: mod_topic adds commands for operators to set, reset and show the hub topic.
+layout: doc
+nav: documentation
+sidebar: plugins
+---
+			<h1>mod_topic</h1>
+			<p class="lead-sub">Change the hub topic from chat. Part of the bundled <a href="index.html">plug-ins</a>.</p>
+
+			<p>
+				<code>mod_topic</code> adds commands for setting the hub topic (its description) at runtime. It
+				takes no configuration string — just load it:
+			</p>
+			<pre><code>plugin /var/lib/uhub/mod_topic.so</code></pre>
+
+			<h2>Commands</h2>
+			<table>
+				<tr><th>Command</th><th>Access</th><th>Description</th></tr>
+				<tr><td><code>!topic &lt;text&gt;</code></td><td>operator</td><td>Set a new hub topic.</td></tr>
+				<tr><td><code>!resettopic</code></td><td>operator</td><td>Reset the topic to the configured default.</td></tr>
+				<tr><td><code>!showtopic</code></td><td>guest</td><td>Show the current topic.</td></tr>
+			</table>
+
+			<p>
+				In a <a href="../linking.html">linked cluster</a>, a topic change propagates to every node, so
+				all clients see the same topic.
+			</p>

@@ -1,0 +1,32 @@
+title: uhub — mod_chat_history
+description: mod_chat_history keeps a global main-chat history and replays it on login and on demand.
+layout: doc
+nav: documentation
+sidebar: plugins
+---
+			<h1>mod_chat_history</h1>
+			<p class="lead-sub">Keep and replay main-chat history. Part of the bundled <a href="index.html">plug-ins</a>.</p>
+
+			<p>
+				<code>mod_chat_history</code> keeps a rolling log of main-chat messages in memory, replays the
+				most recent lines to each user on login, and lets users pull up history with a command. The
+				log is not persisted — it is lost when the hub restarts. For a persistent log, use
+				<a href="mod_chat_history_sqlite.html">mod_chat_history_sqlite</a>.
+			</p>
+
+			<h2>Loading</h2>
+			<pre><code>plugin /var/lib/uhub/mod_chat_history.so "history_max=200 history_default=25 history_connect=5"</code></pre>
+
+			<h2>Configuration</h2>
+			<table>
+				<tr><th>Option</th><th>Default</th><th>Description</th></tr>
+				<tr><td><code>history_max</code></td><td><code>200</code></td><td>Maximum number of messages kept in the log.</td></tr>
+				<tr><td><code>history_default</code></td><td><code>25</code></td><td>Number of lines <code>!history</code> shows when called without an argument.</td></tr>
+				<tr><td><code>history_connect</code></td><td><code>5</code></td><td>Number of recent lines sent automatically when a user logs in (0 disables).</td></tr>
+			</table>
+
+			<h2>Commands</h2>
+			<table>
+				<tr><th>Command</th><th>Access</th><th>Description</th></tr>
+				<tr><td><code>!history [N]</code></td><td>guest</td><td>Show the last <code>N</code> messages (or <code>history_default</code> if omitted).</td></tr>
+			</table>

@@ -67,41 +67,21 @@
 			<pre><code>plugin c:\path\to\mod_logging.dll "file=c:\uhub\uhub.log"</code></pre>
 
 			<h2>Bundled plug-ins</h2>
+			<p>Click a module for its configuration options and commands.</p>
 			<table class="table">
 				<tr><th>Module</th><th>Description</th></tr>
-				<tr><td><code>mod_auth_simple</code></td><td>Authenticate users based on a read-only text file.</td></tr>
-				<tr><td><code>mod_auth_sqlite</code></td><td>Authenticate users based on a SQLite database.</td></tr>
-				<tr><td><code>mod_logging</code></td><td>Logs users entering and leaving the hub.</td></tr>
-				<tr><td><code>mod_welcome</code></td><td>Sends a welcome message (and rules / MOTD) to users when they log in.</td></tr>
-				<tr><td><code>mod_chat_history</code></td><td>Provides a global chat history log.</td></tr>
-				<tr><td><code>mod_chat_history_sqlite</code></td><td>Provides a global chat history log backed by SQLite.</td></tr>
-				<tr><td><code>mod_chat_only</code></td><td>Chat-only hub: disables connection setup, search and results.</td></tr>
-				<tr><td><code>mod_chat_is_privileged</code></td><td>Only registered users can send messages in the main chat.</td></tr>
-				<tr><td><code>mod_topic</code></td><td>Adds commands for changing the hub topic (description).</td></tr>
-				<tr><td><code>mod_no_guest_downloads</code></td><td>Only registered users can search and initiate transfers.</td></tr>
-				<tr><td><code>mod_example</code></td><td>A simple example plug-in to base your own on.</td></tr>
+				<tr><td><a href="mod_auth_simple.html"><code>mod_auth_simple</code></a></td><td>Authenticate users based on a read-only text file.</td></tr>
+				<tr><td><a href="mod_auth_sqlite.html"><code>mod_auth_sqlite</code></a></td><td>Authenticate users based on a SQLite database, with optional self-registration.</td></tr>
+				<tr><td><a href="mod_logging.html"><code>mod_logging</code></a></td><td>Logs users entering and leaving the hub.</td></tr>
+				<tr><td><a href="mod_welcome.html"><code>mod_welcome</code></a></td><td>Sends a welcome message (and rules / MOTD) to users when they log in.</td></tr>
+				<tr><td><a href="mod_chat_history.html"><code>mod_chat_history</code></a></td><td>Provides a global chat history log.</td></tr>
+				<tr><td><a href="mod_chat_history_sqlite.html"><code>mod_chat_history_sqlite</code></a></td><td>Provides a global chat history log backed by SQLite.</td></tr>
+				<tr><td><a href="mod_chat_only.html"><code>mod_chat_only</code></a></td><td>Chat-only hub: disables connection setup, search and results.</td></tr>
+				<tr><td><a href="mod_topic.html"><code>mod_topic</code></a></td><td>Adds commands for changing the hub topic (description).</td></tr>
+				<tr><td><a href="mod_no_guest_downloads.html"><code>mod_no_guest_downloads</code></a></td><td>Only registered users can search and initiate transfers.</td></tr>
+				<tr><td><a href="mod_flood.html"><code>mod_flood</code></a></td><td>Disconnects users after repeated hub-detected floods.</td></tr>
+				<tr><td><a href="mod_example.html"><code>mod_example</code></a></td><td>A simple example plug-in to base your own on.</td></tr>
 			</table>
-
-			<h2>Chat-only hubs (mod_chat_only)</h2>
-			<p>
-				<code>mod_chat_only</code> turns the hub into a pure chat hub: it denies file searches,
-				search results and peer-to-peer connection setup (both active and passive), so users can
-				talk but not set up transfers through the hub. It takes no configuration string — just
-				load it:
-			</p>
-			<pre><code>plugin /var/lib/uhub/mod_chat_only.so</code></pre>
-			<p>
-				The first time a user searches, or a client attempts to set up a transfer, the hub sends a
-				one-time notice (<em>“Searching is disabled. This is a chat only hub.”</em> or
-				<em>“Connection setup denied. This is a chat only hub.”</em>); further attempts are denied
-				silently.
-			</p>
-			<p>
-				This is the plug-in form of a chat-only hub — there is no core <code>chat_only</code>
-				configuration directive. To instead restrict <em>who</em> may talk rather than disable
-				transfers, use <code>mod_chat_is_privileged</code> or the
-				<a href="../config.html">chat_is_privileged</a> option.
-			</p>
 
 			<h2>Example configuration</h2>
 			<p>A typical <code>plugins.conf</code> combining several modules:</p>
