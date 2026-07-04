@@ -82,6 +82,27 @@
 				<tr><td><code>mod_example</code></td><td>A simple example plug-in to base your own on.</td></tr>
 			</table>
 
+			<h2>Chat-only hubs (mod_chat_only)</h2>
+			<p>
+				<code>mod_chat_only</code> turns the hub into a pure chat hub: it denies file searches,
+				search results and peer-to-peer connection setup (both active and passive), so users can
+				talk but not set up transfers through the hub. It takes no configuration string — just
+				load it:
+			</p>
+			<pre><code>plugin /var/lib/uhub/mod_chat_only.so</code></pre>
+			<p>
+				The first time a user searches, or a client attempts to set up a transfer, the hub sends a
+				one-time notice (<em>“Searching is disabled. This is a chat only hub.”</em> or
+				<em>“Connection setup denied. This is a chat only hub.”</em>); further attempts are denied
+				silently.
+			</p>
+			<p>
+				This is the plug-in form of a chat-only hub — there is no core <code>chat_only</code>
+				configuration directive. To instead restrict <em>who</em> may talk rather than disable
+				transfers, use <code>mod_chat_is_privileged</code> or the
+				<a href="../config.html">chat_is_privileged</a> option.
+			</p>
+
 			<h2>Example configuration</h2>
 			<p>A typical <code>plugins.conf</code> combining several modules:</p>
 			<pre><code>plugin /var/lib/uhub/mod_auth_sqlite.so "file=/etc/uhub/users.db"
