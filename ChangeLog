@@ -1,3 +1,10 @@
+0.7.1:
+New features:
+- New plugin mod_ucmd: publishes the hub's registered commands as ADC user-command (UCMD) context-menu entries for clients that support the UCM0 extension. Every command available at a user's credential level appears in the client's right-click menu — user-targeting commands (kick, ban, getip, ...) in the user-list menu and the rest in the hub menu — and selecting an entry sends the corresponding +command on the user's behalf.
+
+Plugin API:
+- Added a command_foreach() hub callback (and a read-only plugin_command_info view) so plugins can enumerate the registered hub commands available to a given credential level.
+
 0.7.0:
 Federation and scaling:
 - Hub linking: multiple uhubs can be linked into a single logical hub with a partitioned SID space, a dedicated hub-to-hub link protocol (challenge-response authenticated with a shared secret), and cross-hub routing of chat, private messages, searches, results and connect requests. Links reuse the normal client port and are auto-detected.
