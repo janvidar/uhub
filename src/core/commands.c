@@ -378,6 +378,83 @@ static int command_kick(struct command_base* cbase, struct hub_user* user, struc
 	return command_status(cbase, user, cmd, buf);
 }
 
+/* Accept only adc://host:port, adcs://host:port or dchub://host:port, with a
+ * non-empty host (hostname / IPv4 / bracketed IPv6) and a numeric port in
+ * 1..65535. Restricting the character set keeps the value safe to place in an
+ * ADC RD flag without further escaping. */
+int command_redirect_valid_address(const char* addr)
+{
+	static const char* const schemes[] = { "adc://", "adcs://", "dchub://", NULL };
+	const char* host = NULL;
+	const char* colon;
+	const char* p;
+	size_t i;
+	long port;
+
+	if (!addr || !*addr || strlen(addr) > 255)
+		return 0;
+
+	for (i = 0; schemes[i]; i++)
+	{
+		size_t len = strlen(schemes[i]);
+		if (!strncmp(addr, schemes[i], len))
+		{
+			host = addr + len;
+			break;
+		}
+	}
+	if (!host)
+		return 0;
+
+	/* Rightmost ':' splits host from port, so bracketed IPv6 ([::1]:411) works. */
+	colon = strrchr(host, ':');
+	if (!colon || colon == host)
+		return 0;
+
+	for (p = host; p < colon; p++)
+	{
+		char c = *p;
+		if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+		      (c >= '0' && c <= '9') || c == '.' || c == '-' ||
+		      c == ':' || c == '[' || c == ']'))
+			return 0;
+	}
+
+	for (p = colon + 1; *p; p++)
+		if (*p < '0' || *p > '9')
+			return 0;
+
+	port = strtol(colon + 1, NULL, 10);
+	if (port < 1 || port > 65535)
+		return 0;
+
+	return 1;
+}
+
+static int command_redirect(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
+{
+	struct cbuffer* buf = cbuf_create(256);
+	struct hub_command_arg_data* arg_user = hub_command_arg_next(cmd, type_user);
+	struct hub_command_arg_data* arg_addr = hub_command_arg_next(cmd, type_string);
+	struct hub_user* target = arg_user->data.user;
+	const char* address = arg_addr->data.string;
+
+	if (target == user)
+	{
+		cbuf_append(buf, "Cannot redirect yourself.");
+	}
+	else if (!command_redirect_valid_address(address))
+	{
+		cbuf_append_format(buf, "Invalid redirect address \"%s\". Expected adc://host:port, adcs://host:port or dchub://host:port.", address);
+	}
+	else
+	{
+		cbuf_append_format(buf, "Redirecting user \"%s\" to %s.", target->id.nick, address);
+		hub_redirect_user(cbase->hub, target, address);
+	}
+	return command_status(cbase, user, cmd, buf);
+}
+
 static int command_ban(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
 	struct cbuffer* buf;
@@ -644,6 +721,7 @@ void commands_builtin_add(struct command_base* cbase)
 	ADD_COMMAND("help",       4, "?c",auth_cred_guest,     command_help,     "Show this help message."      );
 	ADD_COMMAND("ban",        3, "u", auth_cred_operator,  command_ban,      "Ban a user (cluster-wide)"    );
 	ADD_COMMAND("kick",       4, "u", auth_cred_operator,  command_kick,     "Kick a user"                  );
+	ADD_COMMAND("redirect",   8, "um",auth_cred_operator,  command_redirect, "Redirect a user to another hub");
 	ADD_COMMAND("log",        3, "?m",auth_cred_operator,  command_log,      "Display log"                  ); // fail
 	ADD_COMMAND("myip",       4, "",  auth_cred_guest,     command_myip,     "Show your own IP."            );
 	ADD_COMMAND("reload",     6, "",  auth_cred_admin,     command_reload,   "Reload configuration files."  );

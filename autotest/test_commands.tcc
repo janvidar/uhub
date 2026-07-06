@@ -229,6 +229,30 @@ EXO_TEST(command_argument_cred_6, {
 
 #undef SETUP_COMMAND
 
+/* !redirect: registration, access level and argument parsing (user "tester"
+ * is registered in the hub at this point). */
+EXO_TEST(command_redirect_parse_ok,      { user.credentials = auth_cred_operator; return verify("!redirect tester adc://host.example:411", cmd_status_ok); });
+EXO_TEST(command_redirect_missing_addr,  { return verify("!redirect tester", cmd_status_missing_args); });
+EXO_TEST(command_redirect_unknown_nick,  { return verify("!redirect nosuchuser adc://host:411", cmd_status_arg_nick); });
+EXO_TEST(command_redirect_access,        { user.credentials = auth_cred_guest; return verify("!redirect tester adc://host:411", cmd_status_access_error); });
+
+/* !redirect: address validation (command_redirect_valid_address). */
+EXO_TEST(command_redirect_addr_adc,          { return command_redirect_valid_address("adc://host.example:411") == 1; });
+EXO_TEST(command_redirect_addr_adcs,         { return command_redirect_valid_address("adcs://host.example:412") == 1; });
+EXO_TEST(command_redirect_addr_dchub,        { return command_redirect_valid_address("dchub://old.example:411") == 1; });
+EXO_TEST(command_redirect_addr_ipv6,         { return command_redirect_valid_address("adc://[::1]:411") == 1; });
+EXO_TEST(command_redirect_addr_ipv4_maxport, { return command_redirect_valid_address("adc://1.2.3.4:65535") == 1; });
+EXO_TEST(command_redirect_addr_bad_scheme,   { return command_redirect_valid_address("http://host:411") == 0; });
+EXO_TEST(command_redirect_addr_no_scheme,    { return command_redirect_valid_address("host:411") == 0; });
+EXO_TEST(command_redirect_addr_no_port,      { return command_redirect_valid_address("adc://host") == 0; });
+EXO_TEST(command_redirect_addr_empty_host,   { return command_redirect_valid_address("adc://:411") == 0; });
+EXO_TEST(command_redirect_addr_port_zero,    { return command_redirect_valid_address("adc://host:0") == 0; });
+EXO_TEST(command_redirect_addr_port_high,    { return command_redirect_valid_address("adc://host:99999") == 0; });
+EXO_TEST(command_redirect_addr_port_nan,     { return command_redirect_valid_address("adc://host:abc") == 0; });
+EXO_TEST(command_redirect_addr_space,        { return command_redirect_valid_address("adc://ho st:411") == 0; });
+EXO_TEST(command_redirect_addr_plain,        { return command_redirect_valid_address("justtext") == 0; });
+EXO_TEST(command_redirect_addr_empty,        { return command_redirect_valid_address("") == 0; });
+
 EXO_TEST(command_user_destroy, { return uman_remove(hub->users, &user) == 0; });
 
 EXO_TEST(command_destroy, {
