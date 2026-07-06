@@ -152,6 +152,7 @@ void command_get_syntax(struct command_handle* handler, struct cbuffer* buf)
 				case 'u': cbuf_append(buf, "<user>");        break;
 				case 'i': cbuf_append(buf, "<cid>");         break;
 				case 'a': cbuf_append(buf, "<addr>");        break;
+				case 'A': cbuf_append(buf, "<address>");     break;
 				case 'r': cbuf_append(buf, "<addr range>");  break;
 				case 'm': cbuf_append(buf, "<message>");     break;
 				case 'p': cbuf_append(buf, "<password>");    break;
@@ -721,7 +722,7 @@ void commands_builtin_add(struct command_base* cbase)
 	ADD_COMMAND("help",       4, "?c",auth_cred_guest,     command_help,     "Show this help message."      );
 	ADD_COMMAND("ban",        3, "u", auth_cred_operator,  command_ban,      "Ban a user (cluster-wide)"    );
 	ADD_COMMAND("kick",       4, "u", auth_cred_operator,  command_kick,     "Kick a user"                  );
-	ADD_COMMAND("redirect",   8, "um",auth_cred_operator,  command_redirect, "Redirect a user to another hub");
+	ADD_COMMAND("redirect",   8, "uA",auth_cred_operator,  command_redirect, "Redirect a user to another hub");
 	ADD_COMMAND("log",        3, "?m",auth_cred_operator,  command_log,      "Display log"                  ); // fail
 	ADD_COMMAND("myip",       4, "",  auth_cred_guest,     command_myip,     "Show your own IP."            );
 	ADD_COMMAND("reload",     6, "",  auth_cred_admin,     command_reload,   "Reload configuration files."  );

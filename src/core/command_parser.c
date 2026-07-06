@@ -202,6 +202,7 @@ static enum command_parse_status command_extract_arguments(struct hub_info* hub,
 			case 'n':
 			case 'm':
 			case 'p':
+			case 'A':
 				data = hub_malloc(sizeof(*data));
 				if (data)
 				{

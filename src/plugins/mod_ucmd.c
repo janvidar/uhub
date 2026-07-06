@@ -85,7 +85,8 @@ static void emit_command(struct plugin_handle* plugin, const struct plugin_comma
 			case 'i': placeholder = "%[userCID]"; context = UCMD_CT_USER; break;
 			case 'm': placeholder = "%[line:Message]";       break;
 			case 'N': placeholder = "%[line:Number]";        break;
-			case 'a': placeholder = "%[line:Address]";       break;
+			case 'a': /* fall through */
+			case 'A': placeholder = "%[line:Address]";       break;
 			case 'r': placeholder = "%[line:Address range]"; break;
 			case 'p': placeholder = "%[line:Password]";      break;
 			case 'C': placeholder = "%[line:Credentials]";   break;
