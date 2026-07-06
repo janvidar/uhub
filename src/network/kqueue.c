@@ -115,6 +115,7 @@ void net_backend_process_kqueue(struct net_backend* data, int res)
 struct net_connection* net_con_create_kqueue(struct net_backend* data)
 {
 	struct net_connection* con = (struct net_connection*) hub_malloc_zero(sizeof(struct net_connection_kqueue));
+	(void) data;
 	con->sd = -1;
 	return con;
 }
@@ -122,6 +123,7 @@ struct net_connection* net_con_create_kqueue(struct net_backend* data)
 void net_con_initialize_kqueue(struct net_backend* data, struct net_connection* con_, int sd, net_connection_cb callback, const void* ptr)
 {
 	struct net_connection_kqueue* con = (struct net_connection_kqueue*) con_;
+	(void) data;
 	con->sd = sd;
 	con->flags = 0;
 	con->callback = callback;
