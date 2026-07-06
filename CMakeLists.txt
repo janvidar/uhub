@@ -396,6 +396,6 @@ endif()
 
 if (UNIX)
 	install( TARGETS uhub uhub-passwd RUNTIME DESTINATION bin )
-	install( TARGETS mod_example mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_chat_history mod_chat_history_sqlite mod_chat_only mod_topic mod_no_guest_downloads mod_flood DESTINATION /usr/lib/uhub/ OPTIONAL )
+	install( TARGETS mod_example mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_chat_history mod_chat_history_sqlite mod_chat_only mod_topic mod_no_guest_downloads mod_flood mod_ucmd DESTINATION /usr/lib/uhub/ OPTIONAL )
 	install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub.conf ${CMAKE_CURRENT_SOURCE_DIR}/doc/plugins.conf ${CMAKE_CURRENT_SOURCE_DIR}/doc/rules.txt ${CMAKE_CURRENT_SOURCE_DIR}/doc/motd.txt DESTINATION /etc/uhub OPTIONAL )
 endif()
