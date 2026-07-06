@@ -108,7 +108,16 @@
 
 #include "version.h"
 
+/* Under -DNDEBUG, assert() expands to ((void)0), which drops its argument
+   entirely. That turns any function parameter used *only* inside an assert
+   into an unused parameter, breaking release builds under -Werror. Keep the
+   argument syntactically "used" (via an unevaluated sizeof) so no side
+   effects run but the compiler still sees the reference. */
+#ifdef NDEBUG
+#define uhub_assert(expr) ((void)sizeof(expr))
+#else
 #define uhub_assert assert
+#endif
 
 #ifdef __linux__
 #define POSIX_THREAD_SUPPORT
