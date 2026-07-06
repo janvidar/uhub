@@ -63,7 +63,7 @@ static void deadline_cb(struct timeout_evt* t)
 	running = 0;
 }
 
-static int handle(struct ADC_client* client, enum ADC_client_callback_type type, struct ADC_client_callback_data* data)
+static int handle(struct ADC_client* client, enum ADC_client_event_type type, struct ADC_client_callback_data* data)
 {
 	switch (type)
 	{

@@ -19,32 +19,22 @@
 
 #include "adcclient.h"
 
-static struct ADC_user g_usermap[SID_MAX];
-
 static void user_add(const struct ADC_user* user)
 {
 	printf(" >> JOIN: %s (%s)\n", user->name, user->address);
-	memcpy(&g_usermap[user->sid], user, sizeof(struct ADC_user));
 }
 
-static struct ADC_user* user_get(sid_t sid)
+static void user_remove(struct ADC_client* client, const struct ADC_client_quit_reason* quit)
 {
-
-	struct ADC_user* user = &g_usermap[sid];
-	uhub_assert(user->sid != 0);
-	return user;
+	/* The user is still in the library's tracked list during the QUIT
+	   callback (it is dropped only afterwards), so we can name it here. */
+	const struct ADC_user* user = ADC_client_get_user(client, quit->sid);
+	printf(" << QUIT: %s (%s)\n", user ? user->name : "?", quit->message);
 }
 
-static void user_remove(const struct ADC_client_quit_reason* quit)
+static void on_message(struct ADC_client* client, struct ADC_chat_message* chat)
 {
-	struct ADC_user* user = user_get(quit->sid);
-	printf(" << QUIT: %s (%s)\n", user->name, quit->message);
-	memset(&g_usermap[quit->sid], 0, sizeof(struct ADC_user));
-}
-
-static void on_message(struct ADC_chat_message* chat)
-{
-	struct ADC_user* user;
+	const struct ADC_user* user;
 	const char* pm = (chat->flags & chat_flags_private) ? "PM" : "  ";
 	const char* brack1 = (chat->flags & chat_flags_action) ? "*" : "<";
 	const char* brack2 = (chat->flags & chat_flags_action) ? "" : ">";
@@ -58,8 +48,8 @@ static void on_message(struct ADC_chat_message* chat)
 	}
 	else
 	{
-		user = user_get(chat->from_sid);
-		printf(" %s %s%s%s ", pm, brack1, user->name, brack2);
+		user = ADC_client_get_user(client, chat->from_sid);
+		printf(" %s %s%s%s ", pm, brack1, user ? user->name : "?", brack2);
 	}
 
 	lines = list_create();
@@ -83,9 +73,8 @@ static void status(const char* msg)
 	printf("*** %s\n", msg);
 }
 
-static int handle(struct ADC_client* client, enum ADC_client_callback_type type, struct ADC_client_callback_data* data)
+static int handle(struct ADC_client* client, enum ADC_client_event_type type, struct ADC_client_callback_data* data)
 {
-	(void) client;
 	switch (type)
 	{
 		case ADC_CLIENT_NAME_LOOKUP:
@@ -138,16 +127,16 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 
 
 		case ADC_CLIENT_MESSAGE:
-			on_message(data->chat);
+			on_message(client, data->chat);
 			break;
 
 		case ADC_CLIENT_USER_JOIN:
-
+		case ADC_CLIENT_USER_UPDATE:
 			user_add(data->user);
 			break;
 
 		case ADC_CLIENT_USER_QUIT:
-			user_remove(data->quit);
+			user_remove(client, data->quit);
 			break;
 
 		case ADC_CLIENT_SEARCH_REQ:
@@ -257,8 +246,6 @@ int main(int argc, char** argv)
 	struct ADC_client* client;
 	net_initialize();
 	adm_setup_control_pipe();
-
-	memset(g_usermap, 0, sizeof(g_usermap));
 
 	client = ADC_client_create("uhub-admin", "stresstester", NULL);
 	ADC_client_set_callback(client, handle);

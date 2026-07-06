@@ -55,7 +55,7 @@ static int blank           = 0;
 static struct net_statistics* stats_intermediate;
 static struct net_statistics* stats_total;
 
-static int handle(struct ADC_client* client, enum ADC_client_callback_type type, struct ADC_client_callback_data* data);
+static int handle(struct ADC_client* client, enum ADC_client_event_type type, struct ADC_client_callback_data* data);
 static void timer_callback(struct timeout_evt* t);
 
 static void do_blank(int n)
@@ -266,6 +266,9 @@ static void client_connect(struct AdcFuzzUser* c)
 	struct ADC_client* client = ADC_client_create(c->nick, c->description, c);
 
 	c->client = client;
+	/* Stress bots never read the user list; keeping a per-bot mirror of the
+	   whole hub would be O(n^2) memory across the fleet. */
+	ADC_client_set_track_users(client, 0);
 	c->timer = (struct timeout_evt*) hub_malloc(sizeof(struct timeout_evt));
 	timeout_evt_initialize(c->timer, timer_callback, c);
 	timeout_queue_insert(net_backend_get_timeout_queue(), c->timer, timeout);
@@ -333,7 +336,7 @@ static void perf_normal_action(struct ADC_client* client)
 	}
 }
 
-static int handle(struct ADC_client* client, enum ADC_client_callback_type type, struct ADC_client_callback_data* data)
+static int handle(struct ADC_client* client, enum ADC_client_event_type type, struct ADC_client_callback_data* data)
 {
 	struct AdcFuzzUser* user = (struct AdcFuzzUser*) ADC_client_get_ptr(client);
 

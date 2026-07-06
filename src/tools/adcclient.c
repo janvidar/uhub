@@ -18,6 +18,7 @@
  */
 
 #include "tools/adcclient.h"
+#include "util/list.h"
 
 #define ADC_HANDSHAKE "HSUP ADBASE ADTIGR ADPING\n"
 #define ADC_CID_SIZE 39
@@ -36,17 +37,6 @@ struct ADC_client_global
 
 static struct ADC_client_global* g_adc_client = NULL;
 
-
-enum ADC_client_state
-{
-	ps_none, /* Not connected */
-	ps_conn, /* Connecting... */
-	ps_conn_ssl, /* SSL handshake */
-	ps_protocol, /* Have sent HSUP */
-	ps_identify, /* Have sent BINF */
-	ps_verify, /* Have sent HPAS */
-	ps_normal, /* Are fully logged in */
-};
 
 enum ADC_client_flags
 {
@@ -71,6 +61,7 @@ struct ADC_client
 	struct ioq_recv* recv_queue;
 	struct ioq_send* send_queue;
 	adc_client_cb callback;
+	adc_client_log_cb log_cb;
 	size_t s_offset;
 	size_t r_offset;
 	struct net_connection* con;
@@ -80,6 +71,15 @@ struct ADC_client
 	char* nick;
 	char* desc;
 	char* password;
+	char* ua_product;
+	char* ua_version;
+	uint64_t share_size;
+	uint64_t share_files;
+	int track_users;
+	struct linked_list* users;    /* struct ADC_user*, keyed by sid  */
+	struct ADC_hub_info hubinfo;   /* last IINF, owned strings         */
+	struct ADC_client_tls_info tls_info;
+	int have_tls;
 	int flags;
 	void* ptr;
 };
@@ -96,15 +96,23 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg);
 static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, size_t length);
 static int ADC_client_send_queue(struct ADC_client* client);
 
-static void ADC_client_debug(struct ADC_client* client, const char* format, ...)
+static void ADC_client_log(struct ADC_client* client, int level, const char* format, ...)
 {
 	char logmsg[1024];
 	va_list args;
 	va_start(args, format);
-	vsnprintf(logmsg, 1024, format, args);
+	vsnprintf(logmsg, sizeof(logmsg), format, args);
 	va_end(args);
-	fprintf(stdout, "* [%p] %s\n", client, logmsg);
+
+	if (client->log_cb)
+		client->log_cb(client, level, logmsg);
+	else
+		fprintf(stdout, "* [%p] %s\n", (void*) client, logmsg);
 }
+
+/* Retained name for the many internal diagnostic call sites; routes
+   through the frontend log sink (or stdout by default). */
+#define ADC_client_debug(client, ...) ADC_client_log(client, 5, __VA_ARGS__)
 
 #ifdef ADCC_DEBUG
 #define ADC_TRACE fprintf(stderr, "TRACE: %s\n", __PRETTY_FUNCTION__)
@@ -115,13 +123,13 @@ static void ADC_client_debug(struct ADC_client* client, const char* format, ...)
 #ifdef ADCC_DEBUG
 static const char* ADC_client_state_string[] =
 {
-	"ps_none",
-	"ps_conn",
-	"ps_conn_ssl",
-	"ps_protocol",
-	"ps_identify",
-	"ps_verify",
-	"ps_normal",
+	"adc_state_none",
+	"adc_state_connecting",
+	"adc_state_ssl",
+	"adc_state_protocol",
+	"adc_state_identify",
+	"adc_state_verify",
+	"adc_state_normal",
 	0
 };
 #endif
@@ -152,7 +160,7 @@ static void adc_cid_pid(struct ADC_client* client)
 	/* create cid+pid pair; mix in pid, time and a per-instance counter so
 	 * the identity is not a predictable function of the heap pointer alone. */
 	memset(seed, 0, 64);
-	snprintf(seed, 64, VERSION "%p%d%ld%u", client, (int) getpid(), (long) time(NULL), ++counter);
+	snprintf(seed, 64, VERSION "%p%d%ld%u", (void*) client, (int) getpid(), (long) time(NULL), ++counter);
 
 	tiger((uint64_t*) seed, strlen(seed), tiger_res1);
 	base32_encode((unsigned char*) tiger_res1, TIGERSIZE, pid);
@@ -173,7 +181,7 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 
 	switch (client->state)
 	{
-		case ps_conn:
+		case adc_state_connecting:
 			if (events == NET_EVENT_TIMEOUT)
 			{
 				client->callback(client, ADC_CLIENT_DISCONNECTED, 0);
@@ -181,7 +189,7 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 			}
 			break;
 
-		case ps_conn_ssl:
+		case adc_state_ssl:
 			if (events == NET_EVENT_TIMEOUT)
 			{
 				client->callback(client, ADC_CLIENT_DISCONNECTED, 0);
@@ -249,6 +257,104 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 		} while (0)
 
 
+/* Read a named integer field if present. Returns 1 and stores the value
+   via *out when the field exists, 0 otherwise. */
+static int adc_msg_named_long(struct adc_message* msg, const char prefix[2], long* out)
+{
+	char* tmp = adc_msg_get_named_argument(msg, prefix);
+	if (!tmp)
+		return 0;
+	*out = strtol(tmp, NULL, 10);
+	hub_free(tmp);
+	return 1;
+}
+
+static int adc_msg_named_u64(struct adc_message* msg, const char prefix[2], uint64_t* out)
+{
+	char* tmp = adc_msg_get_named_argument(msg, prefix);
+	if (!tmp)
+		return 0;
+	*out = (uint64_t) strtoull(tmp, NULL, 10);
+	hub_free(tmp);
+	return 1;
+}
+
+/* Overlay whatever INF fields are present in msg onto u. Absent fields are
+   left untouched so partial INF updates (e.g. a lone "HN2") do not wipe the
+   rest of a known user. */
+static void adc_user_apply_inf(struct ADC_user* u, struct adc_message* msg)
+{
+	long v;
+	char* ap;
+	char* ve;
+
+	if (adc_msg_has_named_argument(msg, ADC_INF_FLAG_NICK))
+		EXTRACT_NAMED_ARG_X(msg, ADC_INF_FLAG_NICK, u->name, sizeof(u->name));
+	if (adc_msg_has_named_argument(msg, ADC_INF_FLAG_DESCRIPTION))
+		EXTRACT_NAMED_ARG_X(msg, ADC_INF_FLAG_DESCRIPTION, u->description, sizeof(u->description));
+	if (adc_msg_has_named_argument(msg, ADC_INF_FLAG_CLIENT_ID))
+		EXTRACT_NAMED_ARG_X(msg, ADC_INF_FLAG_CLIENT_ID, u->cid, sizeof(u->cid));
+	if (adc_msg_has_named_argument(msg, ADC_INF_FLAG_IPV4_ADDR))
+		EXTRACT_NAMED_ARG_X(msg, ADC_INF_FLAG_IPV4_ADDR, u->address, sizeof(u->address));
+	if (adc_msg_has_named_argument(msg, ADC_INF_FLAG_IPV6_ADDR))
+		EXTRACT_NAMED_ARG_X(msg, ADC_INF_FLAG_IPV6_ADDR, u->address6, sizeof(u->address6));
+
+	/* Compose a human-readable "product version" from AP/VE when either is
+	   present. Keep VE as the previous behaviour's fallback. */
+	ap = adc_msg_has_named_argument(msg, ADC_INF_FLAG_USER_AGENT_PRODUCT) ?
+		adc_msg_get_named_argument(msg, ADC_INF_FLAG_USER_AGENT_PRODUCT) : NULL;
+	ve = adc_msg_has_named_argument(msg, ADC_INF_FLAG_USER_AGENT_VERSION) ?
+		adc_msg_get_named_argument(msg, ADC_INF_FLAG_USER_AGENT_VERSION) : NULL;
+	if (ap || ve)
+	{
+		char* ap_u = ap ? adc_msg_unescape(ap) : NULL;
+		char* ve_u = ve ? adc_msg_unescape(ve) : NULL;
+		snprintf(u->version, sizeof(u->version), "%s%s%s",
+			ap_u ? ap_u : "", (ap_u && ve_u) ? " " : "", ve_u ? ve_u : "");
+		hub_free(ap_u);
+		hub_free(ve_u);
+	}
+	hub_free(ap);
+	hub_free(ve);
+
+	if (adc_msg_named_long(msg, ADC_INF_FLAG_IPV4_UDP_PORT, &v)) u->udp4_port = (uint16_t) v;
+	if (adc_msg_named_long(msg, ADC_INF_FLAG_IPV6_UDP_PORT, &v)) u->udp6_port = (uint16_t) v;
+	if (adc_msg_named_long(msg, ADC_INF_FLAG_CLIENT_TYPE, &v))   u->type = (int) v;
+	if (adc_msg_named_long(msg, ADC_INF_FLAG_AWAY, &v))          u->away = (int) v;
+	adc_msg_named_u64(msg, ADC_INF_FLAG_SHARED_SIZE, &u->shared_size);
+	adc_msg_named_u64(msg, ADC_INF_FLAG_SHARED_FILES, &u->shared_files);
+}
+
+static struct ADC_user* userlist_find(struct ADC_client* client, sid_t sid)
+{
+	struct ADC_user* u;
+	if (!client->users)
+		return NULL;
+	LIST_FOREACH(struct ADC_user*, u, client->users,
+	{
+		if (u->sid == sid)
+			return u;
+	});
+	return NULL;
+}
+
+static void userlist_remove(struct ADC_client* client, sid_t sid)
+{
+	struct ADC_user* u = userlist_find(client, sid);
+	if (u)
+	{
+		list_remove(client->users, u);
+		hub_free(u);
+	}
+}
+
+static void userlist_clear(struct ADC_client* client)
+{
+	if (client->users)
+		list_clear(client->users, hub_free_handle);
+}
+
+
 static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, size_t length)
 {
 	struct ADC_chat_message chat;
@@ -279,7 +385,7 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 			break;
 
 		case ADC_CMD_IGPA:
-			if (client->state == ps_identify || client->state == ps_verify)
+			if (client->state == adc_state_identify || client->state == adc_state_verify)
 			{
 				char* challenge = adc_msg_get_argument(msg, 0);
 				client->callback(client, ADC_CLIENT_PASSWORD_REQ, 0);
@@ -290,7 +396,7 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 			break;
 
 		case ADC_CMD_ISID:
-			if (client->state == ps_protocol)
+			if (client->state == adc_state_protocol)
 			{
 				char* sid = adc_msg_get_argument(msg, 0);
 				if (sid)
@@ -298,7 +404,7 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 					client->sid = string_to_sid(sid);
 					hub_free(sid);
 					client->callback(client, ADC_CLIENT_LOGGING_IN, 0);
-					ADC_client_set_state(client, ps_identify);
+					ADC_client_set_state(client, adc_state_identify);
 					ADC_client_send_info(client);
 				}
 			}
@@ -328,24 +434,102 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 
 		case ADC_CMD_IINF:
 		{
-			struct ADC_hub_info hubinfo;
-			EXTRACT_NAMED_ARG(msg, "NI", hubinfo.name);
-			EXTRACT_NAMED_ARG(msg, "DE", hubinfo.description);
-			EXTRACT_NAMED_ARG(msg, "VE", hubinfo.version);
+			hub_free(client->hubinfo.name);
+			hub_free(client->hubinfo.description);
+			hub_free(client->hubinfo.version);
+			EXTRACT_NAMED_ARG(msg, ADC_INF_FLAG_NICK, client->hubinfo.name);
+			EXTRACT_NAMED_ARG(msg, ADC_INF_FLAG_DESCRIPTION, client->hubinfo.description);
+			EXTRACT_NAMED_ARG(msg, ADC_INF_FLAG_USER_AGENT_VERSION, client->hubinfo.version);
 
-			struct ADC_client_callback_data data;
-			data.hubinfo = &hubinfo;
+			data.hubinfo = &client->hubinfo;
 			client->callback(client, ADC_CLIENT_HUB_INFO, &data);
-			hub_free(hubinfo.name);
-			hub_free(hubinfo.description);
-			hub_free(hubinfo.version);
 			break;
 		}
 
 		case ADC_CMD_BSCH:
 		case ADC_CMD_FSCH:
+		case ADC_CMD_DSCH:
+		case ADC_CMD_ESCH:
 		{
-			client->callback(client, ADC_CLIENT_SEARCH_REQ, 0);
+			struct ADC_search_request req;
+			memset(&req, 0, sizeof(req));
+			req.from_sid = msg->source;
+			EXTRACT_POS_ARG(msg, 0, req.raw);
+			EXTRACT_NAMED_ARG_X(msg, ADC_SCH_FLAG_TOKEN, req.token, sizeof(req.token));
+			data.search_req = &req;
+			client->callback(client, ADC_CLIENT_SEARCH_REQ, &data);
+			hub_free(req.raw);
+			break;
+		}
+
+		case ADC_CMD_BRES:
+		case ADC_CMD_DRES:
+		case ADC_CMD_ERES:
+		case ADC_CMD_FRES:
+		{
+			struct ADC_search_result res;
+			memset(&res, 0, sizeof(res));
+			res.from_sid = msg->source;
+			EXTRACT_NAMED_ARG(msg, ADC_RES_FLAG_FILE_NAME, res.filename);
+			EXTRACT_NAMED_ARG_X(msg, ADC_SCH_FLAG_TTH, res.tth, sizeof(res.tth));
+			EXTRACT_NAMED_ARG_X(msg, ADC_RES_FLAG_TOKEN, res.token, sizeof(res.token));
+			adc_msg_named_u64(msg, ADC_RES_FLAG_FILE_SIZE, &res.size);
+			{
+				long v;
+				if (adc_msg_named_long(msg, ADC_RES_FLAG_UPLOAD_SLOTS, &v))
+					res.slots_free = (int) v;
+			}
+			data.search_res = &res;
+			client->callback(client, ADC_CLIENT_SEARCH_REP, &data);
+			hub_free(res.filename);
+			break;
+		}
+
+		case ADC_CMD_DCTM:
+		case ADC_CMD_ECTM:
+		{
+			struct ADC_connect_request req;
+			char* proto;
+			char* token;
+			memset(&req, 0, sizeof(req));
+			req.from_sid = msg->source;
+			proto = adc_msg_get_argument(msg, 0);
+			if (proto)
+			{
+				snprintf(req.protocol, sizeof(req.protocol), "%s", proto);
+				req.secure = (strstr(proto, "ADCS") != NULL);
+				hub_free(proto);
+			}
+			{
+				char* p = adc_msg_get_argument(msg, 1);
+				if (p) { req.port = (uint16_t) strtol(p, NULL, 10); hub_free(p); }
+			}
+			token = adc_msg_get_argument(msg, 2);
+			if (token) { snprintf(req.token, sizeof(req.token), "%s", token); hub_free(token); }
+			data.connect = &req;
+			client->callback(client, ADC_CLIENT_CONNECT_REQ, &data);
+			break;
+		}
+
+		case ADC_CMD_DRCM:
+		case ADC_CMD_ERCM:
+		{
+			struct ADC_connect_request req;
+			char* proto;
+			char* token;
+			memset(&req, 0, sizeof(req));
+			req.from_sid = msg->source;
+			proto = adc_msg_get_argument(msg, 0);
+			if (proto)
+			{
+				snprintf(req.protocol, sizeof(req.protocol), "%s", proto);
+				req.secure = (strstr(proto, "ADCS") != NULL);
+				hub_free(proto);
+			}
+			token = adc_msg_get_argument(msg, 1);
+			if (token) { snprintf(req.token, sizeof(req.token), "%s", token); hub_free(token); }
+			data.connect = &req;
+			client->callback(client, ADC_CLIENT_REVCONNECT_REQ, &data);
 			break;
 		}
 
@@ -353,27 +537,51 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 		{
 			if (msg->source == client->sid)
 			{
-				if (client->state == ps_verify || client->state == ps_identify)
+				if (client->state == adc_state_verify || client->state == adc_state_identify)
 				{
 					ADC_client_on_login(client);
 				}
 			}
 			else
 			{
-				if (adc_msg_has_named_argument(msg, "ID"))
-				{
-					struct ADC_user user;
-					user.sid = msg->source;
-					EXTRACT_NAMED_ARG_X(msg, "NI", user.name, sizeof(user.name));
-					EXTRACT_NAMED_ARG_X(msg, "DE", user.description, sizeof(user.description));
-					EXTRACT_NAMED_ARG_X(msg, "VE", user.version, sizeof(user.version));
-					EXTRACT_NAMED_ARG_X(msg, "ID", user.cid, sizeof(user.cid));
-					EXTRACT_NAMED_ARG_X(msg, "I4", user.address, sizeof(user.address));
+				struct ADC_user stackuser;
+				struct ADC_user* user;
+				enum ADC_client_event_type ev;
 
-					struct ADC_client_callback_data data;
-					data.user = &user;
-					client->callback(client, ADC_CLIENT_USER_JOIN, &data);
+				if (client->track_users)
+				{
+					user = userlist_find(client, msg->source);
+					if (user)
+					{
+						ev = ADC_CLIENT_USER_UPDATE;
+					}
+					else if (adc_msg_has_named_argument(msg, ADC_INF_FLAG_CLIENT_ID))
+					{
+						user = (struct ADC_user*) hub_malloc_zero(sizeof(struct ADC_user));
+						user->sid = msg->source;
+						list_append(client->users, user);
+						ev = ADC_CLIENT_USER_JOIN;
+					}
+					else
+					{
+						break; /* partial INF for an unknown user; ignore */
+					}
 				}
+				else
+				{
+					/* No tracking: report every INF as a JOIN with a transient
+					   snapshot. JOIN/UPDATE cannot be told apart without state. */
+					if (!adc_msg_has_named_argument(msg, ADC_INF_FLAG_CLIENT_ID))
+						break;
+					memset(&stackuser, 0, sizeof(stackuser));
+					stackuser.sid = msg->source;
+					user = &stackuser;
+					ev = ADC_CLIENT_USER_JOIN;
+				}
+
+				adc_user_apply_inf(user, msg);
+				data.user = user;
+				client->callback(client, ev, &data);
 			}
 		}
 		break;
@@ -399,6 +607,12 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 
 			data.quit = &reason;
 			client->callback(client, ADC_CLIENT_USER_QUIT, &data);
+
+			/* Drop the user from the tracked list only after the frontend has
+			   been handed the quit event (which still names the sid, not the
+			   user record). */
+			if (client->track_users)
+				userlist_remove(client, reason.sid);
 			break;
 		}
 
@@ -416,7 +630,7 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 			EXTRACT_POS_ARG(msg, 1, status.message);
 
 			data.status = &status;
-			if (status.severity == 2 && client->state != ps_normal)
+			if (status.severity == 2 && client->state != adc_state_normal)
 				client->callback(client, ADC_CLIENT_LOGIN_ERROR, &data);
 			else
 				client->callback(client, ADC_CLIENT_PROTOCOL_STATUS, &data);
@@ -565,11 +779,13 @@ void ADC_client_send_info(struct ADC_client* client)
 		adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_DESCRIPTION, client->desc);
 	}
 
-	adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_USER_AGENT_PRODUCT, PRODUCT);
-	adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_USER_AGENT_VERSION, VERSION);
+	adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_USER_AGENT_PRODUCT,
+		client->ua_product ? client->ua_product : PRODUCT);
+	adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_USER_AGENT_VERSION,
+		client->ua_version ? client->ua_version : VERSION);
 	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_UPLOAD_SLOTS, 0);
-	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_SHARED_SIZE, 0);
-	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_SHARED_FILES, 0);
+	adc_msg_add_named_argument_uint64(client->info, ADC_INF_FLAG_SHARED_SIZE, client->share_size);
+	adc_msg_add_named_argument_uint64(client->info, ADC_INF_FLAG_SHARED_FILES, client->share_files);
 
 	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_COUNT_HUB_NORMAL, 1);
 	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_COUNT_HUB_REGISTER, 0);
@@ -624,7 +840,7 @@ static void ADC_client_send_password(struct ADC_client* client, const char* chal
 
 	hpas = adc_msg_construct(ADC_CMD_HPAS, MAX_CID_LEN + 8);
 	adc_msg_add_argument(hpas, response);
-	ADC_client_set_state(client, ps_verify);
+	ADC_client_set_state(client, adc_state_verify);
 	ADC_client_send(client, hpas);
 	adc_msg_free(hpas);
 }
@@ -634,13 +850,16 @@ struct ADC_client* ADC_client_create(const char* nickname, const char* descripti
 	ADC_TRACE;
 	struct ADC_client* client = (struct ADC_client*) hub_malloc_zero(sizeof(struct ADC_client));
 
-	ADC_client_set_state(client, ps_none);
+	ADC_client_set_state(client, adc_state_none);
 
 	client->nick = hub_strdup(nickname);
 	client->desc = hub_strdup(description);
 
 	client->send_queue = ioq_send_create();
 	client->recv_queue = ioq_recv_create();
+
+	client->track_users = 1;
+	client->users = list_create();
 
 	client->ptr = ptr;
 
@@ -658,12 +877,19 @@ void ADC_client_destroy(struct ADC_client* client)
 {
 	ADC_TRACE;
 	ADC_client_disconnect(client);
+	userlist_clear(client);
+	list_destroy(client->users);
 	ioq_send_destroy(client->send_queue);
 	ioq_recv_destroy(client->recv_queue);
 	adc_msg_free(client->info);
+	hub_free(client->hubinfo.name);
+	hub_free(client->hubinfo.description);
+	hub_free(client->hubinfo.version);
 	hub_free(client->nick);
 	hub_free(client->desc);
 	hub_free(client->password);
+	hub_free(client->ua_product);
+	hub_free(client->ua_version);
 	hub_free(client->address.hostname);
 	hub_free(client);
 
@@ -701,7 +927,7 @@ static void connect_callback(struct net_connect_handle* handle, enum net_connect
 		case net_connect_status_timeout:
 		case net_connect_status_socket_error:
 			ADC_client_disconnect(client);
-			ADC_client_set_state(client, ps_none);
+			ADC_client_set_state(client, adc_state_none);
 			client->callback(client, ADC_CLIENT_DISCONNECTED, 0);
 			break;
 	}
@@ -710,13 +936,13 @@ static void connect_callback(struct net_connect_handle* handle, enum net_connect
 int ADC_client_connect(struct ADC_client* client, const char* address)
 {
 	ADC_TRACE;
-	if (client->state == ps_none)
+	if (client->state == adc_state_none)
 	{
 		if (!ADC_client_parse_address(client, address))
 			return 0;
 	}
 
-	ADC_client_set_state(client, ps_conn);
+	ADC_client_set_state(client, adc_state_connecting);
 	client->callback(client, ADC_CLIENT_CONNECTING, 0);
 	client->connect_job = net_con_connect(client->address.hostname, client->address.port, connect_callback, client);
 	if (!client->connect_job)
@@ -735,7 +961,7 @@ static void ADC_client_send_handshake(struct ADC_client* client)
 	client->callback(client, ADC_CLIENT_CONNECTED, 0);
 	net_con_update(client->con, NET_EVENT_READ);
 	ADC_client_send(client, handshake);
-	ADC_client_set_state(client, ps_protocol);
+	ADC_client_set_state(client, adc_state_protocol);
 	adc_msg_free(handshake);
 }
 
@@ -746,23 +972,23 @@ static void ADC_client_on_connected(struct ADC_client* client)
 	{
 		net_con_update(client->con, NET_EVENT_READ | NET_EVENT_WRITE);
 		client->callback(client, ADC_CLIENT_SSL_HANDSHAKE, 0);
-		ADC_client_set_state(client, ps_conn_ssl);
+		ADC_client_set_state(client, adc_state_ssl);
 		net_con_ssl_handshake(client->con, net_con_ssl_mode_client, g_adc_client->ctx);
 	}
 	else
 	ADC_client_send_handshake(client);
-	
+
 }
 
 static void ADC_client_on_connected_ssl(struct ADC_client* client)
 {
 	ADC_TRACE;
 	struct ADC_client_callback_data data;
-	struct ADC_client_tls_info tls_info;
-	data.tls_info = &tls_info;
 
-	tls_info.version = net_ssl_get_tls_version(client->con);
-	tls_info.cipher = net_ssl_get_tls_cipher(client->con);
+	client->tls_info.version = net_ssl_get_tls_version(client->con);
+	client->tls_info.cipher = net_ssl_get_tls_cipher(client->con);
+	client->have_tls = 1;
+	data.tls_info = &client->tls_info;
 
 	client->callback(client, ADC_CLIENT_SSL_OK, &data);
 	ADC_client_send_handshake(client);
@@ -776,7 +1002,9 @@ static void ADC_client_on_disconnected(struct ADC_client* client)
 		net_con_close(client->con);
 		client->con = 0;
 	}
-	ADC_client_set_state(client, ps_none);
+	ADC_client_set_state(client, adc_state_none);
+	client->have_tls = 0;
+	userlist_clear(client);
 
 	/* Notify the owner that the connection is gone. Without this an unexpected
 	   drop (peer reset, recv error) leaves the client with a NULL connection but
@@ -788,7 +1016,7 @@ static void ADC_client_on_disconnected(struct ADC_client* client)
 static void ADC_client_on_login(struct ADC_client* client)
 {
 	ADC_TRACE;
-	ADC_client_set_state(client, ps_normal);
+	ADC_client_set_state(client, adc_state_normal);
 	client->callback(client, ADC_CLIENT_LOGGED_IN, 0);
 }
 
@@ -872,6 +1100,173 @@ void ADC_client_set_callback(struct ADC_client* client, adc_client_cb cb)
 	client->callback = cb;
 }
 
+void ADC_client_set_log_callback(struct ADC_client* client, adc_client_log_cb cb)
+{
+	ADC_TRACE;
+	client->log_cb = cb;
+}
+
+void ADC_client_set_user_agent(struct ADC_client* client, const char* product, const char* version)
+{
+	ADC_TRACE;
+	hub_free(client->ua_product);
+	hub_free(client->ua_version);
+	client->ua_product = product ? hub_strdup(product) : NULL;
+	client->ua_version = version ? hub_strdup(version) : NULL;
+}
+
+void ADC_client_set_share(struct ADC_client* client, uint64_t size, uint64_t files)
+{
+	ADC_TRACE;
+	client->share_size = size;
+	client->share_files = files;
+}
+
+void ADC_client_set_track_users(struct ADC_client* client, int enable)
+{
+	ADC_TRACE;
+	client->track_users = enable ? 1 : 0;
+	if (!enable)
+		userlist_clear(client);
+}
+
+/* ------------------------------------------------------------------ *
+ *  Outbound intent
+ * ------------------------------------------------------------------ */
+
+static int ADC_client_can_send(struct ADC_client* client)
+{
+	return client->con != NULL && client->state == adc_state_normal;
+}
+
+int ADC_client_say(struct ADC_client* client, const char* text)
+{
+	char* esc;
+	struct adc_message* cmd;
+	if (!ADC_client_can_send(client))
+		return 0;
+	esc = adc_msg_escape(text);
+	cmd = adc_msg_construct_source(ADC_CMD_BMSG, client->sid, strlen(esc));
+	adc_msg_add_argument(cmd, esc);
+	ADC_client_send(client, cmd);
+	adc_msg_free(cmd);
+	hub_free(esc);
+	return 1;
+}
+
+int ADC_client_say_me(struct ADC_client* client, const char* text)
+{
+	char* esc;
+	struct adc_message* cmd;
+	if (!ADC_client_can_send(client))
+		return 0;
+	esc = adc_msg_escape(text);
+	cmd = adc_msg_construct_source(ADC_CMD_BMSG, client->sid, strlen(esc) + 4);
+	adc_msg_add_argument(cmd, esc);
+	adc_msg_add_named_argument(cmd, ADC_MSG_FLAG_ACTION, "1");
+	ADC_client_send(client, cmd);
+	adc_msg_free(cmd);
+	hub_free(esc);
+	return 1;
+}
+
+int ADC_client_pm(struct ADC_client* client, sid_t to, const char* text)
+{
+	char* esc;
+	struct adc_message* cmd;
+	if (!ADC_client_can_send(client))
+		return 0;
+	esc = adc_msg_escape(text);
+	cmd = adc_msg_construct_source_dest(ADC_CMD_DMSG, client->sid, to, strlen(esc) + 8);
+	adc_msg_add_argument(cmd, esc);
+	adc_msg_add_named_argument(cmd, ADC_MSG_FLAG_PRIVATE, sid_to_string(client->sid));
+	ADC_client_send(client, cmd);
+	adc_msg_free(cmd);
+	hub_free(esc);
+	return 1;
+}
+
+int ADC_client_search(struct ADC_client* client, const char* terms)
+{
+	struct adc_message* cmd;
+	struct linked_list* tokens;
+	char* token;
+	if (!ADC_client_can_send(client) || !terms)
+		return 0;
+	cmd = adc_msg_construct_source(ADC_CMD_BSCH, client->sid, strlen(terms) + 8);
+	/* terms are already-formed ADC search args ("ANfoo", "TR...", "TOtoken")
+	   separated by spaces; each becomes its own message argument. */
+	tokens = list_create();
+	split_string(terms, " ", tokens, 0);
+	LIST_FOREACH(char*, token, tokens,
+	{
+		if (*token)
+			adc_msg_add_argument(cmd, token);
+	});
+	list_clear(tokens, hub_free_handle);
+	list_destroy(tokens);
+	ADC_client_send(client, cmd);
+	adc_msg_free(cmd);
+	return 1;
+}
+
+int ADC_client_connect_to_me(struct ADC_client* client, sid_t to, const char* token, uint16_t port, int secure)
+{
+	struct adc_message* cmd;
+	char portbuf[8];
+	if (!ADC_client_can_send(client))
+		return 0;
+	cmd = adc_msg_construct_source_dest(ADC_CMD_DCTM, client->sid, to, 48);
+	adc_msg_add_argument(cmd, secure ? "ADCS/1.0" : "ADC/1.0");
+	snprintf(portbuf, sizeof(portbuf), "%u", (unsigned) port);
+	adc_msg_add_argument(cmd, portbuf);
+	adc_msg_add_argument(cmd, token ? token : "");
+	ADC_client_send(client, cmd);
+	adc_msg_free(cmd);
+	return 1;
+}
+
+int ADC_client_rev_connect_to_me(struct ADC_client* client, sid_t to, const char* token)
+{
+	struct adc_message* cmd;
+	if (!ADC_client_can_send(client))
+		return 0;
+	cmd = adc_msg_construct_source_dest(ADC_CMD_DRCM, client->sid, to, 32);
+	adc_msg_add_argument(cmd, "ADC/1.0");
+	adc_msg_add_argument(cmd, token ? token : "");
+	ADC_client_send(client, cmd);
+	adc_msg_free(cmd);
+	return 1;
+}
+
+int ADC_client_set_away(struct ADC_client* client, enum ADC_away_state state)
+{
+	struct adc_message* cmd;
+	if (!ADC_client_can_send(client))
+		return 0;
+	cmd = adc_msg_construct_source(ADC_CMD_BINF, client->sid, 16);
+	adc_msg_add_named_argument_int(cmd, ADC_INF_FLAG_AWAY, (int) state);
+	ADC_client_send(client, cmd);
+	adc_msg_free(cmd);
+	return 1;
+}
+
+int ADC_client_update_info(struct ADC_client* client, const char named_field[2], const char* value)
+{
+	struct adc_message* cmd;
+	if (!ADC_client_can_send(client))
+		return 0;
+	cmd = adc_msg_construct_source(ADC_CMD_BINF, client->sid, (value ? strlen(value) : 0) + 8);
+	adc_msg_add_named_argument_string(cmd, named_field, value ? value : "");
+	ADC_client_send(client, cmd);
+	adc_msg_free(cmd);
+	return 1;
+}
+
+/* ------------------------------------------------------------------ *
+ *  Accessors
+ * ------------------------------------------------------------------ */
+
 sid_t ADC_client_get_sid(const struct ADC_client* client)
 {
 	return client->sid;
@@ -887,7 +1282,43 @@ const char* ADC_client_get_description(const struct ADC_client* client)
 	return client->desc;
 }
 
+enum ADC_client_state ADC_client_get_state(const struct ADC_client* client)
+{
+	return client->state;
+}
+
 void* ADC_client_get_ptr(const struct ADC_client* client)
 {
 	return client->ptr;
+}
+
+const struct ADC_hub_info* ADC_client_get_hub_info(const struct ADC_client* client)
+{
+	return &client->hubinfo;
+}
+
+const struct ADC_client_tls_info* ADC_client_get_tls_info(const struct ADC_client* client)
+{
+	return client->have_tls ? &client->tls_info : NULL;
+}
+
+const struct ADC_user* ADC_client_get_user(const struct ADC_client* client, sid_t sid)
+{
+	return userlist_find((struct ADC_client*) client, sid);
+}
+
+size_t ADC_client_user_count(const struct ADC_client* client)
+{
+	return client->users ? list_size(client->users) : 0;
+}
+
+void ADC_client_foreach_user(const struct ADC_client* client, adc_user_iter_cb cb, void* data)
+{
+	struct ADC_user* u;
+	if (!client->users || !cb)
+		return;
+	LIST_FOREACH(struct ADC_user*, u, client->users,
+	{
+		cb(u, data);
+	});
 }
