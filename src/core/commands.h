@@ -103,6 +103,12 @@ extern int command_invoke(struct command_base*, struct hub_user* user, const cha
 int command_is_available(struct command_handle* handle, enum auth_credentials credentials);
 
 /**
+ * Returns 1 if @p addr is a valid hub redirect address (adc://host:port,
+ * adcs://host:port or dchub://host:port), 0 otherwise. Exposed for testing.
+ */
+int command_redirect_valid_address(const char* addr);
+
+/**
  * Lookup a command handle based on prefix.
  * If no matching command handle is found then NULL is returned.
  */

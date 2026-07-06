@@ -1411,6 +1411,28 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 	adc_msg_free(qui);
 }
 
+void hub_redirect_user(struct hub_info* hub, struct hub_user* user, const char* address)
+{
+	struct adc_message* qui = adc_msg_construct(ADC_CMD_IQUI, 512);
+	char buf[300];
+
+	if (!qui)
+		return;
+
+	/* Tell the client to reconnect elsewhere: an IQUI carrying the user's own
+	 * SID plus an RD (redirect) flag, mirroring the redirect path in
+	 * hub_send_status(). The caller has validated the address, so it needs no
+	 * escaping. The message is routed before the disconnect, whose pre-close
+	 * flush pushes it to the socket. */
+	adc_msg_add_argument(qui, sid_to_string(user->id.sid));
+	snprintf(buf, sizeof(buf), "RD%s", address);
+	adc_msg_add_argument(qui, buf);
+	route_to_user(hub, user, qui);
+	adc_msg_free(qui);
+
+	hub_disconnect_user(hub, user, quit_disconnected);
+}
+
 const char* hub_get_status_message(struct hub_info* hub, enum status_message msg)
 {
 #define STATUS(MSG) case status_ ## MSG : return cfg->MSG; break

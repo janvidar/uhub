@@ -249,6 +249,13 @@ extern void hub_send_password_challenge(struct hub_info* hub, struct hub_user* u
 extern void hub_send_status(struct hub_info*, struct hub_user* user, enum status_message msg, enum msg_status_level level);
 
 /**
+ * Redirect a user to another hub: sends an IQUI with an RD (redirect) flag
+ * pointing at @p address, then disconnects the user. @p address is expected to
+ * be a validated adc:// / adcs:// / dchub:// URL.
+ */
+extern void hub_redirect_user(struct hub_info* hub, struct hub_user* user, const char* address);
+
+/**
  * Warn user about flooding.
  */
 extern void hub_send_flood_warning(struct hub_info*, struct hub_user* user, const char* message);
