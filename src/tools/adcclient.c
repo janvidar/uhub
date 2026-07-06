@@ -1136,7 +1136,11 @@ void ADC_client_set_track_users(struct ADC_client* client, int enable)
 
 static int ADC_client_can_send(struct ADC_client* client)
 {
-	return client->con != NULL && client->state == adc_state_normal;
+	/* A session id plus a live connection is enough: once ISID has arrived
+	   and INF has been sent (adc_state_identify onward) the hub accepts and
+	   relays messages, which is how a peer's INF can reach us -- and be
+	   replied to -- before our own login echo completes. */
+	return client->con != NULL && client->sid != 0;
 }
 
 int ADC_client_say(struct ADC_client* client, const char* text)

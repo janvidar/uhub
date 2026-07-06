@@ -72,33 +72,14 @@ static int handle(struct ADC_client* client, enum ADC_client_event_type type, st
 			if (opt_command && !sent_command)
 			{
 				/* Hub commands arrive as a main-chat message starting with '!'. */
-				char* esc = adc_msg_escape(opt_command);
-				struct adc_message* m = adc_msg_construct_source(ADC_CMD_BMSG,
-					ADC_client_get_sid(client), esc ? strlen(esc) : 0);
-				if (m && esc)
+				if (ADC_client_say(client, opt_command))
 				{
-					adc_msg_add_argument(m, esc);
-					ADC_client_send(client, m);
 					sent_command = 1;
 					printf("LINKTEST %s: ran command: %s\n", opt_nick, opt_command);
 				}
-				adc_msg_free(m);
-				hub_free(esc);
 			}
-			if (opt_say)
-			{
-				char* esc = adc_msg_escape(opt_say);
-				struct adc_message* m = adc_msg_construct_source(ADC_CMD_BMSG,
-					ADC_client_get_sid(client), esc ? strlen(esc) : 0);
-				if (m && esc)
-				{
-					adc_msg_add_argument(m, esc);
-					ADC_client_send(client, m);
-					printf("LINKTEST %s: said public: %s\n", opt_nick, opt_say);
-				}
-				adc_msg_free(m);
-				hub_free(esc);
-			}
+			if (opt_say && ADC_client_say(client, opt_say))
+				printf("LINKTEST %s: said public: %s\n", opt_nick, opt_say);
 			break;
 
 		case ADC_CLIENT_USER_JOIN:
@@ -107,18 +88,11 @@ static int handle(struct ADC_client* client, enum ADC_client_event_type type, st
 				printf("LINKTEST %s: sees user %s (sid %s)\n", opt_nick, data->user->name, sid_to_string(data->user->sid));
 				if (opt_pm_nick && !sent_pm && strcmp(data->user->name, opt_pm_nick) == 0)
 				{
-					char* esc = adc_msg_escape(opt_pm_text);
-					struct adc_message* m = adc_msg_construct_source_dest(ADC_CMD_DMSG,
-						ADC_client_get_sid(client), data->user->sid, esc ? strlen(esc) : 0);
-					if (m && esc)
+					if (ADC_client_pm(client, data->user->sid, opt_pm_text))
 					{
-						adc_msg_add_argument(m, esc);
-						ADC_client_send(client, m);
 						sent_pm = 1;
 						printf("LINKTEST %s: sent PM to %s (sid %s)\n", opt_nick, data->user->name, sid_to_string(data->user->sid));
 					}
-					adc_msg_free(m);
-					hub_free(esc);
 				}
 			}
 			break;
