@@ -46,6 +46,12 @@ static void on_message(struct ADC_client* client, struct ADC_chat_message* chat)
 	{
 		printf("HUB ");
 	}
+	else if (chat->from_sid == ADC_client_get_sid(client))
+	{
+		/* our own message, echoed back by the hub; we are not in our own
+		   tracked user list, so name ourselves directly */
+		printf(" %s %s%s%s ", pm, brack1, ADC_client_get_nick(client), brack2);
+	}
 	else
 	{
 		user = ADC_client_get_user(client, chat->from_sid);
@@ -71,6 +77,188 @@ static void on_message(struct ADC_client* client, struct ADC_chat_message* chat)
 static void status(const char* msg)
 {
 	printf("*** %s\n", msg);
+}
+
+/* ------------------------------------------------------------------ *
+ *  Interactive input: read stdin from inside the event loop and drive
+ *  the client through the typed ADC_client_* intent API. A plain line
+ *  is public chat; a line starting with '/' is a local command. (Hub
+ *  commands like "!help" are just public chat starting with '!', so
+ *  they need no special handling here.)
+ * ------------------------------------------------------------------ */
+
+static int running = 1;
+static struct net_connection* g_stdin_con = NULL;
+static int g_stdin_flags = -1;
+static char g_line[1024];
+static size_t g_line_len = 0;
+
+struct nick_lookup { const char* name; sid_t sid; };
+
+static void nick_match_cb(const struct ADC_user* user, void* data)
+{
+	struct nick_lookup* l = (struct nick_lookup*) data;
+	if (!l->sid && strcmp(user->name, l->name) == 0)
+		l->sid = user->sid;
+}
+
+static void who_print_cb(const struct ADC_user* user, void* data)
+{
+	(void) data;
+	printf("    %-20s %-40s %s\n", user->name,
+		user->address[0] ? user->address : user->address6,
+		sid_to_string(user->sid));
+}
+
+static void print_help(void)
+{
+	printf("*** Commands:\n"
+	       "      <text>            send public chat\n"
+	       "      /me <text>        send an action (/me waves)\n"
+	       "      /msg <nick> <t>   send a private message\n"
+	       "      /who              list users in the hub\n"
+	       "      /help             this help\n"
+	       "      /quit             disconnect and exit\n"
+	       "    (a line starting with '!' is sent as a hub command)\n");
+}
+
+static void handle_command(struct ADC_client* client, char* line)
+{
+	char* cmd;
+	char* arg;
+
+	/* strip a trailing CR (in case of CRLF input) */
+	size_t n = strlen(line);
+	if (n && line[n-1] == '\r')
+		line[--n] = '\0';
+
+	if (n == 0)
+		return;
+
+	if (line[0] != '/')
+	{
+		if (!ADC_client_say(client, line))
+			status("Not connected -- message not sent.");
+		return;
+	}
+
+	/* split "/cmd" from the remaining argument text */
+	cmd = line + 1;
+	arg = strchr(cmd, ' ');
+	if (arg)
+		*arg++ = '\0';
+	while (arg && *arg == ' ')
+		arg++;
+
+	if (!strcmp(cmd, "quit") || !strcmp(cmd, "q"))
+	{
+		running = 0;
+	}
+	else if (!strcmp(cmd, "help") || !strcmp(cmd, "h"))
+	{
+		print_help();
+	}
+	else if (!strcmp(cmd, "who") || !strcmp(cmd, "w"))
+	{
+		printf("*** %zu user(s):\n", ADC_client_user_count(client));
+		ADC_client_foreach_user(client, who_print_cb, NULL);
+	}
+	else if (!strcmp(cmd, "me"))
+	{
+		if (arg && *arg && !ADC_client_say_me(client, arg))
+			status("Not connected -- message not sent.");
+	}
+	else if (!strcmp(cmd, "msg") || !strcmp(cmd, "pm"))
+	{
+		char* target = arg;
+		char* text = arg ? strchr(arg, ' ') : NULL;
+		if (text)
+		{
+			*text++ = '\0';
+			struct nick_lookup l = { target, 0 };
+			ADC_client_foreach_user(client, nick_match_cb, &l);
+			if (!l.sid)
+				printf("*** No such user: %s\n", target);
+			else if (!ADC_client_pm(client, l.sid, text))
+				status("Not connected -- message not sent.");
+		}
+		else
+			status("Usage: /msg <nick> <text>");
+	}
+	else
+	{
+		printf("*** Unknown command: /%s (try /help)\n", cmd);
+	}
+}
+
+static void stdin_callback(struct net_connection* con, int events, void* ptr)
+{
+	(void) events;
+	struct ADC_client* client = (struct ADC_client*) ptr;
+	char buf[1024];
+	ssize_t r = read(net_con_get_sd(con), buf, sizeof(buf));
+	ssize_t i;
+
+	if (r <= 0)
+	{
+		/* EOF (Ctrl-D or piped input exhausted): stop watching stdin but
+		   keep running so hub events are still observed until SIGINT. A
+		   would-block is spurious (level-triggered epoll) and ignored; any
+		   other read error is treated like EOF. */
+		if (r == 0 || (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR))
+		{
+			if (g_stdin_flags != -1)
+			{
+				fcntl(STDIN_FILENO, F_SETFL, g_stdin_flags);
+				g_stdin_flags = -1;
+			}
+			net_con_close(con);
+			g_stdin_con = NULL;
+		}
+		return;
+	}
+
+	for (i = 0; i < r; i++)
+	{
+		char c = buf[i];
+		if (c == '\n')
+		{
+			g_line[g_line_len] = '\0';
+			handle_command(client, g_line);
+			g_line_len = 0;
+		}
+		else if (g_line_len < sizeof(g_line) - 1)
+		{
+			g_line[g_line_len++] = c;
+		}
+		/* overlong lines past the buffer are truncated at the boundary */
+	}
+}
+
+static void stdin_setup(struct ADC_client* client)
+{
+	/* net_con_initialize() will flip fd 0 to non-blocking; fd 0's open file
+	   description is shared with the parent shell, so remember the original
+	   flags and restore them on teardown (otherwise the shell inherits a
+	   non-blocking stdin and its next read fails with EAGAIN). */
+	g_stdin_flags = fcntl(STDIN_FILENO, F_GETFL, 0);
+	g_stdin_con = net_con_create();
+	net_con_initialize(g_stdin_con, STDIN_FILENO, stdin_callback, client, NET_EVENT_READ);
+	print_help();
+}
+
+static void stdin_teardown(void)
+{
+	if (g_stdin_flags != -1)
+	{
+		fcntl(STDIN_FILENO, F_SETFL, g_stdin_flags);
+		g_stdin_flags = -1;
+	}
+	if (g_stdin_con)
+	{
+		net_con_close(g_stdin_con);
+		g_stdin_con = NULL;
+	}
 }
 
 static int handle(struct ADC_client* client, enum ADC_client_event_type type, struct ADC_client_callback_data* data)
@@ -154,8 +342,6 @@ static int handle(struct ADC_client* client, enum ADC_client_event_type type, st
 	}
 	return 1;
 }
-
-static int running = 1;
 
 #if !defined(WIN32)
 static struct uhub_notify_handle* notify_handle;
@@ -253,8 +439,11 @@ int main(int argc, char** argv)
 		ADC_client_set_password(client, argv[2]);
 	ADC_client_connect(client, argv[1]);
 
+	stdin_setup(client);
+
 	while (running && net_backend_process()) { }
 
+	stdin_teardown();
 	adm_shutdown_control_pipe();
 
 	ADC_client_destroy(client);
