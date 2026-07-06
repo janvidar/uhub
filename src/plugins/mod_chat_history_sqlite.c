@@ -45,7 +45,9 @@ struct chat_history_line
 	char time[20];
 };
 
-static int null_callback(void* ptr, int argc, char **argv, char **colName) { return 0; }
+static int null_callback(void* ptr, int argc, char **argv, char **colName) {
+	(void) ptr; (void) argc; (void) argv; (void) colName;
+	return 0; }
 
 static int sql_execute(struct chat_history_data* sql, int (*callback)(void* ptr, int argc, char **argv, char **colName), void* ptr, const char* sql_fmt, ...)
 {
@@ -86,6 +88,7 @@ static void create_tables(struct plugin_handle* plugin)
  */
 static void history_add(struct plugin_handle* plugin, struct plugin_user* from, const char* message, int flags)
 {
+	(void) flags;
 	struct chat_history_data* data = (struct chat_history_data*) plugin->ptr;
 	sqlite3_stmt* stmt;
 	int rc;

@@ -105,7 +105,7 @@ size_t timeout_queue_process(struct timeout_queue* t, time_t now)
 	struct timeout_evt* evt = 0;
 	t->last = now;
 	timeout_queue_lock(t);
-	for (; pos <= now; pos++)
+	for (; pos <= (size_t) now; pos++)
 	{
 		while ((evt = t->events[pos % t->max]))
 		{

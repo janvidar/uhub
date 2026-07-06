@@ -140,6 +140,7 @@ int handle_net_write(struct hub_user* user)
 
 void net_event(struct net_connection* con, int event, void *arg)
 {
+	(void) con;
 	struct hub_user* user = (struct hub_user*) arg;
 	int flag_close = 0;
 
@@ -185,6 +186,7 @@ void net_event(struct net_connection* con, int event, void *arg)
 
 void net_on_accept(struct net_connection* con, int event, void *arg)
 {
+	(void) event;
 	struct hub_info* hub = (struct hub_info*) arg;
 	struct hub_probe* probe = 0;
 	struct ip_addr_encap ipaddr;

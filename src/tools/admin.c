@@ -85,6 +85,7 @@ static void status(const char* msg)
 
 static int handle(struct ADC_client* client, enum ADC_client_callback_type type, struct ADC_client_callback_data* data)
 {
+	(void) client;
 	switch (type)
 	{
 		case ADC_CLIENT_NAME_LOOKUP:

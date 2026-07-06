@@ -231,6 +231,7 @@ int net_set_nonblocking(int fd, int toggle)
 /* NOTE: Possibly only supported on BSD and OSX? */
 int net_set_nosigpipe(int fd, int toggle)
 {
+	(void) fd; (void) toggle;
 	int ret = -1;
 #ifdef SO_NOSIGPIPE
 	/* Call setsockopt() directly rather than net_setsockopt() so we can vet

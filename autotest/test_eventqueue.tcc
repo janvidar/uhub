@@ -5,6 +5,7 @@ static int eq_val;
 
 static void eq_callback(void* callback_data, struct event_data* event_data)
 {
+	(void) callback_data;
 	eq_val += event_data->id;
 }
 

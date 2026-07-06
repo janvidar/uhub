@@ -228,6 +228,7 @@ void plugin_unload(struct plugin_handle* plugin)
 
 static int plugin_parse_line(char* line, int line_count, void* ptr_data)
 {
+	(void) line_count;
 	struct hub_info* hub = (struct hub_info*) ptr_data;
 	struct uhub_plugins* handle = hub->plugins;
 	struct cfg_tokens* tokens = cfg_tokenize(line);

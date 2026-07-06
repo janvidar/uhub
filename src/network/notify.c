@@ -50,6 +50,7 @@ struct uhub_notify_handle
 #ifndef WIN32
 static void notify_callback(struct net_connection* con, int event, void* ptr)
 {
+	(void) con; (void) event;
 	LOG_TRACE("notify_callback()");
 	struct uhub_notify_handle* handle = (struct uhub_notify_handle*) ptr;
 	char buf;
@@ -101,6 +102,7 @@ void net_notify_signal(struct uhub_notify_handle* handle, char data)
 {
 	LOG_TRACE("net_notify_signal()");
 #ifndef WIN32
-	write(handle->pipe_fd[1], &data, 1);
+	ssize_t written = write(handle->pipe_fd[1], &data, 1);
+	(void) written;
 #endif
 }

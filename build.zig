@@ -231,7 +231,11 @@ pub fn build(b: *std.Build) void {
 
     // Assemble the common C flags applied to every translation unit.
     var flags = std.array_list.Managed([]const u8).init(b.allocator);
-    flags.appendSlice(&.{ "-std=gnu23", "-pedantic", "-Wall", "-W", "-D_GNU_SOURCE" }) catch @panic("OOM");
+    // -Wall -W -Werror, matching the CMake warning set. Deliberately no
+    // -pedantic: with -Werror it would promote strict-ISO-C diagnostics to hard
+    // errors, and the plugin loader's dlsym() void*->function-pointer conversion
+    // (among others) cannot be expressed in strict ISO C without ugly hacks.
+    flags.appendSlice(&.{ "-std=gnu23", "-Wall", "-W", "-Werror", "-D_GNU_SOURCE" }) catch @panic("OOM");
     // Binary hardening, mirroring CMakeLists.txt: a stack canary always, and
     // _FORTIFY_SOURCE when optimizing (the fortified libc checks compile in only
     // under optimization, so it is inert -- and warns -- in a Debug build).

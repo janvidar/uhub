@@ -22,6 +22,7 @@
 
 static plugin_st on_search_result(struct plugin_handle* plugin, struct plugin_user* from, struct plugin_user* to, const char* search_data)
 {
+	(void) plugin; (void) from; (void) search_data;
 	if (to->credentials >= auth_cred_user)
 		return st_default;
 	return st_deny;
@@ -29,6 +30,7 @@ static plugin_st on_search_result(struct plugin_handle* plugin, struct plugin_us
 
 static plugin_st on_search(struct plugin_handle* plugin, struct plugin_user* user, const char* search_data)
 {
+	(void) plugin; (void) search_data;
 	// Registered users are allowed to search.
 	if (user->credentials >= auth_cred_user)
 		return st_default;
@@ -37,6 +39,7 @@ static plugin_st on_search(struct plugin_handle* plugin, struct plugin_user* use
 
 static plugin_st on_p2p_connect(struct plugin_handle* plugin, struct plugin_user* from, struct plugin_user* to)
 {
+	(void) plugin; (void) to;
 	if (from->credentials >= auth_cred_user)
 		return st_default;
 	return st_deny;
@@ -44,6 +47,7 @@ static plugin_st on_p2p_connect(struct plugin_handle* plugin, struct plugin_user
 
 int plugin_register(struct plugin_handle* plugin, const char* config)
 {
+	(void) config;
 	PLUGIN_INITIALIZE(plugin, "No guest downloading", "0.1", "This plug-in only allows registered users to search and initiate transfers.");
 	plugin->ptr = NULL;
 	plugin->funcs.on_search = on_search;
@@ -55,6 +59,7 @@ int plugin_register(struct plugin_handle* plugin, const char* config)
 
 int plugin_unregister(struct plugin_handle* plugin)
 {
+	(void) plugin;
 	return 0;
 }
 

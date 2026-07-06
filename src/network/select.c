@@ -114,6 +114,7 @@ void net_backend_process_select(struct net_backend* data, int res)
 
 struct net_connection* net_con_create_select(struct net_backend* data)
 {
+	(void) data;
 	struct net_connection* con = (struct net_connection*) hub_malloc_zero(sizeof(struct net_connection_select));
 	con->sd = -1;
 	return con;
@@ -121,6 +122,7 @@ struct net_connection* net_con_create_select(struct net_backend* data)
 
 void net_con_initialize_select(struct net_backend* data, struct net_connection* con_, int sd, net_connection_cb callback, const void* ptr)
 {
+	(void) data;
 	struct net_connection_select* con = (struct net_connection_select*) con_;
 	con->sd = sd;
 	con->flags = 0;
@@ -148,6 +150,7 @@ void net_con_backend_add_select(struct net_backend* data, struct net_connection*
 
 void net_con_backend_mod_select(struct net_backend* data, struct net_connection* con, int events)
 {
+	(void) data;
 	con->flags |= (events & (NET_EVENT_READ | NET_EVENT_WRITE));
 }
 

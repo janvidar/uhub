@@ -101,7 +101,7 @@ EXO_TEST(sid_list_all_1, {
 	for (s = last->sid; s <= last_sid; s++)
 	{
 		struct dummy_user* user = (struct dummy_user*) sid_lookup(sid_pool, s);
-		if (s != (user ? user->sid : -1))
+		if (s != (user ? user->sid : (sid_t)-1))
 		{
 			ok = 0;
 			break;

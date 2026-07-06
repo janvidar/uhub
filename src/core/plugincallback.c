@@ -80,6 +80,7 @@ static struct plugin_command* as_plugin_command(struct hub_command* cmd)
 
 static int plugin_command_dispatch(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
+	(void) cbase;
 	struct plugin_handle* plugin = (struct plugin_handle*) cmd->ptr;
 	struct plugin_callback_data* data = get_callback_data(plugin);
 	struct plugin_command_handle* cmdh;
@@ -220,11 +221,13 @@ static void cbfunc_command_foreach(struct plugin_handle* plugin, enum auth_crede
 
 size_t cbfunc_command_arg_reset(struct plugin_handle* plugin, struct plugin_command* cmd)
 {
+	(void) plugin;
 	return hub_command_arg_reset(as_hub_command(cmd));
 }
 
 struct plugin_command_arg_data* cbfunc_command_arg_next(struct plugin_handle* plugin, struct plugin_command* cmd, enum plugin_command_arg_type t)
 {
+	(void) plugin;
 	return (struct plugin_command_arg_data*) hub_command_arg_next(as_hub_command(cmd), (enum hub_command_arg_type) t);
 }
 
@@ -302,6 +305,7 @@ void plugin_register_callback_functions(struct plugin_handle* handle)
 
 void plugin_unregister_callback_functions(struct plugin_handle* handle)
 {
+	(void) handle;
 }
 
 struct plugin_callback_data* plugin_callback_data_create()

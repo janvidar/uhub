@@ -41,6 +41,7 @@ struct chat_history_data
  */
 static void history_add(struct plugin_handle* plugin, struct plugin_user* from, const char* message, int flags)
 {
+	(void) flags;
 	struct chat_history_data* data = (struct chat_history_data*) plugin->ptr;
 	const char* ts = get_timestamp(time(NULL));
 	/* Format: "%s <%s> %s\n" = timestamp + " <" + nick + "> " + message + "\n" */

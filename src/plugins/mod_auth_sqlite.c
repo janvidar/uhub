@@ -37,10 +37,6 @@ struct sql_data {
     struct plugin_command_handle *cmd_passwd;
 };
 
-static int null_callback(void *ptr, int argc, char **argv, char **colName) {
-    return 0;
-}
-
 static struct sql_data *parse_config(const char *line, struct plugin_handle *plugin) {
     struct sql_data *data = (struct sql_data *)hub_malloc_zero(sizeof(struct sql_data));
     struct cfg_tokens *tokens = cfg_tokenize(line);
@@ -192,6 +188,7 @@ static plugin_st update_user(struct plugin_handle *plugin, struct auth_info *use
 }
 
 static plugin_st delete_user(struct plugin_handle *plugin, struct auth_info *user) {
+	(void) user;
     struct sql_data *sql = (struct sql_data *)plugin->ptr;
     if (sql->exclusive)
         return st_deny;
@@ -241,10 +238,8 @@ static int command_regme_handler(struct plugin_handle *plugin, struct plugin_use
     }
 
     memset(&info, 0, sizeof(info));
-    strncpy(info.nickname, user->nick, MAX_NICK_LEN);
-    info.nickname[MAX_NICK_LEN] = '\0';
-    strncpy(info.password, pass, MAX_PASS_LEN);
-    info.password[MAX_PASS_LEN] = '\0';
+    snprintf(info.nickname, sizeof(info.nickname), "%s", user->nick);
+    snprintf(info.password, sizeof(info.password), "%s", pass);
     info.credentials = auth_cred_user;
 
     if (register_user(plugin, &info) == st_allow) {

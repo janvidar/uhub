@@ -408,11 +408,13 @@ int acl_user_ban_cid(struct acl_handle* handle, const char* cid)
 
 int acl_user_unban_nick(struct acl_handle* handle, const char* nick)
 {
+	(void) handle; (void) nick;
 	return -1;
 }
 
 int acl_user_unban_cid(struct acl_handle* handle, const char* cid)
 {
+	(void) handle; (void) cid;
 	return -1;
 }
 

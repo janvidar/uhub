@@ -88,11 +88,13 @@ static struct user_info* get_user_info(struct chat_only_data* data, sid_t sid)
 
 static plugin_st on_search_result(struct plugin_handle* plugin, struct plugin_user* from, struct plugin_user* to, const char* search_data)
 {
+	(void) plugin; (void) from; (void) to; (void) search_data;
 	return st_deny;
 }
 
 static plugin_st on_search(struct plugin_handle* plugin, struct plugin_user* user, const char* search_data)
 {
+	(void) search_data;
 	struct chat_only_data* data = (struct chat_only_data*) plugin->ptr;
 	struct user_info* info = get_user_info(data, user->sid);
 
@@ -109,6 +111,7 @@ static plugin_st on_search(struct plugin_handle* plugin, struct plugin_user* use
 
 static plugin_st on_p2p_connect(struct plugin_handle* plugin, struct plugin_user* from, struct plugin_user* to)
 {
+	(void) to;
 	struct chat_only_data* data = (struct chat_only_data*) plugin->ptr;
 	struct user_info* info = get_user_info(data, from->sid);
 
@@ -132,6 +135,7 @@ static void on_user_login(struct plugin_handle* plugin, struct plugin_user* user
 
 static void on_user_logout(struct plugin_handle* plugin, struct plugin_user* user, const char* reason)
 {
+	(void) reason;
 	struct chat_only_data* data = (struct chat_only_data*) plugin->ptr;
 	struct user_info* info = get_user_info(data, user->sid);
 	if (info->sid)
@@ -142,6 +146,7 @@ static void on_user_logout(struct plugin_handle* plugin, struct plugin_user* use
 
 int plugin_register(struct plugin_handle* plugin, const char* config)
 {
+	(void) config;
 	PLUGIN_INITIALIZE(plugin, "Chat only hub", "1.0", "Disables connection setup, search and results.");
 	plugin->ptr = co_initialize();
 

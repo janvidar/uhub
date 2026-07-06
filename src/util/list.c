@@ -45,6 +45,7 @@ void list_destroy(struct linked_list* list)
 
 static void dummy_free(void* ptr)
 {
+	(void) ptr;
 }
 
 void list_clear(struct linked_list* list, void (*free_handle)(void* ptr))

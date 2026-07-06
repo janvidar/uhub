@@ -921,6 +921,7 @@ struct server_alt_port_data
 
 static int server_alt_port_start_one(char* line, int count, void* ptr)
 {
+	(void) count;
 	struct server_alt_port_data* data = (struct server_alt_port_data*) ptr;
 
 	int port = uhub_atoi(line);
@@ -1478,6 +1479,7 @@ const char* hub_get_status_message(struct hub_info* hub, enum status_message msg
 
 const char* hub_get_status_message_log(struct hub_info* hub, enum status_message msg)
 {
+	(void) hub;
 #define STATUS(MSG) case status_ ## MSG : return #MSG; break
 	switch (msg)
 	{

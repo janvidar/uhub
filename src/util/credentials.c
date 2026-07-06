@@ -102,7 +102,7 @@ const char* auth_cred_to_string(enum auth_credentials cred)
 	}
 
 	return "";
-};
+}
 
 int auth_string_to_cred(const char* str, enum auth_credentials* out)
 {

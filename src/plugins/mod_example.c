@@ -28,6 +28,7 @@ struct example_plugin_data
 
 static int example_command_handler(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_command* cmd)
 {
+	(void) cmd;
 	plugin->hub.send_message(plugin, user, "Hello from mod_example.");
 	return 0;
 }
@@ -54,6 +55,7 @@ static void command_unregister(struct plugin_handle* plugin)
 
 int plugin_register(struct plugin_handle* plugin, const char* config)
 {
+	(void) config;
 	PLUGIN_INITIALIZE(plugin, "Example plugin", "1.0", "A simple example plugin");
 	command_register(plugin);
 	return 0;

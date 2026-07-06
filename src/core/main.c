@@ -95,6 +95,7 @@ static int signals[] =
 
 void setup_signal_handlers(struct hub_info* hub)
 {
+	(void) hub;
 	sigset_t sig_set;
 	struct sigaction act;
 	int i;
@@ -115,6 +116,7 @@ void setup_signal_handlers(struct hub_info* hub)
 
 void shutdown_signal_handlers(struct hub_info* hub)
 {
+	(void) hub;
 }
 #endif /* !WIN32 */
 
@@ -158,7 +160,7 @@ static void set_config_str(char** field, const char* value)
    g_worker_count cluster, sharing the port and meshed over Unix sockets. */
 static void apply_worker_overrides(struct hub_config* cfg)
 {
-	char path[80];
+	char path[128];
 	char peers[8192];
 	int j;
 
@@ -177,7 +179,7 @@ static void apply_worker_overrides(struct hub_config* cfg)
 	peers[0] = 0;
 	for (j = 0; j < g_worker_index; j++)
 	{
-		char one[96];
+		char one[128];
 		snprintf(one, sizeof(one), "%s%s/w%d.sock", (j ? "," : ""), g_worker_dir, j);
 		strncat(peers, one, sizeof(peers) - strlen(peers) - 1);
 	}
@@ -213,7 +215,7 @@ static int run_master(int n)
 		LOG_FATAL("Unable to create worker socket directory %s: %s", dir, strerror(errno));
 		return -1;
 	}
-	strncpy(g_worker_dir, dir, sizeof(g_worker_dir) - 1);
+	snprintf(g_worker_dir, sizeof(g_worker_dir), "%s", dir);
 
 	/* Ephemeral shared link secret (memory only), hex-encoded. */
 	if (RAND_bytes(rnd, sizeof(rnd)) != 1)

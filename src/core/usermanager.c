@@ -273,6 +273,7 @@ int uman_send_user_list(struct hub_info* hub, struct hub_user_manager* users, st
 
 void uman_send_quit_message(struct hub_info* hub, struct hub_user_manager* users, struct hub_user* leaving)
 {
+	(void) users;
 	struct adc_message* command = adc_msg_construct(ADC_CMD_IQUI, 6);
 	adc_msg_add_argument(command, (const char*) sid_to_string(leaving->id.sid));
 

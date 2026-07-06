@@ -163,6 +163,7 @@ static void open_database()
 
 static int create(size_t argc, const char** argv)
 {
+	(void) argc; (void) argv;
 	const char* sql = "CREATE TABLE users"
 		"("
 			"nickname CHAR NOT NULL UNIQUE,"
@@ -200,6 +201,7 @@ static int create(size_t argc, const char** argv)
 
 static int sql_callback_list(void* ptr, int argc, char **argv, char **colName)
 {
+	(void) argc;
 	int* found = (int*) ptr;
 	uhub_assert(strcmp(colName[0], "nickname") == 0 && strcmp(colName[2], "credentials") == 0);
 	printf("%s\t%s\n", argv[2], argv[0]);
@@ -209,6 +211,7 @@ static int sql_callback_list(void* ptr, int argc, char **argv, char **colName)
 
 static int list(size_t argc, const char** argv)
 {
+	(void) argc; (void) argv;
 	char* errMsg;
 	int found = 0;
 	int rc;

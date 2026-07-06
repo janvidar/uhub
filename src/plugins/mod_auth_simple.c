@@ -83,7 +83,7 @@ static struct acl_data* parse_config(const char* line)
 	{
 		char* split = strchr(token, '=');
 		size_t len = strlen(token);
-		size_t key = split ? (split - token) : len;
+		size_t key = split ? (size_t)(split - token) : len;
 		const char* value = split ? split + 1 : "";
 		if (key == 4 && strncmp(token, "file", 4) == 0)
 		{
@@ -117,6 +117,7 @@ static struct acl_data* parse_config(const char* line)
 
 static int parse_line(char* line, int line_count, void* ptr_data)
 {
+	(void) line_count;
 	struct linked_list* users = (struct linked_list*) ptr_data;
 	struct cfg_tokens* tokens = cfg_tokenize(line);
 	enum auth_credentials cred;
@@ -199,6 +200,7 @@ static plugin_st get_user(struct plugin_handle* plugin, const char* nickname, st
 
 static plugin_st register_user(struct plugin_handle* plugin, struct auth_info* user)
 {
+	(void) user;
 	struct acl_data* acl = (struct acl_data*) plugin->ptr;
 	if (acl->exclusive)
 		return st_deny;
@@ -207,6 +209,7 @@ static plugin_st register_user(struct plugin_handle* plugin, struct auth_info* u
 
 static plugin_st update_user(struct plugin_handle* plugin, struct auth_info* user)
 {
+	(void) user;
 	struct acl_data* acl = (struct acl_data*) plugin->ptr;
 	if (acl->exclusive)
 		return st_deny;
@@ -215,6 +218,7 @@ static plugin_st update_user(struct plugin_handle* plugin, struct auth_info* use
 
 static plugin_st delete_user(struct plugin_handle* plugin, struct auth_info* user)
 {
+	(void) user;
 	struct acl_data* acl = (struct acl_data*) plugin->ptr;
 	if (acl->exclusive)
 		return st_deny;

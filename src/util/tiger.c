@@ -175,7 +175,7 @@ void tiger_fix_endian(uint8_t *s) {
 }
 #endif
 
-void tiger(uint64_t* str, uint64_t length, uint64_t res[3]) {
+void tiger(uint64_t* str, uint64_t length, uint64_t* res) {
 	uint64_t i, j;
 	uint8_t temp[64];
 	res[0]= 0x0123456789ABCDEFULL;

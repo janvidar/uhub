@@ -192,7 +192,10 @@ int rb_tree_insert(struct rb_tree* tree, const void* key, const void* value)
 	return 1;
 }
 
-void null_node_free(struct rb_node* n) { }
+void null_node_free(struct rb_node* n)
+{
+	(void) n;
+}
 
 int rb_tree_remove(struct rb_tree* tree, const void* key)
 {
@@ -330,7 +333,7 @@ struct rb_node* rb_tree_first(struct rb_tree* tree)
 		n = n->link[0];
 	}
 	return rb_it_set(tree, n);
-};
+}
 
 
 static struct rb_node* rb_tree_traverse(struct rb_tree* tree, int dir)

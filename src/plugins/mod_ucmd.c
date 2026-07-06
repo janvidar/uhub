@@ -119,6 +119,7 @@ static void on_user_login(struct plugin_handle* plugin, struct plugin_user* user
 
 int plugin_register(struct plugin_handle* plugin, const char* config)
 {
+	(void) config;
 	PLUGIN_INITIALIZE(plugin, "UCMD plugin", "0.2",
 		"Publishes registered hub commands as ADC user-command (UCMD) context menus.");
 	plugin->funcs.on_user_login = on_user_login;
@@ -127,6 +128,7 @@ int plugin_register(struct plugin_handle* plugin, const char* config)
 
 int plugin_unregister(struct plugin_handle* plugin)
 {
+	(void) plugin;
 	/* The ICMD entries live in each client; there is nothing hub-side to free.
 	 * To clear a client's menu you would re-send each entry with an "RM" field. */
 	return 0;

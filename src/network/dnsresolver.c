@@ -24,6 +24,20 @@
 #include "network/dnsresolver.h"
 #include "network/notify.h"
 
+// Emitting a preprocessor directive inside a function-like macro's argument
+// list (the LIST_FOREACH delivery loop below) is undefined behaviour, so the
+// optional lookup timing is wrapped in its own macro that fully resolves before
+// LIST_FOREACH expands.
+#ifdef DEBUG_LOOKUP_TIME
+#define DNS_LOG_LOOKUP_TIME(job) do { \
+		struct timeval time_result; \
+		timersub(&(job)->time_finish, &(job)->time_start, &time_result); \
+		LOG_TRACE("DNS lookup took %d ms", (int) ((time_result.tv_sec * 1000) + (time_result.tv_usec / 1000))); \
+	} while (0)
+#else
+#define DNS_LOG_LOOKUP_TIME(job) do { } while (0)
+#endif
+
 /*
  * The resolver runs a pool of worker threads that drain a shared queue of
  * lookup jobs. getaddrinfo() is blocking, so it must run off the main
@@ -94,6 +108,7 @@ static void free_result_handle(void* ptr)
 
 static void notify_callback(struct uhub_notify_handle* handle, void* ptr)
 {
+	(void) handle; (void) ptr;
 	net_dns_process();
 }
 
@@ -235,11 +250,7 @@ void net_dns_process()
 	{
 		struct net_dns_job* job = result->job;
 		const struct net_dns_result* delivered = result->error ? NULL : result;
-#ifdef DEBUG_LOOKUP_TIME
-		struct timeval time_result;
-		timersub(&job->time_finish, &job->time_start, &time_result);
-		LOG_TRACE("DNS lookup took %d ms", (int) ((time_result.tv_sec * 1000) + (time_result.tv_usec / 1000)));
-#endif
+		DNS_LOG_LOOKUP_TIME(job);
 		if (job->callback(job, delivered))
 		{
 			net_dns_result_free(result);
@@ -268,6 +279,7 @@ static struct net_dns_result* do_resolve(struct net_dns_job* job)
 	struct net_dns_result* dns_results;
 	int ret;
 	int count = 0;
+	(void) count; /* only referenced by LOG_DUMP, compiled out in release */
 
 	dns_results = (struct net_dns_result*) hub_malloc_zero(sizeof(struct net_dns_result));
 	dns_results->addr_list = list_create();

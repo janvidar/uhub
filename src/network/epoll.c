@@ -78,6 +78,7 @@ void net_backend_process_epoll(struct net_backend* data, int res)
 
 struct net_connection* net_con_create_epoll(struct net_backend* data)
 {
+	(void) data;
 	struct net_connection* con = (struct net_connection*) hub_malloc_zero(sizeof(struct net_connection_epoll));
 	con->sd = -1;
 	return con;
@@ -85,6 +86,7 @@ struct net_connection* net_con_create_epoll(struct net_backend* data)
 
 void net_con_initialize_epoll(struct net_backend* data, struct net_connection* con_, int sd, net_connection_cb callback, const void* ptr)
 {
+	(void) data;
 	struct net_connection_epoll* con = (struct net_connection_epoll*) con_;
 	con->sd = sd;
 	con->flags = 0;
@@ -128,7 +130,7 @@ void net_con_backend_mod_epoll(struct net_backend* data, struct net_connection* 
 	if (events & NET_EVENT_READ)  newev |= EPOLLIN;
 	if (events & NET_EVENT_WRITE) newev |= EPOLLOUT;
 
-	if (newev == con->ev.events)
+	if ((uint32_t) newev == con->ev.events)
 		return;
 
 	con->ev.events = newev;

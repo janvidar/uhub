@@ -33,7 +33,7 @@ int  flood_control_check(struct flood_control* data, size_t max_count, size_t ti
 
 	// No previous message, or a long time since
 	// the last message. We allow the message.
-	if (!data->time || ((now - data->time) > time_delay))
+	if (!data->time || ((now - data->time) > (time_t) time_delay))
 	{
 		data->time = now;
 		data->count = 1;

@@ -23,8 +23,8 @@
 #include "util/memory.h"
 #include "util/misc.h"
 
-#define ADD_CHAR(X) do { *out = X; out++; token_size++; } while(0)
-#define RESET_TOKEN do { ADD_CHAR('\0'); out = buffer; if (cfg_token_add(tokens, out)) token_count++; token_size = 0; buffer[0] = '\0'; } while (0)
+#define ADD_CHAR(X) do { *out = X; out++; } while(0)
+#define RESET_TOKEN do { ADD_CHAR('\0'); out = buffer; cfg_token_add(tokens, out); buffer[0] = '\0'; } while (0)
 
 struct cfg_tokens
 {
@@ -39,8 +39,6 @@ struct cfg_tokens* cfg_tokenize(const char* line)
 	const char* p = line;
 	int backslash = 0;
 	char quote = 0;
-	size_t token_count = 0;
-	size_t token_size = 0;
 	tokens->list = list_create();
 
 	for (; *p; p++)

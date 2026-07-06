@@ -383,6 +383,7 @@ static int net_connect_failover(struct net_connect_handle* handle, struct net_co
  */
 static void net_connect_job_internal_cb(struct net_connection* con, int event, void* ptr)
 {
+	(void) ptr;
 	struct net_connect_job* job = net_con_get_ptr(con);
 	struct net_connect_handle* handle = job->handle;
 
@@ -427,6 +428,7 @@ static void net_connect_cancel(struct net_connect_handle* handle)
 
 static int net_connect_process_queue(struct net_connect_handle* handle, struct net_connect_job* job)
 {
+	(void) handle;
 	int ret;
 	while (job)
 	{

@@ -66,6 +66,15 @@ if (NOT MSVC)
 	add_compile_options(-fwrapv -fno-strict-aliasing)
 endif()
 
+# Always treat warnings as errors. -Wall/-Wextra are turned on alongside so
+# -Werror has warnings to act on -- the rest of the CMake build sets no warning
+# level, whereas build.zig keeps -Wall -W on unconditionally.
+if (MSVC)
+	add_compile_options(/W4 /WX)
+else()
+	add_compile_options(-Wall -Wextra -Werror)
+endif()
+
 # --- Binary hardening -------------------------------------------------------
 # Standard exploit-mitigation flags on GCC/Clang: stack canaries, FORTIFY,
 # full RELRO + BIND_NOW, a non-executable stack, and a position-independent

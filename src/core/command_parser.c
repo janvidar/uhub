@@ -66,6 +66,7 @@ void command_free(struct hub_command* cmd)
 
 static enum command_parse_status command_extract_arguments(struct hub_info* hub, const struct hub_user* user, struct command_handle* command, struct linked_list* tokens, struct linked_list* args)
 {
+	(void) user;
 	int arg = 0;
 	int opt = 0;
 	int greedy = 0;

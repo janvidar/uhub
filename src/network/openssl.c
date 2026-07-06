@@ -181,6 +181,7 @@ unsigned char alpn_protocols[] = {
 static int alpn_server_select_protocol(SSL *ssl, const unsigned char **out, unsigned char *outlen,
                                  const unsigned char *in, unsigned int inlen, void *arg)
 {
+	(void) ssl; (void) arg;
     int res = SSL_select_next_proto((unsigned char **)out, outlen,
                     alpn_protocols, sizeof(alpn_protocols), in, inlen);
     if (res == OPENSSL_NPN_NO_OVERLAP)

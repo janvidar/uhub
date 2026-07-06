@@ -28,6 +28,7 @@ EXO_TEST(setup, {
 
 static int test_handler(struct command_base* cbase, struct hub_user* user, struct hub_command* hcmd)
 {
+	(void) cbase; (void) user; (void) hcmd;
 	printf("test_handler\n");
 	result = 1;
 	return 0;

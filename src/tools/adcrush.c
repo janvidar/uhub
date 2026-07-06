@@ -51,7 +51,6 @@ static int cfg_quiet       = 0; /* quiet mode (no output) */
 static int cfg_clients     = ADC_CLIENTS_DEFAULT; /* number of clients */
 static int cfg_netstats_interval = STATS_INTERVAL;
 static int running         = 1;
-static int logged_in       = 0;
 static int blank           = 0;
 static struct net_statistics* stats_intermediate;
 static struct net_statistics* stats_total;
@@ -172,7 +171,6 @@ static size_t get_next_timeout_evt()
 }
 
 
-static void perf_result(struct ADC_client* client, sid_t target, const char* what, const char* token);
 
 static void perf_chat(struct ADC_client* client, int priv)
 {
@@ -208,26 +206,8 @@ static void perf_search(struct ADC_client* client)
 	ADC_client_send(client, cmd);
 }
 
-static void perf_result(struct ADC_client* client, sid_t target, const char* what, const char* token)
-{
-	char tmp[256];
-	struct adc_message* cmd = adc_msg_construct_source_dest(ADC_CMD_DRES, ADC_client_get_sid(client), target, strlen(what) + strlen(token) + 64);
-
-	snprintf(tmp, sizeof(tmp), "FNtest/%s.dat", what);
-	adc_msg_add_argument(cmd, tmp);
-
-	adc_msg_add_argument(cmd, "SL0");
-	adc_msg_add_argument(cmd, "SI1209818412");
-	adc_msg_add_argument(cmd, "TR5T6YJYKO3WECS52BKWVSOP5VUG4IKNSZBZ5YHBA");
-	snprintf(tmp, sizeof(tmp), "TO%s", token);
-	adc_msg_add_argument(cmd, tmp);
-
-	ADC_client_send(client, cmd);
-}
-
 static void perf_ctm(struct ADC_client* client)
 {
-	char buf[1024] = { 0, };
 	struct adc_message* cmd = adc_msg_construct_source_dest(ADC_CMD_DCTM, ADC_client_get_sid(client), ADC_client_get_sid(client), 32);
 	adc_msg_add_argument(cmd, "ADC/1.0");
 	adc_msg_add_argument(cmd, "TOKEN123456");
@@ -303,6 +283,7 @@ static void perf_normal_action(struct ADC_client* client)
 	struct AdcFuzzUser* user = (struct AdcFuzzUser*) ADC_client_get_ptr(client);
 	size_t r = get_wait_rand(5);
 	size_t p = get_wait_rand(100);
+	(void) p; /* reserved for the commented-out probability checks below */
 
 	switch (r)
 	{
@@ -466,7 +447,7 @@ void p_status()
 	size_t n;
 	static size_t rx = 0, tx = 0;
 
-	for (n = 0; n < cfg_clients; n++)
+	for (n = 0; n < (size_t) cfg_clients; n++)
 	{
 		if (client[n].logged_in)
 			logged_in++;
@@ -484,7 +465,7 @@ void p_status()
 
 	n = blank;
 	blank = printf("Connected bots: %d/%d, network: rx=%s/s, tx=%s/s", logged_in, cfg_clients, rxbuf, txbuf);
-	if (n > blank)
+	if (n > (size_t) blank)
 		do_blank(n-blank);
 	printf("\r");
 }

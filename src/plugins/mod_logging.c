@@ -57,6 +57,7 @@ static void set_error_message(struct plugin_handle* plugin, const char* msg)
 
 static int log_open_file(struct plugin_handle* plugin, struct log_data* data)
 {
+	(void) plugin;
 	int flags = O_CREAT | O_APPEND | O_WRONLY;
 	data->fd = open(data->logfile, flags, 0664);
 	return (data->fd != -1);
@@ -65,6 +66,7 @@ static int log_open_file(struct plugin_handle* plugin, struct log_data* data)
 #ifndef WIN32
 static int log_open_syslog(struct plugin_handle* plugin)
 {
+	(void) plugin;
 	openlog("uhub", 0, LOG_USER);
 	return 1;
 }

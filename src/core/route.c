@@ -208,6 +208,7 @@ void route_clear_dirty(struct hub_info* hub, struct hub_user* user)
 
 int route_flush_pipeline(struct hub_info* hub, struct hub_user* u)
 {
+	(void) hub;
 	if (ioq_send_is_empty(u->send_queue))
 		return 0;
 

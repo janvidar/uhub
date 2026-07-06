@@ -24,7 +24,7 @@
 #include "core/pluginloader.h"
 #include "plugin_api/handle.h"
 
-#define PLUGIN_DEBUG(hub, name) LOG_PLUGIN("Invoke %s on %d plugins", name, (int) (hub->plugins ? list_size(hub->plugins->loaded) : -1));
+#define PLUGIN_DEBUG(hub, name) LOG_PLUGIN("Invoke %s on %d plugins", name, (hub->plugins ? (int) list_size(hub->plugins->loaded) : -1));
 
 
 #define INVOKE(HUB, FUNCNAME, CODE) \
@@ -142,12 +142,14 @@ void plugin_log_chat_message(struct hub_info* hub, struct hub_user* who, const c
 
 plugin_st plugin_handle_chat_message(struct hub_info* hub, struct hub_user* from, const char* message, int flags)
 {
+	(void) flags;
 	struct plugin_user* user = convert_user_type(from);
 	PLUGIN_INVOKE_STATUS_2(hub, on_chat_msg, user, message);
 }
 
 plugin_st plugin_handle_private_message(struct hub_info* hub, struct hub_user* from, struct hub_user* to, const char* message, int flags)
 {
+	(void) flags;
 	struct plugin_user* user1 = convert_user_type(from);
 	struct plugin_user* user2 = convert_user_type(to);
 	PLUGIN_INVOKE_STATUS_3(hub, on_private_msg, user1, user2, message);

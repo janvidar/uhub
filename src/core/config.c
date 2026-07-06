@@ -35,6 +35,7 @@
 
 static int apply_boolean(const char* key, const char* data, int* target)
 {
+	(void) key;
 	return string_to_boolean(data, target);
 }
 
@@ -96,6 +97,7 @@ static int apply_string(const char* key, const char* data, char** target, const 
 
 static int apply_integer(const char* key, const char* data, int* target, int* min, int* max)
 {
+	(void) key;
 	char* endptr;
 	int val;
 	errno = 0;

@@ -390,6 +390,7 @@ static void regserver_io_cb(struct net_connection* con, int events, void* ptr)
 
 static void regserver_connect_cb(struct net_connect_handle* handle, enum net_connect_status status, struct net_connection* con, void* ptr)
 {
+	(void) handle;
 	struct regserver* rs = (struct regserver*) ptr;
 	rs->connect_job = NULL; /* the handle auto-destroys after this callback returns */
 

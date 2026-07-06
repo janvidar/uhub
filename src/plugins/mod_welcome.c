@@ -256,12 +256,14 @@ static void on_user_login(struct plugin_handle* plugin, struct plugin_user* user
 
 static int command_handler_motd(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_command* cmd)
 {
+	(void) cmd;
 	send_motd(plugin, user);
 	return 0;
 }
 
 static int command_handler_rules(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_command* cmd)
 {
+	(void) cmd;
 	send_rules(plugin, user);
 	return 0;
 }

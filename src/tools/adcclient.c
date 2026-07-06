@@ -167,6 +167,7 @@ static void adc_cid_pid(struct ADC_client* client)
 
 static void event_callback(struct net_connection* con, int events, void *arg)
 {
+	(void) arg;
 	ADC_TRACE;
 	struct ADC_client* client = (struct ADC_client*) net_con_get_ptr(con);
 
@@ -681,6 +682,7 @@ void ADC_client_destroy(struct ADC_client* client)
 
 static void connect_callback(struct net_connect_handle* handle, enum net_connect_status status, struct net_connection* con, void* ptr)
 {
+	(void) handle;
 	struct ADC_client* client = (struct ADC_client*) ptr;
 	client->connect_job = NULL;
 	switch (status)

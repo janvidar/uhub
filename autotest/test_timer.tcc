@@ -12,6 +12,7 @@ static size_t g_triggered;
 
 static void timeout_cb(struct timeout_evt* t)
 {
+	(void) t;
 	g_triggered++;
 }
 

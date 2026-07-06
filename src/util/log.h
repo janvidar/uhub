@@ -34,16 +34,16 @@ enum log_verbosity {
 	log_plugin   = 10,
 };
 
-#define LOG_FATAL(format, ...)  hub_log(log_fatal,    format, ## __VA_ARGS__)
-#define LOG_ERROR(format, ...)  hub_log(log_error,    format, ## __VA_ARGS__)
-#define LOG_WARN(format, ...)   hub_log(log_warning,  format, ## __VA_ARGS__)
-#define LOG_USER(format, ...)   hub_log(log_user,     format, ## __VA_ARGS__)
-#define LOG_INFO(format, ...)   hub_log(log_info,     format, ## __VA_ARGS__)
+#define LOG_FATAL(format, ...)  hub_log(log_fatal,    format __VA_OPT__(,) __VA_ARGS__)
+#define LOG_ERROR(format, ...)  hub_log(log_error,    format __VA_OPT__(,) __VA_ARGS__)
+#define LOG_WARN(format, ...)   hub_log(log_warning,  format __VA_OPT__(,) __VA_ARGS__)
+#define LOG_USER(format, ...)   hub_log(log_user,     format __VA_OPT__(,) __VA_ARGS__)
+#define LOG_INFO(format, ...)   hub_log(log_info,     format __VA_OPT__(,) __VA_ARGS__)
 
 #ifdef DEBUG
-# define LOG_DEBUG(format, ...)  hub_log(log_debug,    format, ## __VA_ARGS__)
-# define LOG_TRACE(format, ...)  hub_log(log_trace,    format, ## __VA_ARGS__)
-# define LOG_PLUGIN(format, ...) hub_log(log_plugin,   format, ## __VA_ARGS__)
+# define LOG_DEBUG(format, ...)  hub_log(log_debug,    format __VA_OPT__(,) __VA_ARGS__)
+# define LOG_TRACE(format, ...)  hub_log(log_trace,    format __VA_OPT__(,) __VA_ARGS__)
+# define LOG_PLUGIN(format, ...) hub_log(log_plugin,   format __VA_OPT__(,) __VA_ARGS__)
 #else
 # define LOG_DEBUG(format, ...)  do { } while(0)
 # define LOG_TRACE(format, ...)  do { } while(0)
@@ -51,9 +51,9 @@ enum log_verbosity {
 #endif
 
 #ifdef LOWLEVEL_DEBUG
-# define LOG_DUMP(format, ...)   hub_log(log_dump,     format, ## __VA_ARGS__)
-# define LOG_MEMORY(format, ...) hub_log(log_memory,   format, ## __VA_ARGS__)
-# define LOG_PROTO(format, ...)  hub_log(log_protocol, format, ## __VA_ARGS__)
+# define LOG_DUMP(format, ...)   hub_log(log_dump,     format __VA_OPT__(,) __VA_ARGS__)
+# define LOG_MEMORY(format, ...) hub_log(log_memory,   format __VA_OPT__(,) __VA_ARGS__)
+# define LOG_PROTO(format, ...)  hub_log(log_protocol, format __VA_OPT__(,) __VA_ARGS__)
 #else
 # define LOG_DUMP(format, ...)   do { } while(0)
 # define LOG_MEMORY(format, ...) do { } while(0)

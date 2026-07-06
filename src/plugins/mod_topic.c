@@ -65,6 +65,7 @@ static int command_showtopic_handler(struct plugin_handle* plugin, struct plugin
 
 int plugin_register(struct plugin_handle* plugin, const char* config)
 {
+	(void) config;
 	struct topic_plugin_data* data = (struct topic_plugin_data*) hub_malloc(sizeof(struct topic_plugin_data));
 
 	data->topic = (struct plugin_command_handle*) hub_malloc_zero(sizeof(struct plugin_command_handle));

@@ -121,6 +121,7 @@ static plugin_st on_flood_detected(struct plugin_handle* plugin, struct plugin_u
 
 static void on_user_logout(struct plugin_handle* plugin, struct plugin_user* user, const char* reason)
 {
+	(void) reason;
 	struct flood_data* data = (struct flood_data*) plugin->ptr;
 	if (user->sid < data->max_users)
 	{
