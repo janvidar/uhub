@@ -29,6 +29,7 @@ option(LOWLEVEL_DEBUG "Enable low level debug messages." OFF)
 option(SYSTEMD_SUPPORT "Enable systemd notify and journal logging" OFF)
 option(ADC_STRESS "Enable the stress tester client" OFF)
 option(FUZZING "Build libFuzzer fuzz targets (requires clang)" OFF)
+option(QT_CLIENT "Build the uhub-qt reference GUI client (requires Qt5/Qt6 Widgets)" OFF)
 
 find_package(Git)
 find_package(SQLite3 REQUIRED)
@@ -385,6 +386,33 @@ if (FUZZING)
 	# command_parse() lives in the hub core, so compile the core objects in
 	# (same source set as autotest-bin, minus main.c / gen_config.c).
 	add_fuzzer(fuzz_command_parser ${UHUB_SOURCE_DIR}/tools/fuzz_command_parser.c ${uhub_SOURCES})
+endif()
+
+if (QT_CLIENT)
+	# Reference GUI client. Prefer Qt6, fall back to Qt5; link whichever
+	# provides Widgets. The C bridge (gui/adcbridge.c) keeps every uhub header
+	# on the C side, so the C++ sources only ever see gui/adcbridge.h.
+	# The project is otherwise C-only, so enable C++ just for this target.
+	enable_language(CXX)
+	set (CMAKE_CXX_STANDARD 17)
+	set (CMAKE_CXX_STANDARD_REQUIRED ON)
+	find_package(Qt6 QUIET COMPONENTS Widgets)
+	if (Qt6_FOUND)
+		set (QT_PKG Qt6)
+	else()
+		find_package(Qt5 REQUIRED COMPONENTS Widgets)
+		set (QT_PKG Qt5)
+	endif()
+	message (STATUS "Qt GUI client: ${QT_PKG}")
+
+	add_executable(uhub-qt
+		${UHUB_SOURCE_DIR}/gui/main.cpp
+		${UHUB_SOURCE_DIR}/gui/mainwindow.cpp
+		${UHUB_SOURCE_DIR}/gui/netclient.cpp
+		${UHUB_SOURCE_DIR}/gui/adcbridge.c
+	)
+	set_target_properties(uhub-qt PROPERTIES AUTOMOC ON)
+	target_link_libraries(uhub-qt adcclient adc network utils pthread ${SSL_LIBS} ${QT_PKG}::Widgets)
 endif()
 
 configure_file ("${UHUB_SOURCE_DIR}/version.h.in" "${PROJECT_BINARY_DIR}/version.h")
