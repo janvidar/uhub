@@ -38,6 +38,7 @@ struct uhub_plugin
 struct uhub_plugins
 {
 	struct linked_list* loaded;
+	char* plugin_dir; /* base directory prepended to plugins given by a relative soname; NULL = load relative to cwd */
 };
 
 // High level plugin loader code

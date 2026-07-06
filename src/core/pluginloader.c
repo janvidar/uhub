@@ -226,6 +226,37 @@ void plugin_unload(struct plugin_handle* plugin)
 	hub_free(plugin);
 }
 
+/*
+ * Is the given plugin path absolute? A relative path is resolved against the
+ * configured plugin_dir (if any); an absolute one is always used verbatim.
+ */
+static int plugin_path_is_absolute(const char* path)
+{
+#ifdef HAVE_DLOPEN
+	return path[0] == '/';
+#else
+	/* Windows: "\foo", "/foo" or a drive-qualified path such as "C:\foo". */
+	if (path[0] == '\\' || path[0] == '/')
+		return 1;
+	if (path[0] && path[1] == ':')
+		return 1;
+	return 0;
+#endif
+}
+
+/* Join a directory and a plugin name, inserting a separator if needed. */
+static char* plugin_join_path(const char* dir, const char* name)
+{
+	size_t dlen = strlen(dir);
+	int need_sep = (dlen > 0 && dir[dlen - 1] != '/' && dir[dlen - 1] != '\\');
+	size_t len = dlen + (need_sep ? 1 : 0) + strlen(name) + 1;
+	char* full = hub_malloc(len);
+	if (!full)
+		return NULL;
+	snprintf(full, len, need_sep ? "%s/%s" : "%s%s", dir, name);
+	return full;
+}
+
 static int plugin_parse_line(char* line, int line_count, void* ptr_data)
 {
 	(void) line_count;
@@ -251,13 +282,41 @@ static int plugin_parse_line(char* line, int line_count, void* ptr_data)
 	soname    = cfg_token_get_next(tokens);
 	params    = cfg_token_get_next(tokens);
 
+	/*
+	 * "plugin_dir <path>" sets the base directory prepended to any subsequent
+	 * plugin given by a relative soname. It applies to plugin directives that
+	 * follow it in the file, so place it before them.
+	 */
+	if (strcmp(directive, "plugin_dir") == 0 && soname && *soname)
+	{
+		hub_free(handle->plugin_dir);
+		handle->plugin_dir = hub_strdup(soname);
+		cfg_tokens_free(tokens);
+		return handle->plugin_dir ? 0 : -1;
+	}
+
 	if (strcmp(directive, "plugin") == 0 && soname && *soname)
 	{
+		char* resolved = NULL;
+		const char* path = soname;
+
+		if (handle->plugin_dir && !plugin_path_is_absolute(soname))
+		{
+			resolved = plugin_join_path(handle->plugin_dir, soname);
+			if (!resolved)
+			{
+				cfg_tokens_free(tokens);
+				return -1;
+			}
+			path = resolved;
+		}
+
 		if (!params)
 			params = "";
 
-		LOG_PLUGIN("Load plugin: \"%s\", params=\"%s\"", soname, params);
-		plugin = plugin_load(soname, params, hub);
+		LOG_PLUGIN("Load plugin: \"%s\", params=\"%s\"", path, params);
+		plugin = plugin_load(path, params, hub);
+		hub_free(resolved);
 		if (plugin)
 		{
 			list_append(handle->loaded, plugin);
@@ -306,6 +365,8 @@ void plugin_shutdown(struct uhub_plugins* handle)
 {
 	list_clear(handle->loaded, plugin_unload_ptr);
 	list_destroy(handle->loaded);
+	hub_free(handle->plugin_dir);
+	handle->plugin_dir = NULL;
 }
 
 // Used internally only
