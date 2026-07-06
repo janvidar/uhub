@@ -160,6 +160,7 @@ struct hub_info
 	uint8_t hub_secret[TIGERSIZE];      /* Hub session secret, used for HBRI, but also password authentication. */
 
 	struct ssl_context_handle* ctx;
+	char* tls_keyprint;                 /* ADC KEYP keyprint of the TLS certificate ("SHA256/..."), NULL when TLS is disabled. */
 
 	struct regserver* regserver;        /* Pending/in-flight registration-server announce (NULL if none). */
 };

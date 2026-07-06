@@ -76,6 +76,17 @@ extern int ssl_load_private_key(struct ssl_context_handle* ctx, const char* pem_
 extern int ssl_check_private_key(struct ssl_context_handle* ctx);
 
 /**
+ * Compute the ADC KEYP keyprint of the leaf certificate installed in @p ctx.
+ * Writes the NUL-terminated form "SHA256/<base32>" (the SHA256 hash of the
+ * certificate's DER encoding, Base32-encoded without padding) into @p out. This
+ * is the value advertised as "?kp=" in an adcs:// URL so clients can pin the
+ * hub's certificate. A 60-byte buffer is always sufficient.
+ *
+ * @return 1 on success, 0 if no certificate is loaded or @p out is too small.
+ */
+extern int net_ssl_get_keyprint(struct ssl_context_handle* ctx, char* out, size_t out_size);
+
+/**
  * Start SSL_accept()
  */
 extern ssize_t net_con_ssl_accept(struct net_connection*);

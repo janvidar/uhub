@@ -19,11 +19,15 @@
 
 #include "util/log.h"
 #include "util/memory.h"
+#include "util/misc.h"
 #include "network/connection.h"
 #include "network/network.h"
 #include "network/common.h"
 #include "network/tls.h"
 #include "network/backend.h"
+
+#include <openssl/x509.h>
+#include <openssl/sha.h>
 
 /*
  * uhub targets OpenSSL >= 3.0 (released 2021) or the contemporaneous
@@ -314,6 +318,49 @@ int ssl_check_private_key(struct ssl_context_handle* ctx_)
 		LOG_FATAL("SSL_CTX_check_private_key: Private key does not match the certificate public key: %s", ERR_error_string(ERR_get_error(), NULL));
 		return 0;
 	}
+	return 1;
+}
+
+int net_ssl_get_keyprint(struct ssl_context_handle* ctx_, char* out, size_t out_size)
+{
+	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
+	X509* cert;
+	unsigned char* der = NULL;
+	int der_len;
+	unsigned char digest[SHA256_DIGEST_LENGTH];
+	char b32[(SHA256_DIGEST_LENGTH * 8 + 4) / 5 + 1]; /* 52 base32 chars + NUL */
+	int n;
+
+	if (!ctx || !ctx->ssl || !out || out_size == 0)
+		return 0;
+
+	/* The leaf (server) certificate previously installed with
+	 * SSL_CTX_use_certificate_chain_file(); SSL_CTX_get0_certificate() returns
+	 * an internal pointer we must not free. */
+	cert = SSL_CTX_get0_certificate(ctx->ssl);
+	if (!cert)
+	{
+		LOG_ERROR("net_ssl_get_keyprint: no certificate loaded in context.");
+		return 0;
+	}
+
+	/* ADC KEYP hashes the DER (ASN.1) encoding of the certificate with SHA256. */
+	der_len = i2d_X509(cert, &der);
+	if (der_len <= 0 || !der)
+	{
+		LOG_ERROR("net_ssl_get_keyprint: i2d_X509 failed: %s", ERR_error_string(ERR_get_error(), NULL));
+		return 0;
+	}
+
+	SHA256(der, (size_t) der_len, digest);
+	OPENSSL_free(der);
+
+	base32_encode(digest, sizeof(digest), b32);
+
+	/* KEYP form: "<hash-name>/<base32>", e.g. "SHA256/G3PJC4F4MQ5KOX...". */
+	n = snprintf(out, out_size, "SHA256/%s", b32);
+	if (n < 0 || (size_t) n >= out_size)
+		return 0;
 	return 1;
 }
 

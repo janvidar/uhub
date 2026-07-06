@@ -104,73 +104,107 @@ static char hh[256 + 8];
 
 /* A complete adc:// URL with a port is passed through unchanged. */
 EXO_TEST(regserver_hh_complete, {
-	return regserver_hub_url("adc://hub.example.org:1511", 0, 411, hh, sizeof(hh))
+	return regserver_hub_url("adc://hub.example.org:1511", 0, 411, NULL, hh, sizeof(hh))
 		&& strcmp(hh, "adc://hub.example.org:1511") == 0;
 });
 
 /* A complete adcs:// URL with a port is passed through unchanged. */
 EXO_TEST(regserver_hh_complete_tls, {
-	return regserver_hub_url("adcs://hub.example.org:1511", 0, 411, hh, sizeof(hh))
+	return regserver_hub_url("adcs://hub.example.org:1511", 0, 411, NULL, hh, sizeof(hh))
 		&& strcmp(hh, "adcs://hub.example.org:1511") == 0;
 });
 
 /* Missing port -> server_port appended. */
 EXO_TEST(regserver_hh_add_port, {
-	return regserver_hub_url("adc://hub.example.org", 0, 1511, hh, sizeof(hh))
+	return regserver_hub_url("adc://hub.example.org", 0, 1511, NULL, hh, sizeof(hh))
 		&& strcmp(hh, "adc://hub.example.org:1511") == 0;
 });
 
 /* Missing scheme, no TLS -> adc:// prepended. */
 EXO_TEST(regserver_hh_add_scheme_plain, {
-	return regserver_hub_url("hub.example.org:1511", 0, 411, hh, sizeof(hh))
+	return regserver_hub_url("hub.example.org:1511", 0, 411, NULL, hh, sizeof(hh))
 		&& strcmp(hh, "adc://hub.example.org:1511") == 0;
 });
 
 /* Missing scheme, TLS enabled -> adcs:// prepended. */
 EXO_TEST(regserver_hh_add_scheme_tls, {
-	return regserver_hub_url("hub.example.org:1511", 1, 411, hh, sizeof(hh))
+	return regserver_hub_url("hub.example.org:1511", 1, 411, NULL, hh, sizeof(hh))
 		&& strcmp(hh, "adcs://hub.example.org:1511") == 0;
 });
 
 /* Bare host: both scheme and port are synthesized. */
 EXO_TEST(regserver_hh_bare_host, {
-	return regserver_hub_url("hub.example.org", 1, 1511, hh, sizeof(hh))
+	return regserver_hub_url("hub.example.org", 1, 1511, NULL, hh, sizeof(hh))
 		&& strcmp(hh, "adcs://hub.example.org:1511") == 0;
 });
 
 /* Bracketed IPv6 literal without a port -> port appended after the bracket. */
 EXO_TEST(regserver_hh_ipv6_add_port, {
-	return regserver_hub_url("adc://[2001:db8::1]", 0, 1511, hh, sizeof(hh))
+	return regserver_hub_url("adc://[2001:db8::1]", 0, 1511, NULL, hh, sizeof(hh))
 		&& strcmp(hh, "adc://[2001:db8::1]:1511") == 0;
 });
 
 /* Bracketed IPv6 literal that already has a port is left alone (colons inside
  * the brackets must not be mistaken for a port separator). */
 EXO_TEST(regserver_hh_ipv6_keep_port, {
-	return regserver_hub_url("adcs://[2001:db8::1]:1511", 0, 411, hh, sizeof(hh))
+	return regserver_hub_url("adcs://[2001:db8::1]:1511", 0, 411, NULL, hh, sizeof(hh))
 		&& strcmp(hh, "adcs://[2001:db8::1]:1511") == 0;
 });
 
 /* Empty / NULL hub_address -> no address to advertise. */
 EXO_TEST(regserver_hh_empty, {
-	return regserver_hub_url("", 0, 1511, hh, sizeof(hh)) == 0
-		&& regserver_hub_url(NULL, 0, 1511, hh, sizeof(hh)) == 0;
+	return regserver_hub_url("", 0, 1511, NULL, hh, sizeof(hh)) == 0
+		&& regserver_hub_url(NULL, 0, 1511, NULL, hh, sizeof(hh)) == 0;
 });
 
 /* A non-ADC scheme is refused rather than advertised verbatim. */
 EXO_TEST(regserver_hh_reject_foreign_scheme, {
-	return regserver_hub_url("http://hub.example.org:80", 0, 1511, hh, sizeof(hh)) == 0
-		&& regserver_hub_url("dchub://hub.example.org:411", 0, 1511, hh, sizeof(hh)) == 0;
+	return regserver_hub_url("http://hub.example.org:80", 0, 1511, NULL, hh, sizeof(hh)) == 0
+		&& regserver_hub_url("dchub://hub.example.org:411", 0, 1511, NULL, hh, sizeof(hh)) == 0;
 });
 
 /* When a port must be synthesized, an out-of-range server_port is rejected. */
 EXO_TEST(regserver_hh_reject_bad_port, {
-	return regserver_hub_url("hub.example.org", 0, 0, hh, sizeof(hh)) == 0
-		&& regserver_hub_url("hub.example.org", 0, 70000, hh, sizeof(hh)) == 0;
+	return regserver_hub_url("hub.example.org", 0, 0, NULL, hh, sizeof(hh)) == 0
+		&& regserver_hub_url("hub.example.org", 0, 70000, NULL, hh, sizeof(hh)) == 0;
 });
 
 /* A result that does not fit the destination buffer is rejected, not truncated. */
 EXO_TEST(regserver_hh_reject_overflow, {
 	char small[8];
-	return regserver_hub_url("adc://hub.example.org:1511", 0, 411, small, sizeof(small)) == 0;
+	return regserver_hub_url("adc://hub.example.org:1511", 0, 411, NULL, small, sizeof(small)) == 0;
 });
+
+/* KEYP: a keyprint is appended as "/?kp=" to an adcs:// URL. */
+#define KP "SHA256/G3PJC4F4MQ5KOXGE2MPYJW5EW63IC6M7RN7OS663JLLWN2M5I6FQ"
+
+EXO_TEST(regserver_hh_kp_tls, {
+	return regserver_hub_url("adcs://hub.example.org:1511", 1, 411, KP, hh, sizeof(hh))
+		&& strcmp(hh, "adcs://hub.example.org:1511/?kp=" KP) == 0;
+});
+
+/* KEYP is added when the scheme is synthesized to adcs:// from use_tls. */
+EXO_TEST(regserver_hh_kp_tls_synthesized_scheme, {
+	return regserver_hub_url("hub.example.org", 1, 1511, KP, hh, sizeof(hh))
+		&& strcmp(hh, "adcs://hub.example.org:1511/?kp=" KP) == 0;
+});
+
+/* KEYP is NOT added to a plaintext adc:// URL (no certificate to pin). */
+EXO_TEST(regserver_hh_kp_ignored_for_plain, {
+	return regserver_hub_url("adc://hub.example.org:1511", 0, 411, KP, hh, sizeof(hh))
+		&& strcmp(hh, "adc://hub.example.org:1511") == 0;
+});
+
+/* An empty keyprint is treated as absent even for adcs://. */
+EXO_TEST(regserver_hh_kp_empty, {
+	return regserver_hub_url("adcs://hub.example.org:1511", 1, 411, "", hh, sizeof(hh))
+		&& strcmp(hh, "adcs://hub.example.org:1511") == 0;
+});
+
+/* KEYP is appended after a synthesized port. */
+EXO_TEST(regserver_hh_kp_with_added_port, {
+	return regserver_hub_url("adcs://hub.example.org", 1, 1511, KP, hh, sizeof(hh))
+		&& strcmp(hh, "adcs://hub.example.org:1511/?kp=" KP) == 0;
+});
+
+#undef KP

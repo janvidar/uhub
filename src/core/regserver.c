@@ -145,11 +145,12 @@ static int hostport_has_port(const char* hostport)
 	return strchr(hostport, ':') != NULL;
 }
 
-int regserver_hub_url(const char* hub_address, int use_tls, int server_port, char* out, size_t out_size)
+int regserver_hub_url(const char* hub_address, int use_tls, int server_port, const char* keyprint, char* out, size_t out_size)
 {
 	const char* scheme;
 	const char* hostport;
 	char portbuf[8];
+	char kpbuf[80]; /* "/?kp=" + "SHA256/" + 52 base32 chars + NUL fits easily */
 	int n;
 
 	if (!hub_address || !*hub_address || !out || out_size == 0)
@@ -188,7 +189,17 @@ int regserver_hub_url(const char* hub_address, int use_tls, int server_port, cha
 		snprintf(portbuf, sizeof(portbuf), ":%d", server_port);
 	}
 
-	n = snprintf(out, out_size, "%s%s%s", scheme, hostport, portbuf);
+	/* Append the KEYP certificate keyprint, but only for adcs:// (a plaintext
+	 * adc:// hub has no certificate to pin). ADC spells this "/?kp=<keyprint>". */
+	kpbuf[0] = '\0';
+	if (keyprint && *keyprint && !strcmp(scheme, "adcs://"))
+	{
+		n = snprintf(kpbuf, sizeof(kpbuf), "/?kp=%s", keyprint);
+		if (n < 0 || (size_t) n >= sizeof(kpbuf))
+			return 0;
+	}
+
+	n = snprintf(out, out_size, "%s%s%s%s", scheme, hostport, portbuf, kpbuf);
 	if (n < 0 || (size_t) n >= out_size)
 		return 0;
 	return 1;
@@ -213,9 +224,9 @@ static char* regserver_build_payload(struct hub_info* hub)
 		return NULL;
 
 	{
-		char hh[256 + 8];
+		char hh[256 + 80];
 		if (regserver_hub_url(hub->config->hub_address, hub->config->tls_enable,
-				hub->config->server_port, hh, sizeof(hh)))
+				hub->config->server_port, hub->tls_keyprint, hh, sizeof(hh)))
 			adc_msg_add_named_argument_string(info, "HH", hh);
 	}
 	if (*hub->config->hub_website)

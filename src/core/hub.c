@@ -638,9 +638,9 @@ void hub_send_hubinfo(struct hub_info* hub, struct hub_user* u)
 			/* Normalize the advertised hub address to a complete adc:// or
 			 * adcs:// URL with a port (same form as the registration announce),
 			 * filling in a missing scheme/port from tls_enable/server_port. */
-			char hh[256 + 8];
+			char hh[256 + 80];
 			if (regserver_hub_url(hub->config->hub_address, hub->config->tls_enable,
-					hub->config->server_port, hh, sizeof(hh)))
+					hub->config->server_port, hub->tls_keyprint, hh, sizeof(hh)))
 				adc_msg_add_named_argument_string(info, "HH", hh);
 		}
 		if (*hub->config->hub_website)
@@ -982,7 +982,15 @@ static int load_ssl_certificates(struct hub_info* hub, struct hub_config* config
 			ssl_load_private_key(hub->ctx, config->tls_private_key) &&
 			ssl_check_private_key(hub->ctx))
 		{
+			char keyprint[80];
 			LOG_INFO("Enabling TLS (%s), using certificate: %s, private key: %s", net_ssl_get_provider(), config->tls_certificate, config->tls_private_key);
+
+			/* Cache the certificate's KEYP keyprint so it can be advertised in
+			 * adcs:// URLs (HH field / registration) without re-hashing per use. */
+			if (net_ssl_get_keyprint(hub->ctx, keyprint, sizeof(keyprint)))
+				hub->tls_keyprint = hub_strdup(keyprint);
+			else
+				LOG_WARN("Unable to compute TLS certificate keyprint; adcs:// URLs will omit ?kp=.");
 			return 1;
 		}
 		return 0;
@@ -994,6 +1002,8 @@ static void unload_ssl_certificates(struct hub_info* hub)
 {
 	if (hub->ctx)
 		net_ssl_context_destroy(hub->ctx);
+	hub_free(hub->tls_keyprint);
+	hub->tls_keyprint = NULL;
 }
 
 static void hub_init_secret(struct hub_info* hub) {
@@ -1045,6 +1055,17 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	{
 		hub_free(hub);
 		return 0;
+	}
+
+	/* Log the address clients should connect to: adcs://host:port with the
+	 * certificate keyprint (?kp=) when TLS is on, else adc://host:port. Prefer
+	 * the configured hub_address; fall back to the bound local address. */
+	{
+		char url[256 + 80];
+		const char* addr = (config->hub_address && *config->hub_address)
+			? config->hub_address : net_get_local_address(hub->server->sd);
+		if (regserver_hub_url(addr, config->tls_enable, config->server_port, hub->tls_keyprint, url, sizeof(url)))
+			LOG_INFO("Connect address: %s", url);
 	}
 
 	/* The metrics endpoint checks its bearer token over whatever transport the

@@ -73,15 +73,21 @@ extern int regserver_parse_url(const char* url, struct regserver_url* out);
  * A bracketed IPv6 literal ([::1]) is recognized when deciding whether a port
  * is already present.
  *
+ * When the resulting URL uses the adcs:// scheme and @p keyprint is a non-empty
+ * KEYP value (see net_ssl_get_keyprint), it is appended as the ADC KEYP query
+ * parameter "/?kp=<keyprint>" so clients can pin the hub's TLS certificate. It
+ * is ignored for plaintext adc:// URLs, where there is no certificate to pin.
+ *
  * @param hub_address the configured address (may be empty/NULL)
  * @param use_tls     non-zero if the hub listens with TLS (selects the default scheme)
  * @param server_port the hub's listening port, used when hub_address omits one
+ * @param keyprint    the hub's KEYP keyprint (may be NULL/empty); appended only for adcs://
  * @param out         destination buffer for the NUL-terminated URL
  * @param out_size    size of @p out
  * @return 1 on success, 0 if no address can be formed (empty hub_address, a
  *         non-ADC scheme, or the result does not fit in @p out).
  */
-extern int regserver_hub_url(const char* hub_address, int use_tls, int server_port, char* out, size_t out_size);
+extern int regserver_hub_url(const char* hub_address, int use_tls, int server_port, const char* keyprint, char* out, size_t out_size);
 
 /**
  * Kick off the one-time registration announce, if reg_server_enable is set and
