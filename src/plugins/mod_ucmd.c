@@ -56,7 +56,7 @@ static void emit_command(struct plugin_handle* plugin, const struct plugin_comma
 	struct plugin_user* user = (struct plugin_user*) ptr;
 	char name[256];
 	char line[512];
-	int context = UCMD_CT_HUB;
+	int context = UCMD_CT_HUB | UCMD_CT_USER;
 	size_t len;
 	size_t i;
 
