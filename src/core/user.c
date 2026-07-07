@@ -26,22 +26,6 @@
 #include "core/netevent.h"
 #include "core/user.h"
 
-#ifdef DEBUG_SENDQ
-static const char* user_log_str(struct hub_user* user)
-{
-	static char buf[128];
-	if (user)
-	{
-		snprintf(buf, 128, "user={ %p, \"%s\", %s/%s}", user, user->id.nick, sid_to_string(user->id.sid), user->id.cid);
-	}
-	else
-	{
-		snprintf(buf, 128, "user={ %p }", user);
-	}
-	return buf;
-}
-#endif
-
 struct hub_user* user_create(struct hub_info* hub, struct net_connection* con, struct ip_addr_encap* addr)
 {
 	struct hub_user* user = NULL;

@@ -465,10 +465,6 @@ static ssize_t ADC_client_recv(struct ADC_client* client)
 			lastPos = pos+1;
 			pos[0] = '\0';
 
-#ifdef DEBUG_SENDQ
-			LOG_DUMP("PROC: \"%s\" (%d)\n", start, (int) (pos - start));
-#endif
-
 			if (client->flags & cflag_choke)
 				client->flags &= ~cflag_choke;
 			else

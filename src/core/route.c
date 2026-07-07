@@ -116,12 +116,6 @@ static int check_send_queue(struct hub_info* hub, struct hub_user* user, struct 
 
 int route_to_user(struct hub_info* hub, struct hub_user* user, struct adc_message* msg)
 {
-#ifdef DEBUG_SENDQ
-	char* data = strndup(msg->cache, msg->length-1);
-	LOG_PROTO("send %s: \"%s\"", sid_to_string(user->id.sid), data);
-	free(data);
-#endif
-
 	/* Remote user (federation): no local socket. Forward only directed (D/E)
 	   messages over the owning link; the peer delivers to its local target.
 	   Broadcasts/presence reaching a remote user here are not relayed per-user

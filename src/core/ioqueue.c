@@ -31,21 +31,6 @@
 #define IOQ_COALESCE_MAX_IOV   64
 #define IOQ_COALESCE_MAX_BYTES (64 * 1024)
 
-#ifdef DEBUG_SENDQ
-static void debug_msg(const char* prefix, struct adc_message* msg)
-{
-	size_t n;
-	char* buf = strdup(msg->cache);
-	for (n = 0; n < msg->length; n++)
-	{
-		if (buf[n] == '\r' || buf[n] == '\n')
-			buf[n] = '_';
-	}
-	LOG_TRACE("%s: [%s] (%d bytes)", prefix, buf, (int) msg->length);
-	free(buf);
-}
-#endif
-
 struct ioq_recv* ioq_recv_create()
 {
 	struct ioq_recv* q = hub_malloc_zero(sizeof(struct ioq_recv));
@@ -135,9 +120,6 @@ void ioq_send_destroy(struct ioq_send* q)
 void ioq_send_add(struct ioq_send* q, struct adc_message* msg_)
 {
 	struct adc_message* msg = adc_msg_incref(msg_);
-#ifdef DEBUG_SENDQ
-	debug_msg("ioq_send_add", msg);
-#endif
 	uhub_assert(msg->cache && *msg->cache);
 	list_append(q->queue, msg);
 	q->size += msg->length;
@@ -145,9 +127,6 @@ void ioq_send_add(struct ioq_send* q, struct adc_message* msg_)
 
 static void ioq_send_remove(struct ioq_send* q, struct adc_message* msg)
 {
-#ifdef DEBUG_SENDQ
-	debug_msg("ioq_send_remove", msg);
-#endif
 	list_remove(q->queue, msg);
 	q->size  -= msg->length;
 	adc_msg_free(msg);

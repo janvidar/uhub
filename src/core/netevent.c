@@ -67,10 +67,6 @@ int handle_net_read(struct hub_user* user)
 			lastPos = pos+1;
 			pos[0] = '\0';
 
-#ifdef DEBUG_SENDQ
-			LOG_DUMP("PROC: \"%s\" (%d)\n", start, (int) (pos - start));
-#endif
-
 			if (user_flag_get(user, flag_maxbuf))
 			{
 				user_flag_unset(user, flag_maxbuf);
@@ -143,10 +139,6 @@ void net_event(struct net_connection* con, int event, void *arg)
 	(void) con;
 	struct hub_user* user = (struct hub_user*) arg;
 	int flag_close = 0;
-
-#ifdef DEBUG_SENDQ
-	LOG_TRACE("net_event() : fd=%d, ev=%d, arg=%p", con->sd, (int) event, arg);
-#endif
 
 	if (event == NET_EVENT_ERROR)
 	{
