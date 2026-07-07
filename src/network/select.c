@@ -40,6 +40,7 @@ struct net_backend_select
 	fd_set wfds;
 	fd_set xfds;
 	int maxfd;
+	size_t max;   /* effective fd ceiling: MIN(common->max, FD_SETSIZE) */
 	struct net_backend_common* common;
 };
 
@@ -65,7 +66,7 @@ int net_backend_poll_select(struct net_backend* data, int ms)
 	FD_ZERO(&backend->xfds);
 
 	backend->maxfd = -1;
-	for (n = 0, found = 0; found < backend->common->num && n < backend->common->max; n++)
+	for (n = 0, found = 0; found < backend->common->num && n < backend->max; n++)
 	{
 		struct net_connection_select* con = backend->conns[n];
 		if (con)
@@ -81,10 +82,19 @@ int net_backend_poll_select(struct net_backend* data, int ms)
 	res = select(backend->maxfd, &backend->rfds, &backend->wfds, &backend->xfds, &tval);
 	if (res == -1)
 	{
-		if (net_error() == EINTR)
+		int err = net_error();
+		if (err == EINTR)
 			return 0;
 
-		LOG_ERROR("select() failed: %d %s", net_error(), net_error_string(net_error()));
+		/* A hard select() error (typically EBADF from a descriptor closed out
+		   from under the set) is persistent: hub_event_loop() calls us again
+		   immediately, so returning the error unthrottled spins the CPU at
+		   100%. Nap briefly to bound the error rate, then report 0 events. */
+		LOG_ERROR("select() failed: %d %s", err, net_error_string(err));
+		tval.tv_sec = 0;
+		tval.tv_usec = 100000;
+		select(0, NULL, NULL, NULL, &tval);
+		return 0;
 	}
 
 	return res;
@@ -134,12 +144,14 @@ void net_con_backend_add_select(struct net_backend* data, struct net_connection*
 {
 	struct net_backend_select* backend = (struct net_backend_select*) data;
 
-	/* Backstop: conns[] is indexed by fd value and sized to common->max.
-	   The accept path already rejects out-of-range descriptors; refuse to
-	   index out of bounds here rather than corrupt the heap. */
-	if (con->sd < 0 || (size_t) con->sd >= backend->common->max)
+	/* Backstop: conns[] is indexed by fd value, and select() cannot address a
+	   descriptor at or above FD_SETSIZE regardless of how many sockets the
+	   process may otherwise open. backend->max folds both limits together;
+	   refuse anything outside it rather than FD_SET() past the fd_set bitmap or
+	   index conns[] out of bounds. */
+	if (con->sd < 0 || (size_t) con->sd >= backend->max)
 	{
-		LOG_ERROR("net_con_backend_add_select: fd %d out of range (max %zu)", con->sd, backend->common->max);
+		LOG_ERROR("net_con_backend_add_select: fd %d out of range (max %zu)", con->sd, backend->max);
 		return;
 	}
 
@@ -151,7 +163,13 @@ void net_con_backend_add_select(struct net_backend* data, struct net_connection*
 void net_con_backend_mod_select(struct net_backend* data, struct net_connection* con, int events)
 {
 	(void) data;
-	con->flags |= (events & (NET_EVENT_READ | NET_EVENT_WRITE));
+	/* events is the full desired interest set, so replace the READ/WRITE bits
+	   rather than OR them in. Accumulating would leave NET_EVENT_WRITE latched
+	   after the send queue drains, making select() report the socket writable
+	   every pass and re-fire the (empty) write handler -- a 100% CPU spin. This
+	   mirrors the epoll (mask replace) and kqueue (per-call rebuild) backends. */
+	con->flags = (con->flags & ~(NET_EVENT_READ | NET_EVENT_WRITE))
+	           | (events & (NET_EVENT_READ | NET_EVENT_WRITE));
 }
 
 void net_con_backend_del_select(struct net_backend* data, struct net_connection* con)
@@ -177,8 +195,23 @@ struct net_backend* net_backend_init_select(struct net_backend_handler* handler,
 	backend = hub_malloc_zero(sizeof(struct net_backend_select));
 	FD_ZERO(&backend->rfds);
 	FD_ZERO(&backend->wfds);
-	backend->conns = hub_malloc_zero(sizeof(struct net_connection_select*) * common->max);
+	FD_ZERO(&backend->xfds);
 	backend->common = common;
+
+	/* select() can only watch descriptors below FD_SETSIZE, so the effective
+	   ceiling is the smaller of that and the configured socket limit. Both the
+	   conns[] allocation and the add-time guard use this bound. */
+	backend->max = common->max < (size_t) FD_SETSIZE ? common->max : (size_t) FD_SETSIZE;
+	if (common->max > backend->max)
+		LOG_WARN("select backend: %zu sockets requested, but select() caps concurrency at FD_SETSIZE (%d); bounding accepts to %zu.",
+			common->max, FD_SETSIZE, backend->max);
+
+	/* Publish the cap as the backend-wide connection limit so the accept path
+	   (net_backend_get_max_connections()) refuses connections beyond what
+	   select() can watch, instead of accepting fds the add path would reject. */
+	common->max = backend->max;
+
+	backend->conns = hub_malloc_zero(sizeof(struct net_connection_select*) * backend->max);
 	net_backend_set_handlers(handler);
 	return (struct net_backend*) backend;
 }
