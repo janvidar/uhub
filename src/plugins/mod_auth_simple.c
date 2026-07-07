@@ -21,7 +21,6 @@
 #include "util/memory.h"
 #include "util/list.h"
 #include "util/misc.h"
-#include "util/log.h"
 #include "util/config_token.h"
 
 static void set_error_message(struct plugin_handle* plugin, const char* msg)

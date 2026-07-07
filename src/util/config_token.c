@@ -224,7 +224,7 @@ struct cfg_settings* cfg_settings_split(const char* line)
 		char* key = cfg_token_get_first(tok);
 		char* val = cfg_token_get_next(tok);
 
-                if ((pos = strchr(key, '=')))
+		if ((pos = strchr(key, '=')))
 		{
 			pos[0] = 0;
 			key = strip_white_space(key);

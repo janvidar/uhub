@@ -18,7 +18,6 @@
  */
 
 #include "system.h"
-#include "adc/adcconst.h"
 #include "adc/sid.h"
 #include "util/memory.h"
 #include "network/ipcalc.h"
