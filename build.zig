@@ -239,12 +239,17 @@ pub fn build(b: *std.Build) void {
     // errors, and the plugin loader's dlsym() void*->function-pointer conversion
     // (among others) cannot be expressed in strict ISO C without ugly hacks.
     flags.appendSlice(&.{ "-std=gnu23", "-Wall", "-W", "-Werror", "-D_GNU_SOURCE" }) catch @panic("OOM");
-    // Binary hardening, mirroring CMakeLists.txt: a stack canary always, and
-    // _FORTIFY_SOURCE when optimizing (the fortified libc checks compile in only
-    // under optimization, so it is inert -- and warns -- in a Debug build).
-    // RELRO, BIND_NOW and a non-executable stack are the Zig linker defaults;
-    // PIE is set per-executable below.
+    // Binary hardening, mirroring CMakeLists.txt: a stack canary always,
+    // stack-clash probing where the target implements it, and _FORTIFY_SOURCE
+    // when optimizing (the fortified libc checks compile in only under
+    // optimization, so it is inert -- and warns -- in a Debug build). RELRO,
+    // BIND_NOW and a non-executable stack are the Zig linker defaults; PIE is
+    // set per-executable below.
     flags.append("-fstack-protector-strong") catch @panic("OOM");
+    // -fstack-clash-protection is unimplemented on Darwin, where clang emits
+    // "argument unused" -- which -Werror would turn into a build failure -- so
+    // add it only off macOS. CMake achieves the same via a compiler probe.
+    if (target.result.os.tag != .macos) flags.append("-fstack-clash-protection") catch @panic("OOM");
     if (optimize != .Debug) flags.append("-D_FORTIFY_SOURCE=2") catch @panic("OOM");
     // Give defined behaviour to the two things the code relies on that are
     // otherwise UB: signed overflow (-fwrapv) and cast-based type punning
