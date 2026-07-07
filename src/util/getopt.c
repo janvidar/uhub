@@ -31,13 +31,16 @@ int getopt(int argc, char* const argv[], const char *optstring)
 {
 	int ret;
 	char* pos;
-	char* arg = argv[optind++];
+	char* arg;
 	optarg = NULL;
 
-	if (optind > argc)
+	/* Bounds-check before indexing argv: argv[argc] is NULL and anything past
+	   it is out of bounds. Read the argument only once it is known to exist. */
+	if (optind >= argc)
 		return -1;
+	arg = argv[optind++];
 
-	if (*arg != '-')
+	if (!arg || *arg != '-')
 		return -1;
 
 	arg++;
@@ -50,7 +53,8 @@ int getopt(int argc, char* const argv[], const char *optstring)
 	if (!pos)
 		return ret;
 
-	if (*(pos+1) == ':')
+	/* Consume the option-argument only if one actually follows. */
+	if (*(pos+1) == ':' && optind < argc)
 		optarg = argv[optind++];
 
 	return ret;

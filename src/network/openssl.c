@@ -610,8 +610,13 @@ void net_ssl_callback(struct net_connection* con, int events)
 			break;
 
 		case tls_st_accepting:
-			if (net_con_ssl_accept(con) != 0)
-				con->callback(con, NET_EVENT_READ, con->ptr);
+			ret = net_con_ssl_accept(con);
+			if (ret == 0)
+				break; /* handshake still in progress */
+			/* Success delivers READ so the connection processes any buffered
+			   bytes; a hard error or peer close must deliver ERROR, not READ,
+			   mirroring the tls_st_connecting branch below. */
+			con->callback(con, (ret > 0) ? NET_EVENT_READ : NET_EVENT_ERROR, con->ptr);
 			break;
 
 		case tls_st_connecting:

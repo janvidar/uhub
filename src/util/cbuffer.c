@@ -35,10 +35,17 @@ struct cbuffer
 extern struct cbuffer* cbuf_create(size_t capacity)
 {
 	struct cbuffer* buf = hub_malloc(sizeof(struct cbuffer));
+	if (!buf)
+		return NULL;
 	buf->capacity = capacity;
 	buf->size = 0;
 	buf->flags = 0;
 	buf->buf = hub_malloc(capacity + 1);
+	if (!buf->buf)
+	{
+		hub_free(buf);
+		return NULL;
+	}
 	buf->buf[0] = '\0';
 	return buf;
 }
@@ -46,6 +53,8 @@ extern struct cbuffer* cbuf_create(size_t capacity)
 struct cbuffer* cbuf_create_const(const char* buffer)
 {
 	struct cbuffer* buf = hub_malloc(sizeof(struct cbuffer));
+	if (!buf)
+		return NULL;
 	buf->capacity = 0;
 	buf->size = strlen(buffer);
 	buf->flags = CBUF_FLAG_CONST_BUFFER;
