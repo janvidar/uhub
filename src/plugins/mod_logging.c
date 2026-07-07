@@ -97,7 +97,7 @@ static struct log_data* parse_config(const char* line, struct plugin_handle* plu
 
 		if (strcmp(cfg_settings_get_key(setting), "file") == 0)
 		{
-			data->logfile = strdup(cfg_settings_get_value(setting));
+			data->logfile = hub_strdup(cfg_settings_get_value(setting));
 			data->logmode = mode_file;
 		}
 #ifndef WIN32

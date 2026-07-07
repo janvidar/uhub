@@ -854,7 +854,7 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 		return 0;
 	client->address.port = (uint16_t) port;
 
-	client->address.hostname = strndup(hub_address, &split[0] - &hub_address[0]);
+	client->address.hostname = hub_strndup(hub_address, &split[0] - &hub_address[0]);
 
 	return 1;
 }

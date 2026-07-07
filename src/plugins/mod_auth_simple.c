@@ -89,7 +89,7 @@ static struct acl_data* parse_config(const char* line)
 		{
 			if (data->file)
 				hub_free(data->file);
-			data->file = strdup(value);
+			data->file = hub_strdup(value);
 		}
 		else if (key == 8 && strncmp(token, "readonly", 8) == 0)
 		{

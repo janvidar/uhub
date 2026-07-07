@@ -99,7 +99,7 @@ struct uhub_plugin* plugin_open(const char* filename)
 		return 0;
 	}
 
-	plugin->filename = strdup(filename);
+	plugin->filename = hub_strdup(filename);
 	if (!plugin->filename)
 	{
 		LOG_ERROR("Unable to allocate memory for plugin filename");

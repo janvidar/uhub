@@ -54,11 +54,11 @@ static char* read_file(const char* filename)
 	if (fd == -1)
 		return NULL;
 
-	ret = read(fd, buf, MAX_WELCOME_SIZE);
+	ret = read(fd, buf, sizeof(buf) - 1);
 	close(fd);
 
 	buf[ret > 0 ? ret : 0] = 0;
-	str = strdup(buf);
+	str = hub_strdup(buf);
 
 	return str;
 }
@@ -116,7 +116,7 @@ static struct welcome_data* parse_config(const char* line, struct plugin_handle*
 
 		if (strcmp(cfg_settings_get_key(setting), "motd") == 0)
 		{
-			data->motd_file = strdup(cfg_settings_get_value(setting));
+			data->motd_file = hub_strdup(cfg_settings_get_value(setting));
 			if (!read_motd(data))
 			{
 				set_error_message(plugin, "Unable to read motd file.");
@@ -129,7 +129,7 @@ static struct welcome_data* parse_config(const char* line, struct plugin_handle*
 		}
 		else if (strcmp(cfg_settings_get_key(setting), "rules") == 0)
 		{
-			data->rules_file = strdup(cfg_settings_get_value(setting));
+			data->rules_file = hub_strdup(cfg_settings_get_value(setting));
 			if (!read_rules(data))
 			{
 				set_error_message(plugin, "Unable to read rules file.");

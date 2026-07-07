@@ -226,7 +226,7 @@ static int run_master(int n)
 	for (i = 0; i < (int) sizeof(rnd); i++)
 		snprintf(g_worker_secret + i * 2, 3, "%02x", rnd[i]);
 
-	g_worker_pids = (pid_t*) calloc((size_t) n, sizeof(pid_t));
+	g_worker_pids = (pid_t*) hub_malloc_zero((size_t) n * sizeof(pid_t));
 	if (!g_worker_pids)
 		return -1;
 
@@ -270,7 +270,7 @@ static int run_master(int n)
 		if (g_worker_pids[i] > 0)
 			waitpid(g_worker_pids[i], 0, 0);
 
-	free(g_worker_pids);
+	hub_free(g_worker_pids);
 	g_worker_pids = 0;
 	rmdir(dir);
 	return 0;
