@@ -28,6 +28,7 @@
 #include "core/netevent.h"
 #include "core/plugininvoke.h"
 #include "core/ioqueue.h"
+#include "core/ipcount.h"
 #include "core/probe.h"
 
 int handle_net_read(struct hub_user* user)
@@ -231,6 +232,23 @@ void net_on_accept(struct net_connection* con, int event, void *arg)
 			continue;
 		}
 
+		/*
+		 * Per-IP concurrent connection ceiling. Bounds connection-slot
+		 * exhaustion from a single source (a flood of connections that never
+		 * complete login, or are churned to keep every slot occupied). Counts
+		 * both pre-login probes and logged-in users from this address. Logged at
+		 * DEBUG only: a rejection is routine under this limit, and logging every
+		 * one at a visible level would itself be an amplification vector.
+		 */
+		if (hub->config->max_connections_per_ip > 0 &&
+		    ipcount_get(hub->ipcount, &ipaddr) >= (size_t) hub->config->max_connections_per_ip)
+		{
+			LOG_DEBUG("Per-IP connection limit (%d) reached for %s, rejecting connection.",
+				hub->config->max_connections_per_ip, ip_convert_to_string(&ipaddr));
+			net_close(fd);
+			continue;
+		}
+
 		plugin_log_connection_accepted(hub, &ipaddr);
 
 		/*
@@ -249,6 +267,14 @@ void net_on_accept(struct net_connection* con, int event, void *arg)
 			LOG_ERROR("Unable to create probe after socket accepted. Out of memory?");
 			net_close(fd);
 			break;
+		}
+
+		/* Take a per-IP slot for this connection. The probe owns it until the
+		   connection is torn down or handed off to a user (see probe.c). */
+		if (hub->config->max_connections_per_ip > 0)
+		{
+			ipcount_increment(hub->ipcount, &ipaddr);
+			probe->counted = 1;
 		}
 	}
 }

@@ -332,6 +332,21 @@
 		]]></example>
 	</option>
 
+	<option name="max_connections_per_ip" type="int" default="0">
+		<check min="0" max="1048576" />
+		<short>Maximum concurrent connections allowed per IP address</short>
+		<description><![CDATA[
+			Limits how many connections a single IP address may hold at once, counting both connections still in the pre-login (probe) phase and logged-in users. This bounds connection-slot exhaustion from a single source (a flood of connections that never complete login, or are churned to keep every slot occupied).<br />
+			If this is 0 the limit is disabled. Note that clients sharing one public IP (behind NAT) all count against the same limit, so pick a value that accommodates your largest expected shared address.
+		]]></description>
+		<syntax>0 = off</syntax>
+		<since>0.7.1</since>
+		<example><![CDATA[
+			To allow at most 10 concurrent connections per IP:<br />
+				max_connections_per_ip = 10
+		]]></example>
+	</option>
+
 	<option name="registered_users_only" type="boolean" default="0">
 		<short>Allow registered users only</short>
 		<description><![CDATA[

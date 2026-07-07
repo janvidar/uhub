@@ -37,6 +37,7 @@
 #include "core/hub.h"
 #include "core/hubevent.h"
 #include "core/inf.h"
+#include "core/ipcount.h"
 #include "core/ioqueue.h"
 #include "core/link.h"
 #include "core/netevent.h"
@@ -1108,6 +1109,10 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	hub->logout_info  = (struct linked_list*) list_create();
 	hub->write_queue  = (struct linked_list*) list_create();
 
+	hub->ipcount = ipcount_create();
+	if (!hub->ipcount)
+		LOG_WARN("hub_start_service(): unable to allocate per-IP connection tracker; max_connections_per_ip will not be enforced.");
+
 	hub_init_secret(hub);
 
 	server_alt_port_start(hub, config);
@@ -1155,6 +1160,7 @@ void hub_shutdown_service(struct hub_info* hub)
 	net_con_close(hub->server);
 	server_alt_port_stop(hub);
 	uman_shutdown(hub->users);
+	ipcount_destroy(hub->ipcount);
 	hub->status = hub_status_stopped;
 	hub_free(hub->sendbuf);
 	hub_free(hub->recvbuf);

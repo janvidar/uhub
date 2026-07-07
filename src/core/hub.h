@@ -163,6 +163,8 @@ struct hub_info
 	char* tls_keyprint;                 /* ADC KEYP keyprint of the TLS certificate ("SHA256/..."), NULL when TLS is disabled. */
 
 	struct regserver* regserver;        /* Pending/in-flight registration-server announce (NULL if none). */
+
+	struct ip_count* ipcount;           /* Per-IP open-connection tally for max_connections_per_ip. Always allocated; entries only added while the limit is active. */
 };
 
 /**

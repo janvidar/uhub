@@ -22,7 +22,9 @@
 #include "adc/message.h"
 #include "adc/adcconst.h"
 #include "network/connection.h"
+#include "core/hub.h"
 #include "core/ioqueue.h"
+#include "core/ipcount.h"
 #include "core/netevent.h"
 #include "core/user.h"
 
@@ -71,6 +73,14 @@ struct hub_user* user_create(struct hub_info* hub, struct net_connection* con, s
 void user_destroy(struct hub_user* user)
 {
 	LOG_TRACE("user_destroy(), user=%p", user);
+
+	/* Release the per-IP connection slot inherited from the probe (local users
+	   only; remote users never hold one). */
+	if (user->counted)
+	{
+		ipcount_decrement(user->hub->ipcount, &user->id.addr);
+		user->counted = 0;
+	}
 
 	ioq_recv_destroy(user->recv_queue);
 	ioq_send_destroy(user->send_queue);

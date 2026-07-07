@@ -31,6 +31,7 @@ struct hub_probe
 	struct net_connection*  connection;         /** Connection data */
 	struct ip_addr_encap    addr;               /** IP address */
 	int                     tls;                /** Set once a TLS handshake has been started on this connection */
+	int                     counted;            /** Set if this connection holds a max_connections_per_ip slot for addr */
 };
 
 extern struct hub_probe* probe_create(struct hub_info* hub, int sd, struct ip_addr_encap* addr);

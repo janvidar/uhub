@@ -151,6 +151,11 @@ struct hub_user
 	int auth_proxy_resolved;
 	enum auth_credentials auth_proxy_cred;
 	struct adc_message *auth_pending_inf;
+
+	/* Set if this connection holds a max_connections_per_ip slot for id.addr,
+	   inherited from the probe when the connection became a user. Local users
+	   only; remote (federated) users never hold a slot. */
+	int counted;
 };
 
 /**

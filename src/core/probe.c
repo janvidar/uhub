@@ -23,9 +23,11 @@
 #include "network/connection.h"
 #include "core/config.h"
 #include "core/hub.h"
+#include "core/ipcount.h"
 #include "core/link.h"
 #include "core/metrics.h"
 #include "core/probe.h"
+#include "core/user.h"
 #include "probe.h"
 
 #define PROBE_RECV_SIZE 12
@@ -106,15 +108,23 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 					}
 				}
 				else
-				if (user_create(probe->hub, probe->connection, &probe->addr))
 				{
-					probe->connection = 0;
-					/* On TLS the handshake peek (SSL_peek) already drained the
-					   socket into the SSL buffer, so epoll won't deliver a read
-					   event for the decrypted bytes we peeked. Kick the freshly
-					   installed handler once so it processes them. */
-					if (probe->tls)
-						net_con_callback(con, NET_EVENT_READ);
+					struct hub_user* user = user_create(probe->hub, probe->connection, &probe->addr);
+					if (user)
+					{
+						probe->connection = 0;
+						/* Transfer the per-IP connection slot from the probe to
+						   the user so it is released only when the user is torn
+						   down (see user_destroy), not now at probe_destroy. */
+						user->counted = probe->counted;
+						probe->counted = 0;
+						/* On TLS the handshake peek (SSL_peek) already drained the
+						   socket into the SSL buffer, so epoll won't deliver a read
+						   event for the decrypted bytes we peeked. Kick the freshly
+						   installed handler once so it processes them. */
+						if (probe->tls)
+							net_con_callback(con, NET_EVENT_READ);
+					}
 				}
 				probe_destroy(probe);
 				return;
@@ -188,6 +198,13 @@ struct hub_probe* probe_create(struct hub_info* hub, int sd, struct ip_addr_enca
 void probe_destroy(struct hub_probe* probe)
 {
 	LOG_TRACE("probe_destroy(): %p (connection=%p)", probe, probe->connection);
+	/* Release the per-IP slot unless it was transferred to a user (which then
+	   owns it). Also covers the link/metrics handoffs, which do not track. */
+	if (probe->counted)
+	{
+		ipcount_decrement(probe->hub->ipcount, &probe->addr);
+		probe->counted = 0;
+	}
 	if (probe->connection)
 	{
 		net_con_close(probe->connection);

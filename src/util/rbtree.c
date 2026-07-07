@@ -327,6 +327,8 @@ struct rb_node* rb_tree_first(struct rb_tree* tree)
 {
 	struct rb_node* n = tree->root;
 	list_clear(tree->iterator.stack, NULL);
+	if (!n)
+		return rb_it_set(tree, NULL);
 	while (n->link[0])
 	{
 		push(tree, n);
