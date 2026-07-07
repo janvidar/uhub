@@ -193,6 +193,33 @@ static void log_message(struct log_data* data, const char *format, ...)
 		size = vsnprintf(logmsg + 20, 1004, format, args);
 		va_end(args);
 
+		/* vsnprintf() returns the length it *would* have written; a line longer
+		   than the buffer would otherwise make write() read past logmsg. Clamp
+		   to what actually landed in the buffer (at most 1003 chars + NUL). */
+		if (size < 0)
+			size = 0;
+		else if (size > 1003)
+			size = 1003;
+
+		/* The message embeds attacker-controlled fields (nick, user agent, CID).
+		   Replace control characters with '?' so an embedded newline cannot forge
+		   a second log line and an ESC cannot smuggle a terminal escape to whoever
+		   reads the log. Preserve a single trailing newline as the line terminator
+		   (mirrors log_sanitize() in util/log.c, which the core logger applies). */
+		{
+			ssize_t body = size;
+			if (body > 0 && logmsg[20 + body - 1] == '\n')
+				body--;
+			for (ssize_t i = 0; i < body; i++)
+			{
+				unsigned char c = (unsigned char) logmsg[20 + i];
+				if (c < 0x20 || c == 0x7f)
+					logmsg[20 + i] = '?';
+			}
+			logmsg[20 + body] = '\n';
+			size = body + 1;
+		}
+
 		if (write(data->fd, logmsg, size + 20) < (size+20))
 		{
 			fprintf(stderr, "Unable to write full log. Error=%d: %s\n", errno, strerror(errno));

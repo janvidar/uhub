@@ -119,7 +119,10 @@ EXO_TEST(inf_nick_10, {
 	char nick[10];
 	struct adc_message* msg;
 
-	nick[0] = 0xf7; nick[1] = 0x80; nick[2] = 0x7f; nick[3] = 0x81; nick[4] = 0x98; nick[5] = 0x00;
+	/* Invalid UTF-8 (0xf7 lead byte is out of range), with no ASCII control
+	   bytes -- so it is rejected by the UTF-8 check, not the bad-characters
+	   check (which now also rejects DEL, 0x7f). */
+	nick[0] = 0xf7; nick[1] = 0x80; nick[2] = 0x80; nick[3] = 0x81; nick[4] = 0x98; nick[5] = 0x00;
 	msg = adc_msg_parse_verify(inf_user, line, strlen(line));
 	
 	adc_msg_add_named_argument(msg, "NI", nick);
@@ -128,6 +131,24 @@ EXO_TEST(inf_nick_10, {
 	if (ok != status_msg_inf_error_nick_not_utf8)
 		printf("Expected %d, got %d\n", status_msg_inf_error_nick_not_utf8, ok);
 	return ok == status_msg_inf_error_nick_not_utf8;
+});
+
+EXO_TEST(inf_nick_11, {
+	const char* line = "BINF AAAB IDGNSSMURMD7K466NGZIHU65TP3S3UZSQ6MN5B2RI PD3A4545WFVGZLSGUXZLG7OS6ULQUVG3HM2T63I7Y\n";
+	int ok;
+	char nick[10];
+	struct adc_message* msg;
+
+	/* Valid UTF-8 but contains DEL (0x7f): must be rejected as a bad character. */
+	nick[0] = 'a'; nick[1] = 'b'; nick[2] = 'c'; nick[3] = 0x7f; nick[4] = 0x00;
+	msg = adc_msg_parse_verify(inf_user, line, strlen(line));
+
+	adc_msg_add_named_argument(msg, "NI", nick);
+	ok = hub_handle_info_login(inf_hub, inf_user, msg);
+	adc_msg_free(msg);
+	if (ok != status_msg_inf_error_nick_bad_chars)
+		printf("Expected %d, got %d\n", status_msg_inf_error_nick_bad_chars, ok);
+	return ok == status_msg_inf_error_nick_bad_chars;
 });
 
 /* check limits for slots and share */

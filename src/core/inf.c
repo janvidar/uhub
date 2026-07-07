@@ -413,10 +413,14 @@ static int nick_bad_characters(const char* nick)
 	if (nick[0] == ' ')
 		return nick_invalid_spaces;
 
-	/* Check for ASCII values below 32 */
+	/* Reject ASCII control characters: values below 32 and DEL (0x7f). High
+	   bytes (>= 0x80, the UTF-8 continuation/lead range) are left alone. */
 	for (tmp = nick; *tmp; tmp++)
-		if ((*tmp < 32) && (*tmp > 0))
+	{
+		unsigned char c = (unsigned char) *tmp;
+		if (c < 32 || c == 0x7f)
 			return nick_invalid_bad_ascii;
+	}
 
 	return nick_ok;
 }
