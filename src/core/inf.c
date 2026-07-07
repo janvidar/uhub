@@ -1007,8 +1007,14 @@ int hub_handle_info(struct hub_info* hub, struct hub_user* user, const struct ad
 		/*
 		 * Don't allow the user to send multiple INF messages in this stage!
 		 * Since that can have serious side-effects.
+		 *
+		 * user->info is not set until the login completes, so during an
+		 * auth_proxy login pause (waiting for the master's LACR) it stays NULL.
+		 * auth_pending_inf, held only for that window, is what rejects a second
+		 * BINF then -- otherwise each repeat would fire another master auth
+		 * query (amplification) and leak the previously held BINF copy.
 		 */
-		if (user->info)
+		if (user->info || user->auth_pending_inf)
 		{
 			adc_msg_free(cmd);
 			return 0;
