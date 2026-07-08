@@ -170,7 +170,9 @@ static plugin_st update_user(struct plugin_handle *plugin, struct auth_info *use
     const char *cred = auth_cred_to_string(user->credentials);
     int rc;
 
-    rc = sqlite3_prepare_v2(sql->db, "UPDATE users SET password=?, credentials=? WHERE nickname=?;", -1, &stmt, NULL);
+    /* Case-insensitive nick match, consistent with get_user/delete_user (L-8):
+       updating "boss" must find the registered "Boss". */
+    rc = sqlite3_prepare_v2(sql->db, "UPDATE users SET password=?, credentials=? WHERE nickname=? COLLATE NOCASE;", -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "Unable to update user \"%s\": %s\n", user->nickname, sqlite3_errmsg(sql->db));
         return st_deny;
@@ -191,11 +193,32 @@ static plugin_st update_user(struct plugin_handle *plugin, struct auth_info *use
 }
 
 static plugin_st delete_user(struct plugin_handle *plugin, struct auth_info *user) {
-	(void) user;
     struct sql_data *sql = (struct sql_data *)plugin->ptr;
+    sqlite3_stmt *stmt;
+    int rc;
+
     if (sql->exclusive)
         return st_deny;
-    return st_default;
+
+    /* Match the nick case-insensitively, consistent with get_user (L-8): a
+       nick's identity does not depend on case, so deleting "boss" must remove a
+       registered "Boss" rather than silently leave it in place. */
+    rc = sqlite3_prepare_v2(sql->db, "DELETE FROM users WHERE nickname=? COLLATE NOCASE;", -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Unable to delete user \"%s\": %s\n", user->nickname, sqlite3_errmsg(sql->db));
+        return st_deny;
+    }
+
+    sqlite3_bind_text(stmt, 1, user->nickname, -1, SQLITE_STATIC);
+
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+
+    if (rc != SQLITE_DONE) {
+        fprintf(stderr, "Unable to delete user \"%s\"\n", user->nickname);
+        return st_deny;
+    }
+    return st_allow;
 }
 
 /**

@@ -92,8 +92,10 @@ EXO_TEST(mas_get_missing, {
 	return mas_plugin.funcs.auth_get_user(&mas_plugin, "stranger", &a) == st_default;
 });
 
-EXO_TEST(mas_update, {
-	struct auth_info a = mas_info("Boss", "newpass", auth_cred_operator);
+/* Update matches the nick case-insensitively (a lowercase "boss" updates the
+   registered "Boss"), consistent with the get_user lookup. */
+EXO_TEST(mas_update_case_insensitive, {
+	struct auth_info a = mas_info("boss", "newpass", auth_cred_operator);
 	struct auth_info got;
 	memset(&got, 0, sizeof(got));
 	if (mas_plugin.funcs.auth_update_user(&mas_plugin, &a) != st_allow)
@@ -103,18 +105,17 @@ EXO_TEST(mas_update, {
 	return got.credentials == auth_cred_operator && !strcmp(got.password, "newpass");
 });
 
-/* Characterization: auth_delete_user in mod_auth_sqlite is currently a stub --
-   it returns st_default but does NOT remove the row (deletion is unimplemented;
-   the plugin exposes no command that calls it). This test documents that and
-   will trip if real deletion is ever added, prompting an update. */
-EXO_TEST(mas_delete_is_noop, {
-	struct auth_info a = mas_info("Boss", "", auth_cred_user);
+/* auth_delete_user removes the registered account (returns st_allow), matching
+   the nick case-insensitively -- deleting "boss" removes "Boss" -- so a
+   subsequent lookup misses. */
+EXO_TEST(mas_delete_case_insensitive, {
+	struct auth_info a = mas_info("boss", "", auth_cred_user);
 	struct auth_info got;
 	memset(&got, 0, sizeof(got));
-	if (mas_plugin.funcs.auth_delete_user(&mas_plugin, &a) != st_default)
+	if (mas_plugin.funcs.auth_delete_user(&mas_plugin, &a) != st_allow)
 		return 0;
-	/* The account is still present afterwards. */
-	return mas_plugin.funcs.auth_get_user(&mas_plugin, "Boss", &got) == st_allow;
+	/* The account is gone afterwards (looked up by its registered case). */
+	return mas_plugin.funcs.auth_get_user(&mas_plugin, "Boss", &got) == st_default;
 });
 
 EXO_TEST(mas_teardown, {
