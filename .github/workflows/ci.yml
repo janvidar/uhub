@@ -25,7 +25,7 @@ jobs:
     env:
       CC: ${{ matrix.compiler }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install dependencies
         run: |
@@ -66,7 +66,7 @@ jobs:
       matrix:
         tls: [openssl@3, libressl]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install dependencies
         # perl ships with macOS; the rest come from Homebrew.
@@ -98,10 +98,10 @@ jobs:
     name: freebsd (kqueue + select)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Build + test in a FreeBSD VM
-        uses: vmactions/freebsd-vm@v1
+        uses: vmactions/freebsd-vm@5a72679103d223925653750faa878a143340fbd0 # v1.5.0
         with:
           usesh: true
           # OpenSSL is in the FreeBSD base system; sqlite3/cmake/perl are pkgs.
@@ -125,7 +125,7 @@ jobs:
     env:
       CC: clang
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install dependencies
         run: |
@@ -163,7 +163,7 @@ jobs:
       # parsers stay overflow-free.
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install dependencies
         run: |
@@ -234,7 +234,7 @@ jobs:
 
       - name: Upload crash reproducers
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: fuzz-crashes
           path: |
