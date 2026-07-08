@@ -258,6 +258,9 @@ add_executable(uhub ${UHUB_SOURCE_DIR}/core/main.c ${uhub_SOURCES})
 # directly via plugin_register(); it pulls in SQLite, hence the extra link.
 add_executable(autotest-bin ${AUTOTEST_GENERATED} ${uhub_SOURCES} ${UHUB_SOURCE_DIR}/plugins/mod_auth_sqlite.c)
 target_include_directories(autotest-bin PRIVATE ${AUTOTEST_DIR})
+# Absolute path to the autotest/ dir so tests can locate checked-in fixtures
+# (e.g. the TLS test certificate) regardless of the working directory.
+target_compile_definitions(autotest-bin PRIVATE UHUB_TEST_DIR="${AUTOTEST_DIR}")
 add_executable(uhub-passwd ${UHUB_SOURCE_DIR}/tools/uhub-passwd.c)
 
 add_library(mod_example MODULE ${UHUB_SOURCE_DIR}/plugins/mod_example.c)
