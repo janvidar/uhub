@@ -1,9 +1,37 @@
 0.7.1:
 New features:
-- New plugin mod_ucmd: publishes the hub's registered commands as ADC user-command (UCMD) context-menu entries for clients that support the UCM0 extension. Every command available at a user's credential level appears in the client's right-click menu — user-targeting commands (kick, ban, getip, ...) in the user-list menu and the rest in the hub menu — and selecting an entry sends the corresponding +command on the user's behalf.
+- New plugin mod_ucmd: publishes the hub's registered commands as ADC
+  user-command (UCMD) context-menu entries for clients that support the UCM0
+  extension. Every command available at a user's credential level appears in
+  the client's right-click menu.
+- New operator command !redirect to redirect a user to another hub
+- Added a max_connections_per_ip option (default 0 = off)
 
 Plugin API:
-- Added a command_foreach() hub callback (and a read-only plugin_command_info view) so plugins can enumerate the registered hub commands available to a given credential level.
+- Added a command_foreach() hub callback so plugins can enumerate the registered hub commands available to a given credential level.
+- The plugin loader accepts a plugin_dir for resolving relative plugin paths.
+
+Federation:
+- Reject a repeated BINF during authentication on a federated hub.
+- The registration server now advertises the hub's TLS certificate keyprint (KEYP) in adcs:// URLs.
+
+Authentication:
+- mod_auth_sqlite matches nicks case-insensitively for auth and implements auth_delete_user
+
+Security and hardening:
+- Additional out-of-memory / NULL-dereference checks
+- A TLS-accept error fix
+- mod_logging and the log-file sink sanitize and reject control characters.
+- Hardened the Docker image.
+
+Portability and bug fixes:
+- Fixed the Tiger PID hash type in check_hash_tiger (uint64_t[8]).
+- select() backend cleanups and fixes; silenced an unused-parameter warning in the kqueue backend.
+
+Build system and tests:
+- The build now always compiles with -Werror; fixed all -Wall/-Wextra warnings.
+- Added -fstack-clash-protection to the Zig build.
+- CI: Expanded the CI to include macOS, FreeBSD, a CodeQL static-analysis workflow and a gcovr/Codecov coverage job.
 
 0.7.0:
 Federation and scaling:
@@ -365,4 +393,3 @@ portability, and less code complexity.
 
 0.1.0-1840:
 - First public release
-
