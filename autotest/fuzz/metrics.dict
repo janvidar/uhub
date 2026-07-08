@@ -1,0 +1,15 @@
+# libFuzzer dictionary for the metrics HTTP request classifier.
+# Tokens that steer the fuzzer toward the method/path/auth branches.
+"GET "
+"POST "
+"HEAD "
+" HTTP/1.1"
+crlf="\x0d\x0a"
+end="\x0d\x0a\x0d\x0a"
+"Authorization:"
+"Bearer "
+"Basic "
+"/metrics"
+token="s3cr3t"
+"?"
+"\x09"

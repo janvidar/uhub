@@ -385,6 +385,8 @@ if (FUZZING)
 	# command_parse() lives in the hub core, so compile the core objects in
 	# (same source set as autotest-bin, minus main.c / gen_config.c).
 	add_fuzzer(fuzz_command_parser ${UHUB_SOURCE_DIR}/tools/fuzz_command_parser.c ${uhub_SOURCES})
+	# metrics_classify_request() likewise lives in the hub core.
+	add_fuzzer(fuzz_metrics        ${UHUB_SOURCE_DIR}/tools/fuzz_metrics.c ${uhub_SOURCES})
 endif()
 
 configure_file ("${UHUB_SOURCE_DIR}/version.h.in" "${PROJECT_BINARY_DIR}/version.h")

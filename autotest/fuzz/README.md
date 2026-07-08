@@ -12,6 +12,7 @@ configured with `-DFUZZING=ON` and run for a short time on every CI run.
 | `fuzz_ipcalc`         | `src/tools/fuzz_ipcalc.c`         | `ip_convert_address_to_range()` / `ip_convert_to_binary()` (IPv4/IPv6 + CIDR + ranges) and the address math | ACL `deny_ip`/range config, command IP args |
 | `fuzz_command_parser` | `src/tools/fuzz_command_parser.c` | `command_parse()` (`!`/`+` commands), incl. the IP/number argument parsers | logged-in user chat input |
 | `fuzz_config_token`   | `src/tools/fuzz_config_token.c`   | `cfg_tokenize()` / `cfg_settings_split()` | `uhub.conf` / `users.conf` file content |
+| `fuzz_metrics`        | `src/tools/fuzz_metrics.c`        | `metrics_classify_request()` (HTTP method/path/bearer-token validation) | raw network bytes on the metrics endpoint |
 
 `fuzz_adc_escape` also checks a property: `escape()` followed by `unescape()`
 must reproduce the original string exactly (a violation aborts the run).
@@ -24,7 +25,7 @@ before authentication. `fuzz_command_parser` also exercises the ipcalc and
 
 ```sh
 CC=clang cmake -B build-fuzz -DFUZZING=ON -DSSL_SUPPORT=OFF -DRELEASE=ON .
-cmake --build build-fuzz --target fuzz_message fuzz_adc_escape fuzz_ipcalc fuzz_config_token fuzz_command_parser -j
+cmake --build build-fuzz --target fuzz_message fuzz_adc_escape fuzz_ipcalc fuzz_config_token fuzz_command_parser fuzz_metrics -j
 ```
 
 ## Run
@@ -39,6 +40,7 @@ export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
 ./build-fuzz/fuzz_ipcalc                                    autotest/fuzz/corpus/ipcalc
 ./build-fuzz/fuzz_config_token                              autotest/fuzz/corpus/config_token
 ./build-fuzz/fuzz_command_parser                            autotest/fuzz/corpus/command_parser
+./build-fuzz/fuzz_metrics      -dict=autotest/fuzz/metrics.dict autotest/fuzz/corpus/metrics
 ```
 
 Add `-max_total_time=<seconds>` for a time-boxed run (what CI does). A crash

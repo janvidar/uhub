@@ -172,7 +172,7 @@ jobs:
         run: cmake -S . -B build-fuzz -DFUZZING=ON -DRELEASE=ON
 
       - name: Build fuzzers
-        run: cmake --build build-fuzz --target fuzz_message fuzz_adc_escape fuzz_ipcalc fuzz_config_token fuzz_command_parser -j
+        run: cmake --build build-fuzz --target fuzz_message fuzz_adc_escape fuzz_ipcalc fuzz_config_token fuzz_command_parser fuzz_metrics -j
 
       - name: Fuzz adc_msg_parse (90s)
         run: |
@@ -209,6 +209,14 @@ jobs:
             -max_total_time=75 -timeout=15 -rss_limit_mb=2048 \
             -print_final_stats=1 \
             autotest/fuzz/corpus/command_parser
+
+      - name: Fuzz metrics HTTP request classifier (45s)
+        run: |
+          ./build-fuzz/fuzz_metrics \
+            -dict=autotest/fuzz/metrics.dict \
+            -max_total_time=45 -timeout=15 -rss_limit_mb=2048 \
+            -print_final_stats=1 \
+            autotest/fuzz/corpus/metrics
 
       - name: Upload crash reproducers
         if: failure()
