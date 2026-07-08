@@ -172,7 +172,7 @@ jobs:
         run: cmake -S . -B build-fuzz -DFUZZING=ON -DRELEASE=ON
 
       - name: Build fuzzers
-        run: cmake --build build-fuzz --target fuzz_message fuzz_adc_escape fuzz_ipcalc fuzz_config_token fuzz_command_parser fuzz_metrics -j
+        run: cmake --build build-fuzz --target fuzz_message fuzz_adc_escape fuzz_ipcalc fuzz_config_token fuzz_command_parser fuzz_metrics fuzz_login -j
 
       - name: Fuzz adc_msg_parse (90s)
         run: |
@@ -217,6 +217,14 @@ jobs:
             -max_total_time=45 -timeout=15 -rss_limit_mb=2048 \
             -print_final_stats=1 \
             autotest/fuzz/corpus/metrics
+
+      - name: Fuzz INF login-validation pipeline (90s)
+        run: |
+          ./build-fuzz/fuzz_login \
+            -dict=autotest/fuzz/login.dict \
+            -max_total_time=90 -timeout=15 -rss_limit_mb=2048 \
+            -print_final_stats=1 \
+            autotest/fuzz/corpus/login
 
       - name: Upload crash reproducers
         if: failure()

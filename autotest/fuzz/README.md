@@ -13,19 +13,23 @@ configured with `-DFUZZING=ON` and run for a short time on every CI run.
 | `fuzz_command_parser` | `src/tools/fuzz_command_parser.c` | `command_parse()` (`!`/`+` commands), incl. the IP/number argument parsers | logged-in user chat input |
 | `fuzz_config_token`   | `src/tools/fuzz_config_token.c`   | `cfg_tokenize()` / `cfg_settings_split()` | `uhub.conf` / `users.conf` file content |
 | `fuzz_metrics`        | `src/tools/fuzz_metrics.c`        | `metrics_classify_request()` (HTTP method/path/bearer-token validation) | raw network bytes on the metrics endpoint |
+| `fuzz_login`          | `src/tools/fuzz_login.c`          | `hub_handle_info_login()` -- the connect-time INF checks (CID/nick/network/user-agent/ACL) | INF from a not-yet-trusted client, **pre-auth** |
 
 `fuzz_adc_escape` also checks a property: `escape()` followed by `unescape()`
 must reproduce the original string exactly (a violation aborts the run).
 
-`fuzz_message` is the highest-value target: it runs against attacker bytes
-before authentication. `fuzz_command_parser` also exercises the ipcalc and
-`is_number` parsers via the address/number argument codes.
+`fuzz_message` and `fuzz_login` are the highest-value targets: both run
+against attacker bytes before authentication. `fuzz_message` covers the ADC
+parse; `fuzz_login` continues past it into the connect-time INF checks
+(CID/nick/network/user-agent/ACL), the code with the OOB history.
+`fuzz_command_parser` also exercises the ipcalc and `is_number` parsers via
+the address/number argument codes.
 
 ## Build
 
 ```sh
 CC=clang cmake -B build-fuzz -DFUZZING=ON -DSSL_SUPPORT=OFF -DRELEASE=ON .
-cmake --build build-fuzz --target fuzz_message fuzz_adc_escape fuzz_ipcalc fuzz_config_token fuzz_command_parser fuzz_metrics -j
+cmake --build build-fuzz --target fuzz_message fuzz_adc_escape fuzz_ipcalc fuzz_config_token fuzz_command_parser fuzz_metrics fuzz_login -j
 ```
 
 ## Run
@@ -41,6 +45,7 @@ export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
 ./build-fuzz/fuzz_config_token                              autotest/fuzz/corpus/config_token
 ./build-fuzz/fuzz_command_parser                            autotest/fuzz/corpus/command_parser
 ./build-fuzz/fuzz_metrics      -dict=autotest/fuzz/metrics.dict autotest/fuzz/corpus/metrics
+./build-fuzz/fuzz_login        -dict=autotest/fuzz/login.dict   autotest/fuzz/corpus/login
 ```
 
 Add `-max_total_time=<seconds>` for a time-boxed run (what CI does). A crash

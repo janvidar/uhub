@@ -387,6 +387,8 @@ if (FUZZING)
 	add_fuzzer(fuzz_command_parser ${UHUB_SOURCE_DIR}/tools/fuzz_command_parser.c ${uhub_SOURCES})
 	# metrics_classify_request() likewise lives in the hub core.
 	add_fuzzer(fuzz_metrics        ${UHUB_SOURCE_DIR}/tools/fuzz_metrics.c ${uhub_SOURCES})
+	# hub_handle_info_login() (the connect-time INF checks) is in the hub core too.
+	add_fuzzer(fuzz_login          ${UHUB_SOURCE_DIR}/tools/fuzz_login.c ${uhub_SOURCES})
 endif()
 
 configure_file ("${UHUB_SOURCE_DIR}/version.h.in" "${PROJECT_BINARY_DIR}/version.h")
