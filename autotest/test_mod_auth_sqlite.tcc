@@ -40,8 +40,9 @@ EXO_TEST(mas_setup, {
 	remove(MAS_DB);
 	if (sqlite3_open(MAS_DB, &db) != SQLITE_OK)
 		return 0;
-	/* The plugin opens the database but does not create the schema. */
-	rc = sqlite3_exec(db, "CREATE TABLE users (nickname TEXT, password TEXT, credentials TEXT);", 0, 0, 0);
+	/* The plugin opens the database but does not create the schema; mirror the
+	   one uhub-passwd creates, including the case-insensitive UNIQUE nick. */
+	rc = sqlite3_exec(db, "CREATE TABLE users (nickname CHAR COLLATE NOCASE NOT NULL UNIQUE, password TEXT, credentials TEXT);", 0, 0, 0);
 	sqlite3_close(db);
 	if (rc != SQLITE_OK)
 		return 0;
@@ -58,6 +59,20 @@ EXO_TEST(mas_setup, {
 EXO_TEST(mas_register, {
 	struct auth_info a = mas_info("Boss", "secret", auth_cred_user);
 	return mas_plugin.funcs.auth_register_user(&mas_plugin, &a) == st_allow;
+});
+
+/* The case-insensitive UNIQUE constraint rejects a nick that collides with an
+   existing registration only by case (registering "boss" when "Boss" exists). */
+EXO_TEST(mas_register_dup_case_rejected, {
+	struct auth_info a = mas_info("boss", "other", auth_cred_user);
+	struct auth_info got;
+	memset(&got, 0, sizeof(got));
+	if (mas_plugin.funcs.auth_register_user(&mas_plugin, &a) != st_deny)
+		return 0;
+	/* The original registration is intact and unchanged. */
+	if (mas_plugin.funcs.auth_get_user(&mas_plugin, "Boss", &got) != st_allow)
+		return 0;
+	return !strcmp(got.nickname, "Boss") && !strcmp(got.password, "secret");
 });
 
 EXO_TEST(mas_get_exact, {
@@ -116,6 +131,80 @@ EXO_TEST(mas_delete_case_insensitive, {
 		return 0;
 	/* The account is gone afterwards (looked up by its registered case). */
 	return mas_plugin.funcs.auth_get_user(&mas_plugin, "Boss", &got) == st_default;
+});
+
+/* A legacy database whose schema lacks the case-insensitive constraint gains
+   it from the index the plugin creates at startup: after registering "Boss",
+   the case-variant "boss" is rejected. */
+EXO_TEST(mas_defensive_index_upgrades_legacy_db, {
+	const char* db2 = "test_mod_auth_sqlite_legacy.db";
+	struct plugin_handle p;
+	struct auth_info a;
+	sqlite3* db = 0;
+	char cfg[256];
+	int ok;
+
+	remove(db2);
+	if (sqlite3_open(db2, &db) != SQLITE_OK)
+		return 0;
+	/* Old-style schema: plain columns, no case-insensitive uniqueness. */
+	if (sqlite3_exec(db, "CREATE TABLE users (nickname TEXT, password TEXT, credentials TEXT);", 0, 0, 0) != SQLITE_OK)
+	{
+		sqlite3_close(db);
+		remove(db2);
+		return 0;
+	}
+	sqlite3_close(db);
+
+	memset(&p, 0, sizeof(p));
+	snprintf(cfg, sizeof(cfg), "file=%s", db2);
+	if (plugin_register(&p, cfg) != 0)
+	{
+		remove(db2);
+		return 0;
+	}
+
+	a = mas_info("Boss", "secret", auth_cred_user);
+	ok = (p.funcs.auth_register_user(&p, &a) == st_allow);
+	a = mas_info("boss", "other", auth_cred_user);
+	ok = ok && (p.funcs.auth_register_user(&p, &a) == st_deny);
+
+	plugin_unregister(&p);
+	remove(db2);
+	return ok;
+});
+
+/* A legacy database that already holds case-duplicate rows must not stop the
+   plugin from loading: the index cannot be created (a warning is logged), but
+   plugin_register still succeeds. */
+EXO_TEST(mas_defensive_index_tolerates_existing_dups, {
+	const char* db3 = "test_mod_auth_sqlite_dups.db";
+	struct plugin_handle p;
+	sqlite3* db = 0;
+	char cfg[256];
+	int rc;
+
+	remove(db3);
+	if (sqlite3_open(db3, &db) != SQLITE_OK)
+		return 0;
+	rc = sqlite3_exec(db,
+		"CREATE TABLE users (nickname TEXT, password TEXT, credentials TEXT);"
+		"INSERT INTO users VALUES ('Boss','a','user');"
+		"INSERT INTO users VALUES ('boss','b','user');", 0, 0, 0);
+	sqlite3_close(db);
+	if (rc != SQLITE_OK)
+	{
+		remove(db3);
+		return 0;
+	}
+
+	memset(&p, 0, sizeof(p));
+	snprintf(cfg, sizeof(cfg), "file=%s", db3);
+	rc = plugin_register(&p, cfg);
+	if (rc == 0)
+		plugin_unregister(&p);
+	remove(db3);
+	return rc == 0;
 });
 
 EXO_TEST(mas_teardown, {

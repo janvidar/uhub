@@ -89,6 +89,26 @@ static struct sql_data *parse_config(const char *line, struct plugin_handle *plu
         hub_free(data);
         return 0;
     }
+
+    /* Defensively ensure a case-insensitive UNIQUE index on the nick exists, so
+       databases created before the schema carried COLLATE NOCASE also reject
+       nicks that differ only by case -- matching the case-insensitive lookups.
+       Best-effort: it fails on a table that does not exist yet or that already
+       holds case-duplicate rows; warn (so the operator can clean up) and carry
+       on rather than refuse to load and break an existing hub. */
+    {
+        char* err = 0;
+        if (sqlite3_exec(data->db,
+                "CREATE UNIQUE INDEX IF NOT EXISTS uhub_users_nickname_nocase "
+                "ON users (nickname COLLATE NOCASE);",
+                NULL, NULL, &err) != SQLITE_OK) {
+            fprintf(stderr, "mod_auth_sqlite: case-insensitive nickname uniqueness "
+                "not enforced (%s); resolve any case-duplicate nicks in the database.\n",
+                err ? err : "unknown error");
+            sqlite3_free(err);
+        }
+    }
+
     return data;
 }
 

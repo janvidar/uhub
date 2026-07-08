@@ -166,7 +166,10 @@ static int create(size_t argc, const char** argv)
 	(void) argc; (void) argv;
 	const char* sql = "CREATE TABLE users"
 		"("
-			"nickname CHAR NOT NULL UNIQUE,"
+			/* COLLATE NOCASE makes the UNIQUE index case-insensitive, matching
+			   the case-insensitive nick lookups in mod_auth_sqlite: two nicks
+			   differing only in case are the same identity and cannot coexist. */
+			"nickname CHAR COLLATE NOCASE NOT NULL UNIQUE,"
 			"password CHAR NOT NULL,"
 			"credentials CHAR NOT NULL DEFAULT 'user',"
 			"created TIMESTAMP DEFAULT (DATETIME('NOW')),"
