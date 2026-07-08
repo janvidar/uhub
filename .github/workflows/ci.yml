@@ -242,3 +242,60 @@ jobs:
             timeout-*
             oom-*
           if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # Test coverage: build gcc --coverage, run the suite under both event
+  # backends (epoll and, forced, select), and report with gcovr. The Cobertura
+  # XML goes to Codecov (best-effort -- never fails the build); the HTML report
+  # is kept as an artifact.
+  # ---------------------------------------------------------------------------
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    env:
+      CC: gcc
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake perl libsqlite3-dev libssl-dev gcc gcovr
+
+      - name: Configure (coverage)
+        run: |
+          cmake -S . -B build-cov -DRELEASE=OFF \
+            -DCMAKE_C_FLAGS="--coverage -O0 -g" \
+            -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+
+      - name: Build
+        run: cmake --build build-cov --target autotest-bin -j
+
+      # Two runs so both event backends are covered: the default (epoll) and,
+      # forced via EVENT_NOEPOLL, the select fallback. .gcda counters accumulate
+      # across runs.
+      - name: Run test suite (epoll + forced select)
+        run: |
+          ./build-cov/autotest-bin
+          EVENT_NOEPOLL=1 ./build-cov/autotest-bin
+
+      - name: Generate coverage report
+        run: |
+          mkdir -p coverage-html
+          gcovr --root . --filter 'src/' \
+            --print-summary \
+            --xml coverage.xml \
+            --html-details coverage-html/index.html
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false   # a Codecov hiccup must not fail the build
+
+      - name: Upload HTML coverage report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage-html
+          path: coverage-html/
+          if-no-files-found: ignore
