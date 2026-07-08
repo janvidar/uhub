@@ -51,6 +51,63 @@ jobs:
         run: ./build/autotest-bin
 
   # ---------------------------------------------------------------------------
+  # macOS build + tests. Exercises the kqueue backend (and, forced, the select
+  # fallback) and the LibreSSL-or-OpenSSL header/lib handling on a non-Linux
+  # platform -- the kind of gap that has let macOS-only bugs reach the tree.
+  # ---------------------------------------------------------------------------
+  macos:
+    name: macos (kqueue + select)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        # perl ships with macOS; cmake/sqlite/openssl come from Homebrew. sqlite
+        # and openssl@3 are keg-only, so point CMake at their prefixes below.
+        run: brew install cmake sqlite openssl@3
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -DRELEASE=OFF \
+            -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)" \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix sqlite)"
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Run unit tests (kqueue)
+        run: ./build/autotest-bin
+
+      # Force the select backend so the non-epoll/non-kqueue fallback path is
+      # actually exercised somewhere in CI.
+      - name: Run unit tests (select fallback)
+        run: EVENT_NOKQUEUE=1 ./build/autotest-bin
+
+  # ---------------------------------------------------------------------------
+  # FreeBSD build + tests, in a VM on the Linux runner (GitHub has no native
+  # FreeBSD runner). Covers kqueue on a second BSD platform and FreeBSD's base
+  # OpenSSL. Same select-fallback pass as macOS.
+  # ---------------------------------------------------------------------------
+  freebsd:
+    name: freebsd (kqueue + select)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build + test in a FreeBSD VM
+        uses: vmactions/freebsd-vm@v1
+        with:
+          usesh: true
+          # OpenSSL is in the FreeBSD base system; sqlite3/cmake/perl are pkgs.
+          prepare: |
+            pkg install -y cmake perl5 sqlite3
+          run: |
+            cmake -S . -B build -DRELEASE=OFF
+            cmake --build build -j
+            ./build/autotest-bin
+            EVENT_NOKQUEUE=1 ./build/autotest-bin
+
+  # ---------------------------------------------------------------------------
   # AddressSanitizer + UndefinedBehaviorSanitizer over the full test suite.
   # This is a hard gate: any memory error or UB fails the build.
   # ---------------------------------------------------------------------------
