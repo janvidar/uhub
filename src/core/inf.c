@@ -165,14 +165,14 @@ static int remove_support_feature(struct adc_message* cmd, const char* feature)
 static int check_hash_tiger(const char* cid, const char* pid)
 {
 	char x_pid[64];
-	char raw_pid[64];
+	uint64_t raw_pid[8];   /* 64 bytes, naturally aligned for tiger() -- no type-pun */
 	uint64_t tiger_res[3];
 
 	memset(x_pid, 0, sizeof(x_pid));
 	memset(raw_pid, 0, sizeof(raw_pid));
 
 	base32_decode(pid, (unsigned char*) raw_pid, MAX_CID_LEN);
-	tiger((uint64_t*) raw_pid, TIGERSIZE, (uint64_t*) tiger_res);
+	tiger(raw_pid, TIGERSIZE, tiger_res);
 	base32_encode((unsigned char*) tiger_res, TIGERSIZE, x_pid);
 	x_pid[MAX_CID_LEN] = 0;
 	if (strncasecmp(x_pid, cid, MAX_CID_LEN) == 0)
