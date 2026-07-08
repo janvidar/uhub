@@ -1,0 +1,52 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+  # Re-scan weekly so new CodeQL queries run against the tree even when it is
+  # quiet (Monday 04:27 UTC).
+  schedule:
+    - cron: '27 4 * * 1'
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: analyze (c-cpp)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write   # upload the analysis results to code scanning
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          # CMake requires SQLite3 and a TLS library; Perl generates the
+          # autotest driver. Same set as the build jobs in ci.yml.
+          sudo apt-get install -y cmake perl libsqlite3-dev libssl-dev
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@411c4c9a36b3fca4d674f06b6396b2c6d23522c6 # v3.36.3
+        with:
+          languages: c-cpp
+
+      # Manual build (not autobuild) so CodeQL traces the real compilation of
+      # this CMake project. RELEASE=OFF so the DEBUG-only code paths are compiled
+      # -- and therefore analysed -- as well. The default target builds the hub,
+      # libraries, plugins, tools and the test binary, so all C is covered.
+      - name: Build
+        run: |
+          cmake -S . -B build -DRELEASE=OFF
+          cmake --build build -j
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@411c4c9a36b3fca4d674f06b6396b2c6d23522c6 # v3.36.3
+        with:
+          category: "/language:c-cpp"
