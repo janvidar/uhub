@@ -85,7 +85,7 @@ GROUPS = [
         "show_banner", "show_banner_sys_info", "redirect_addr")),
     ("Hub information", names("hub_address", "hub_website", "hub_network",
         "hub_owner", "reg_server_url")),
-    ("Limits", prefixes("limit_")),
+    ("Limits", either(prefixes("limit_"), names("max_connections_per_ip"))),
     ("Flood control", prefixes("flood_ctl_")),
     ("TLS", prefixes("tls_")),
     ("Metrics", prefixes("metrics_")),

@@ -336,6 +336,19 @@
 			</div>
 			<div class="config-group">
 				<h2>Limits</h2>
+				<details class="directive" data-name="max_connections_per_ip" data-desc="Maximum concurrent connections allowed per IP address">
+					<summary>max_connections_per_ip<span class="badge">default: 0</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Limits how many connections a single IP address may hold at once, counting both connections still in the pre-login (probe) phase and logged-in users. This bounds connection-slot exhaustion from a single source (a flood of connections that never complete login, or are churned to keep every slot occupied).<br />
+			If this is 0 the limit is disabled. Note that clients sharing one public IP (behind NAT) all count against the same limit, so pick a value that accommodates your largest expected shared address.</td></tr>
+						<tr><th>Type</th><td>number (0–1048576)</td></tr>
+						<tr><th>Default</th><td><code>0</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.7.1</td></tr>
+						<tr><th>Syntax</th><td>0 = off</td></tr>
+						<tr><th>Example</th><td>To allow at most 10 concurrent connections per IP:<br />
+				max_connections_per_ip = 10</td></tr>
+					</table></div>
+				</details>
 				<details class="directive" data-name="limit_max_hubs_user" data-desc="Max concurrent hubs as a guest user">
 					<summary>limit_max_hubs_user<span class="badge">default: 10</span></summary>
 					<div class="directive-body"><table>

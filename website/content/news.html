@@ -9,6 +9,27 @@ nav: news
 		<p class="section-sub">Release announcements and project updates.</p>
 
 		<article class="news-entry">
+			<h2>uhub 0.7.1 released <span class="tag">release</span></h2>
+			<div class="news-meta">2026-07-08 by Jan Vidar Krey</div>
+			<p>
+				uhub 0.7.1 is available as platform-independent source. This release introduces
+				<strong>mod_ucmd</strong>, a new plug-in that publishes the hub's registered commands as
+				ADC user-command (UCMD) context-menu entries for clients that support the UCM0 extension.
+				Every command available at a user's credential level appears in the client's right-click
+				menu — user-targeting commands such as kick, ban and getip in the user-list menu, and the
+				rest in the hub menu — and selecting an entry sends the matching <code>+command</code> on
+				the user's behalf.
+			</p>
+			<p>
+				The plug-in API gains a <code>command_foreach()</code> hub callback and a read-only
+				<code>plugin_command_info</code> view so plug-ins can enumerate the registered hub commands
+				available to a given credential level. See the <a href="download.html">download page</a> to
+				get the sources and the <a href="doc/getstarted.html">getting started guide</a> to run your
+				first hub.
+			</p>
+		</article>
+
+		<article class="news-entry">
 			<h2>uhub 0.7.0 released <span class="tag">release</span></h2>
 			<div class="news-meta">2026-07-03 by Jan Vidar Krey</div>
 			<p>
