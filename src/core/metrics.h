@@ -38,4 +38,25 @@ struct ip_addr_encap;
  */
 extern void metrics_handle_connection(struct hub_info* hub, struct net_connection* con, struct ip_addr_encap* addr);
 
+/**
+ * Outcome of classifying a complete metrics HTTP request. Each non-OK value
+ * maps to the corresponding HTTP error the handler returns.
+ */
+enum metrics_result
+{
+	METRICS_OK = 0,       /* authorized GET for the configured metrics path (-> 200) */
+	METRICS_BAD_METHOD,   /* not a GET (-> 405) */
+	METRICS_URI_TOO_LONG, /* request-target longer than can be buffered (-> 414) */
+	METRICS_NOT_FOUND,    /* path does not match metrics_path (-> 404) */
+	METRICS_FORBIDDEN,    /* missing or incorrect bearer token (-> 403) */
+};
+
+/**
+ * Classify a complete HTTP request against the configured metrics path and
+ * token. Pure function: parses the NUL-terminated request text and returns the
+ * outcome with no I/O and no global state, so it can be unit-tested directly.
+ * `metrics_token` is the expected bearer token (compared length-aware).
+ */
+extern enum metrics_result metrics_classify_request(const char* req, const char* metrics_path, const char* metrics_token);
+
 #endif /* HAVE_UHUB_METRICS_H */

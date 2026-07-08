@@ -331,24 +331,21 @@ static void metrics_send_error(struct metrics_connection* m, int code, const cha
 }
 
 /*
- * The request line and headers are complete. Validate method, path and token,
- * then queue either the metrics document or an error response.
+ * Validate a complete HTTP request against the configured metrics path and
+ * token. Pure: no I/O and no global state, so it is exercised directly by the
+ * unit tests. metrics_handle_request() maps the result to a response.
  */
-static void metrics_handle_request(struct metrics_connection* m)
+enum metrics_result metrics_classify_request(const char* req, const char* metrics_path, const char* metrics_token)
 {
-	struct hub_config* config = m->hub->config;
-	const char* req = m->req;
 	const char* p;
 	char path[512];
 	size_t path_len;
 	const char* line;
+	int authorized = 0;
 
 	/* Method: only GET serves metrics. */
 	if (strncmp(req, "GET ", 4) != 0)
-	{
-		metrics_send_error(m, 405, "Method Not Allowed", "Allow: GET\r\n");
-		return;
-	}
+		return METRICS_BAD_METHOD;
 
 	/* Path: from after "GET " up to the next space, stripping any query string. */
 	p = req + 4;
@@ -357,78 +354,94 @@ static void metrics_handle_request(struct metrics_connection* m)
 		&& p[path_len] != '\r' && p[path_len] != '\n')
 	{
 		if (path_len >= sizeof(path) - 1)
-		{
-			metrics_send_error(m, 414, "URI Too Long", NULL);
-			return;
-		}
+			return METRICS_URI_TOO_LONG;
 		path[path_len] = p[path_len];
 		path_len++;
 	}
 	path[path_len] = '\0';
 
-	if (strcmp(path, config->metrics_path) != 0)
-	{
-		metrics_send_error(m, 404, "Not Found", NULL);
-		return;
-	}
+	if (strcmp(path, metrics_path) != 0)
+		return METRICS_NOT_FOUND;
 
 	/* Authorization: Bearer <token> -- scan the header lines case-insensitively. */
+	line = strstr(req, "\r\n");
+	while (line)
 	{
-		int authorized = 0;
-		line = strstr(req, "\r\n");
-		while (line)
+		line += 2; /* step over the CRLF onto the next header line */
+		if (line[0] == '\r' || line[0] == '\0')
+			break; /* reached the blank line that ends the headers */
+
+		if (strncasecmp(line, "Authorization:", 14) == 0)
 		{
-			line += 2; /* step over the CRLF onto the next header line */
-			if (line[0] == '\r' || line[0] == '\0')
-				break; /* reached the blank line that ends the headers */
+			const char* v = line + 14;
+			const char* end;
+			char token[256];
+			size_t tlen = 0;
 
-			if (strncasecmp(line, "Authorization:", 14) == 0)
+			while (*v == ' ' || *v == '\t')
+				v++;
+			if (strncasecmp(v, "Bearer", 6) == 0 && (v[6] == ' ' || v[6] == '\t'))
 			{
-				const char* v = line + 14;
-				const char* end;
-				char token[256];
-				size_t tlen = 0;
-
+				v += 6;
 				while (*v == ' ' || *v == '\t')
 					v++;
-				if (strncasecmp(v, "Bearer", 6) == 0 && (v[6] == ' ' || v[6] == '\t'))
+				end = v;
+				while (*end && *end != '\r' && *end != '\n')
+					end++;
+				/* trim trailing whitespace */
+				while (end > v && (end[-1] == ' ' || end[-1] == '\t'))
+					end--;
+				tlen = (size_t) (end - v);
+				if (tlen < sizeof(token))
 				{
-					v += 6;
-					while (*v == ' ' || *v == '\t')
-						v++;
-					end = v;
-					while (*end && *end != '\r' && *end != '\n')
-						end++;
-					/* trim trailing whitespace */
-					while (end > v && (end[-1] == ' ' || end[-1] == '\t'))
-						end--;
-					tlen = (size_t) (end - v);
-					if (tlen < sizeof(token))
-					{
-						memcpy(token, v, tlen);
-						token[tlen] = '\0';
-						if (token_equal(token, config->metrics_token))
-							authorized = 1;
-					}
+					memcpy(token, v, tlen);
+					token[tlen] = '\0';
+					if (token_equal(token, metrics_token))
+						authorized = 1;
 				}
-				break; /* only the first Authorization header matters */
 			}
-			line = strstr(line, "\r\n");
+			break; /* only the first Authorization header matters */
 		}
-
-		if (!authorized)
-		{
-			metrics_send_error(m, 403, "Forbidden", "WWW-Authenticate: Bearer\r\n");
-			return;
-		}
+		line = strstr(line, "\r\n");
 	}
 
-	/* Authorized GET for the metrics path -- serve the document. */
+	return authorized ? METRICS_OK : METRICS_FORBIDDEN;
+}
+
+/*
+ * The request line and headers are complete. Classify the request, then queue
+ * either the metrics document or the matching error response.
+ */
+static void metrics_handle_request(struct metrics_connection* m)
+{
+	struct hub_config* config = m->hub->config;
+
+	switch (metrics_classify_request(m->req, config->metrics_path, config->metrics_token))
 	{
-		struct cbuffer* body = cbuf_create(2048);
-		metrics_build_body(m->hub, body);
-		metrics_send_response(m, 200, "OK", "text/plain; version=0.0.4; charset=utf-8", body, NULL);
-		cbuf_destroy(body);
+		case METRICS_BAD_METHOD:
+			metrics_send_error(m, 405, "Method Not Allowed", "Allow: GET\r\n");
+			return;
+
+		case METRICS_URI_TOO_LONG:
+			metrics_send_error(m, 414, "URI Too Long", NULL);
+			return;
+
+		case METRICS_NOT_FOUND:
+			metrics_send_error(m, 404, "Not Found", NULL);
+			return;
+
+		case METRICS_FORBIDDEN:
+			metrics_send_error(m, 403, "Forbidden", "WWW-Authenticate: Bearer\r\n");
+			return;
+
+		case METRICS_OK:
+		{
+			struct cbuffer* body = cbuf_create(2048);
+			metrics_build_body(m->hub, body);
+			metrics_send_response(m, 200, "OK", "text/plain; version=0.0.4; charset=utf-8", body, NULL);
+			cbuf_destroy(body);
+			return;
+		}
 	}
 }
 
