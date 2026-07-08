@@ -33,6 +33,30 @@
 #define PROBE_RECV_SIZE 12
 static char probe_recvbuf[PROBE_RECV_SIZE];
 
+enum probe_protocol probe_classify(const char* buf, size_t len)
+{
+	const unsigned char* b = (const unsigned char*) buf;
+
+	if (len < 4)
+		return probe_protocol_incomplete;
+
+	/* TLS ClientHello: handshake record (22), major version 3, handshake type
+	   client_hello (1), and the version echoed at offset 9. Needs 11 bytes. */
+	if (len >= 11 && b[0] == 22 && b[1] == 3 && b[5] == 1 && b[9] == b[1])
+		return probe_protocol_tls;
+
+	if (memcmp(buf, "HSUP", 4) == 0 || memcmp(buf, "HTCP", 4) == 0)
+		return probe_protocol_adc;
+
+	if (memcmp(buf, "LCHA", 4) == 0)
+		return probe_protocol_link;
+
+	if (memcmp(buf, "GET ", 4) == 0 || memcmp(buf, "POST", 4) == 0 || memcmp(buf, "HEAD", 4) == 0)
+		return probe_protocol_http;
+
+	return probe_protocol_unsupported;
+}
+
 static void probe_net_event(struct net_connection* con, int events, void *arg)
 {
 	(void) arg;
@@ -54,17 +78,15 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 
 		if (bytes >= 4)
 		{
+			enum probe_protocol proto = probe_classify(probe_recvbuf, (size_t) bytes);
+
 			/* A TLS ClientHello on a not-yet-encrypted connection: start the
 			   handshake and re-probe the *decrypted* stream once it completes.
 			   net_ssl_callback() drives the handshake and re-enters us (with
 			   NET_EVENT_READ) only when the connection is established, at which
 			   point net_con_peek() returns the decrypted application bytes. This
 			   lets ADC and the HTTP metrics endpoint share a port over TLS too. */
-			if (!probe->tls && bytes >= 11 &&
-				probe_recvbuf[0] == 22 &&
-				probe_recvbuf[1] == 3 && /* protocol major version */
-				probe_recvbuf[5] == 1 && /* message type */
-				probe_recvbuf[9] == probe_recvbuf[1])
+			if (proto == probe_protocol_tls && !probe->tls)
 			{
 				if (probe->hub->config->tls_enable)
 				{
@@ -89,7 +111,7 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 			/* "HSUP" starts a normal login; "HTCP" starts an HBRI secondary-
 			   protocol validation connection (see hbri.c). Both are ADC and
 			   handled by the per-user command dispatcher once a user exists. */
-			if (memcmp(probe_recvbuf, "HSUP", 4) == 0 || memcmp(probe_recvbuf, "HTCP", 4) == 0)
+			if (proto == probe_protocol_adc)
 			{
 				LOG_TRACE("Probed ADC");
 				if (!probe->tls && probe->hub->config->tls_enable && probe->hub->config->tls_require)
@@ -129,7 +151,7 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 				probe_destroy(probe);
 				return;
 			}
-			else if (memcmp(probe_recvbuf, "LCHA", 4) == 0)
+			else if (proto == probe_protocol_link)
 			{
 				/* Hub-to-hub link handshake (see link.c). Links reuse the
 				   normal hub port; hand the connection to the link layer. */
@@ -139,9 +161,7 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 				probe_destroy(probe);
 				return;
 			}
-			else if ((memcmp(probe_recvbuf, "GET ", 4) == 0) ||
-				 (memcmp(probe_recvbuf, "POST", 4) == 0) ||
-				 (memcmp(probe_recvbuf, "HEAD", 4) == 0))
+			else if (proto == probe_protocol_http)
 			{
 				/* Looks like HTTP (plaintext, or decrypted on a TLS connection). If
 				   the metrics endpoint is enabled (and a token is configured) hand the

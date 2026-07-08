@@ -67,7 +67,7 @@ int route_message(struct hub_info* hub, struct hub_user* u, struct adc_message* 
 	return 0;
 }
 
-static size_t get_max_send_queue(struct hub_info* hub)
+size_t get_max_send_queue(struct hub_info* hub)
 {
 	/*
 	 * Hard send-queue limit (exceeding it disconnects the user). A user that
@@ -81,7 +81,7 @@ static size_t get_max_send_queue(struct hub_info* hub)
 	           (size_t) hub->config->max_recv_buffer * hub_get_user_count(hub));
 }
 
-static size_t get_max_send_queue_soft(struct hub_info* hub)
+size_t get_max_send_queue_soft(struct hub_info* hub)
 {
 	return hub->config->max_send_buffer_soft;
 }

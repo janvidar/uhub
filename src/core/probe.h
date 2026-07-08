@@ -37,4 +37,25 @@ struct hub_probe
 extern struct hub_probe* probe_create(struct hub_info* hub, int sd, struct ip_addr_encap* addr);
 extern void probe_destroy(struct hub_probe* probe);
 
+/**
+ * Protocol detected from the first bytes of a fresh, not-yet-classified
+ * connection.
+ */
+enum probe_protocol
+{
+	probe_protocol_incomplete,   /* fewer than 4 bytes seen; need more before deciding */
+	probe_protocol_tls,          /* TLS ClientHello */
+	probe_protocol_adc,          /* ADC handshake: "HSUP" (login) or "HTCP" (HBRI) */
+	probe_protocol_link,         /* hub-to-hub link handshake: "LCHA" */
+	probe_protocol_http,         /* HTTP request: "GET " / "POST" / "HEAD" (metrics) */
+	probe_protocol_unsupported,  /* none of the above */
+};
+
+/**
+ * Classify the protocol from the leading bytes peeked off a new connection.
+ * Pure: inspects only the buffer, no I/O or connection state, so it is
+ * unit-tested directly. `len` is how many bytes are available in `buf`.
+ */
+extern enum probe_protocol probe_classify(const char* buf, size_t len);
+
 #endif /* HAVE_UHUB_PROBE_H */
