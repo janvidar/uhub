@@ -103,7 +103,9 @@ jobs:
             pkg install -y cmake perl5 sqlite3
           run: |
             cmake -S . -B build -DRELEASE=OFF
-            cmake --build build -j
+            # FreeBSD's make (bmake) requires an argument for -j, unlike the GNU
+            # make used on the Linux/macOS jobs where a bare -j is fine.
+            cmake --build build -j $(sysctl -n hw.ncpu)
             ./build/autotest-bin
             EVENT_NOKQUEUE=1 ./build/autotest-bin
 
