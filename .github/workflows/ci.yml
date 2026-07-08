@@ -51,25 +51,31 @@ jobs:
         run: ./build/autotest-bin
 
   # ---------------------------------------------------------------------------
-  # macOS build + tests. Exercises the kqueue backend (and, forced, the select
-  # fallback) and the LibreSSL-or-OpenSSL header/lib handling on a non-Linux
-  # platform -- the kind of gap that has let macOS-only bugs reach the tree.
+  # macOS build + tests, across both TLS providers. Exercises the kqueue backend
+  # (and, forced, the select fallback) on a non-Linux platform -- the kind of
+  # gap that has let macOS-only bugs reach the tree -- and covers the LibreSSL
+  # backend, which is supported but otherwise unbuilt in CI. OpenSSL and
+  # LibreSSL are both keg-only Homebrew formulae; CMake is pointed at the
+  # selected one's prefix.
   # ---------------------------------------------------------------------------
   macos:
-    name: macos (kqueue + select)
+    name: macos (${{ matrix.tls }}, kqueue + select)
     runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tls: [openssl@3, libressl]
     steps:
       - uses: actions/checkout@v4
 
       - name: Install dependencies
-        # perl ships with macOS; cmake/sqlite/openssl come from Homebrew. sqlite
-        # and openssl@3 are keg-only, so point CMake at their prefixes below.
-        run: brew install cmake sqlite openssl@3
+        # perl ships with macOS; the rest come from Homebrew.
+        run: brew install cmake sqlite ${{ matrix.tls }}
 
       - name: Configure
         run: |
           cmake -S . -B build -DRELEASE=OFF \
-            -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)" \
+            -DOPENSSL_ROOT_DIR="$(brew --prefix ${{ matrix.tls }})" \
             -DCMAKE_PREFIX_PATH="$(brew --prefix sqlite)"
 
       - name: Build
