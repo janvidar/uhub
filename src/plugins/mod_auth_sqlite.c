@@ -100,7 +100,10 @@ static plugin_st get_user(struct plugin_handle *plugin, const char *nickname, st
 
     memset(data, 0, sizeof(struct auth_info));
 
-    rc = sqlite3_prepare_v2(sql->db, "SELECT nickname, password, credentials FROM users WHERE nickname=?;", -1, &stmt, NULL);
+    /* Match the nick case-insensitively (COLLATE NOCASE): otherwise a guest
+       logging in as "boss" would miss the registered "Boss" account, dodge the
+       password challenge, and get online impersonating that identity. */
+    rc = sqlite3_prepare_v2(sql->db, "SELECT nickname, password, credentials FROM users WHERE nickname=? COLLATE NOCASE;", -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
         return st_default;
     }
