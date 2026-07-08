@@ -253,7 +253,10 @@ add_custom_command(
 	VERBATIM)
 
 add_executable(uhub ${UHUB_SOURCE_DIR}/core/main.c ${uhub_SOURCES})
-add_executable(autotest-bin ${AUTOTEST_GENERATED} ${uhub_SOURCES})
+# mod_auth_sqlite.c is compiled into the test binary (not just built as a
+# loadable module) so test_mod_auth_sqlite.tcc can drive its auth functions
+# directly via plugin_register(); it pulls in SQLite, hence the extra link.
+add_executable(autotest-bin ${AUTOTEST_GENERATED} ${uhub_SOURCES} ${UHUB_SOURCE_DIR}/plugins/mod_auth_sqlite.c)
 target_include_directories(autotest-bin PRIVATE ${AUTOTEST_DIR})
 add_executable(uhub-passwd ${UHUB_SOURCE_DIR}/tools/uhub-passwd.c)
 
@@ -287,7 +290,7 @@ set_target_properties(
 
 target_link_libraries(uhub ${CMAKE_DL_LIBS} adc network utils)
 target_link_libraries(uhub-passwd SQLite::SQLite3 utils)
-target_link_libraries(autotest-bin ${CMAKE_DL_LIBS} adc network utils)
+target_link_libraries(autotest-bin ${CMAKE_DL_LIBS} adc network utils SQLite::SQLite3)
 target_link_libraries(mod_example utils)
 target_link_libraries(mod_welcome network utils)
 target_link_libraries(mod_auth_simple utils)
