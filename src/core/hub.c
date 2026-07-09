@@ -1237,6 +1237,30 @@ void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, int 
 	if (nick && *nick)
 		acl_user_ban_nick(hub->acl, nick);
 
+	/* Persist the ban through a storage plugin (write-through), so it survives a
+	   reload/restart -- the runtime ACL above is rebuilt from config on reload.
+	   No-op when no storage plugin is loaded, in which case the ban lives only in
+	   the in-memory ACL and is lost on restart. Done regardless of propagate, so
+	   each node persists its own copy of a cluster-wide ban. */
+	{
+		struct ban_info ban;
+		memset(&ban, 0, sizeof(ban));
+		if (cid && *cid)
+		{
+			ban.flags |= ban_cid;
+			strncpy(ban.cid, cid, MAX_CID_LEN);
+			ban.cid[MAX_CID_LEN] = '\0';
+		}
+		if (nick && *nick)
+		{
+			ban.flags |= ban_nickname;
+			strncpy(ban.nickname, nick, MAX_NICK_LEN);
+			ban.nickname[MAX_NICK_LEN] = '\0';
+		}
+		if (ban.flags)
+			plugin_ban_add(hub, &ban);
+	}
+
 	/* Disconnect a matching locally-connected user. The session lives on exactly
 	   one node; that node drops it here, while remote-user records on other nodes
 	   are cleaned up by the owning node's LQUI. */
@@ -1275,6 +1299,20 @@ int hub_apply_unban(struct hub_info* hub, const char* target, int propagate)
 		removed++;
 	if (acl_user_unban_ip(hub->acl, target) == 0)
 		removed++;
+
+	/* Remove any persisted record through the storage plugin. target may be a
+	   nick or a CID, so offer it as both and let the plugin match either. */
+	{
+		struct ban_info ban;
+		memset(&ban, 0, sizeof(ban));
+		ban.flags = ban_nickname | ban_cid;
+		strncpy(ban.nickname, target, MAX_NICK_LEN);
+		ban.nickname[MAX_NICK_LEN] = '\0';
+		strncpy(ban.cid, target, MAX_CID_LEN);
+		ban.cid[MAX_CID_LEN] = '\0';
+		if (plugin_ban_del(hub, &ban) == st_allow)
+			removed++;
+	}
 
 	/* Propagate cluster-wide, mirroring hub_apply_ban. An unban received over a
 	   link is applied with propagate = 0 (loop-free on a full mesh). */

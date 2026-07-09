@@ -30,6 +30,7 @@
 #include "core/hubevent.h"
 #include "core/inf.h"
 #include "core/link.h"
+#include "core/plugininvoke.h"
 #include "core/route.h"
 #include "network/connection.h"
 #include "core/usermanager.h"
@@ -594,6 +595,13 @@ static int check_acl(struct hub_info* hub, struct hub_user* user, struct adc_mes
 	}
 
 	if (acl_is_user_banned(hub->acl, user->id.nick))
+	{
+		return status_msg_ban_permanently;
+	}
+
+	/* Persisted bans held by a storage plugin (survive restart/reload, where the
+	   in-memory ACL above is rebuilt from config only). */
+	if (plugin_is_banned(hub, user) == st_deny)
 	{
 		return status_msg_ban_permanently;
 	}
