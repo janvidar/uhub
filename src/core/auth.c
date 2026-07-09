@@ -406,15 +406,52 @@ int acl_user_ban_cid(struct acl_handle* handle, const char* cid)
 	return 0;
 }
 
+/* Remove the first case-insensitively matching string from a list of
+   hub_strdup'd strings (matching how acl_is_*_banned compares). Frees the
+   removed entry. Returns 0 if an entry was removed, -1 if none matched. */
+static int acl_list_remove_string(struct linked_list* list, const char* value)
+{
+	char* str;
+	LIST_FOREACH(char*, str, list,
+	{
+		if (strcasecmp(str, value) == 0)
+		{
+			list_remove(list, str);
+			hub_free(str);
+			return 0;
+		}
+	});
+	return -1;
+}
+
 int acl_user_unban_nick(struct acl_handle* handle, const char* nick)
 {
-	(void) handle; (void) nick;
-	return -1;
+	return acl_list_remove_string(handle->users_banned, nick);
 }
 
 int acl_user_unban_cid(struct acl_handle* handle, const char* cid)
 {
-	(void) handle; (void) cid;
+	return acl_list_remove_string(handle->cids, cid);
+}
+
+int acl_user_unban_ip(struct acl_handle* handle, const char* address)
+{
+	struct ip_range target;
+	struct ip_range* info;
+
+	memset(&target, 0, sizeof(target));
+	if (!ip_convert_address_to_range(address, &target))
+		return -1;
+
+	LIST_FOREACH(struct ip_range*, info, handle->networks,
+	{
+		if (ip_compare(&info->lo, &target.lo) == 0 && ip_compare(&info->hi, &target.hi) == 0)
+		{
+			list_remove(handle->networks, info);
+			hub_free(info);
+			return 0;
+		}
+	});
 	return -1;
 }
 

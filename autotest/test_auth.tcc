@@ -124,6 +124,22 @@ EXO_TEST(acl_deny_ip_out,    { return acl_is_ip_banned(&acl_acl, "11.0.0.1") == 
 EXO_TEST(acl_nat_ip_in,      { return acl_is_ip_nat_override(&acl_acl, "192.168.5.5") == 1; });
 EXO_TEST(acl_nat_ip_out,     { return acl_is_ip_nat_override(&acl_acl, "10.1.2.3") == 0; });
 
+/* Runtime ban add/remove round-trips (acl_user_ban_* / acl_user_unban_*). These
+   mutate the shared handle, so they run after the ban-query assertions above. */
+EXO_TEST(acl_unban_nick_add,    { return acl_user_ban_nick(&acl_acl, "tempnick") == 0 && acl_is_user_banned(&acl_acl, "tempnick") == 1; });
+EXO_TEST(acl_unban_nick_remove, { return acl_user_unban_nick(&acl_acl, "tempnick") == 0 && acl_is_user_banned(&acl_acl, "tempnick") == 0; });
+EXO_TEST(acl_unban_nick_again,  { return acl_user_unban_nick(&acl_acl, "tempnick") == -1; }); /* already gone */
+EXO_TEST(acl_unban_nick_case,   { return acl_user_ban_nick(&acl_acl, "MixedCase") == 0 && acl_user_unban_nick(&acl_acl, "mixedcase") == 0 && acl_is_user_banned(&acl_acl, "MixedCase") == 0; });
+EXO_TEST(acl_unban_nick_missing,{ return acl_user_unban_nick(&acl_acl, "neverbanned") == -1; });
+
+EXO_TEST(acl_unban_cid_add,     { return acl_user_ban_cid(&acl_acl, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA") == 0 && acl_is_cid_banned(&acl_acl, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA") == 1; });
+EXO_TEST(acl_unban_cid_remove,  { return acl_user_unban_cid(&acl_acl, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA") == 0 && acl_is_cid_banned(&acl_acl, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA") == 0; });
+
+/* Lift the deny_ip 10.0.0.0/8 range added at setup (runs after the deny_ip tests). */
+EXO_TEST(acl_unban_ip_remove,   { return acl_user_unban_ip(&acl_acl, "10.0.0.0/8") == 0 && acl_is_ip_banned(&acl_acl, "10.1.2.3") == 0; });
+EXO_TEST(acl_unban_ip_again,    { return acl_user_unban_ip(&acl_acl, "10.0.0.0/8") == -1; }); /* already gone */
+EXO_TEST(acl_unban_ip_badaddr,  { return acl_user_unban_ip(&acl_acl, "not-an-ip") == -1; });
+
 /* Parser acceptance/rejection of whole lines. */
 EXO_TEST(acl_ok_comment,     { return acl_parse_expect("# nothing here\n", 0); });
 EXO_TEST(acl_ok_blank,       { return acl_parse_expect("   \n\t\n", 0); });

@@ -331,6 +331,16 @@ static int link_process_line(struct hub_link* link, const char* line)
 		return 0;
 	}
 
+	if (strncmp(line, "LUBN ", 5) == 0)
+	{
+		/* Cluster-wide unban from a peer: "LUBN <target>". Apply locally
+		   (remove a matching ban) without re-propagating. */
+		if (link->state != link_state_established)
+			return -1;
+		hub_apply_unban(link->hub, line + 5, 0);
+		return 0;
+	}
+
 	if (strncmp(line, "LACQ ", 5) == 0)
 	{
 		/* Auth master: a slave asks whether <nick> is registered. Reply
@@ -1066,6 +1076,27 @@ void link_broadcast_ban(struct hub_info* hub, const char* cid, const char* nick)
 	if (!g_links)
 		return;
 	n = snprintf(buf, sizeof(buf), "LBAN %s %s\n", cid ? cid : "", nick ? nick : "");
+	if (n <= 0 || n >= (int) sizeof(buf))
+		return;
+	LIST_FOREACH(struct hub_link*, link, g_links,
+	{
+		if (link->state == link_state_established)
+			net_con_send(link->connection, buf, (size_t) n);
+	});
+}
+
+/* Propagate an unban to every established link. Format: "LUBN <target>", where
+   target is a nick, CID or IP/range and takes the rest of the line (a nick may
+   legitimately contain spaces). */
+void link_broadcast_unban(struct hub_info* hub, const char* target)
+{
+	struct hub_link* link;
+	char buf[256];
+	int n;
+	(void) hub;
+	if (!g_links)
+		return;
+	n = snprintf(buf, sizeof(buf), "LUBN %s\n", target ? target : "");
 	if (n <= 0 || n >= (int) sizeof(buf))
 		return;
 	LIST_FOREACH(struct hub_link*, link, g_links,

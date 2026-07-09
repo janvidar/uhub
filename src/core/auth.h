@@ -59,6 +59,7 @@ extern int acl_user_ban_nick(struct acl_handle* handle, const char* nick);
 extern int acl_user_ban_cid(struct acl_handle* handle, const char* cid);
 extern int acl_user_unban_nick(struct acl_handle* handle, const char* nick);
 extern int acl_user_unban_cid(struct acl_handle* handle, const char* cid);
+extern int acl_user_unban_ip(struct acl_handle* handle, const char* address);
 
 /**
  * Verify a password.

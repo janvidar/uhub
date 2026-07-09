@@ -306,6 +306,14 @@ extern void hub_update_description(struct hub_info* hub, const char* escaped_des
 extern void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, int propagate);
 
 /**
+ * Lift a ban cluster-wide. target may be a nick, CID or IP/range; it is removed
+ * from every runtime ACL list it appears in. When propagate is set the unban is
+ * forwarded to linked hubs. An unban received over a link is applied with
+ * propagate = 0. Returns the number of ACL lists the target was removed from.
+ */
+extern int hub_apply_unban(struct hub_info* hub, const char* target, int propagate);
+
+/**
  * Master-slave auth (slave side): complete a login that was paused waiting for
  * the master to verify the password (LVRS). ok != 0 admits the user.
  */

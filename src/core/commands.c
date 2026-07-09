@@ -477,6 +477,25 @@ static int command_ban(struct command_base* cbase, struct hub_user* user, struct
 	return command_status(cbase, user, cmd, buf);
 }
 
+static int command_unban(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
+{
+	struct cbuffer* buf;
+	struct hub_command_arg_data* arg = hub_command_arg_next(cmd, type_string);
+	const char* target = arg->data.string;
+	int removed;
+
+	buf = cbuf_create(128);
+	/* Lift the ban from this node and propagate cluster-wide. target may be a
+	   nick, CID or IP/range; a user banned via !ban has both a nick and a CID
+	   ban, so lifting both may take two !unban calls (one per identifier). */
+	removed = hub_apply_unban(cbase->hub, target, 1);
+	if (removed)
+		cbuf_append_format(buf, "Removed ban matching \"%s\".", target);
+	else
+		cbuf_append_format(buf, "No ban found matching \"%s\".", target);
+	return command_status(cbase, user, cmd, buf);
+}
+
 static int command_reload(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
 	cbase->hub->status = hub_status_restart;
@@ -721,6 +740,7 @@ void commands_builtin_add(struct command_base* cbase)
 	ADD_COMMAND("getip",      5, "u", auth_cred_operator,  command_getip,    "Show IP address for a user"   );
 	ADD_COMMAND("help",       4, "?c",auth_cred_guest,     command_help,     "Show this help message."      );
 	ADD_COMMAND("ban",        3, "u", auth_cred_operator,  command_ban,      "Ban a user (cluster-wide)"    );
+	ADD_COMMAND("unban",      5, "+n",auth_cred_operator,  command_unban,    "Remove a ban by nick/CID/IP"  );
 	ADD_COMMAND("kick",       4, "u", auth_cred_operator,  command_kick,     "Kick a user"                  );
 	ADD_COMMAND("redirect",   8, "uA",auth_cred_operator,  command_redirect, "Redirect a user to another hub");
 	ADD_COMMAND("log",        3, "?m",auth_cred_operator,  command_log,      "Display log"                  ); // fail
