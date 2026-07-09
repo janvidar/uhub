@@ -94,6 +94,11 @@ extern void link_broadcast_description(struct hub_info* hub, const char* escaped
  */
 extern void link_broadcast_ban(struct hub_info* hub, const char* cid, const char* nick);
 
+/**
+ * Propagate a cluster-wide unban (nick, CID or IP/range) to every established link.
+ */
+extern void link_broadcast_unban(struct hub_info* hub, const char* target);
+
 struct hub_user;
 
 /**

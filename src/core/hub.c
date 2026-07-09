@@ -1259,6 +1259,31 @@ void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, int 
 		link_broadcast_ban(hub, cid, nick);
 }
 
+int hub_apply_unban(struct hub_info* hub, const char* target, int propagate)
+{
+	int removed = 0;
+
+	if (!target || !*target)
+		return 0;
+
+	/* The same string may be present as a banned nick, a banned CID, or a
+	   banned IP/range (a !ban records both a nick and a CID); lift it from each
+	   list it appears in. */
+	if (acl_user_unban_nick(hub->acl, target) == 0)
+		removed++;
+	if (acl_user_unban_cid(hub->acl, target) == 0)
+		removed++;
+	if (acl_user_unban_ip(hub->acl, target) == 0)
+		removed++;
+
+	/* Propagate cluster-wide, mirroring hub_apply_ban. An unban received over a
+	   link is applied with propagate = 0 (loop-free on a full mesh). */
+	if (removed && propagate)
+		link_broadcast_unban(hub, target);
+
+	return removed;
+}
+
 void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 {
 	char* tmp;
