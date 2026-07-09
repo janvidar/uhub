@@ -273,6 +273,30 @@ EXO_TEST(mas_ban_del_missing, {
 	return mas_plugin.funcs.auth_ban_del(&mas_plugin, &b) == st_default;
 });
 
+/* Timed bans: a future expiry is enforced; a past expiry is treated as lifted. */
+static struct ban_info mas_ban_exp(const char* cid, const char* nick, time_t expiry)
+{
+	struct ban_info b = mas_ban(cid, nick);
+	b.expiry = expiry;
+	return b;
+}
+EXO_TEST(mas_timed_future_add, {
+	struct ban_info b = mas_ban_exp("TIMEDCID000000000000000000000000000000A", "timeduser", 2000000000);
+	return mas_plugin.funcs.auth_ban_add(&mas_plugin, &b) == st_allow;
+});
+EXO_TEST(mas_timed_future_hit, {
+	struct plugin_user u = mas_puser("TIMEDCID000000000000000000000000000000A", "whoever");
+	return mas_plugin.funcs.auth_is_banned(&mas_plugin, &u) == st_deny;
+});
+EXO_TEST(mas_timed_past_add, {
+	struct ban_info b = mas_ban_exp("EXPIREDCID00000000000000000000000000000A", "expireduser", 1);
+	return mas_plugin.funcs.auth_ban_add(&mas_plugin, &b) == st_allow;
+});
+EXO_TEST(mas_timed_past_miss, {
+	struct plugin_user u = mas_puser("EXPIREDCID00000000000000000000000000000A", "whoever");
+	return mas_plugin.funcs.auth_is_banned(&mas_plugin, &u) == st_default;
+});
+
 EXO_TEST(mas_teardown, {
 	int rc = plugin_unregister(&mas_plugin);
 	remove(MAS_DB);

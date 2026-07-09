@@ -104,6 +104,18 @@ EXO_TEST(acl_unban_ip_remove,   { return acl_user_unban_ip(&acl_acl, "10.0.0.0/8
 EXO_TEST(acl_unban_ip_again,    { return acl_user_unban_ip(&acl_acl, "10.0.0.0/8") == -1; }); /* already gone */
 EXO_TEST(acl_unban_ip_badaddr,  { return acl_user_unban_ip(&acl_acl, "not-an-ip") == -1; });
 
+/* Timed bans: expiry is absolute, and acl_timed_ban_remaining takes 'now' as a
+   parameter so the tests are deterministic (no sleeping). Ordered so the expiry
+   / purge cases run last. */
+EXO_TEST(acl_timed_add,        { return acl_add_timed_ban(&acl_acl, "TCIDxxxx", "TimedNick", 2000000000) == 0; });
+EXO_TEST(acl_timed_by_cid,     { return acl_timed_ban_remaining(&acl_acl, "TCIDxxxx", "someoneelse", 1999999900) == 100; });
+EXO_TEST(acl_timed_by_nick,    { return acl_timed_ban_remaining(&acl_acl, "OTHERCID", "timednick", 1999999000) == 1000; }); /* case-insensitive nick */
+EXO_TEST(acl_timed_notmatch,   { return acl_timed_ban_remaining(&acl_acl, "NOPE", "nobody", 1999999900) == 0; });
+EXO_TEST(acl_timed_expired,    { return acl_timed_ban_remaining(&acl_acl, "TCIDxxxx", "TimedNick", 2000000000) == 0; }); /* expiry<=now: expired + purged */
+EXO_TEST(acl_timed_purged,     { return acl_timed_ban_remaining(&acl_acl, "TCIDxxxx", "TimedNick", 1999999900) == 0; }); /* purged by the previous call */
+EXO_TEST(acl_timed_unban_add,  { return acl_add_timed_ban(&acl_acl, "UCIDxxxx", "unbanme", 2000000000) == 0; });
+EXO_TEST(acl_timed_unban_rm,   { return acl_timed_unban(&acl_acl, "unbanme") == 1 && acl_timed_ban_remaining(&acl_acl, "UCIDxxxx", "unbanme", 1999999900) == 0; });
+
 /* Parser acceptance/rejection of whole lines. */
 EXO_TEST(acl_ok_comment,     { return acl_parse_expect("# nothing here\n", 0); });
 EXO_TEST(acl_ok_blank,       { return acl_parse_expect("   \n\t\n", 0); });

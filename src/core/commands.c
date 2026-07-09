@@ -461,18 +461,34 @@ static int command_ban(struct command_base* cbase, struct hub_user* user, struct
 	struct cbuffer* buf;
 	struct hub_command_arg_data* arg = hub_command_arg_next(cmd, type_user);
 	struct hub_user* target = arg->data.user;
+	struct hub_command_arg_data* darg = hub_command_arg_next(cmd, type_string);
+	int seconds = 0;
+	time_t expiry = 0;
 
 	buf = cbuf_create(128);
+
+	/* Optional duration argument, e.g. "1h", "30m", "7d" or bare seconds. */
+	if (darg && parse_duration_seconds(darg->data.string, &seconds) == -1)
+	{
+		cbuf_append_format(buf, "Invalid duration \"%s\"; use e.g. 30m, 12h, 7d.", darg->data.string);
+		return command_status(cbase, user, cmd, buf);
+	}
+	if (seconds > 0)
+		expiry = time(NULL) + seconds;
+
 	if (target == user)
 	{
 		cbuf_append(buf, "Cannot ban yourself.");
 	}
 	else
 	{
-		cbuf_append_format(buf, "Banning user \"%s\".", target->id.nick);
+		if (expiry)
+			cbuf_append_format(buf, "Banning user \"%s\" for %d seconds.", target->id.nick, seconds);
+		else
+			cbuf_append_format(buf, "Banning user \"%s\".", target->id.nick);
 		/* Ban by CID and nick, disconnect, and propagate to linked hubs so the
 		   ban applies across the whole logical hub. */
-		hub_apply_ban(cbase->hub, target->id.cid, target->id.nick, 1);
+		hub_apply_ban(cbase->hub, target->id.cid, target->id.nick, expiry, 1);
 	}
 	return command_status(cbase, user, cmd, buf);
 }
@@ -739,7 +755,7 @@ void commands_builtin_add(struct command_base* cbase)
 	ADD_COMMAND("broadcast",  9, "+m",auth_cred_operator,  command_broadcast,"Send a message to all users"  );
 	ADD_COMMAND("getip",      5, "u", auth_cred_operator,  command_getip,    "Show IP address for a user"   );
 	ADD_COMMAND("help",       4, "?c",auth_cred_guest,     command_help,     "Show this help message."      );
-	ADD_COMMAND("ban",        3, "u", auth_cred_operator,  command_ban,      "Ban a user (cluster-wide)"    );
+	ADD_COMMAND("ban",        3, "u?n",auth_cred_operator, command_ban,      "Ban a user (cluster-wide); optional duration e.g. 30m/12h/7d");
 	ADD_COMMAND("unban",      5, "+n",auth_cred_operator,  command_unban,    "Remove a ban by nick/CID/IP"  );
 	ADD_COMMAND("kick",       4, "u", auth_cred_operator,  command_kick,     "Kick a user"                  );
 	ADD_COMMAND("redirect",   8, "uA",auth_cred_operator,  command_redirect, "Redirect a user to another hub");

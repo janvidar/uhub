@@ -20,6 +20,8 @@
 #ifndef HAVE_UHUB_ACL_H
 #define HAVE_UHUB_ACL_H
 
+#include <time.h>
+
 struct linked_list;
 struct auth_info;
 
@@ -35,6 +37,7 @@ struct acl_handle
 	struct linked_list* nat_override;   /* IPs inside these ranges can provide their false IP. Use with care! */
 	struct linked_list* users_banned;   /* Users permanently banned */
 	struct linked_list* users_denied;   /* bad nickname */
+	struct linked_list* timed_bans;     /* Runtime bans with an expiry (struct acl_timed_ban) */
 };
 
 
@@ -59,6 +62,14 @@ extern int acl_user_ban_cid(struct acl_handle* handle, const char* cid);
 extern int acl_user_unban_nick(struct acl_handle* handle, const char* nick);
 extern int acl_user_unban_cid(struct acl_handle* handle, const char* cid);
 extern int acl_user_unban_ip(struct acl_handle* handle, const char* address);
+
+/* Timed (expiring) runtime bans. expiry is an absolute unix time. */
+extern int acl_add_timed_ban(struct acl_handle* handle, const char* cid, const char* nick, time_t expiry);
+/* Returns seconds remaining (>0) if cid or nick matches a non-expired timed ban
+   at time 'now'; 0 if not banned. Purges entries that have expired. */
+extern time_t acl_timed_ban_remaining(struct acl_handle* handle, const char* cid, const char* nick, time_t now);
+/* Remove timed bans whose cid or nick equals target. Returns the number removed. */
+extern int acl_timed_unban(struct acl_handle* handle, const char* target);
 
 /**
  * Verify a password.

@@ -606,9 +606,26 @@ static int check_acl(struct hub_info* hub, struct hub_user* user, struct adc_mes
 		return status_msg_ban_permanently;
 	}
 
+	/* Timed (expiring) runtime bans. Expired entries are purged by this call. */
+	if (acl_timed_ban_remaining(hub->acl, user->id.cid, user->id.nick, time(NULL)) > 0)
+	{
+		return status_msg_ban_temporarily;
+	}
+
 	if (acl_is_user_denied(hub->acl, user->id.nick))
 	{
 		return status_msg_inf_error_nick_restricted;
+	}
+
+	/* Policy plugins may dynamically restrict nicks / CIDs. */
+	if (plugin_check_nick(hub, user->id.nick) == st_deny)
+	{
+		return status_msg_inf_error_nick_restricted;
+	}
+
+	if (plugin_check_cid(hub, user->id.cid) == st_deny)
+	{
+		return status_msg_inf_error_cid_invalid;
 	}
 
 	return 0;

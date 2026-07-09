@@ -116,7 +116,8 @@ static struct sql_data *parse_config(const char *line, struct plugin_handle *plu
         char* err = 0;
         if (sqlite3_exec(data->db,
                 "CREATE TABLE IF NOT EXISTS bans ("
-                "cid TEXT NOT NULL DEFAULT '', nickname TEXT NOT NULL DEFAULT '');"
+                "cid TEXT NOT NULL DEFAULT '', nickname TEXT NOT NULL DEFAULT '', "
+                "expiry INTEGER NOT NULL DEFAULT 0);"
                 "CREATE INDEX IF NOT EXISTS uhub_bans_cid ON bans (cid);"
                 "CREATE INDEX IF NOT EXISTS uhub_bans_nick ON bans (nickname COLLATE NOCASE);",
                 NULL, NULL, &err) != SQLITE_OK) {
@@ -124,6 +125,12 @@ static struct sql_data *parse_config(const char *line, struct plugin_handle *plu
                 err ? err : "unknown error");
             sqlite3_free(err);
         }
+        /* Add the expiry column to a bans table created before timed bans
+           existed. Best-effort: fails harmlessly if the column already exists. */
+        err = 0;
+        sqlite3_exec(data->db, "ALTER TABLE bans ADD COLUMN expiry INTEGER NOT NULL DEFAULT 0;",
+            NULL, NULL, &err);
+        sqlite3_free(err);
     }
 
     return data;
@@ -269,7 +276,7 @@ static plugin_st ban_add(struct plugin_handle *plugin, const struct ban_info *ba
     if (sql->exclusive)
         return st_deny;
 
-    rc = sqlite3_prepare_v2(sql->db, "INSERT INTO bans (cid, nickname) VALUES(?, ?);", -1, &stmt, NULL);
+    rc = sqlite3_prepare_v2(sql->db, "INSERT INTO bans (cid, nickname, expiry) VALUES(?, ?, ?);", -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "Unable to store ban: %s\n", sqlite3_errmsg(sql->db));
         return st_deny;
@@ -277,6 +284,7 @@ static plugin_st ban_add(struct plugin_handle *plugin, const struct ban_info *ba
 
     sqlite3_bind_text(stmt, 1, (ban->flags & ban_cid) ? ban->cid : "", -1, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 2, (ban->flags & ban_nickname) ? ban->nickname : "", -1, SQLITE_STATIC);
+    sqlite3_bind_int64(stmt, 3, (sqlite3_int64) ban->expiry);
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
@@ -315,21 +323,31 @@ static plugin_st ban_del(struct plugin_handle *plugin, const struct ban_info *ba
     return sqlite3_changes(sql->db) > 0 ? st_allow : st_default;
 }
 
-/* Login-time query: is this user's CID or nick in the bans table? */
+/* Login-time query: is this user's CID or nick in the bans table and not yet
+   expired? Timed bans (expiry != 0) lift themselves once expiry passes. */
 static plugin_st is_banned(struct plugin_handle *plugin, struct plugin_user *user) {
     struct sql_data *sql = (struct sql_data *)plugin->ptr;
     sqlite3_stmt *stmt;
+    sqlite3_int64 now = (sqlite3_int64) time(NULL);
     int rc;
     int banned = 0;
 
+    /* Housekeeping: drop expired timed bans (best-effort). */
+    if (sqlite3_prepare_v2(sql->db, "DELETE FROM bans WHERE expiry <> 0 AND expiry <= ?;", -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_int64(stmt, 1, now);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+
     rc = sqlite3_prepare_v2(sql->db,
-        "SELECT 1 FROM bans WHERE (nickname <> '' AND nickname = ? COLLATE NOCASE) "
-        "OR (cid <> '' AND cid = ?) LIMIT 1;", -1, &stmt, NULL);
+        "SELECT 1 FROM bans WHERE ((nickname <> '' AND nickname = ? COLLATE NOCASE) "
+        "OR (cid <> '' AND cid = ?)) AND (expiry = 0 OR expiry > ?) LIMIT 1;", -1, &stmt, NULL);
     if (rc != SQLITE_OK)
         return st_default;
 
     sqlite3_bind_text(stmt, 1, user->nick, -1, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 2, user->cid, -1, SQLITE_STATIC);
+    sqlite3_bind_int64(stmt, 3, now);
 
     if (sqlite3_step(stmt) == SQLITE_ROW)
         banned = 1;

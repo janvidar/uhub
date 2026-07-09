@@ -80,6 +80,15 @@ extern const char* uhub_ulltoa(uint64_t val);
 
 extern int uhub_atoi(const char* value);
 
+/**
+ * Parse a human ban duration into seconds. Accepts a non-negative integer with
+ * an optional unit suffix: 's' (seconds, default), 'm' (minutes), 'h' (hours),
+ * or 'd' (days). Examples: "3600", "60m", "24h", "7d".
+ * @param seconds_out set to the parsed number of seconds on success.
+ * @return 0 on success, -1 on a malformed or negative/overflowing value.
+ */
+extern int parse_duration_seconds(const char* str, int* seconds_out);
+
 #ifndef HAVE_STRNDUP
 extern char* strndup(const char* string, size_t n);
 #endif

@@ -314,20 +314,31 @@ static int link_process_line(struct hub_link* link, const char* line)
 
 	if (strncmp(line, "LBAN ", 5) == 0)
 	{
-		/* Cluster-wide ban from a peer: "LBAN <cid> <nick>". Apply locally
-		   (ban + disconnect a matching local user) without re-propagating. */
-		const char* p = line + 5;
-		const char* sp = strchr(p, ' ');
+		/* Cluster-wide ban from a peer: "LBAN <expiry> <cid> <nick>". Apply
+		   locally (ban + disconnect a matching local user) without re-propagating.
+		   expiry is an absolute unix time (0 = permanent). */
+		const char* p = line + 5;   /* <expiry> */
+		char* end = NULL;
+		long long expiry;
+		const char* cidp;
+		const char* sp;
 		char cid[MAX_CID_LEN + 1];
 		size_t clen;
-		if (link->state != link_state_established || !sp)
+		if (link->state != link_state_established)
 			return -1;
-		clen = (size_t) (sp - p);
+		expiry = strtoll(p, &end, 10);
+		if (end == p || *end != ' ')
+			return -1;
+		cidp = end + 1;             /* <cid> */
+		sp = strchr(cidp, ' ');
+		if (!sp)
+			return -1;
+		clen = (size_t) (sp - cidp);
 		if (clen > MAX_CID_LEN)
 			clen = MAX_CID_LEN;
-		memcpy(cid, p, clen);
+		memcpy(cid, cidp, clen);
 		cid[clen] = 0;
-		hub_apply_ban(link->hub, cid, sp + 1, 0);
+		hub_apply_ban(link->hub, cid, sp + 1, (time_t) expiry, 0);
 		return 0;
 	}
 
@@ -1064,10 +1075,11 @@ void link_broadcast_description(struct hub_info* hub, const char* escaped_desc)
 	});
 }
 
-/* Propagate a ban to every established link. Format: "LBAN <cid> <nick>", with
-   the CID first (fixed-width base32, no spaces) and the nick taking the rest of
-   the line (it may legitimately contain spaces). */
-void link_broadcast_ban(struct hub_info* hub, const char* cid, const char* nick)
+/* Propagate a ban to every established link. Format: "LBAN <expiry> <cid> <nick>",
+   with the absolute-unix-time expiry first (0 = permanent), then the CID
+   (fixed-width base32, no spaces), then the nick taking the rest of the line (it
+   may legitimately contain spaces). */
+void link_broadcast_ban(struct hub_info* hub, const char* cid, const char* nick, time_t expiry)
 {
 	struct hub_link* link;
 	char buf[256];
@@ -1075,7 +1087,7 @@ void link_broadcast_ban(struct hub_info* hub, const char* cid, const char* nick)
 	(void) hub;
 	if (!g_links)
 		return;
-	n = snprintf(buf, sizeof(buf), "LBAN %s %s\n", cid ? cid : "", nick ? nick : "");
+	n = snprintf(buf, sizeof(buf), "LBAN %lld %s %s\n", (long long) expiry, cid ? cid : "", nick ? nick : "");
 	if (n <= 0 || n >= (int) sizeof(buf))
 		return;
 	LIST_FOREACH(struct hub_link*, link, g_links,

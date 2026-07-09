@@ -158,6 +158,21 @@ static int cbfunc_user_disconnect(struct plugin_handle* plugin, struct plugin_us
 	return 0;
 }
 
+static int cbfunc_ban_user(struct plugin_handle* plugin, struct plugin_user* user, int seconds)
+{
+	struct hub_user* huser = as_hub_user(user);
+	/* Same path as the operator !ban: ban by cid+nick, disconnect, persist, and
+	   propagate cluster-wide. seconds > 0 makes it a timed ban; 0 is permanent. */
+	time_t expiry = (seconds > 0) ? time(NULL) + seconds : 0;
+	hub_apply_ban(plugin_get_hub(plugin), huser->id.cid, huser->id.nick, expiry, 1);
+	return 0;
+}
+
+static int cbfunc_unban(struct plugin_handle* plugin, const char* target)
+{
+	return hub_apply_unban(plugin_get_hub(plugin), target, 1);
+}
+
 static int cbfunc_command_add(struct plugin_handle* plugin, struct plugin_command_handle* cmdh)
 {
 	struct plugin_callback_data* data = get_callback_data(plugin);
@@ -291,6 +306,8 @@ void plugin_register_callback_functions(struct plugin_handle* handle)
 	handle->hub.send_status_message = cbfunc_send_status;
 	handle->hub.send_user_command = cbfunc_send_user_command;
 	handle->hub.user_disconnect = cbfunc_user_disconnect;
+	handle->hub.ban_user = cbfunc_ban_user;
+	handle->hub.unban = cbfunc_unban;
 	handle->hub.command_add = cbfunc_command_add;
 	handle->hub.command_del = cbfunc_command_del;
 	handle->hub.command_foreach = cbfunc_command_foreach;
