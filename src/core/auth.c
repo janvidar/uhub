@@ -253,8 +253,9 @@ int acl_initialize(struct hub_config* config, struct acl_handle* handle)
 	handle->cids         = list_create();
 	handle->networks     = list_create();
 	handle->nat_override = list_create();
+	handle->timed_bans   = list_create();
 
-	if (!handle->cids || !handle->networks || !handle->users_denied || !handle->users_banned || !handle->nat_override)
+	if (!handle->cids || !handle->networks || !handle->users_denied || !handle->users_banned || !handle->nat_override || !handle->timed_bans)
 	{
 		LOG_FATAL("acl_initialize: Out of memory");
 
@@ -263,6 +264,7 @@ int acl_initialize(struct hub_config* config, struct acl_handle* handle)
 		list_destroy(handle->cids);
 		list_destroy(handle->networks);
 		list_destroy(handle->nat_override);
+		list_destroy(handle->timed_bans);
 		return -1;
 	}
 
@@ -291,6 +293,9 @@ static void acl_free_ip_info(void* ptr)
 		hub_free(info);
 	}
 }
+
+/* Defined below (with the timed-ban store); forward-declared for acl_shutdown. */
+static void acl_free_timed_ban(void* ptr);
 
 int acl_shutdown(struct acl_handle* handle)
 {
@@ -323,6 +328,12 @@ int acl_shutdown(struct acl_handle* handle)
 	{
 		list_clear(handle->nat_override, &acl_free_ip_info);
 		list_destroy(handle->nat_override);
+	}
+
+	if (handle->timed_bans)
+	{
+		list_clear(handle->timed_bans, &acl_free_timed_ban);
+		list_destroy(handle->timed_bans);
 	}
 
 	memset(handle, 0, sizeof(struct acl_handle));
@@ -477,6 +488,120 @@ int acl_user_unban_ip(struct acl_handle* handle, const char* address)
 		}
 	});
 	return -1;
+}
+
+
+/* A runtime ban with an expiry, stored in acl_handle->timed_bans. cid and nick
+   are heap strings ("" when that identifier is not part of the ban). */
+struct acl_timed_ban
+{
+	char* cid;
+	char* nick;
+	time_t expiry;   /* absolute unix time */
+};
+
+static void acl_free_timed_ban(void* ptr)
+{
+	struct acl_timed_ban* tb = (struct acl_timed_ban*) ptr;
+	if (tb)
+	{
+		hub_free(tb->cid);
+		hub_free(tb->nick);
+		hub_free(tb);
+	}
+}
+
+static int acl_timed_ban_matches(struct acl_timed_ban* tb, const char* cid, const char* nick)
+{
+	if (tb->cid[0] && cid && strcasecmp(tb->cid, cid) == 0)
+		return 1;
+	if (tb->nick[0] && nick && strcasecmp(tb->nick, nick) == 0)
+		return 1;
+	return 0;
+}
+
+int acl_add_timed_ban(struct acl_handle* handle, const char* cid, const char* nick, time_t expiry)
+{
+	struct acl_timed_ban* tb = hub_malloc_zero(sizeof(struct acl_timed_ban));
+	if (!tb)
+	{
+		LOG_ERROR("ACL error: Out of memory!");
+		return -1;
+	}
+	tb->cid = hub_strdup(cid ? cid : "");
+	tb->nick = hub_strdup(nick ? nick : "");
+	tb->expiry = expiry;
+	if (!tb->cid || !tb->nick)
+	{
+		acl_free_timed_ban(tb);
+		return -1;
+	}
+	list_append(handle->timed_bans, tb);
+	return 0;
+}
+
+time_t acl_timed_ban_remaining(struct acl_handle* handle, const char* cid, const char* nick, time_t now)
+{
+	struct acl_timed_ban* tb;
+	struct acl_timed_ban* match = NULL;
+	struct linked_list* expired;
+	time_t remaining = 0;
+
+	if (!handle->timed_bans)
+		return 0;
+	expired = list_create();
+	if (!expired)
+		return 0;
+
+	LIST_FOREACH(struct acl_timed_ban*, tb, handle->timed_bans,
+	{
+		if (tb->expiry != 0 && tb->expiry <= now)
+			list_append(expired, tb);          /* collect; do not remove while iterating */
+		else if (!match && acl_timed_ban_matches(tb, cid, nick))
+			match = tb;
+	});
+
+	while ((tb = (struct acl_timed_ban*) list_get_first(expired)))
+	{
+		list_remove(handle->timed_bans, tb);
+		acl_free_timed_ban(tb);
+		list_remove(expired, tb);
+	}
+	list_destroy(expired);
+
+	if (match)
+		remaining = match->expiry - now;
+	return remaining > 0 ? remaining : 0;
+}
+
+int acl_timed_unban(struct acl_handle* handle, const char* target)
+{
+	struct acl_timed_ban* tb;
+	struct linked_list* hits;
+	int removed = 0;
+
+	if (!handle->timed_bans || !target)
+		return 0;
+	hits = list_create();
+	if (!hits)
+		return 0;
+
+	LIST_FOREACH(struct acl_timed_ban*, tb, handle->timed_bans,
+	{
+		if ((tb->cid[0] && strcasecmp(tb->cid, target) == 0) ||
+		    (tb->nick[0] && strcasecmp(tb->nick, target) == 0))
+			list_append(hits, tb);
+	});
+
+	while ((tb = (struct acl_timed_ban*) list_get_first(hits)))
+	{
+		list_remove(handle->timed_bans, tb);
+		acl_free_timed_ban(tb);
+		list_remove(hits, tb);
+		removed++;
+	}
+	list_destroy(hits);
+	return removed;
 }
 
 

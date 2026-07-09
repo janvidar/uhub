@@ -217,3 +217,27 @@ EXO_TEST(base32_decode_len_one, {
 		if (dec[k] != 0xA5) return 0;
 	return 1;
 });
+
+/* parse_duration_seconds: bare seconds and s/m/h/d unit suffixes. */
+static int dur_ok(const char* s, int expect)
+{
+	int v = -1;
+	return parse_duration_seconds(s, &v) == 0 && v == expect;
+}
+static int dur_bad(const char* s)
+{
+	int v = 0;
+	return parse_duration_seconds(s, &v) == -1;
+}
+EXO_TEST(dur_seconds_bare, { return dur_ok("3600", 3600); });
+EXO_TEST(dur_seconds_unit, { return dur_ok("45s", 45); });
+EXO_TEST(dur_minutes,      { return dur_ok("30m", 1800); });
+EXO_TEST(dur_hours,        { return dur_ok("12h", 43200); });
+EXO_TEST(dur_days,         { return dur_ok("7d", 604800); });
+EXO_TEST(dur_zero,         { return dur_ok("0", 0); });
+EXO_TEST(dur_leading_ws,   { return dur_ok("  60m", 3600); });
+EXO_TEST(dur_bad_empty,    { return dur_bad(""); });
+EXO_TEST(dur_bad_unit,     { return dur_bad("10y"); });
+EXO_TEST(dur_bad_trailing, { return dur_bad("10mm"); });
+EXO_TEST(dur_bad_nonnum,   { return dur_bad("abc"); });
+EXO_TEST(dur_bad_negative, { return dur_bad("-5"); });

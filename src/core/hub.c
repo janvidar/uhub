@@ -1226,16 +1226,24 @@ void hub_update_description(struct hub_info* hub, const char* escaped_desc, int 
 		link_broadcast_description(hub, escaped_desc);
 }
 
-void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, int propagate)
+void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, time_t expiry, int propagate)
 {
 	struct hub_user* u;
 
 	/* Add to this node's runtime ACL so the user cannot reconnect here
-	   (check_acl consults acl_is_*_banned at login). */
-	if (cid && *cid)
-		acl_user_ban_cid(hub->acl, cid);
-	if (nick && *nick)
-		acl_user_ban_nick(hub->acl, nick);
+	   (check_acl consults the ACL at login). A permanent ban (expiry == 0) goes
+	   to the plain nick/CID lists; a timed ban goes to the expiring store. */
+	if (expiry == 0)
+	{
+		if (cid && *cid)
+			acl_user_ban_cid(hub->acl, cid);
+		if (nick && *nick)
+			acl_user_ban_nick(hub->acl, nick);
+	}
+	else
+	{
+		acl_add_timed_ban(hub->acl, cid ? cid : "", nick ? nick : "", expiry);
+	}
 
 	/* Persist the ban through a storage plugin (write-through), so it survives a
 	   reload/restart -- the runtime ACL above is rebuilt from config on reload.
@@ -1245,6 +1253,7 @@ void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, int 
 	{
 		struct ban_info ban;
 		memset(&ban, 0, sizeof(ban));
+		ban.expiry = expiry;
 		if (cid && *cid)
 		{
 			ban.flags |= ban_cid;
@@ -1278,9 +1287,10 @@ void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, int 
 	}
 
 	/* Propagate cluster-wide so the ban applies on every node. A ban received
-	   over a link is applied with propagate = 0 (loop-free on a full mesh). */
+	   over a link is applied with propagate = 0 (loop-free on a full mesh). The
+	   expiry is an absolute time, so every node agrees on when it lifts. */
 	if (propagate)
-		link_broadcast_ban(hub, cid, nick);
+		link_broadcast_ban(hub, cid, nick, expiry);
 }
 
 int hub_apply_unban(struct hub_info* hub, const char* target, int propagate)
@@ -1299,6 +1309,7 @@ int hub_apply_unban(struct hub_info* hub, const char* target, int propagate)
 		removed++;
 	if (acl_user_unban_ip(hub->acl, target) == 0)
 		removed++;
+	removed += acl_timed_unban(hub->acl, target);
 
 	/* Remove any persisted record through the storage plugin. target may be a
 	   nick or a CID, so offer it as both and let the plugin match either. */

@@ -323,6 +323,51 @@ int uhub_atoi(const char* value) {
 	return (int) val;
 }
 
+int parse_duration_seconds(const char* str, int* seconds_out)
+{
+	int64_t val = 0;
+	int64_t mult = 1;
+	const char* p = str;
+	int digits = 0;
+
+	if (!str)
+		return -1;
+
+	while (*p == ' ' || *p == '\t')
+		p++;
+
+	for (; *p >= '0' && *p <= '9'; p++)
+	{
+		val = val * 10 + (*p - '0');
+		digits = 1;
+		if (val > INT_MAX)          /* keep the pre-multiply value in range */
+			return -1;
+	}
+	if (!digits)
+		return -1;
+
+	switch (*p)
+	{
+		case '\0':
+		case 's': mult = 1;     break;
+		case 'm': mult = 60;    break;
+		case 'h': mult = 3600;  break;
+		case 'd': mult = 86400; break;
+		default:  return -1;    /* unknown unit */
+	}
+	if (*p != '\0')
+		p++;                    /* consumed the unit char */
+	if (*p != '\0')
+		return -1;              /* trailing garbage */
+
+	val *= mult;
+	if (val > INT_MAX)
+		return -1;              /* overflow */
+
+	*seconds_out = (int) val;
+	return 0;
+}
+
 int is_number(const char* value, int* num)
 {
 	int len = strlen(value);

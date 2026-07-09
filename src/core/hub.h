@@ -301,9 +301,10 @@ extern void hub_update_description(struct hub_info* hub, const char* escaped_des
  * Ban a user cluster-wide: add the cid/nick to this node's runtime ACL,
  * disconnect a matching locally-connected user, and (when propagate is set)
  * forward the ban to linked hubs so it applies on every node. A ban received
- * over a link is applied with propagate = 0.
+ * over a link is applied with propagate = 0. expiry is an absolute unix time
+ * (0 = permanent); a non-zero expiry makes it a timed ban that lifts itself.
  */
-extern void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, int propagate);
+extern void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, time_t expiry, int propagate);
 
 /**
  * Lift a ban cluster-wide. target may be a nick, CID or IP/range; it is removed

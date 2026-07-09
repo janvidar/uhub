@@ -40,6 +40,10 @@ void plugin_log_chat_message(struct hub_info* hub, struct hub_user* from, const 
 plugin_st plugin_check_ip_early(struct hub_info* hub, struct ip_addr_encap* addr);
 plugin_st plugin_check_ip_late(struct hub_info* hub, struct hub_user* user, struct ip_addr_encap* addr);
 
+/* Login-time nick/CID validation. A plugin returning st_deny rejects the login. */
+plugin_st plugin_check_nick(struct hub_info* hub, const char* nick);
+plugin_st plugin_check_cid(struct hub_info* hub, const char* cid);
+
 /* Nickname allow/deny handling */
 plugin_st plugin_check_nickname_valid(struct hub_info* hub, const char* nick);
 plugin_st plugin_check_nickname_reserved(struct hub_info* hub, const char* nick);

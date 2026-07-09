@@ -94,6 +94,16 @@ plugin_st plugin_check_ip_late(struct hub_info* hub, struct hub_user* who, struc
 	PLUGIN_INVOKE_STATUS_2(hub, on_check_ip_late, user, addr);
 }
 
+plugin_st plugin_check_nick(struct hub_info* hub, const char* nick)
+{
+	PLUGIN_INVOKE_STATUS_1(hub, on_validate_nick, nick);
+}
+
+plugin_st plugin_check_cid(struct hub_info* hub, const char* cid)
+{
+	PLUGIN_INVOKE_STATUS_1(hub, on_validate_cid, cid);
+}
+
 void plugin_log_connection_accepted(struct hub_info* hub, struct ip_addr_encap* ipaddr)
 {
 	PLUGIN_INVOKE_1(hub, on_connection_accepted, ipaddr);

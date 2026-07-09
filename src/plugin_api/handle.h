@@ -96,6 +96,8 @@ struct plugin_funcs
 	// Activity events (can be intercepted and refused/accepted by a plugin)
 	on_check_ip_early_t     on_check_ip_early;   /* A user has just connected (can be intercepted) */
 /* ! */	on_check_ip_late_t      on_check_ip_late;    /* A user has logged in (can be intercepted) */
+	on_validate_nick_t      on_validate_nick;    /* Validate a nick at login; st_deny rejects it */
+	on_validate_cid_t       on_validate_cid;     /* Validate a CID at login; st_deny rejects it */
 /* ! */	on_change_nick_t        on_change_nick;      /* A user wants to change his nick (can be intercepted) */
 	on_chat_msg_t           on_chat_msg;         /* A public chat message is about to be sent (can be intercepted) */
 	on_private_msg_t        on_private_msg;      /* A public chat message is about to be sent (can be intercepted) */
@@ -130,6 +132,8 @@ typedef int (*hfunc_send_broadcast_message)(struct plugin_handle*, const char* m
 typedef int (*hfunc_send_status)(struct plugin_handle*, struct plugin_user* to, int code, const char* message);
 typedef int (*hfunc_send_user_command)(struct plugin_handle*, struct plugin_user* user, const char* name, int context, const char* command);
 typedef int (*hfunc_user_disconnect)(struct plugin_handle*, struct plugin_user* user);
+typedef int (*hfunc_ban_user)(struct plugin_handle*, struct plugin_user* user, int seconds);
+typedef int (*hfunc_unban)(struct plugin_handle*, const char* target);
 typedef int (*hfunc_command_add)(struct plugin_handle*, struct plugin_command_handle*);
 typedef int (*hfunc_command_del)(struct plugin_handle*, struct plugin_command_handle*);
 
@@ -157,6 +161,8 @@ struct plugin_hub_funcs
 	hfunc_send_status send_status_message;
 	hfunc_send_user_command send_user_command;
 	hfunc_user_disconnect user_disconnect;
+	hfunc_ban_user ban_user;      /* Ban a user (cid+nick) cluster-wide, persist, disconnect; seconds=0 is permanent */
+	hfunc_unban unban;            /* Lift a ban by nick/CID/IP cluster-wide */
 	hfunc_command_add command_add;
 	hfunc_command_del command_del;
 	hfunc_command_foreach command_foreach;

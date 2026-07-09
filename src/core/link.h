@@ -20,6 +20,7 @@
 #ifndef HAVE_UHUB_LINK_H
 #define HAVE_UHUB_LINK_H
 
+#include <time.h>
 #include "adc/adctypes.h"
 
 /*
@@ -91,8 +92,9 @@ extern void link_broadcast_description(struct hub_info* hub, const char* escaped
 
 /**
  * Propagate a cluster-wide ban (cid and/or nick) to every established link.
+ * expiry is an absolute unix time (0 = permanent).
  */
-extern void link_broadcast_ban(struct hub_info* hub, const char* cid, const char* nick);
+extern void link_broadcast_ban(struct hub_info* hub, const char* cid, const char* nick, time_t expiry);
 
 /**
  * Propagate a cluster-wide unban (nick, CID or IP/range) to every established link.
