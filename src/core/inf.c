@@ -600,16 +600,31 @@ static int check_acl(struct hub_info* hub, struct hub_user* user, struct adc_mes
 	}
 
 	/* Persisted bans held by a storage plugin (survive restart/reload, where the
-	   in-memory ACL above is rebuilt from config only). */
-	if (plugin_is_banned(hub, user) == st_deny)
+	   in-memory ACL above is rebuilt from config only). The plugin reports the
+	   ban's expiry so a still-active timed ban is shown as temporary with the
+	   correct reconnect time, not as a permanent ban. */
 	{
-		return status_msg_ban_permanently;
+		time_t expiry = 0;
+		if (plugin_is_banned(hub, user, &expiry) == st_deny)
+		{
+			time_t remaining = expiry ? expiry - time(NULL) : 0;
+			if (expiry && remaining > 0)
+			{
+				user->ban_reconnect_time = (int) remaining;
+				return status_msg_ban_temporarily;
+			}
+			return status_msg_ban_permanently;
+		}
 	}
 
 	/* Timed (expiring) runtime bans. Expired entries are purged by this call. */
-	if (acl_timed_ban_remaining(hub->acl, user->id.cid, user->id.nick, time(NULL)) > 0)
 	{
-		return status_msg_ban_temporarily;
+		time_t remaining = acl_timed_ban_remaining(hub->acl, user->id.cid, user->id.nick, time(NULL));
+		if (remaining > 0)
+		{
+			user->ban_reconnect_time = (int) remaining;
+			return status_msg_ban_temporarily;
+		}
 	}
 
 	if (acl_is_user_denied(hub->acl, user->id.nick))

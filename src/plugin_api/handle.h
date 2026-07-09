@@ -67,7 +67,9 @@ typedef plugin_st (*auth_delete_user_t)(struct plugin_handle*, struct auth_info*
 
 typedef plugin_st (*auth_ban_add_t)(struct plugin_handle*, const struct ban_info* ban);
 typedef plugin_st (*auth_ban_del_t)(struct plugin_handle*, const struct ban_info* ban);
-typedef plugin_st (*auth_is_banned_t)(struct plugin_handle*, struct plugin_user* user);
+/* On st_deny, set *expiry to the ban's absolute expiry time (0 = permanent) so
+   the hub can report the correct temporary/permanent status and reconnect time. */
+typedef plugin_st (*auth_is_banned_t)(struct plugin_handle*, struct plugin_user* user, time_t* expiry);
 
 /**
  * These are callbacks used for the hub to invoke functions in plugins.

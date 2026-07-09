@@ -74,7 +74,7 @@ plugin_st plugin_auth_delete_user(struct hub_info* hub, struct auth_info* user);
    plugin reports the user as banned. */
 plugin_st plugin_ban_add(struct hub_info* hub, const struct ban_info* ban);
 plugin_st plugin_ban_del(struct hub_info* hub, const struct ban_info* ban);
-plugin_st plugin_is_banned(struct hub_info* hub, struct hub_user* user);
+plugin_st plugin_is_banned(struct hub_info* hub, struct hub_user* user, time_t* expiry);
 
 #endif // HAVE_UHUB_PLUGIN_INVOKE_H
 

@@ -240,31 +240,35 @@ EXO_TEST(mas_ban_add, {
 	return mas_plugin.funcs.auth_ban_add(&mas_plugin, &b) == st_allow;
 });
 
-/* A user matching the banned CID (any nick) is banned. */
+/* A user matching the banned CID (any nick) is banned; expiry 0 = permanent. */
 EXO_TEST(mas_banned_by_cid, {
 	struct plugin_user u = mas_puser(MAS_CID, "SomeOtherNick");
-	return mas_plugin.funcs.auth_is_banned(&mas_plugin, &u) == st_deny;
+	time_t exp = -1;
+	return mas_plugin.funcs.auth_is_banned(&mas_plugin, &u, &exp) == st_deny && exp == 0;
 });
 
 /* A user matching the banned nick (any CID), case-insensitively, is banned. */
 EXO_TEST(mas_banned_by_nick, {
 	struct plugin_user u = mas_puser("CLEANCID000000000000000000000000000000A", "eviluser");
-	return mas_plugin.funcs.auth_is_banned(&mas_plugin, &u) == st_deny;
+	time_t exp = 0;
+	return mas_plugin.funcs.auth_is_banned(&mas_plugin, &u, &exp) == st_deny;
 });
 
 /* An unrelated user is not banned. */
 EXO_TEST(mas_not_banned, {
 	struct plugin_user u = mas_puser("CLEANCID000000000000000000000000000000A", "innocent");
-	return mas_plugin.funcs.auth_is_banned(&mas_plugin, &u) == st_default;
+	time_t exp = 0;
+	return mas_plugin.funcs.auth_is_banned(&mas_plugin, &u, &exp) == st_default;
 });
 
 /* Unban by nick (hub offers the target as both fields) removes the record. */
 EXO_TEST(mas_ban_del, {
 	struct ban_info b = mas_ban("Eviluser", "Eviluser");
 	struct plugin_user u = mas_puser(MAS_CID, "Eviluser");
+	time_t exp = 0;
 	if (mas_plugin.funcs.auth_ban_del(&mas_plugin, &b) != st_allow)
 		return 0;
-	return mas_plugin.funcs.auth_is_banned(&mas_plugin, &u) == st_default;
+	return mas_plugin.funcs.auth_is_banned(&mas_plugin, &u, &exp) == st_default;
 });
 
 /* Deleting a ban that does not exist reports "no opinion" (st_default). */
@@ -286,7 +290,8 @@ EXO_TEST(mas_timed_future_add, {
 });
 EXO_TEST(mas_timed_future_hit, {
 	struct plugin_user u = mas_puser("TIMEDCID000000000000000000000000000000A", "whoever");
-	return mas_plugin.funcs.auth_is_banned(&mas_plugin, &u) == st_deny;
+	time_t exp = 0;
+	return mas_plugin.funcs.auth_is_banned(&mas_plugin, &u, &exp) == st_deny && exp == 2000000000;
 });
 EXO_TEST(mas_timed_past_add, {
 	struct ban_info b = mas_ban_exp("EXPIREDCID00000000000000000000000000000A", "expireduser", 1);
@@ -294,7 +299,8 @@ EXO_TEST(mas_timed_past_add, {
 });
 EXO_TEST(mas_timed_past_miss, {
 	struct plugin_user u = mas_puser("EXPIREDCID00000000000000000000000000000A", "whoever");
-	return mas_plugin.funcs.auth_is_banned(&mas_plugin, &u) == st_default;
+	time_t exp = 0;
+	return mas_plugin.funcs.auth_is_banned(&mas_plugin, &u, &exp) == st_default;
 });
 
 EXO_TEST(mas_teardown, {
