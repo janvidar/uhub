@@ -112,6 +112,7 @@ const plugins = [_]Plugin{
     .{ .name = "mod_logging" },
     .{ .name = "mod_auth_simple" },
     .{ .name = "mod_auth_sqlite", .sqlite = true },
+    .{ .name = "mod_selfregister" },
     .{ .name = "mod_chat_history" },
     .{ .name = "mod_chat_history_sqlite", .sqlite = true },
     .{ .name = "mod_chat_only" },

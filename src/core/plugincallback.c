@@ -20,6 +20,7 @@
 #include "util/log.h"
 #include "util/memory.h"
 #include "adc/message.h"
+#include "core/auth.h"
 #include "core/commands.h"
 #include "core/config.h"
 #include "core/hub.h"
@@ -173,6 +174,26 @@ static int cbfunc_unban(struct plugin_handle* plugin, const char* target)
 	return hub_apply_unban(plugin_get_hub(plugin), target, 1);
 }
 
+static int cbfunc_auth_get_user(struct plugin_handle* plugin, const char* nick, struct auth_info* out)
+{
+	struct auth_info* info = acl_get_access_info(plugin_get_hub(plugin), nick);
+	if (!info)
+		return 0;
+	memcpy(out, info, sizeof(*out));
+	hub_free(info);
+	return 1;
+}
+
+static int cbfunc_auth_register_user(struct plugin_handle* plugin, struct auth_info* user)
+{
+	return acl_register_user(plugin_get_hub(plugin), user);
+}
+
+static int cbfunc_auth_update_user(struct plugin_handle* plugin, struct auth_info* user)
+{
+	return acl_update_user(plugin_get_hub(plugin), user);
+}
+
 static int cbfunc_command_add(struct plugin_handle* plugin, struct plugin_command_handle* cmdh)
 {
 	struct plugin_callback_data* data = get_callback_data(plugin);
@@ -308,6 +329,9 @@ void plugin_register_callback_functions(struct plugin_handle* handle)
 	handle->hub.user_disconnect = cbfunc_user_disconnect;
 	handle->hub.ban_user = cbfunc_ban_user;
 	handle->hub.unban = cbfunc_unban;
+	handle->hub.auth_get_user = cbfunc_auth_get_user;
+	handle->hub.auth_register_user = cbfunc_auth_register_user;
+	handle->hub.auth_update_user = cbfunc_auth_update_user;
 	handle->hub.command_add = cbfunc_command_add;
 	handle->hub.command_del = cbfunc_command_del;
 	handle->hub.command_foreach = cbfunc_command_foreach;

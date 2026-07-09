@@ -136,6 +136,12 @@ typedef int (*hfunc_send_user_command)(struct plugin_handle*, struct plugin_user
 typedef int (*hfunc_user_disconnect)(struct plugin_handle*, struct plugin_user* user);
 typedef int (*hfunc_ban_user)(struct plugin_handle*, struct plugin_user* user, int seconds);
 typedef int (*hfunc_unban)(struct plugin_handle*, const char* target);
+/* User-account storage access, routed to whatever auth/storage plugin is loaded.
+   A business-logic plugin (e.g. self-registration) uses these instead of talking
+   to a specific storage plugin. Return 1 on success, 0 on failure/not-found. */
+typedef int (*hfunc_auth_get_user)(struct plugin_handle*, const char* nick, struct auth_info* out);
+typedef int (*hfunc_auth_register_user)(struct plugin_handle*, struct auth_info* user);
+typedef int (*hfunc_auth_update_user)(struct plugin_handle*, struct auth_info* user);
 typedef int (*hfunc_command_add)(struct plugin_handle*, struct plugin_command_handle*);
 typedef int (*hfunc_command_del)(struct plugin_handle*, struct plugin_command_handle*);
 
@@ -165,6 +171,9 @@ struct plugin_hub_funcs
 	hfunc_user_disconnect user_disconnect;
 	hfunc_ban_user ban_user;      /* Ban a user (cid+nick) cluster-wide, persist, disconnect; seconds=0 is permanent */
 	hfunc_unban unban;            /* Lift a ban by nick/CID/IP cluster-wide */
+	hfunc_auth_get_user auth_get_user;           /* Look up a stored user record via the storage plugin(s) */
+	hfunc_auth_register_user auth_register_user; /* Create a stored user record */
+	hfunc_auth_update_user auth_update_user;     /* Update a stored user record */
 	hfunc_command_add command_add;
 	hfunc_command_del command_del;
 	hfunc_command_foreach command_foreach;
