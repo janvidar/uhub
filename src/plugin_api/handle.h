@@ -65,6 +65,10 @@ typedef plugin_st (*auth_register_user_t)(struct plugin_handle*, struct auth_inf
 typedef plugin_st (*auth_update_user_t)(struct plugin_handle*, struct auth_info* user);
 typedef plugin_st (*auth_delete_user_t)(struct plugin_handle*, struct auth_info* user);
 
+typedef plugin_st (*auth_ban_add_t)(struct plugin_handle*, const struct ban_info* ban);
+typedef plugin_st (*auth_ban_del_t)(struct plugin_handle*, const struct ban_info* ban);
+typedef plugin_st (*auth_is_banned_t)(struct plugin_handle*, struct plugin_user* user);
+
 /**
  * These are callbacks used for the hub to invoke functions in plugins.
  * The marked ones are not being called yet.
@@ -106,6 +110,14 @@ struct plugin_funcs
 	auth_register_user_t    auth_register_user;  /* Register user */
 	auth_update_user_t      auth_update_user;    /* Update a registered user */
 	auth_delete_user_t      auth_delete_user;    /* Delete a registered user */
+
+	// Ban storage/retention. The hub is the only caller: it persists bans here
+	// (write-through from !ban / hub_apply_ban) and asks at login whether a user
+	// is banned. If no plugin implements these, bans live only in the hub's
+	// in-memory ACL and are lost on restart.
+	auth_ban_add_t          auth_ban_add;        /* Persist a ban record (st_allow if stored) */
+	auth_ban_del_t          auth_ban_del;        /* Remove a persisted ban record */
+	auth_is_banned_t        auth_is_banned;      /* Query if a user matches a persisted ban (st_deny = banned) */
 
 };
 

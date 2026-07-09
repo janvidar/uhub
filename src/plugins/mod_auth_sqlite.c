@@ -109,6 +109,23 @@ static struct sql_data *parse_config(const char *line, struct plugin_handle *plu
         }
     }
 
+    /* Ban storage. Unlike the users table (provisioned by uhub-passwd), the bans
+       table is created here so an existing hub gains ban persistence on upgrade
+       without a manual migration. */
+    {
+        char* err = 0;
+        if (sqlite3_exec(data->db,
+                "CREATE TABLE IF NOT EXISTS bans ("
+                "cid TEXT NOT NULL DEFAULT '', nickname TEXT NOT NULL DEFAULT '');"
+                "CREATE INDEX IF NOT EXISTS uhub_bans_cid ON bans (cid);"
+                "CREATE INDEX IF NOT EXISTS uhub_bans_nick ON bans (nickname COLLATE NOCASE);",
+                NULL, NULL, &err) != SQLITE_OK) {
+            fprintf(stderr, "mod_auth_sqlite: could not create bans table (%s)\n",
+                err ? err : "unknown error");
+            sqlite3_free(err);
+        }
+    }
+
     return data;
 }
 
@@ -241,6 +258,86 @@ static plugin_st delete_user(struct plugin_handle *plugin, struct auth_info *use
     return st_allow;
 }
 
+/* Persist a ban. The hub calls this write-through from !ban / hub_apply_ban. A
+   record stores the CID and/or nick present in the ban (empty string when a
+   field is not part of the ban). */
+static plugin_st ban_add(struct plugin_handle *plugin, const struct ban_info *ban) {
+    struct sql_data *sql = (struct sql_data *)plugin->ptr;
+    sqlite3_stmt *stmt;
+    int rc;
+
+    if (sql->exclusive)
+        return st_deny;
+
+    rc = sqlite3_prepare_v2(sql->db, "INSERT INTO bans (cid, nickname) VALUES(?, ?);", -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Unable to store ban: %s\n", sqlite3_errmsg(sql->db));
+        return st_deny;
+    }
+
+    sqlite3_bind_text(stmt, 1, (ban->flags & ban_cid) ? ban->cid : "", -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, (ban->flags & ban_nickname) ? ban->nickname : "", -1, SQLITE_STATIC);
+
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+
+    if (rc != SQLITE_DONE) {
+        fprintf(stderr, "Unable to store ban\n");
+        return st_deny;
+    }
+    return st_allow;
+}
+
+/* Remove persisted ban records. The hub offers the unban target as both cid and
+   nick (it does not know which the operator typed), so delete any row matching
+   either. Returns st_allow if at least one row was removed. */
+static plugin_st ban_del(struct plugin_handle *plugin, const struct ban_info *ban) {
+    struct sql_data *sql = (struct sql_data *)plugin->ptr;
+    sqlite3_stmt *stmt;
+    int rc;
+
+    rc = sqlite3_prepare_v2(sql->db,
+        "DELETE FROM bans WHERE (nickname <> '' AND nickname = ? COLLATE NOCASE) "
+        "OR (cid <> '' AND cid = ?);", -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Unable to remove ban: %s\n", sqlite3_errmsg(sql->db));
+        return st_deny;
+    }
+
+    sqlite3_bind_text(stmt, 1, (ban->flags & ban_nickname) ? ban->nickname : "", -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, (ban->flags & ban_cid) ? ban->cid : "", -1, SQLITE_STATIC);
+
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+
+    if (rc != SQLITE_DONE)
+        return st_deny;
+    return sqlite3_changes(sql->db) > 0 ? st_allow : st_default;
+}
+
+/* Login-time query: is this user's CID or nick in the bans table? */
+static plugin_st is_banned(struct plugin_handle *plugin, struct plugin_user *user) {
+    struct sql_data *sql = (struct sql_data *)plugin->ptr;
+    sqlite3_stmt *stmt;
+    int rc;
+    int banned = 0;
+
+    rc = sqlite3_prepare_v2(sql->db,
+        "SELECT 1 FROM bans WHERE (nickname <> '' AND nickname = ? COLLATE NOCASE) "
+        "OR (cid <> '' AND cid = ?) LIMIT 1;", -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return st_default;
+
+    sqlite3_bind_text(stmt, 1, user->nick, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, user->cid, -1, SQLITE_STATIC);
+
+    if (sqlite3_step(stmt) == SQLITE_ROW)
+        banned = 1;
+    sqlite3_finalize(stmt);
+
+    return banned ? st_deny : st_default;
+}
+
 /**
  * Validate a user-supplied password. Returns 1 if acceptable, 0 otherwise.
  * The 'p' command argument type already rejects whitespace, so we only need
@@ -365,6 +462,11 @@ int plugin_register(struct plugin_handle *plugin, const char *config) {
     plugin->funcs.auth_register_user = register_user;
     plugin->funcs.auth_update_user = update_user;
     plugin->funcs.auth_delete_user = delete_user;
+
+    // Ban storage/retention.
+    plugin->funcs.auth_ban_add = ban_add;
+    plugin->funcs.auth_ban_del = ban_del;
+    plugin->funcs.auth_is_banned = is_banned;
 
     plugin->ptr = parse_config(config, plugin);
     if (!plugin->ptr)

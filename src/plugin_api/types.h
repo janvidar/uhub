@@ -26,7 +26,7 @@
 #include "util/credentials.h"
 #include "network/ipcalc.h"
 
-#define PLUGIN_API_VERSION 3
+#define PLUGIN_API_VERSION 4
 
 struct plugin_handle;
 

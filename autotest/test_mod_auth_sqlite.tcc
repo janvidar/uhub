@@ -207,6 +207,72 @@ EXO_TEST(mas_defensive_index_tolerates_existing_dups, {
 	return rc == 0;
 });
 
+/* --- Ban storage (auth_ban_add / auth_ban_del / auth_is_banned) --- */
+
+static struct ban_info mas_ban(const char* cid, const char* nick)
+{
+	struct ban_info b;
+	memset(&b, 0, sizeof(b));
+	if (cid && *cid)  { b.flags |= ban_cid;      snprintf(b.cid, sizeof(b.cid), "%s", cid); }
+	if (nick && *nick){ b.flags |= ban_nickname; snprintf(b.nickname, sizeof(b.nickname), "%s", nick); }
+	return b;
+}
+
+static struct plugin_user mas_puser(const char* cid, const char* nick)
+{
+	struct plugin_user u;
+	memset(&u, 0, sizeof(u));
+	snprintf(u.cid, sizeof(u.cid), "%s", cid);
+	snprintf(u.nick, sizeof(u.nick), "%s", nick);
+	return u;
+}
+
+#define MAS_CID "3AGHMAASJA2RFNM22AA6753V7B7DYEPNTIWHBAY"
+
+EXO_TEST(mas_ban_funcs, {
+	return mas_plugin.funcs.auth_ban_add
+		&& mas_plugin.funcs.auth_ban_del
+		&& mas_plugin.funcs.auth_is_banned;
+});
+
+EXO_TEST(mas_ban_add, {
+	struct ban_info b = mas_ban(MAS_CID, "Eviluser");
+	return mas_plugin.funcs.auth_ban_add(&mas_plugin, &b) == st_allow;
+});
+
+/* A user matching the banned CID (any nick) is banned. */
+EXO_TEST(mas_banned_by_cid, {
+	struct plugin_user u = mas_puser(MAS_CID, "SomeOtherNick");
+	return mas_plugin.funcs.auth_is_banned(&mas_plugin, &u) == st_deny;
+});
+
+/* A user matching the banned nick (any CID), case-insensitively, is banned. */
+EXO_TEST(mas_banned_by_nick, {
+	struct plugin_user u = mas_puser("CLEANCID000000000000000000000000000000A", "eviluser");
+	return mas_plugin.funcs.auth_is_banned(&mas_plugin, &u) == st_deny;
+});
+
+/* An unrelated user is not banned. */
+EXO_TEST(mas_not_banned, {
+	struct plugin_user u = mas_puser("CLEANCID000000000000000000000000000000A", "innocent");
+	return mas_plugin.funcs.auth_is_banned(&mas_plugin, &u) == st_default;
+});
+
+/* Unban by nick (hub offers the target as both fields) removes the record. */
+EXO_TEST(mas_ban_del, {
+	struct ban_info b = mas_ban("Eviluser", "Eviluser");
+	struct plugin_user u = mas_puser(MAS_CID, "Eviluser");
+	if (mas_plugin.funcs.auth_ban_del(&mas_plugin, &b) != st_allow)
+		return 0;
+	return mas_plugin.funcs.auth_is_banned(&mas_plugin, &u) == st_default;
+});
+
+/* Deleting a ban that does not exist reports "no opinion" (st_default). */
+EXO_TEST(mas_ban_del_missing, {
+	struct ban_info b = mas_ban("nope", "nope");
+	return mas_plugin.funcs.auth_ban_del(&mas_plugin, &b) == st_default;
+});
+
 EXO_TEST(mas_teardown, {
 	int rc = plugin_unregister(&mas_plugin);
 	remove(MAS_DB);

@@ -207,3 +207,19 @@ plugin_st plugin_auth_delete_user(struct hub_info* hub, struct auth_info* info)
 {
 	PLUGIN_INVOKE_STATUS_1(hub, auth_delete_user, info);
 }
+
+plugin_st plugin_ban_add(struct hub_info* hub, const struct ban_info* ban)
+{
+	PLUGIN_INVOKE_STATUS_1(hub, auth_ban_add, ban);
+}
+
+plugin_st plugin_ban_del(struct hub_info* hub, const struct ban_info* ban)
+{
+	PLUGIN_INVOKE_STATUS_1(hub, auth_ban_del, ban);
+}
+
+plugin_st plugin_is_banned(struct hub_info* hub, struct hub_user* who)
+{
+	struct plugin_user* user = convert_user_type(who);
+	PLUGIN_INVOKE_STATUS_1(hub, auth_is_banned, user);
+}
