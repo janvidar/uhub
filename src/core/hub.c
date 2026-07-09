@@ -1412,6 +1412,7 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 	struct adc_message* qui = adc_msg_construct(ADC_CMD_IQUI, 512);
 	char code[4];
 	char buf[256];
+	char tl_flag[16];
 	const char* text = 0;
 	const char* flag = 0;
 	char* escaped_text = 0;
@@ -1451,7 +1452,7 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 		STATUS(ADC_STATUS_INF_FIELD_BAD, msg_inf_error_pid_missing, "FMPD", 0, 0);
 		STATUS(ADC_STATUS_INVALID_PID, msg_inf_error_pid_invalid, "FBPD", 0, 0);
 		STATUS(ADC_STATUS_BANNED_PERMANENTLY, msg_ban_permanently, 0, 0, 0);
-		STATUS(ADC_STATUS_BANNED_TEMPORARILY, msg_ban_temporarily, "TL" HUB_STR(RECONNECT_TIME_TEMP_BAN), RECONNECT_TIME_TEMP_BAN, 0);
+		STATUS(ADC_STATUS_BANNED_TEMPORARILY, msg_ban_temporarily, 0, RECONNECT_TIME_TEMP_BAN, 0);
 		STATUS(ADC_STATUS_INVALID_PASSWORD, msg_auth_invalid_password, 0, 0, 0);
 		STATUS(ADC_STATUS_LOGIN_GENERIC, msg_auth_user_not_found, 0, 0, 0);
 		STATUS(ADC_STATUS_DISCONNECT_GENERIC, msg_error_no_memory, 0, 0, 0);
@@ -1468,6 +1469,16 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 #undef STATUS
 #undef HUB_STR
 #undef HUB_STR_
+
+	/* For a temporary ban, emit the actual remaining time (resolved during the
+	   login ACL check) as the TL reconnect hint, falling back to the default. */
+	if (msg == status_msg_ban_temporarily)
+	{
+		if (user->ban_reconnect_time > 0)
+			reconnect_time = user->ban_reconnect_time;
+		snprintf(tl_flag, sizeof(tl_flag), "TL%d", reconnect_time);
+		flag = tl_flag;
+	}
 
 	escaped_text = adc_msg_escape(text);
 	if (!escaped_text)

@@ -156,6 +156,11 @@ struct hub_user
 	   inherited from the probe when the connection became a user. Local users
 	   only; remote (federated) users never hold a slot. */
 	int counted;
+
+	/* Seconds until an active temporary ban lifts, resolved during the login ACL
+	   check and used to build the accurate TL reconnect hint in hub_send_status.
+	   0 means "use the default temp-ban reconnect time". */
+	int ban_reconnect_time;
 };
 
 /**

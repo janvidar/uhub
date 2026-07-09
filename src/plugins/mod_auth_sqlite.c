@@ -324,8 +324,11 @@ static plugin_st ban_del(struct plugin_handle *plugin, const struct ban_info *ba
 }
 
 /* Login-time query: is this user's CID or nick in the bans table and not yet
-   expired? Timed bans (expiry != 0) lift themselves once expiry passes. */
-static plugin_st is_banned(struct plugin_handle *plugin, struct plugin_user *user) {
+   expired? Timed bans (expiry != 0) lift themselves once expiry passes. On a hit
+   *expiry is set to the matching record's expiry (0 = permanent). When several
+   records match, the most permanent one wins (a permanent 0 sorts first, else
+   the latest expiry) so the hub reports the longest-lasting ban. */
+static plugin_st is_banned(struct plugin_handle *plugin, struct plugin_user *user, time_t *expiry) {
     struct sql_data *sql = (struct sql_data *)plugin->ptr;
     sqlite3_stmt *stmt;
     sqlite3_int64 now = (sqlite3_int64) time(NULL);
@@ -340,8 +343,9 @@ static plugin_st is_banned(struct plugin_handle *plugin, struct plugin_user *use
     }
 
     rc = sqlite3_prepare_v2(sql->db,
-        "SELECT 1 FROM bans WHERE ((nickname <> '' AND nickname = ? COLLATE NOCASE) "
-        "OR (cid <> '' AND cid = ?)) AND (expiry = 0 OR expiry > ?) LIMIT 1;", -1, &stmt, NULL);
+        "SELECT expiry FROM bans WHERE ((nickname <> '' AND nickname = ? COLLATE NOCASE) "
+        "OR (cid <> '' AND cid = ?)) AND (expiry = 0 OR expiry > ?) "
+        "ORDER BY (expiry = 0) DESC, expiry DESC LIMIT 1;", -1, &stmt, NULL);
     if (rc != SQLITE_OK)
         return st_default;
 
@@ -349,8 +353,11 @@ static plugin_st is_banned(struct plugin_handle *plugin, struct plugin_user *use
     sqlite3_bind_text(stmt, 2, user->cid, -1, SQLITE_STATIC);
     sqlite3_bind_int64(stmt, 3, now);
 
-    if (sqlite3_step(stmt) == SQLITE_ROW)
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
         banned = 1;
+        if (expiry)
+            *expiry = (time_t) sqlite3_column_int64(stmt, 0);
+    }
     sqlite3_finalize(stmt);
 
     return banned ? st_deny : st_default;
