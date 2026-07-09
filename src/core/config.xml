@@ -350,7 +350,7 @@
 	<option name="registered_users_only" type="boolean" default="0">
 		<short>Allow registered users only</short>
 		<description><![CDATA[
-			If this is enabled only registered users will be able to use the hub. A user must be registered in the acl file (file_acl).
+			If this is enabled only registered users will be able to use the hub. Users are registered through an authentication plugin (for example mod_auth_sqlite or mod_auth_simple), configured via file_plugins.
 		]]></description>
 		<since>0.1.1</since>
 	</option>
