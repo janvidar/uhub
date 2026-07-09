@@ -858,6 +858,23 @@
 		]]></example>
 	</option>
 
+	<option name="nat_override" type="string" default="">
+		<short>Comma separated list of IP ranges allowed to advertise their own address</short>
+		<description><![CDATA[
+			Clients connecting from one of these IP ranges (typically the hub's own
+			LAN, or a NAT gateway) are permitted to advertise the IPv4 address they
+			claim in their INF instead of the (often private) address the hub
+			observes. This lets a client behind NAT be reachable by remote peers for
+			connection setup and transfers. Only list networks you trust. Ranges may
+			be given as CIDR, as a lo-hi range, or as a single address. This replaces
+			the former nat_ip entries in the acl file (file_acl).
+		]]></description>
+		<since>0.7.2</since>
+		<example><![CDATA[
+			nat_override = 10.0.0.0/8,192.168.0.0/16
+		]]></example>
+	</option>
+
 	<option name="file_plugins" type="file" default="">
 		<short>Plugin configuration file</short>
 		<description><![CDATA[
