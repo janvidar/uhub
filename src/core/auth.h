@@ -30,7 +30,6 @@ struct ip_addr_encap;
 
 struct acl_handle
 {
-	struct linked_list* users;          /* Known users. See enum user_status */
 	struct linked_list* cids;           /* Known CIDs */
 	struct linked_list* networks;       /* IP ranges, used for banning */
 	struct linked_list* nat_override;   /* IPs inside these ranges can provide their false IP. Use with care! */

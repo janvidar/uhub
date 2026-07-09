@@ -30,7 +30,6 @@
 #include "core/plugininvoke.h"
 #include "core/user.h"
 
-#define ACL_ADD_USER(S, L, V) do { ret = check_cmd_user(S, V, L, line, line_count); if (ret != 0) return ret; } while(0)
 #define ACL_ADD_BOOL(S, L)    do { ret = check_cmd_bool(S,    L, line, line_count); if (ret != 0) return ret; } while(0)
 #define ACL_ADD_ADDR(S, L)    do { ret = check_cmd_addr(S,    L, line, line_count); if (ret != 0) return ret; } while(0)
 
@@ -81,48 +80,6 @@ static int check_cmd_bool(const char* cmd, struct linked_list* list, char* line,
 	LOG_DEBUG("ACL: Deny access for: '%s' (%s)", data, cmd);
 	return 1;
 }
-
-static int check_cmd_user(const char* cmd, int status, struct linked_list* list, char* line, int line_count)
-{
-	char* data;
-	char* data_extra = 0;
-	struct auth_info* info = 0;
-	int err = 0;
-
-	data = acl_match_keyword(cmd, line, line_count, &err);
-	if (err) return err;
-	if (!data) return 0;
-
-	info = hub_malloc_zero(sizeof(struct auth_info));
-	if (!info)
-	{
-		LOG_ERROR("ACL parse error. Out of memory!");
-		return -1;
-	}
-
-	if (strncmp(cmd, "user_", 5) == 0)
-	{
-		data_extra = strrchr(data, ':');
-		if (data_extra)
-		{
-			data_extra[0] = 0;
-			data_extra++;
-		}
-	}
-
-	strncpy(info->nickname, data, MAX_NICK_LEN);
-	info->nickname[MAX_NICK_LEN] = '\0';
-	if (data_extra)
-	{
-		strncpy(info->password, data_extra, MAX_PASS_LEN);
-		info->password[MAX_PASS_LEN] = '\0';
-	}
-	info->credentials = status;
-	list_append(list, info);
-	LOG_DEBUG("ACL: Added user '%s' (%s)", info->nickname, auth_cred_to_string(info->credentials));
-	return 1;
-}
-
 
 static void add_ip_range(struct linked_list* list, struct ip_range* info)
 {
@@ -230,8 +187,20 @@ static int check_cmd_addr(const char* cmd, struct linked_list* list, char* line,
    one-line migration warning and is otherwise ignored (non-fatal). */
 static int acl_is_obsolete_keyword(const char* line, int line_count)
 {
+	static const char* const auth_plugin_advice =
+		"registered users are configured via an auth plugin (mod_auth_simple / "
+		"mod_auth_sqlite), not file_acl";
 	static const struct { const char* key; const char* advice; } obsolete[] = {
-		{ "nat_ip", "use the 'nat_override' option in uhub.conf" },
+		{ "nat_ip",     "use the 'nat_override' option in uhub.conf" },
+		{ "user_admin", auth_plugin_advice },
+		{ "user_super", auth_plugin_advice },
+		{ "user_op",    auth_plugin_advice },
+		{ "user_reg",   auth_plugin_advice },
+		{ "link",       auth_plugin_advice },
+		{ "bot",        auth_plugin_advice },
+		{ "ubot",       auth_plugin_advice },
+		{ "opbot",      auth_plugin_advice },
+		{ "opubot",     auth_plugin_advice },
 	};
 	size_t i;
 	for (i = 0; i < sizeof(obsolete) / sizeof(obsolete[0]); i++)
@@ -261,15 +230,6 @@ static int acl_parse_line(char* line, int line_count, void* ptr_data)
 
 	LOG_DEBUG("acl_parse_line: '%s'", line);
 
-	ACL_ADD_USER("bot",        handle->users, auth_cred_bot);
-	ACL_ADD_USER("ubot",        handle->users, auth_cred_ubot);
-	ACL_ADD_USER("opbot",        handle->users, auth_cred_opbot);
-	ACL_ADD_USER("opubot",        handle->users, auth_cred_opubot);
-	ACL_ADD_USER("user_admin", handle->users, auth_cred_admin);
-	ACL_ADD_USER("user_super", handle->users, auth_cred_super);
-	ACL_ADD_USER("user_op",    handle->users, auth_cred_operator);
-	ACL_ADD_USER("user_reg",   handle->users, auth_cred_user);
-	ACL_ADD_USER("link",       handle->users, auth_cred_link);
 	ACL_ADD_BOOL("deny_nick",  handle->users_denied);
 	ACL_ADD_BOOL("ban_nick",   handle->users_banned);
 	ACL_ADD_BOOL("ban_cid",    handle->cids);
@@ -288,18 +248,16 @@ int acl_initialize(struct hub_config* config, struct acl_handle* handle)
 	int ret;
 	memset(handle, 0, sizeof(struct acl_handle));
 
-	handle->users        = list_create();
 	handle->users_denied = list_create();
 	handle->users_banned = list_create();
 	handle->cids         = list_create();
 	handle->networks     = list_create();
 	handle->nat_override = list_create();
 
-	if (!handle->users || !handle->cids || !handle->networks || !handle->users_denied || !handle->users_banned || !handle->nat_override)
+	if (!handle->cids || !handle->networks || !handle->users_denied || !handle->users_banned || !handle->nat_override)
 	{
 		LOG_FATAL("acl_initialize: Out of memory");
 
-		list_destroy(handle->users);
 		list_destroy(handle->users_denied);
 		list_destroy(handle->users_banned);
 		list_destroy(handle->cids);
@@ -325,16 +283,6 @@ int acl_initialize(struct hub_config* config, struct acl_handle* handle)
 }
 
 
-static void acl_free_access_info(void* ptr)
-{
-	struct auth_info* info = (struct auth_info*) ptr;
-	if (info)
-	{
-		hub_free(info);
-	}
-}
-
-
 static void acl_free_ip_info(void* ptr)
 {
 	struct access_info* info = (struct access_info*) ptr;
@@ -346,12 +294,6 @@ static void acl_free_ip_info(void* ptr)
 
 int acl_shutdown(struct acl_handle* handle)
 {
-	if (handle->users)
-	{
-		list_clear(handle->users, &acl_free_access_info);
-		list_destroy(handle->users);
-	}
-
 	if (handle->users_denied)
 	{
 		list_clear(handle->users_denied, hub_free_handle);

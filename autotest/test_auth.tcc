@@ -27,18 +27,6 @@ static int acl_write_file(const char* contents)
 	return 1;
 }
 
-/* Look up a credentialed user by nick in the parsed users list. */
-static struct auth_info* acl_find_user(struct acl_handle* handle, const char* nick)
-{
-	struct auth_info* info;
-	LIST_FOREACH(struct auth_info*, info, handle->users,
-	{
-		if (strcmp(info->nickname, nick) == 0)
-			return info;
-	});
-	return NULL;
-}
-
 /* Parse a single snippet through a throwaway handle and return acl_initialize's
    result code (0 on success, -1 on parse error). */
 static int acl_parse_expect(const char* contents, int expect)
@@ -66,15 +54,7 @@ EXO_TEST(acl_setup,
 	const char* acl =
 		"# comment line, must be ignored\n"
 		"\n"
-		"user_admin admin1:secret\n"
-		"user_super super1\n"
-		"user_op op1\n"
-		"user_reg reg1:pass1\n"
-		"link linkuser\n"
-		"bot bot1\n"
-		"ubot ubot1\n"
-		"opbot opbot1\n"
-		"opubot opubot1\n"
+		"user_admin admin1:secret\n" /* obsolete: registered users live in an auth plugin now; ignored non-fatally */
 		"deny_nick badnick\n"
 		"ban_nick evil\n"
 		"ban_cid GNSSMURMD7K466NGZIHU65TP3S3UZSQ6MN5B2RI\n"
@@ -91,24 +71,6 @@ EXO_TEST(acl_setup,
 	acl_config.nat_override = hub_strdup("192.168.0.0/16");
 	return acl_initialize(&acl_config, &acl_acl) == 0;
 });
-
-/* Credentialed users: nick, credentials, and optional password. */
-EXO_TEST(acl_admin_cred,  { struct auth_info* u = acl_find_user(&acl_acl, "admin1"); return u && u->credentials == auth_cred_admin; });
-EXO_TEST(acl_admin_pass,  { struct auth_info* u = acl_find_user(&acl_acl, "admin1"); return u && strcmp(u->password, "secret") == 0; });
-EXO_TEST(acl_super_cred,  { struct auth_info* u = acl_find_user(&acl_acl, "super1"); return u && u->credentials == auth_cred_super; });
-EXO_TEST(acl_op_cred,     { struct auth_info* u = acl_find_user(&acl_acl, "op1"); return u && u->credentials == auth_cred_operator; });
-EXO_TEST(acl_op_nopass,   { struct auth_info* u = acl_find_user(&acl_acl, "op1"); return u && u->password[0] == '\0'; });
-EXO_TEST(acl_reg_cred,    { struct auth_info* u = acl_find_user(&acl_acl, "reg1"); return u && u->credentials == auth_cred_user && strcmp(u->password, "pass1") == 0; });
-EXO_TEST(acl_link_cred,   { struct auth_info* u = acl_find_user(&acl_acl, "linkuser"); return u && u->credentials == auth_cred_link; });
-EXO_TEST(acl_bot_cred,    { struct auth_info* u = acl_find_user(&acl_acl, "bot1"); return u && u->credentials == auth_cred_bot; });
-EXO_TEST(acl_ubot_cred,   { struct auth_info* u = acl_find_user(&acl_acl, "ubot1"); return u && u->credentials == auth_cred_ubot; });
-EXO_TEST(acl_opbot_cred,  { struct auth_info* u = acl_find_user(&acl_acl, "opbot1"); return u && u->credentials == auth_cred_opbot; });
-EXO_TEST(acl_opubot_cred, { struct auth_info* u = acl_find_user(&acl_acl, "opubot1"); return u && u->credentials == auth_cred_opubot; });
-EXO_TEST(acl_unknown_user, { return acl_find_user(&acl_acl, "nobody") == NULL; });
-
-/* The bot/ubot/opbot/opubot keywords share the "user_" prefix logic for the
-   ':' password split only for user_* entries; a bare bot nick keeps no pass. */
-EXO_TEST(acl_bot_nopass,  { struct auth_info* u = acl_find_user(&acl_acl, "bot1"); return u && u->password[0] == '\0'; });
 
 /* deny_nick / ban_nick / ban_cid query helpers. */
 EXO_TEST(acl_deny_nick,      { return acl_is_user_denied(&acl_acl, "badnick") == 1; });
@@ -147,9 +109,16 @@ EXO_TEST(acl_ok_comment,     { return acl_parse_expect("# nothing here\n", 0); }
 EXO_TEST(acl_ok_blank,       { return acl_parse_expect("   \n\t\n", 0); });
 EXO_TEST(acl_err_unknown,    { return acl_parse_expect("frobnicate foo\n", -1); });
 EXO_TEST(acl_err_prefix,     { return acl_parse_expect("user_adminx bar\n", -1); }); /* keyword must be a whole token */
-EXO_TEST(acl_err_no_arg,     { return acl_parse_expect("user_admin\n", -1); });       /* keyword present, argument missing */
+EXO_TEST(acl_err_no_arg,     { return acl_parse_expect("ban_nick\n", -1); });         /* live keyword present, argument missing */
 EXO_TEST(acl_err_bad_ip,     { return acl_parse_expect("deny_ip not-an-ip\n", -1); }); /* malformed address */
-EXO_TEST(acl_ok_nat_ip_obs,  { return acl_parse_expect("nat_ip 10.0.0.0/8\n", 0); });  /* obsolete keyword: warn + ignore, non-fatal */
+
+/* Obsolete keywords: recognised, warned about, ignored (non-fatal) so old files load. */
+EXO_TEST(acl_ok_nat_ip_obs,  { return acl_parse_expect("nat_ip 10.0.0.0/8\n", 0); });
+EXO_TEST(acl_ok_user_obs,    { return acl_parse_expect("user_admin admin:secret\n", 0); });
+EXO_TEST(acl_ok_useropo_obs, { return acl_parse_expect("user_op op1\n", 0); });
+EXO_TEST(acl_ok_link_obs,    { return acl_parse_expect("link peerhub\n", 0); });
+EXO_TEST(acl_ok_bot_obs,     { return acl_parse_expect("bot mybot\n", 0); });
+EXO_TEST(acl_ok_user_noarg,  { return acl_parse_expect("user_admin\n", 0); });         /* obsolete even without an argument */
 
 EXO_TEST(acl_teardown,
 {
