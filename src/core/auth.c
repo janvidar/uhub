@@ -144,6 +144,58 @@ static void add_ip_range(struct linked_list* list, struct ip_range* info)
 	list_append(list, info);
 }
 
+/* Parse a comma-separated list of addresses/CIDRs/ranges (the nat_override hub
+   option, formerly the nat_ip acl keyword) and append each as an ip_range to
+   target. Returns 0 on success, -1 on OOM or a malformed entry. */
+static int acl_add_address_list(struct linked_list* target, const char* csv)
+{
+	struct linked_list* parts;
+	char* token;
+	int failed = 0;
+
+	if (!csv || !*csv)
+		return 0;
+
+	parts = list_create();
+	if (!parts)
+	{
+		LOG_ERROR("ACL error: Out of memory!");
+		return -1;
+	}
+
+	if (split_string(csv, ",", parts, 0) < 0)
+	{
+		list_destroy(parts);
+		return -1;
+	}
+
+	LIST_FOREACH(char*, token, parts,
+	{
+		struct ip_range* range = hub_malloc_zero(sizeof(struct ip_range));
+		if (!range)
+		{
+			LOG_ERROR("ACL error: Out of memory!");
+			failed = 1;
+			break;
+		}
+		if (ip_convert_address_to_range(strip_white_space(token), range))
+		{
+			add_ip_range(target, range);
+		}
+		else
+		{
+			LOG_ERROR("nat_override: invalid address '%s'", token);
+			hub_free(range);
+			failed = 1;
+			break;
+		}
+	});
+
+	list_clear(parts, hub_free_handle);
+	list_destroy(parts);
+	return failed ? -1 : 0;
+}
+
 
 static int check_cmd_addr(const char* cmd, struct linked_list* list, char* line, int line_count)
 {
@@ -173,6 +225,29 @@ static int check_cmd_addr(const char* cmd, struct linked_list* list, char* line,
 
 
 
+/* Keywords that were once valid in file_acl but have moved or been removed.
+   Recognised as whole tokens so existing acl files keep loading; each logs a
+   one-line migration warning and is otherwise ignored (non-fatal). */
+static int acl_is_obsolete_keyword(const char* line, int line_count)
+{
+	static const struct { const char* key; const char* advice; } obsolete[] = {
+		{ "nat_ip", "use the 'nat_override' option in uhub.conf" },
+	};
+	size_t i;
+	for (i = 0; i < sizeof(obsolete) / sizeof(obsolete[0]); i++)
+	{
+		size_t n = strlen(obsolete[i].key);
+		if (strncmp(line, obsolete[i].key, n) == 0 &&
+		    (line[n] == ' ' || line[n] == '\t' || line[n] == '\0'))
+		{
+			LOG_WARN("ACL line %d: '%s' is obsolete and ignored; %s.",
+			         line_count, obsolete[i].key, obsolete[i].advice);
+			return 1;
+		}
+	}
+	return 0;
+}
+
 static int acl_parse_line(char* line, int line_count, void* ptr_data)
 {
 	struct acl_handle* handle = (struct acl_handle*) ptr_data;
@@ -199,7 +274,9 @@ static int acl_parse_line(char* line, int line_count, void* ptr_data)
 	ACL_ADD_BOOL("ban_nick",   handle->users_banned);
 	ACL_ADD_BOOL("ban_cid",    handle->cids);
 	ACL_ADD_ADDR("deny_ip",    handle->networks);
-	ACL_ADD_ADDR("nat_ip",     handle->nat_override);
+
+	if (acl_is_obsolete_keyword(line, line_count))
+		return 0;
 
 	LOG_ERROR("Unknown ACL command on line %d: '%s'", line_count, line);
 	return -1;
@@ -233,6 +310,11 @@ int acl_initialize(struct hub_config* config, struct acl_handle* handle)
 
 	if (config)
 	{
+		/* NAT-override ranges come from the hub config (formerly the nat_ip acl
+		   keyword); parse them regardless of whether an acl file is set. */
+		if (acl_add_address_list(handle->nat_override, config->nat_override) == -1)
+			return -1;
+
 		if (!*config->file_acl) return 0;
 
 		ret = file_read_lines(config->file_acl, handle, &acl_parse_line);

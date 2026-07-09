@@ -78,8 +78,7 @@ EXO_TEST(acl_setup,
 		"deny_nick badnick\n"
 		"ban_nick evil\n"
 		"ban_cid GNSSMURMD7K466NGZIHU65TP3S3UZSQ6MN5B2RI\n"
-		"deny_ip 10.0.0.0/8\n"
-		"nat_ip 192.168.0.0/16\n";
+		"deny_ip 10.0.0.0/8\n";
 
 	net_initialize();
 	memset(&acl_config, 0, sizeof(acl_config));
@@ -87,6 +86,9 @@ EXO_TEST(acl_setup,
 	if (!acl_write_file(acl)) return 0;
 	hub_free(acl_config.file_acl);
 	acl_config.file_acl = hub_strdup(acl_test_file);
+	/* NAT override now comes from the hub config, not the acl file's nat_ip. */
+	hub_free(acl_config.nat_override);
+	acl_config.nat_override = hub_strdup("192.168.0.0/16");
 	return acl_initialize(&acl_config, &acl_acl) == 0;
 });
 
@@ -117,12 +119,12 @@ EXO_TEST(acl_ban_nick_neg,   { return acl_is_user_banned(&acl_acl, "saint") == 0
 EXO_TEST(acl_ban_cid,        { return acl_is_cid_banned(&acl_acl, "GNSSMURMD7K466NGZIHU65TP3S3UZSQ6MN5B2RI") == 1; });
 EXO_TEST(acl_ban_cid_neg,    { return acl_is_cid_banned(&acl_acl, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA") == 0; });
 
-/* deny_ip / nat_ip ranges. */
+/* deny_ip ranges (from the acl file) and nat_override ranges (from hub config). */
 EXO_TEST(acl_deny_ip_in,     { return acl_is_ip_banned(&acl_acl, "10.1.2.3") == 1; });
 EXO_TEST(acl_deny_ip_edge,   { return acl_is_ip_banned(&acl_acl, "10.255.255.255") == 1; });
 EXO_TEST(acl_deny_ip_out,    { return acl_is_ip_banned(&acl_acl, "11.0.0.1") == 0; });
-EXO_TEST(acl_nat_ip_in,      { return acl_is_ip_nat_override(&acl_acl, "192.168.5.5") == 1; });
-EXO_TEST(acl_nat_ip_out,     { return acl_is_ip_nat_override(&acl_acl, "10.1.2.3") == 0; });
+EXO_TEST(acl_nat_override_in,  { return acl_is_ip_nat_override(&acl_acl, "192.168.5.5") == 1; });
+EXO_TEST(acl_nat_override_out, { return acl_is_ip_nat_override(&acl_acl, "10.1.2.3") == 0; });
 
 /* Runtime ban add/remove round-trips (acl_user_ban_* / acl_user_unban_*). These
    mutate the shared handle, so they run after the ban-query assertions above. */
@@ -147,6 +149,7 @@ EXO_TEST(acl_err_unknown,    { return acl_parse_expect("frobnicate foo\n", -1); 
 EXO_TEST(acl_err_prefix,     { return acl_parse_expect("user_adminx bar\n", -1); }); /* keyword must be a whole token */
 EXO_TEST(acl_err_no_arg,     { return acl_parse_expect("user_admin\n", -1); });       /* keyword present, argument missing */
 EXO_TEST(acl_err_bad_ip,     { return acl_parse_expect("deny_ip not-an-ip\n", -1); }); /* malformed address */
+EXO_TEST(acl_ok_nat_ip_obs,  { return acl_parse_expect("nat_ip 10.0.0.0/8\n", 0); });  /* obsolete keyword: warn + ignore, non-fatal */
 
 EXO_TEST(acl_teardown,
 {
