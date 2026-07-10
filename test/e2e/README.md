@@ -39,8 +39,24 @@ BUILD=/path/to/build test/e2e/run_ban_e2e.sh [port]
 Exit status is 0 only if every scenario passes. Requires `uhub`, `adc_cmd`,
 `uhub-passwd`, and `mod_auth_sqlite.so` in the build dir.
 
+## run_link_e2e.sh
+
+Brings up **two linked hubs** (node 0 and node 1, a shared `link_secret`, node 1
+linking to node 0), each with its **own** auth/ban database so the link is the
+only path a ban can travel between them. Verifies cluster propagation:
+
+1. the two hubs establish a link;
+2. the roster is unified (a user on node B is visible on node A);
+3. an operator `!ban` on node A disconnects the victim on node B (`LBAN`);
+4. the banned nick is refused when it reconnects to node B;
+5. `!unban` on node A restores access on node B (`LUBN`).
+
+```sh
+BUILD=/path/to/build test/e2e/run_link_e2e.sh [portA] [portB]
+```
+
 ## Not yet scripted
 
-Cluster propagation (`LBAN`/`LUBN` across two linked hubs), plugin-driven bans
-(`hub.ban_user`/`unban`), and the `on_validate_nick`/`on_validate_cid` hooks —
-all extensions of the same harness.
+Plugin-driven bans (`hub.ban_user`/`unban`) and the `on_validate_nick` /
+`on_validate_cid` hooks — both need a small test plugin, and are extensions of
+the same harness.
