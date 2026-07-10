@@ -80,6 +80,8 @@ struct ADC_client
 	char* nick;
 	char* desc;
 	char* password;
+	char* fixed_pid;             /* caller-supplied PID (base32); NULL = generate a random one */
+	char cid[MAX_CID_LEN + 1];   /* CID for the current identity (set by adc_cid_pid / set_pid) */
 	int flags;
 	void* ptr;
 };
@@ -149,17 +151,34 @@ static void adc_cid_pid(struct ADC_client* client)
 	uint64_t tiger_res1[3];
 	uint64_t tiger_res2[3];
 
-	/* create cid+pid pair; mix in pid, time and a per-instance counter so
-	 * the identity is not a predictable function of the heap pointer alone. */
-	memset(seed, 0, 64);
-	snprintf(seed, 64, VERSION "%p%d%ld%u", client, (int) getpid(), (long) time(NULL), ++counter);
+	if (client->fixed_pid)
+	{
+		/* Use the caller-supplied PID; the CID is derived from it below and
+		   must equal base32(tiger(PID)) (which the hub verifies). Decode into a
+		   generous buffer -- base32_decode of MAX_CID_LEN chars writes >24 bytes. */
+		uint64_t decoded[8];
+		memset(decoded, 0, sizeof(decoded));
+		base32_decode(client->fixed_pid, (unsigned char*) decoded, MAX_CID_LEN);
+		memcpy(tiger_res1, decoded, TIGERSIZE);
+		snprintf(pid, sizeof(pid), "%s", client->fixed_pid);
+	}
+	else
+	{
+		/* create cid+pid pair; mix in pid, time and a per-instance counter so
+		 * the identity is not a predictable function of the heap pointer alone. */
+		memset(seed, 0, 64);
+		snprintf(seed, 64, VERSION "%p%d%ld%u", client, (int) getpid(), (long) time(NULL), ++counter);
 
-	tiger((uint64_t*) seed, strlen(seed), tiger_res1);
-	base32_encode((unsigned char*) tiger_res1, TIGERSIZE, pid);
+		tiger((uint64_t*) seed, strlen(seed), tiger_res1);
+		base32_encode((unsigned char*) tiger_res1, TIGERSIZE, pid);
+	}
+
 	tiger((uint64_t*) tiger_res1, TIGERSIZE, tiger_res2);
 	base32_encode((unsigned char*) tiger_res2, TIGERSIZE, cid);
 	cid[ADC_CID_SIZE] = 0;
 	pid[ADC_CID_SIZE] = 0;
+
+	snprintf(client->cid, sizeof(client->cid), "%s", cid);
 
 	adc_msg_add_named_argument(client->info, ADC_INF_FLAG_PRIVATE_ID, pid);
 	adc_msg_add_named_argument(client->info, ADC_INF_FLAG_CLIENT_ID, cid);
@@ -660,6 +679,7 @@ void ADC_client_destroy(struct ADC_client* client)
 	hub_free(client->nick);
 	hub_free(client->desc);
 	hub_free(client->password);
+	hub_free(client->fixed_pid);
 	hub_free(client->address.hostname);
 	hub_free(client);
 
@@ -862,6 +882,29 @@ void ADC_client_set_password(struct ADC_client* client, const char* password)
 	client->password = password ? hub_strdup(password) : NULL;
 }
 
+/* Pin the client's PID (base32, MAX_CID_LEN chars) instead of generating a
+   random one, giving the client a stable identity. The CID is derived from it
+   (CID = base32(tiger(PID))) and cached so ADC_client_get_cid() is valid before
+   connecting. Passing NULL restores random per-connection identities. */
+void ADC_client_set_pid(struct ADC_client* client, const char* pid)
+{
+	ADC_TRACE;
+	hub_free(client->fixed_pid);
+	client->fixed_pid = NULL;
+	client->cid[0] = '\0';
+	if (pid && strlen(pid) == MAX_CID_LEN)
+	{
+		uint64_t t1[8];   /* base32_decode of MAX_CID_LEN chars writes >24 bytes */
+		uint64_t t2[3];
+		client->fixed_pid = hub_strdup(pid);
+		memset(t1, 0, sizeof(t1));
+		base32_decode(pid, (unsigned char*) t1, MAX_CID_LEN);
+		tiger((uint64_t*) t1, TIGERSIZE, t2);
+		base32_encode((unsigned char*) t2, TIGERSIZE, client->cid);
+		client->cid[MAX_CID_LEN] = '\0';
+	}
+}
+
 void ADC_client_set_callback(struct ADC_client* client, adc_client_cb cb)
 {
 	ADC_TRACE;
@@ -871,6 +914,11 @@ void ADC_client_set_callback(struct ADC_client* client, adc_client_cb cb)
 sid_t ADC_client_get_sid(const struct ADC_client* client)
 {
 	return client->sid;
+}
+
+const char* ADC_client_get_cid(const struct ADC_client* client)
+{
+	return client->cid;
 }
 
 const char* ADC_client_get_nick(const struct ADC_client* client)

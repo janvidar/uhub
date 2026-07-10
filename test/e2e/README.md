@@ -61,16 +61,18 @@ Loads the test-only `mod_e2e_test` plugin and verifies the plugin-facing hooks:
 
 1. `on_validate_nick` rejects a login (the reserved nick `denynick`), and a
    normal nick still logs in;
-2. a plugin-driven ban via `hub.ban_user` (chat trigger `PLZBANME`) disconnects
+2. `on_validate_cid` rejects a login by CID — the client pins a PID
+   (`adc_cmd --pid`), giving it a deterministic CID that the plugin is told to
+   deny (`deny_cid=<cid>`); a client with any other CID is unaffected;
+3. a plugin-driven ban via `hub.ban_user` (chat trigger `PLZBANME`) disconnects
    the user and blocks their reconnect;
-3. a plugin-driven unban via `hub.unban` (operator trigger `PLZUNBAN <nick>`)
+4. a plugin-driven unban via `hub.unban` (operator trigger `PLZUNBAN <nick>`)
    restores access.
 
 ```sh
 BUILD=/path/to/build test/e2e/run_plugin_e2e.sh [port]
 ```
 
-`mod_e2e_test` also implements `on_validate_cid` (deny a CID given as
-`deny_cid=<cid>`), sharing the exact login code path as nick validation. It is
-not asserted end-to-end because `adc_cmd`'s CID is randomised per run, so a fixed
-CID can't be pre-configured for rejection.
+The CID test relies on `ADC_client_set_pid()` (added to `libadcclient`): a fixed
+PID yields a fixed CID (`CID = base32(tiger(PID))`), so `adc_cmd --pid P --show-cid`
+prints the CID to configure the plugin's `deny_cid`.

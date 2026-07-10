@@ -112,7 +112,9 @@ int main(int argc, char** argv)
 	const char* address = NULL;
 	const char* nick = NULL;
 	const char* password = NULL;
+	const char* pid = NULL;
 	const char* expect = NULL;
+	int show_cid = 0;
 	int timeout = 8;
 	struct ADC_client* client;
 	int i;
@@ -122,16 +124,33 @@ int main(int argc, char** argv)
 		if (argv[i][0] != '-' && !address) { address = argv[i]; }
 		else if (!strcmp(argv[i], "--nick") && i + 1 < argc) nick = argv[++i];
 		else if (!strcmp(argv[i], "--password") && i + 1 < argc) password = argv[++i];
+		else if (!strcmp(argv[i], "--pid") && i + 1 < argc) pid = argv[++i];
+		else if (!strcmp(argv[i], "--show-cid")) show_cid = 1;
 		else if (!strcmp(argv[i], "--send") && i + 1 < argc && opt_send_n < MAX_SEND) opt_send[opt_send_n++] = argv[++i];
 		else if (!strcmp(argv[i], "--linger") && i + 1 < argc) opt_linger = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--timeout") && i + 1 < argc) timeout = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--expect") && i + 1 < argc) expect = argv[++i];
 		else { fprintf(stderr, "Unknown/!bad arg: %s\n", argv[i]); return 2; }
 	}
+
+	/* --show-cid: print the CID derived from --pid and exit (no connection). */
+	if (show_cid)
+	{
+		if (!pid) { fprintf(stderr, "--show-cid requires --pid\n"); return 2; }
+		net_initialize();
+		client = ADC_client_create(nick ? nick : "probe", "e2e", NULL);
+		ADC_client_set_pid(client, pid);
+		printf("%s\n", ADC_client_get_cid(client));
+		ADC_client_destroy(client);
+		net_destroy();
+		return 0;
+	}
+
 	if (!address || !nick)
 	{
-		fprintf(stderr, "Usage: %s <adc://host:port> --nick N [--password P] [--send TEXT]... "
-		                "[--linger S] [--timeout S] [--expect ok|fail]\n", argv[0]);
+		fprintf(stderr, "Usage: %s <adc://host:port> --nick N [--password P] [--pid PID] "
+		                "[--send TEXT]... [--linger S] [--timeout S] [--expect ok|fail]\n"
+		                "       %s --pid PID --show-cid\n", argv[0], argv[0]);
 		return 2;
 	}
 
@@ -148,6 +167,8 @@ int main(int argc, char** argv)
 	ADC_client_set_callback(client, handle);
 	if (password)
 		ADC_client_set_password(client, password);
+	if (pid)
+		ADC_client_set_pid(client, pid);
 	ADC_client_connect(client, address);
 
 	while (running && net_backend_process()) { }
