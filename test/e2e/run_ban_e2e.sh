@@ -132,5 +132,18 @@ else
 	bad "pvic never logged in"; kill "$PBID" 2>/dev/null
 fi
 
+# 8. a ban reason is shown to the banned user on the refused reconnect.
+"$ADC" "$HUB" --nick rvic --expect ok --linger 12 >"$DIR/rvic_bg.log" 2>&1 &
+RBID=$!
+if wait_for "LOGGED_IN" "$DIR/rvic_bg.log"; then
+	"$ADC" "$HUB" --nick admin --password adminpass --send "!ban rvic 1h spamming_the_hub" --linger 3 >/dev/null 2>&1
+	wait "$RBID" 2>/dev/null
+	"$ADC" "$HUB" --nick rvic --expect fail --linger 1 >"$DIR/s8.log" 2>&1
+	if grep -q "spamming_the_hub" "$DIR/s8.log"; then ok "ban reason is shown to the banned user"; else bad "ban reason not shown (see $DIR/s8.log)"; fi
+	"$ADC" "$HUB" --nick admin --password adminpass --send "!unban rvic" --linger 2 >/dev/null 2>&1
+else
+	bad "rvic never logged in"; kill "$RBID" 2>/dev/null
+fi
+
 echo "== result: $pass passed, $fail failed =="
 [ "$fail" -eq 0 ]

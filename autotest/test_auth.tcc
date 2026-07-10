@@ -116,6 +116,16 @@ EXO_TEST(acl_timed_purged,     { return acl_timed_ban_remaining(&acl_acl, "TCIDx
 EXO_TEST(acl_timed_unban_add,  { return acl_add_timed_ban(&acl_acl, "UCIDxxxx", "unbanme", 2000000000) == 0; });
 EXO_TEST(acl_timed_unban_rm,   { return acl_timed_unban(&acl_acl, "unbanme") == 1 && acl_timed_ban_remaining(&acl_acl, "UCIDxxxx", "unbanme", 1999999900) == 0; });
 
+/* Ban reasons: acl_ban_add records an optional reason, retrievable by cid or
+   nick via acl_ban_reason for as long as the ban is active. */
+EXO_TEST(acl_reason_perm_add,  { return acl_ban_add(&acl_acl, "RCIDxxxx", "ReasonNick", 0, "being a spammer") == 0; });
+EXO_TEST(acl_reason_by_cid,    { return acl_ban_reason(&acl_acl, "RCIDxxxx", NULL, 1999999900) != NULL && strcmp(acl_ban_reason(&acl_acl, "RCIDxxxx", NULL, 1999999900), "being a spammer") == 0; });
+EXO_TEST(acl_reason_by_nick,   { return acl_ban_reason(&acl_acl, NULL, "reasonnick", 1999999900) != NULL && strcmp(acl_ban_reason(&acl_acl, NULL, "reasonnick", 1999999900), "being a spammer") == 0; }); /* case-insensitive */
+EXO_TEST(acl_reason_perm_seen, { return acl_is_cid_banned(&acl_acl, "RCIDxxxx") == 1; }); /* permanent ban record is a permanent ban */
+EXO_TEST(acl_reason_none,      { return acl_ban_reason(&acl_acl, "NOSUCHCID", "nobody", 1999999900) == NULL; });
+EXO_TEST(acl_reason_noreason,  { return acl_add_timed_ban(&acl_acl, "NRCIDxxx", "noreason", 2000000000) == 0 && acl_ban_reason(&acl_acl, "NRCIDxxx", NULL, 1999999900) == NULL; }); /* ban without a reason */
+EXO_TEST(acl_reason_unban,     { return acl_user_unban_cid(&acl_acl, "RCIDxxxx") == 0 && acl_ban_reason(&acl_acl, "RCIDxxxx", NULL, 1999999900) == NULL; });
+
 /* Parser acceptance/rejection of whole lines. */
 EXO_TEST(acl_ok_comment,     { return acl_parse_expect("# nothing here\n", 0); });
 EXO_TEST(acl_ok_blank,       { return acl_parse_expect("   \n\t\n", 0); });

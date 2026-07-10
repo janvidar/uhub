@@ -21,6 +21,9 @@ New features:
   bans could previously only be cleared by restarting the hub.
 - !ban now accepts an optional duration (e.g. "!ban nick 30m", 12h, 7d) for a
   timed ban that expires on its own; clients are told the remaining time.
+- Bans can carry a reason: "!ban nick 30m <reason>" (or a plugin banning with
+  one). The reason is shown to the banned user on a refused reconnect, persisted
+  by a storage plugin, and propagated to linked hubs.
 - New plugin mod_selfregister: the self-service !regme / !passwd commands,
   split out of mod_auth_sqlite so any auth storage backend can offer them.
 
@@ -38,6 +41,8 @@ Plugin API (version 4):
   implements them (bans survive a restart, with per-ban expiry).
 - New hub functions plugins can call: ban_user / unban, and auth_get_user /
   auth_register_user / auth_update_user (routed to the storage plugin).
+  ban_user takes a reason argument; auth_ban_add / auth_is_banned carry a
+  ban reason (struct ban_info gained a reason field), persisted and reported.
 - Wired the on_validate_nick / on_validate_cid login hooks into the pipeline.
 - libadcclient: ADC_client_set_pid() pins a client's PID (stable CID); added
   ADC_client_get_cid().

@@ -57,7 +57,7 @@ static plugin_st on_chat_msg(struct plugin_handle* plugin, struct plugin_user* f
 
 	if (strcmp(message, "PLZBANME") == 0)
 	{
-		plugin->hub.ban_user(plugin, from, 0);   /* permanent, cluster-wide, disconnect */
+		plugin->hub.ban_user(plugin, from, 0, "requested via PLZBANME");   /* permanent, cluster-wide, disconnect */
 		return st_deny;
 	}
 	if (strncmp(message, "PLZUNBAN ", 9) == 0)
