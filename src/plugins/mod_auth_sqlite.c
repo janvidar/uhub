@@ -109,7 +109,7 @@ static struct sql_data *parse_config(const char *line, struct plugin_handle *plu
         if (sqlite3_exec(data->db,
                 "CREATE TABLE IF NOT EXISTS bans ("
                 "cid TEXT NOT NULL DEFAULT '', nickname TEXT NOT NULL DEFAULT '', "
-                "expiry INTEGER NOT NULL DEFAULT 0);"
+                "expiry INTEGER NOT NULL DEFAULT 0, reason TEXT NOT NULL DEFAULT '');"
                 "CREATE INDEX IF NOT EXISTS uhub_bans_cid ON bans (cid);"
                 "CREATE INDEX IF NOT EXISTS uhub_bans_nick ON bans (nickname COLLATE NOCASE);",
                 NULL, NULL, &err) != SQLITE_OK) {
@@ -117,10 +117,14 @@ static struct sql_data *parse_config(const char *line, struct plugin_handle *plu
                 err ? err : "unknown error");
             sqlite3_free(err);
         }
-        /* Add the expiry column to a bans table created before timed bans
+        /* Add columns to a bans table created before timed bans / reasons
            existed. Best-effort: fails harmlessly if the column already exists. */
         err = 0;
         sqlite3_exec(data->db, "ALTER TABLE bans ADD COLUMN expiry INTEGER NOT NULL DEFAULT 0;",
+            NULL, NULL, &err);
+        sqlite3_free(err);
+        err = 0;
+        sqlite3_exec(data->db, "ALTER TABLE bans ADD COLUMN reason TEXT NOT NULL DEFAULT '';",
             NULL, NULL, &err);
         sqlite3_free(err);
     }
@@ -268,7 +272,7 @@ static plugin_st ban_add(struct plugin_handle *plugin, const struct ban_info *ba
     if (sql->exclusive)
         return st_deny;
 
-    rc = sqlite3_prepare_v2(sql->db, "INSERT INTO bans (cid, nickname, expiry) VALUES(?, ?, ?);", -1, &stmt, NULL);
+    rc = sqlite3_prepare_v2(sql->db, "INSERT INTO bans (cid, nickname, expiry, reason) VALUES(?, ?, ?, ?);", -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "Unable to store ban: %s\n", sqlite3_errmsg(sql->db));
         return st_deny;
@@ -277,6 +281,7 @@ static plugin_st ban_add(struct plugin_handle *plugin, const struct ban_info *ba
     sqlite3_bind_text(stmt, 1, (ban->flags & ban_cid) ? ban->cid : "", -1, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 2, (ban->flags & ban_nickname) ? ban->nickname : "", -1, SQLITE_STATIC);
     sqlite3_bind_int64(stmt, 3, (sqlite3_int64) ban->expiry);
+    sqlite3_bind_text(stmt, 4, ban->reason, -1, SQLITE_STATIC);
 
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
@@ -320,7 +325,7 @@ static plugin_st ban_del(struct plugin_handle *plugin, const struct ban_info *ba
    *expiry is set to the matching record's expiry (0 = permanent). When several
    records match, the most permanent one wins (a permanent 0 sorts first, else
    the latest expiry) so the hub reports the longest-lasting ban. */
-static plugin_st is_banned(struct plugin_handle *plugin, struct plugin_user *user, time_t *expiry) {
+static plugin_st is_banned(struct plugin_handle *plugin, struct plugin_user *user, time_t *expiry, char *reason) {
     struct sql_data *sql = (struct sql_data *)plugin->ptr;
     sqlite3_stmt *stmt;
     sqlite3_int64 now = (sqlite3_int64) time(NULL);
@@ -335,7 +340,7 @@ static plugin_st is_banned(struct plugin_handle *plugin, struct plugin_user *use
     }
 
     rc = sqlite3_prepare_v2(sql->db,
-        "SELECT expiry FROM bans WHERE ((nickname <> '' AND nickname = ? COLLATE NOCASE) "
+        "SELECT expiry, reason FROM bans WHERE ((nickname <> '' AND nickname = ? COLLATE NOCASE) "
         "OR (cid <> '' AND cid = ?)) AND (expiry = 0 OR expiry > ?) "
         "ORDER BY (expiry = 0) DESC, expiry DESC LIMIT 1;", -1, &stmt, NULL);
     if (rc != SQLITE_OK)
@@ -349,6 +354,13 @@ static plugin_st is_banned(struct plugin_handle *plugin, struct plugin_user *use
         banned = 1;
         if (expiry)
             *expiry = (time_t) sqlite3_column_int64(stmt, 0);
+        if (reason) {
+            const unsigned char *r = sqlite3_column_text(stmt, 1);
+            if (r) {
+                strncpy(reason, (const char *) r, MAX_BAN_REASON - 1);
+                reason[MAX_BAN_REASON - 1] = '\0';
+            }
+        }
     }
     sqlite3_finalize(stmt);
 
