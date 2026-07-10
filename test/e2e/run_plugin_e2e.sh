@@ -48,9 +48,14 @@ start_hub() {
 "$PASSWD" "$DIR/users.db" create >/dev/null 2>&1
 "$PASSWD" "$DIR/users.db" add admin adminpass admin >/dev/null 2>&1
 
+# A fixed PID yields a deterministic CID, which we tell the plugin to deny so the
+# on_validate_cid rejection path can be exercised end-to-end.
+FIXED_PID="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+DENY_CID=$("$ADC" --pid "$FIXED_PID" --show-cid)
+
 cat > "$DIR/plugins.conf" <<EOF
 plugin $BUILD/mod_auth_sqlite.so "file=$DIR/users.db"
-plugin $BUILD/mod_e2e_test.so
+plugin $BUILD/mod_e2e_test.so "deny_cid=$DENY_CID"
 EOF
 cat > "$DIR/uhub.conf" <<EOF
 server_port = $PORT
@@ -67,6 +72,13 @@ if "$ADC" "$HUB" --nick denynick --expect fail --linger 1 >"$DIR/deny.log" 2>&1;
 	ok "on_validate_nick rejects a login"; else bad "denynick was not rejected (see $DIR/deny.log)"; fi
 if "$ADC" "$HUB" --nick gooduser --expect ok --linger 1 >"$DIR/good.log" 2>&1; then
 	ok "on_validate_nick allows a normal nick"; else bad "gooduser rejected (see $DIR/good.log)"; fi
+
+# on_validate_cid rejects a login by CID (client pins a PID -> the denied CID);
+# a client with any other CID is unaffected.
+if "$ADC" "$HUB" --nick cidprobe --pid "$FIXED_PID" --expect fail --linger 1 >"$DIR/cid.log" 2>&1; then
+	ok "on_validate_cid rejects a login by CID"; else bad "denied CID not rejected (see $DIR/cid.log)"; fi
+if "$ADC" "$HUB" --nick cidok --expect ok --linger 1 >"$DIR/cidok.log" 2>&1; then
+	ok "on_validate_cid allows a different CID (control)"; else bad "control CID rejected (see $DIR/cidok.log)"; fi
 
 # 2. plugin-driven ban: the victim triggers hub.ban_user on itself.
 "$ADC" "$HUB" --nick pvictim --send "PLZBANME" --linger 3 --expect ok >"$DIR/selfban.log" 2>&1
