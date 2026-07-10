@@ -607,7 +607,9 @@ static void ADC_client_send_password(struct ADC_client* client, const char* chal
 {
 	struct adc_message* hpas;
 	char buf[MAX_PASS_LEN + TIGERSIZE];
-	char raw_challenge[TIGERSIZE];
+	/* Generous buffer: base32_decode zero-fills and writes `len` (MAX_CID_LEN)
+	   bytes, which is wider than the 24-byte TIGER hash it yields. */
+	char raw_challenge[64];
 	char response[MAX_CID_LEN + 1];
 	uint64_t tiger_res[3];
 	size_t password_len;
