@@ -1,3 +1,60 @@
+0.8.0:
+Incompatible changes (action required beyond replacing the binaries):
+- The acl file (file_acl) no longer defines registered users. The user_admin,
+  user_super, user_op, user_reg, link, bot, ubot, opbot and opubot keywords are
+  obsolete (they had already stopped granting access in prior releases). Remove
+  them and configure accounts through an auth plugin (mod_auth_sqlite /
+  mod_auth_simple). The acl file now holds only ban_nick / ban_cid / deny_nick /
+  deny_ip. Obsolete keywords are ignored with a warning so old files still load.
+- nat_ip is no longer an acl-file keyword; use the nat_override option in
+  uhub.conf instead. A leftover nat_ip line is ignored with a warning.
+- The mod_auth_sqlite "self_register" parameter was removed; the hub refuses to
+  start if it is still present. The !regme / !passwd self-service commands moved
+  to the new mod_selfregister plugin. To keep self-registration, drop the
+  parameter and load the new plugin:
+    old:  plugin .../mod_auth_sqlite.so "file=/etc/uhub/users.db self_register=true"
+    new:  plugin .../mod_auth_sqlite.so "file=/etc/uhub/users.db"
+          plugin .../mod_selfregister.so
+
+New features:
+- New operator command !unban to lift a ban by nick, CID or IP/range. Runtime
+  bans could previously only be cleared by restarting the hub.
+- !ban now accepts an optional duration (e.g. "!ban nick 30m", 12h, 7d) for a
+  timed ban that expires on its own; clients are told the remaining time.
+- New plugin mod_selfregister: the self-service !regme / !passwd commands,
+  split out of mod_auth_sqlite so any auth storage backend can offer them.
+
+Configuration:
+- NAT override moved out of the acl file into the nat_override option in
+  uhub.conf (the old nat_ip acl keyword is obsolete and ignored with a warning).
+- Retired the dead file_acl registered-user list (user_admin/user_op/... and
+  friends); accounts are handled by an auth plugin. The obsolete keywords are
+  ignored with a warning so existing acl files keep loading. file_acl now holds
+  only bans and denied nicks.
+
+Plugin API (version 4):
+- Ban storage callbacks (auth_ban_add / auth_ban_del / auth_is_banned) let a
+  storage plugin persist bans; the hub queries them at login. mod_auth_sqlite
+  implements them (bans survive a restart, with per-ban expiry).
+- New hub functions plugins can call: ban_user / unban, and auth_get_user /
+  auth_register_user / auth_update_user (routed to the storage plugin).
+- Wired the on_validate_nick / on_validate_cid login hooks into the pipeline.
+- libadcclient: ADC_client_set_pid() pins a client's PID (stable CID); added
+  ADC_client_get_cid().
+
+Federation:
+- LBAN carries an absolute expiry and a new LUBN message propagates unbans, so
+  bans/unbans (and timed-ban expiry) apply cluster-wide.
+
+Authentication:
+- mod_auth_sqlite is now storage-only (users + bans); self-registration moved to
+  mod_selfregister.
+
+Testing:
+- Added a scripted end-to-end test harness (test/e2e/) that drives a live hub
+  with real ADC clients: ban/unban/timed-ban/persistence, linked-hub LBAN/LUBN
+  propagation, and the plugin ban/validate hooks.
+
 0.7.1:
 New features:
 - New plugin mod_ucmd: publishes the hub's registered commands as ADC
