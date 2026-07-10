@@ -138,7 +138,10 @@ library CSPRNG. nonce and response are base32, MAX_CID_LEN characters each.
   LQUI <sid>                 both    A user left (4-char base32 SID).
   LRTE <adc-message>         both    Forward an ADC message to be re-routed.
   LDSC <description>         both    Hub description (topic) changed.
-  LBAN <cid> <nick>          both    Ban a user cluster-wide (and disconnect).
+  LBAN <expiry> <cid> <nick> both    Ban a user cluster-wide (and disconnect).
+                                     expiry is an absolute unix time (0 = permanent).
+  LUBN <target>              both    Lift a ban cluster-wide; target is a nick,
+                                     CID or IP/range (takes the rest of the line).
   LACQ <sid> <nick>          slave   Is this nick registered? (master auth)
   LACR <sid> <cred>          master  Reply: the nick's credential ("guest" if not).
   LVFY <sid> <chal> <resp> <nick>  slave   Verify a password challenge-response.
@@ -249,10 +252,14 @@ is loop-free on a full mesh):
     tells its local clients.
 
   - Bans: the !ban command adds the user's CID and nick to the local ACL,
-    disconnects a matching local user, and sends LBAN <cid> <nick> to every
-    link. Each node adds the ban and disconnects its own matching session, so
-    the user is dropped wherever connected and cannot reconnect on any node
+    disconnects a matching local user, and sends LBAN <expiry> <cid> <nick> to
+    every link. Each node adds the ban and disconnects its own matching session,
+    so the user is dropped wherever connected and cannot reconnect on any node
     (login already consults the ACL). This makes a ban a cluster-wide kick too.
+    The expiry is an absolute unix time (0 = permanent), so a timed ban lifts at
+    the same moment on every node. !unban (and a plugin's hub.unban) sends
+    LUBN <target> the same way, lifting the ban cluster-wide. Bans by CID/nick
+    propagate; IP-range bans (deny_ip) and deny_nick currently do not.
 
 State that is file-backed -- chat history and the user database when stored in
 SQLite -- is shared automatically among co-located workers because they read
@@ -360,7 +367,7 @@ Implemented and tested (two nodes / star-to-a-coordinator, and multi-process):
   - coordinator election (LELC)
   - roster snapshot and live join/update/quit deltas (LINF/LQUI)
   - directed and broadcast routing across one hop (LRTE)
-  - topic propagation (LDSC) and cluster-wide bans (LBAN)
+  - topic propagation (LDSC) and cluster-wide bans/unbans (LBAN/LUBN)
   - master-slave authentication (LACQ/LACR/LVFY/LVRS, auth_proxy)
   - multi-process "one logical hub" via workers (SO_REUSEPORT + Unix-socket mesh)
   - netsplit cleanup on link drop

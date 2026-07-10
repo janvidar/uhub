@@ -839,11 +839,19 @@
 	</option>
 
 	<option name="file_acl" type="file" default="">
-		<short>File containing access control lists</short>
+		<short>File containing access control lists (bans and denied nicks)</short>
 		<description><![CDATA[
-			This is an access control list (acl) file.
-			In this file all registered users, bans, etc should be stored.
-			If the file is missing, or empty no registered users, or ban records are used.
+			An access control list (acl) file holding ban and deny rules only:
+			ban_nick, ban_cid, deny_nick and deny_ip. If missing or empty, no such
+			rules are loaded.
+
+			IMPORTANT (changed in 0.8.0): registered users are NO LONGER defined
+			here. Account credentials are served by an authentication plugin
+			(mod_auth_simple / mod_auth_sqlite, configured via file_plugins). The
+			old user_admin / user_super / user_op / user_reg / link / bot / ubot /
+			opbot / opubot keywords, and nat_ip (now the nat_override option), are
+			obsolete: they are ignored with a warning so existing files keep
+			loading, but you must migrate them.
 		]]></description>
 		<since>0.1.3</since>
 		<example><![CDATA[
@@ -869,7 +877,7 @@
 			be given as CIDR, as a lo-hi range, or as a single address. This replaces
 			the former nat_ip entries in the acl file (file_acl).
 		]]></description>
-		<since>0.7.2</since>
+		<since>0.8.0</since>
 		<example><![CDATA[
 			nat_override = 10.0.0.0/8,192.168.0.0/16
 		]]></example>
