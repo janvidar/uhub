@@ -97,6 +97,10 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 			if (data && data->chat && data->chat->message)
 				printf("MSG: %s\n", data->chat->message);
 			break;
+		case ADC_CLIENT_USER_JOIN:
+			if (data && data->user)
+				printf("JOIN: %s\n", data->user->name);
+			break;
 		default:
 			break;
 	}
