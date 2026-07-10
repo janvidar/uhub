@@ -253,9 +253,9 @@ int acl_initialize(struct hub_config* config, struct acl_handle* handle)
 	handle->cids         = list_create();
 	handle->networks     = list_create();
 	handle->nat_override = list_create();
-	handle->timed_bans   = list_create();
+	handle->bans         = list_create();
 
-	if (!handle->cids || !handle->networks || !handle->users_denied || !handle->users_banned || !handle->nat_override || !handle->timed_bans)
+	if (!handle->cids || !handle->networks || !handle->users_denied || !handle->users_banned || !handle->nat_override || !handle->bans)
 	{
 		LOG_FATAL("acl_initialize: Out of memory");
 
@@ -264,7 +264,7 @@ int acl_initialize(struct hub_config* config, struct acl_handle* handle)
 		list_destroy(handle->cids);
 		list_destroy(handle->networks);
 		list_destroy(handle->nat_override);
-		list_destroy(handle->timed_bans);
+		list_destroy(handle->bans);
 		return -1;
 	}
 
@@ -294,8 +294,11 @@ static void acl_free_ip_info(void* ptr)
 	}
 }
 
-/* Defined below (with the timed-ban store); forward-declared for acl_shutdown. */
-static void acl_free_timed_ban(void* ptr);
+/* The runtime ban store is defined below; these are forward-declared for the
+   acl_is_*_banned / acl_user_(un)ban_* functions above it and acl_shutdown. */
+static void acl_free_ban(void* ptr);
+static int acl_ban_has_permanent(struct acl_handle* handle, const char* cid, const char* nick);
+static int acl_ban_remove_match(struct acl_handle* handle, const char* cid, const char* nick);
 
 int acl_shutdown(struct acl_handle* handle)
 {
@@ -330,10 +333,10 @@ int acl_shutdown(struct acl_handle* handle)
 		list_destroy(handle->nat_override);
 	}
 
-	if (handle->timed_bans)
+	if (handle->bans)
 	{
-		list_clear(handle->timed_bans, &acl_free_timed_ban);
-		list_destroy(handle->timed_bans);
+		list_clear(handle->bans, &acl_free_ban);
+		list_destroy(handle->bans);
 	}
 
 	memset(handle, 0, sizeof(struct acl_handle));
@@ -398,14 +401,26 @@ int acl_is_cid_banned(struct acl_handle* handle, const char* data)
 {
 	char* str;
 	if (!handle) return 0;
-	STR_LIST_CONTAINS(handle->cids, data);
+	/* Config-file bans (ban_cid) plus permanent runtime ban records. */
+	LIST_FOREACH(char*, str, handle->cids,
+	{
+		if (strcasecmp(str, data) == 0)
+			return 1;
+	});
+	return acl_ban_has_permanent(handle, data, NULL);
 }
 
 int acl_is_user_banned(struct acl_handle* handle, const char* data)
 {
 	char* str;
 	if (!handle) return 0;
-	STR_LIST_CONTAINS(handle->users_banned, data);
+	/* Config-file bans (ban_nick) plus permanent runtime ban records. */
+	LIST_FOREACH(char*, str, handle->users_banned,
+	{
+		if (strcasecmp(str, data) == 0)
+			return 1;
+	});
+	return acl_ban_has_permanent(handle, NULL, data);
 }
 
 int acl_is_user_denied(struct acl_handle* handle, const char* data)
@@ -417,28 +432,12 @@ int acl_is_user_denied(struct acl_handle* handle, const char* data)
 
 int acl_user_ban_nick(struct acl_handle* handle, const char* nick)
 {
-	char* data = hub_strdup(nick);
-	if (!data)
-	{
-		LOG_ERROR("ACL error: Out of memory!");
-		return -1;
-	}
-
-	list_append(handle->users_banned, data);
-	return 0;
+	return acl_ban_add(handle, NULL, nick, 0, NULL);
 }
 
 int acl_user_ban_cid(struct acl_handle* handle, const char* cid)
 {
-	char* data = hub_strdup(cid);
-	if (!data)
-	{
-		LOG_ERROR("ACL error: Out of memory!");
-		return -1;
-	}
-
-	list_append(handle->cids, data);
-	return 0;
+	return acl_ban_add(handle, cid, NULL, 0, NULL);
 }
 
 /* Remove the first case-insensitively matching string from a list of
@@ -461,12 +460,20 @@ static int acl_list_remove_string(struct linked_list* list, const char* value)
 
 int acl_user_unban_nick(struct acl_handle* handle, const char* nick)
 {
-	return acl_list_remove_string(handle->users_banned, nick);
+	int removed = 0;
+	if (acl_list_remove_string(handle->users_banned, nick) == 0)
+		removed++;
+	removed += acl_ban_remove_match(handle, NULL, nick);
+	return removed ? 0 : -1;
 }
 
 int acl_user_unban_cid(struct acl_handle* handle, const char* cid)
 {
-	return acl_list_remove_string(handle->cids, cid);
+	int removed = 0;
+	if (acl_list_remove_string(handle->cids, cid) == 0)
+		removed++;
+	removed += acl_ban_remove_match(handle, cid, NULL);
+	return removed ? 0 : -1;
 }
 
 int acl_user_unban_ip(struct acl_handle* handle, const char* address)
@@ -491,119 +498,183 @@ int acl_user_unban_ip(struct acl_handle* handle, const char* address)
 }
 
 
-/* A runtime ban with an expiry, stored in acl_handle->timed_bans. cid and nick
-   are heap strings ("" when that identifier is not part of the ban). */
-struct acl_timed_ban
+/* A runtime ban stored in acl_handle->bans. cid and nick are heap strings ("" when
+   that identifier is not part of the ban); expiry 0 means permanent; reason is an
+   optional heap string (NULL when none). This single record type backs both the
+   permanent runtime bans (acl_user_ban_*) and the timed bans (acl_add_timed_ban). */
+struct acl_ban
 {
 	char* cid;
 	char* nick;
-	time_t expiry;   /* absolute unix time */
+	time_t expiry;   /* absolute unix time, 0 = permanent */
+	char* reason;    /* may be NULL */
 };
 
-static void acl_free_timed_ban(void* ptr)
+static void acl_free_ban(void* ptr)
 {
-	struct acl_timed_ban* tb = (struct acl_timed_ban*) ptr;
-	if (tb)
+	struct acl_ban* b = (struct acl_ban*) ptr;
+	if (b)
 	{
-		hub_free(tb->cid);
-		hub_free(tb->nick);
-		hub_free(tb);
+		hub_free(b->cid);
+		hub_free(b->nick);
+		hub_free(b->reason);
+		hub_free(b);
 	}
 }
 
-static int acl_timed_ban_matches(struct acl_timed_ban* tb, const char* cid, const char* nick)
+static int acl_ban_matches(struct acl_ban* b, const char* cid, const char* nick)
 {
-	if (tb->cid[0] && cid && strcasecmp(tb->cid, cid) == 0)
+	if (b->cid[0] && cid && strcasecmp(b->cid, cid) == 0)
 		return 1;
-	if (tb->nick[0] && nick && strcasecmp(tb->nick, nick) == 0)
+	if (b->nick[0] && nick && strcasecmp(b->nick, nick) == 0)
 		return 1;
+	return 0;
+}
+
+/* Remove and free every expired (non-permanent, expiry <= now) ban record. */
+static void acl_ban_purge_expired(struct acl_handle* handle, time_t now)
+{
+	struct acl_ban* b;
+	struct linked_list* expired;
+
+	if (!handle->bans)
+		return;
+	expired = list_create();
+	if (!expired)
+		return;
+
+	LIST_FOREACH(struct acl_ban*, b, handle->bans,
+	{
+		if (b->expiry != 0 && b->expiry <= now)
+			list_append(expired, b);   /* collect; do not remove while iterating */
+	});
+	while ((b = (struct acl_ban*) list_get_first(expired)))
+	{
+		list_remove(expired, b);
+		list_remove(handle->bans, b);
+		acl_free_ban(b);
+	}
+	list_destroy(expired);
+}
+
+int acl_ban_add(struct acl_handle* handle, const char* cid, const char* nick, time_t expiry, const char* reason)
+{
+	struct acl_ban* b;
+
+	if (!handle || !handle->bans)
+		return -1;
+	b = hub_malloc_zero(sizeof(struct acl_ban));
+	if (!b)
+	{
+		LOG_ERROR("ACL error: Out of memory!");
+		return -1;
+	}
+	b->cid = hub_strdup(cid ? cid : "");
+	b->nick = hub_strdup(nick ? nick : "");
+	b->expiry = expiry;
+	b->reason = (reason && *reason) ? hub_strdup(reason) : NULL;
+	if (!b->cid || !b->nick || (reason && *reason && !b->reason))
+	{
+		acl_free_ban(b);
+		return -1;
+	}
+	list_append(handle->bans, b);
 	return 0;
 }
 
 int acl_add_timed_ban(struct acl_handle* handle, const char* cid, const char* nick, time_t expiry)
 {
-	struct acl_timed_ban* tb = hub_malloc_zero(sizeof(struct acl_timed_ban));
-	if (!tb)
+	return acl_ban_add(handle, cid, nick, expiry, NULL);
+}
+
+/* True if a permanent (expiry == 0) ban record matches cid or nick. Used by
+   acl_is_cid_banned / acl_is_user_banned to keep permanent bans distinct from
+   timed ones (which check_acl reports differently). */
+static int acl_ban_has_permanent(struct acl_handle* handle, const char* cid, const char* nick)
+{
+	struct acl_ban* b;
+	if (!handle || !handle->bans)
+		return 0;
+	LIST_FOREACH(struct acl_ban*, b, handle->bans,
 	{
-		LOG_ERROR("ACL error: Out of memory!");
-		return -1;
-	}
-	tb->cid = hub_strdup(cid ? cid : "");
-	tb->nick = hub_strdup(nick ? nick : "");
-	tb->expiry = expiry;
-	if (!tb->cid || !tb->nick)
-	{
-		acl_free_timed_ban(tb);
-		return -1;
-	}
-	list_append(handle->timed_bans, tb);
+		if (b->expiry == 0 && acl_ban_matches(b, cid, nick))
+			return 1;
+	});
 	return 0;
 }
 
 time_t acl_timed_ban_remaining(struct acl_handle* handle, const char* cid, const char* nick, time_t now)
 {
-	struct acl_timed_ban* tb;
-	struct acl_timed_ban* match = NULL;
-	struct linked_list* expired;
-	time_t remaining = 0;
+	struct acl_ban* b;
+	struct acl_ban* match = NULL;
 
-	if (!handle->timed_bans)
-		return 0;
-	expired = list_create();
-	if (!expired)
+	if (!handle || !handle->bans)
 		return 0;
 
-	LIST_FOREACH(struct acl_timed_ban*, tb, handle->timed_bans,
+	acl_ban_purge_expired(handle, now);
+
+	LIST_FOREACH(struct acl_ban*, b, handle->bans,
 	{
-		if (tb->expiry != 0 && tb->expiry <= now)
-			list_append(expired, tb);          /* collect; do not remove while iterating */
-		else if (!match && acl_timed_ban_matches(tb, cid, nick))
-			match = tb;
+		if (b->expiry != 0 && !match && acl_ban_matches(b, cid, nick))
+			match = b;
 	});
 
-	while ((tb = (struct acl_timed_ban*) list_get_first(expired)))
-	{
-		/* Unlink from both lists before freeing (do not touch tb afterwards). */
-		list_remove(expired, tb);
-		list_remove(handle->timed_bans, tb);
-		acl_free_timed_ban(tb);
-	}
-	list_destroy(expired);
-
 	if (match)
-		remaining = match->expiry - now;
-	return remaining > 0 ? remaining : 0;
+	{
+		time_t remaining = match->expiry - now;
+		return remaining > 0 ? remaining : 0;
+	}
+	return 0;
 }
 
-int acl_timed_unban(struct acl_handle* handle, const char* target)
+const char* acl_ban_reason(struct acl_handle* handle, const char* cid, const char* nick, time_t now)
 {
-	struct acl_timed_ban* tb;
+	struct acl_ban* b;
+	if (!handle || !handle->bans)
+		return NULL;
+	LIST_FOREACH(struct acl_ban*, b, handle->bans,
+	{
+		if ((b->expiry == 0 || b->expiry > now) && acl_ban_matches(b, cid, nick))
+			return b->reason;
+	});
+	return NULL;
+}
+
+/* Remove every ban record matching cid or nick (any expiry). Returns the count. */
+static int acl_ban_remove_match(struct acl_handle* handle, const char* cid, const char* nick)
+{
+	struct acl_ban* b;
 	struct linked_list* hits;
 	int removed = 0;
 
-	if (!handle->timed_bans || !target)
+	if (!handle || !handle->bans)
 		return 0;
 	hits = list_create();
 	if (!hits)
 		return 0;
 
-	LIST_FOREACH(struct acl_timed_ban*, tb, handle->timed_bans,
+	LIST_FOREACH(struct acl_ban*, b, handle->bans,
 	{
-		if ((tb->cid[0] && strcasecmp(tb->cid, target) == 0) ||
-		    (tb->nick[0] && strcasecmp(tb->nick, target) == 0))
-			list_append(hits, tb);
+		if (acl_ban_matches(b, cid, nick))
+			list_append(hits, b);
 	});
-
-	while ((tb = (struct acl_timed_ban*) list_get_first(hits)))
+	while ((b = (struct acl_ban*) list_get_first(hits)))
 	{
-		/* Unlink from both lists before freeing (do not touch tb afterwards). */
-		list_remove(hits, tb);
-		list_remove(handle->timed_bans, tb);
-		acl_free_timed_ban(tb);
+		list_remove(hits, b);
+		list_remove(handle->bans, b);
+		acl_free_ban(b);
 		removed++;
 	}
 	list_destroy(hits);
 	return removed;
+}
+
+int acl_timed_unban(struct acl_handle* handle, const char* target)
+{
+	if (!target)
+		return 0;
+	/* target may be a cid or a nick; match either. */
+	return acl_ban_remove_match(handle, target, target);
 }
 
 

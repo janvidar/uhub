@@ -1226,24 +1226,14 @@ void hub_update_description(struct hub_info* hub, const char* escaped_desc, int 
 		link_broadcast_description(hub, escaped_desc);
 }
 
-void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, time_t expiry, int propagate)
+void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, time_t expiry, const char* reason, int propagate)
 {
 	struct hub_user* u;
 
 	/* Add to this node's runtime ACL so the user cannot reconnect here
-	   (check_acl consults the ACL at login). A permanent ban (expiry == 0) goes
-	   to the plain nick/CID lists; a timed ban goes to the expiring store. */
-	if (expiry == 0)
-	{
-		if (cid && *cid)
-			acl_user_ban_cid(hub->acl, cid);
-		if (nick && *nick)
-			acl_user_ban_nick(hub->acl, nick);
-	}
-	else
-	{
-		acl_add_timed_ban(hub->acl, cid ? cid : "", nick ? nick : "", expiry);
-	}
+	   (check_acl consults the ACL at login). One record carries both identifiers,
+	   the expiry (0 = permanent) and the optional reason. */
+	acl_ban_add(hub->acl, cid, nick, expiry, reason);
 
 	/* Persist the ban through a storage plugin (write-through), so it survives a
 	   reload/restart -- the runtime ACL above is rebuilt from config on reload.
@@ -1265,6 +1255,11 @@ void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, time
 			ban.flags |= ban_nickname;
 			strncpy(ban.nickname, nick, MAX_NICK_LEN);
 			ban.nickname[MAX_NICK_LEN] = '\0';
+		}
+		if (reason && *reason)
+		{
+			strncpy(ban.reason, reason, sizeof(ban.reason) - 1);
+			ban.reason[sizeof(ban.reason) - 1] = '\0';
 		}
 		if (ban.flags)
 			plugin_ban_add(hub, &ban);
@@ -1290,7 +1285,7 @@ void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, time
 	   over a link is applied with propagate = 0 (loop-free on a full mesh). The
 	   expiry is an absolute time, so every node agrees on when it lifts. */
 	if (propagate)
-		link_broadcast_ban(hub, cid, nick, expiry);
+		link_broadcast_ban(hub, cid, nick, expiry, reason);
 }
 
 int hub_apply_unban(struct hub_info* hub, const char* target, int propagate)
@@ -1413,6 +1408,7 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 	char code[4];
 	char buf[256];
 	char tl_flag[16];
+	char reason_buf[320];
 	const char* text = 0;
 	const char* flag = 0;
 	char* escaped_text = 0;
@@ -1478,6 +1474,15 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 			reconnect_time = user->ban_reconnect_time;
 		snprintf(tl_flag, sizeof(tl_flag), "TL%d", reconnect_time);
 		flag = tl_flag;
+	}
+
+	/* Append the per-ban reason (resolved during the login ACL check) to the
+	   configured ban message, so the banned user is told why. */
+	if ((msg == status_msg_ban_permanently || msg == status_msg_ban_temporarily)
+		&& text && user->ban_reason[0])
+	{
+		snprintf(reason_buf, sizeof(reason_buf), "%s: %s", text, user->ban_reason);
+		text = reason_buf;
 	}
 
 	escaped_text = adc_msg_escape(text);

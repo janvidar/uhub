@@ -228,9 +228,11 @@ plugin_st plugin_ban_del(struct hub_info* hub, const struct ban_info* ban)
 	PLUGIN_INVOKE_STATUS_1(hub, auth_ban_del, ban);
 }
 
-plugin_st plugin_is_banned(struct hub_info* hub, struct hub_user* who, time_t* expiry)
+plugin_st plugin_is_banned(struct hub_info* hub, struct hub_user* who, time_t* expiry, char* reason)
 {
 	struct plugin_user* user = convert_user_type(who);
 	*expiry = 0;
-	PLUGIN_INVOKE_STATUS_2(hub, auth_is_banned, user, expiry);
+	if (reason)
+		reason[0] = '\0';
+	PLUGIN_INVOKE_STATUS_3(hub, auth_is_banned, user, expiry, reason);
 }

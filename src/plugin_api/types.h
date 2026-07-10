@@ -82,6 +82,10 @@ enum ban_flags
 	ban_ip       = 0x04, /* IP address (range) is banned */
 };
 
+/* Size of a ban reason buffer, shared by struct ban_info and the auth_is_banned
+   reason out-parameter. */
+#define MAX_BAN_REASON 128
+
 struct ban_info
 {
 	unsigned int flags;                 /* See enum ban_flags. */
@@ -90,6 +94,7 @@ struct ban_info
 	struct ip_addr_encap ip_addr_lo;    /* Low IP address of an IP range */
 	struct ip_addr_encap ip_addr_hi;    /* High IP address of an IP range */
 	time_t expiry;                      /* Time when the ban record expires */
+	char reason[MAX_BAN_REASON];        /* Human-readable ban reason ("" if none) */
 };
 
 

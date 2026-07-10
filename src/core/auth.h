@@ -35,9 +35,9 @@ struct acl_handle
 	struct linked_list* cids;           /* Known CIDs */
 	struct linked_list* networks;       /* IP ranges, used for banning */
 	struct linked_list* nat_override;   /* IPs inside these ranges can provide their false IP. Use with care! */
-	struct linked_list* users_banned;   /* Users permanently banned */
+	struct linked_list* users_banned;   /* Users permanently banned (from the acl file) */
 	struct linked_list* users_denied;   /* bad nickname */
-	struct linked_list* timed_bans;     /* Runtime bans with an expiry (struct acl_timed_ban) */
+	struct linked_list* bans;           /* Runtime bans, permanent or timed, with an optional reason (struct acl_ban) */
 };
 
 
@@ -63,6 +63,11 @@ extern int acl_user_unban_nick(struct acl_handle* handle, const char* nick);
 extern int acl_user_unban_cid(struct acl_handle* handle, const char* cid);
 extern int acl_user_unban_ip(struct acl_handle* handle, const char* address);
 
+/* Add a runtime ban record matching cid and/or nick (either may be NULL/empty).
+   expiry is an absolute unix time (0 = permanent); reason may be NULL. This is
+   the general entry point behind acl_user_ban_* and acl_add_timed_ban. */
+extern int acl_ban_add(struct acl_handle* handle, const char* cid, const char* nick, time_t expiry, const char* reason);
+
 /* Timed (expiring) runtime bans. expiry is an absolute unix time. */
 extern int acl_add_timed_ban(struct acl_handle* handle, const char* cid, const char* nick, time_t expiry);
 /* Returns seconds remaining (>0) if cid or nick matches a non-expired timed ban
@@ -70,6 +75,11 @@ extern int acl_add_timed_ban(struct acl_handle* handle, const char* cid, const c
 extern time_t acl_timed_ban_remaining(struct acl_handle* handle, const char* cid, const char* nick, time_t now);
 /* Remove timed bans whose cid or nick equals target. Returns the number removed. */
 extern int acl_timed_unban(struct acl_handle* handle, const char* target);
+
+/* Reason of the active runtime ban (permanent or not-yet-expired) matching cid
+   or nick at time 'now', or NULL if none matches or the ban carries no reason.
+   The returned pointer is owned by the ACL and valid until the ban is removed. */
+extern const char* acl_ban_reason(struct acl_handle* handle, const char* cid, const char* nick, time_t now);
 
 /**
  * Verify a password.

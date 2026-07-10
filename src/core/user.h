@@ -161,6 +161,10 @@ struct hub_user
 	   check and used to build the accurate TL reconnect hint in hub_send_status.
 	   0 means "use the default temp-ban reconnect time". */
 	int ban_reconnect_time;
+
+	/* Reason for the ban that rejected this login, resolved during the ACL check
+	   and appended to the ban message in hub_send_status ("" when none). */
+	char ban_reason[128];
 };
 
 /**

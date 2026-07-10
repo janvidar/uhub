@@ -304,7 +304,7 @@ extern void hub_update_description(struct hub_info* hub, const char* escaped_des
  * over a link is applied with propagate = 0. expiry is an absolute unix time
  * (0 = permanent); a non-zero expiry makes it a timed ban that lifts itself.
  */
-extern void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, time_t expiry, int propagate);
+extern void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, time_t expiry, const char* reason, int propagate);
 
 /**
  * Lift a ban cluster-wide. target may be a nick, CID or IP/range; it is removed

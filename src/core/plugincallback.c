@@ -159,13 +159,14 @@ static int cbfunc_user_disconnect(struct plugin_handle* plugin, struct plugin_us
 	return 0;
 }
 
-static int cbfunc_ban_user(struct plugin_handle* plugin, struct plugin_user* user, int seconds)
+static int cbfunc_ban_user(struct plugin_handle* plugin, struct plugin_user* user, int seconds, const char* reason)
 {
 	struct hub_user* huser = as_hub_user(user);
 	/* Same path as the operator !ban: ban by cid+nick, disconnect, persist, and
-	   propagate cluster-wide. seconds > 0 makes it a timed ban; 0 is permanent. */
+	   propagate cluster-wide. seconds > 0 makes it a timed ban; 0 is permanent.
+	   reason may be NULL. */
 	time_t expiry = (seconds > 0) ? time(NULL) + seconds : 0;
-	hub_apply_ban(plugin_get_hub(plugin), huser->id.cid, huser->id.nick, expiry, 1);
+	hub_apply_ban(plugin_get_hub(plugin), huser->id.cid, huser->id.nick, expiry, reason, 1);
 	return 0;
 }
 

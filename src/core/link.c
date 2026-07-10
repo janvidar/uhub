@@ -314,16 +314,21 @@ static int link_process_line(struct hub_link* link, const char* line)
 
 	if (strncmp(line, "LBAN ", 5) == 0)
 	{
-		/* Cluster-wide ban from a peer: "LBAN <expiry> <cid> <nick>". Apply
-		   locally (ban + disconnect a matching local user) without re-propagating.
-		   expiry is an absolute unix time (0 = permanent). */
+		/* Cluster-wide ban from a peer: "LBAN <expiry> <cid> <nick> <reason>".
+		   Apply locally (ban + disconnect a matching local user) without
+		   re-propagating. expiry is an absolute unix time (0 = permanent); the
+		   reason (rest of the line) may be empty. */
 		const char* p = line + 5;   /* <expiry> */
 		char* end = NULL;
 		long long expiry;
 		const char* cidp;
 		const char* sp;
+		const char* nickp;
+		const char* sp2;
+		const char* reason;
 		char cid[MAX_CID_LEN + 1];
-		size_t clen;
+		char nick[MAX_NICK_LEN + 1];
+		size_t clen, nlen;
 		if (link->state != link_state_established)
 			return -1;
 		expiry = strtoll(p, &end, 10);
@@ -338,7 +343,23 @@ static int link_process_line(struct hub_link* link, const char* line)
 			clen = MAX_CID_LEN;
 		memcpy(cid, cidp, clen);
 		cid[clen] = 0;
-		hub_apply_ban(link->hub, cid, sp + 1, (time_t) expiry, 0);
+		nickp = sp + 1;             /* <nick> (single token) */
+		sp2 = strchr(nickp, ' ');
+		if (sp2)
+		{
+			nlen = (size_t) (sp2 - nickp);
+			reason = sp2 + 1;       /* <reason> (rest, may be empty) */
+		}
+		else
+		{
+			nlen = strlen(nickp);
+			reason = "";
+		}
+		if (nlen > MAX_NICK_LEN)
+			nlen = MAX_NICK_LEN;
+		memcpy(nick, nickp, nlen);
+		nick[nlen] = 0;
+		hub_apply_ban(link->hub, cid, nick, (time_t) expiry, reason[0] ? reason : NULL, 0);
 		return 0;
 	}
 
@@ -1075,19 +1096,32 @@ void link_broadcast_description(struct hub_info* hub, const char* escaped_desc)
 	});
 }
 
-/* Propagate a ban to every established link. Format: "LBAN <expiry> <cid> <nick>",
-   with the absolute-unix-time expiry first (0 = permanent), then the CID
-   (fixed-width base32, no spaces), then the nick taking the rest of the line (it
-   may legitimately contain spaces). */
-void link_broadcast_ban(struct hub_info* hub, const char* cid, const char* nick, time_t expiry)
+/* Propagate a ban to every established link. Format:
+   "LBAN <expiry> <cid> <nick> <reason>", with the absolute-unix-time expiry first
+   (0 = permanent), then the CID (fixed-width base32, no spaces), the nick (a
+   single token -- ADC nicks contain no spaces), then the reason taking the rest
+   of the line (may be empty and may contain spaces, but no CR/LF). */
+void link_broadcast_ban(struct hub_info* hub, const char* cid, const char* nick, time_t expiry, const char* reason)
 {
 	struct hub_link* link;
-	char buf[256];
+	char buf[512];
+	char safe[MAX_BAN_REASON];
+	size_t i;
 	int n;
 	(void) hub;
 	if (!g_links)
 		return;
-	n = snprintf(buf, sizeof(buf), "LBAN %lld %s %s\n", (long long) expiry, cid ? cid : "", nick ? nick : "");
+	/* Sanitise the reason for the line-based link protocol: strip CR/LF. */
+	safe[0] = '\0';
+	if (reason)
+	{
+		strncpy(safe, reason, sizeof(safe) - 1);
+		safe[sizeof(safe) - 1] = '\0';
+		for (i = 0; safe[i]; i++)
+			if (safe[i] == '\n' || safe[i] == '\r')
+				safe[i] = ' ';
+	}
+	n = snprintf(buf, sizeof(buf), "LBAN %lld %s %s %s\n", (long long) expiry, cid ? cid : "", nick ? nick : "", safe);
 	if (n <= 0 || n >= (int) sizeof(buf))
 		return;
 	LIST_FOREACH(struct hub_link*, link, g_links,

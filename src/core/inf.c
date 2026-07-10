@@ -581,9 +581,23 @@ static int check_user_agent(struct hub_info* hub, struct hub_user* user, struct 
 }
 
 
+static void set_ban_reason(struct hub_user* user, const char* reason)
+{
+	if (reason && *reason)
+	{
+		strncpy(user->ban_reason, reason, sizeof(user->ban_reason) - 1);
+		user->ban_reason[sizeof(user->ban_reason) - 1] = '\0';
+	}
+	else
+		user->ban_reason[0] = '\0';
+}
+
 static int check_acl(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
+	time_t now = time(NULL);
     (void) cmd;
+	user->ban_reason[0] = '\0';
+
 	if (acl_is_ip_banned(hub->acl, user_get_address(user)))
 	{
 		return status_msg_ban_permanently;
@@ -591,23 +605,28 @@ static int check_acl(struct hub_info* hub, struct hub_user* user, struct adc_mes
 
 	if (acl_is_cid_banned(hub->acl, user->id.cid))
 	{
+		set_ban_reason(user, acl_ban_reason(hub->acl, user->id.cid, NULL, now));
 		return status_msg_ban_permanently;
 	}
 
 	if (acl_is_user_banned(hub->acl, user->id.nick))
 	{
+		set_ban_reason(user, acl_ban_reason(hub->acl, NULL, user->id.nick, now));
 		return status_msg_ban_permanently;
 	}
 
 	/* Persisted bans held by a storage plugin (survive restart/reload, where the
 	   in-memory ACL above is rebuilt from config only). The plugin reports the
 	   ban's expiry so a still-active timed ban is shown as temporary with the
-	   correct reconnect time, not as a permanent ban. */
+	   correct reconnect time, not as a permanent ban, plus its reason. */
 	{
 		time_t expiry = 0;
-		if (plugin_is_banned(hub, user, &expiry) == st_deny)
+		char reason[MAX_BAN_REASON];
+		reason[0] = '\0';
+		if (plugin_is_banned(hub, user, &expiry, reason) == st_deny)
 		{
-			time_t remaining = expiry ? expiry - time(NULL) : 0;
+			time_t remaining = expiry ? expiry - now : 0;
+			set_ban_reason(user, reason);
 			if (expiry && remaining > 0)
 			{
 				user->ban_reconnect_time = (int) remaining;
@@ -619,9 +638,10 @@ static int check_acl(struct hub_info* hub, struct hub_user* user, struct adc_mes
 
 	/* Timed (expiring) runtime bans. Expired entries are purged by this call. */
 	{
-		time_t remaining = acl_timed_ban_remaining(hub->acl, user->id.cid, user->id.nick, time(NULL));
+		time_t remaining = acl_timed_ban_remaining(hub->acl, user->id.cid, user->id.nick, now);
 		if (remaining > 0)
 		{
+			set_ban_reason(user, acl_ban_reason(hub->acl, user->id.cid, user->id.nick, now));
 			user->ban_reconnect_time = (int) remaining;
 			return status_msg_ban_temporarily;
 		}

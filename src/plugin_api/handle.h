@@ -68,8 +68,9 @@ typedef plugin_st (*auth_delete_user_t)(struct plugin_handle*, struct auth_info*
 typedef plugin_st (*auth_ban_add_t)(struct plugin_handle*, const struct ban_info* ban);
 typedef plugin_st (*auth_ban_del_t)(struct plugin_handle*, const struct ban_info* ban);
 /* On st_deny, set *expiry to the ban's absolute expiry time (0 = permanent) so
-   the hub can report the correct temporary/permanent status and reconnect time. */
-typedef plugin_st (*auth_is_banned_t)(struct plugin_handle*, struct plugin_user* user, time_t* expiry);
+   the hub can report the correct temporary/permanent status and reconnect time,
+   and copy the ban reason (may be "") into reason, a buffer of MAX_BAN_REASON bytes. */
+typedef plugin_st (*auth_is_banned_t)(struct plugin_handle*, struct plugin_user* user, time_t* expiry, char* reason);
 
 /**
  * These are callbacks used for the hub to invoke functions in plugins.
@@ -134,7 +135,7 @@ typedef int (*hfunc_send_broadcast_message)(struct plugin_handle*, const char* m
 typedef int (*hfunc_send_status)(struct plugin_handle*, struct plugin_user* to, int code, const char* message);
 typedef int (*hfunc_send_user_command)(struct plugin_handle*, struct plugin_user* user, const char* name, int context, const char* command);
 typedef int (*hfunc_user_disconnect)(struct plugin_handle*, struct plugin_user* user);
-typedef int (*hfunc_ban_user)(struct plugin_handle*, struct plugin_user* user, int seconds);
+typedef int (*hfunc_ban_user)(struct plugin_handle*, struct plugin_user* user, int seconds, const char* reason);
 typedef int (*hfunc_unban)(struct plugin_handle*, const char* target);
 /* User-account storage access, routed to whatever auth/storage plugin is loaded.
    A business-logic plugin (e.g. self-registration) uses these instead of talking
@@ -169,7 +170,7 @@ struct plugin_hub_funcs
 	hfunc_send_status send_status_message;
 	hfunc_send_user_command send_user_command;
 	hfunc_user_disconnect user_disconnect;
-	hfunc_ban_user ban_user;      /* Ban a user (cid+nick) cluster-wide, persist, disconnect; seconds=0 is permanent */
+	hfunc_ban_user ban_user;      /* Ban a user (cid+nick) cluster-wide, persist, disconnect; seconds=0 is permanent; reason may be NULL */
 	hfunc_unban unban;            /* Lift a ban by nick/CID/IP cluster-wide */
 	hfunc_auth_get_user auth_get_user;           /* Look up a stored user record via the storage plugin(s) */
 	hfunc_auth_register_user auth_register_user; /* Create a stored user record */
