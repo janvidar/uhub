@@ -563,9 +563,10 @@ time_t acl_timed_ban_remaining(struct acl_handle* handle, const char* cid, const
 
 	while ((tb = (struct acl_timed_ban*) list_get_first(expired)))
 	{
+		/* Unlink from both lists before freeing (do not touch tb afterwards). */
+		list_remove(expired, tb);
 		list_remove(handle->timed_bans, tb);
 		acl_free_timed_ban(tb);
-		list_remove(expired, tb);
 	}
 	list_destroy(expired);
 
@@ -595,9 +596,10 @@ int acl_timed_unban(struct acl_handle* handle, const char* target)
 
 	while ((tb = (struct acl_timed_ban*) list_get_first(hits)))
 	{
+		/* Unlink from both lists before freeing (do not touch tb afterwards). */
+		list_remove(hits, tb);
 		list_remove(handle->timed_bans, tb);
 		acl_free_timed_ban(tb);
-		list_remove(hits, tb);
 		removed++;
 	}
 	list_destroy(hits);
