@@ -178,7 +178,11 @@ static void adc_cid_pid(struct ADC_client* client)
 	cid[ADC_CID_SIZE] = 0;
 	pid[ADC_CID_SIZE] = 0;
 
-	snprintf(client->cid, sizeof(client->cid), "%s", cid);
+	/* The CID is always exactly ADC_CID_SIZE (== MAX_CID_LEN) base32 chars; copy
+	   a fixed length rather than snprintf'ing from the larger local buffer (which
+	   trips -Werror=format-truncation under gcc). */
+	memcpy(client->cid, cid, MAX_CID_LEN);
+	client->cid[MAX_CID_LEN] = '\0';
 
 	adc_msg_add_named_argument(client->info, ADC_INF_FLAG_PRIVATE_ID, pid);
 	adc_msg_add_named_argument(client->info, ADC_INF_FLAG_CLIENT_ID, cid);

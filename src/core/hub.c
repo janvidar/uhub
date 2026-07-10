@@ -1507,7 +1507,7 @@ void hub_send_status(struct hub_info* hub, struct hub_user* user, enum status_me
 
 		if (reconnect_time != 0)
 		{
-			snprintf(buf, 10, "TL%d", reconnect_time);
+			snprintf(buf, sizeof(buf), "TL%d", reconnect_time);
 			adc_msg_add_argument(qui, buf);
 		}
 
