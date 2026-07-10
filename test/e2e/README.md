@@ -55,8 +55,22 @@ only path a ban can travel between them. Verifies cluster propagation:
 BUILD=/path/to/build test/e2e/run_link_e2e.sh [portA] [portB]
 ```
 
-## Not yet scripted
+## run_plugin_e2e.sh
 
-Plugin-driven bans (`hub.ban_user`/`unban`) and the `on_validate_nick` /
-`on_validate_cid` hooks — both need a small test plugin, and are extensions of
-the same harness.
+Loads the test-only `mod_e2e_test` plugin and verifies the plugin-facing hooks:
+
+1. `on_validate_nick` rejects a login (the reserved nick `denynick`), and a
+   normal nick still logs in;
+2. a plugin-driven ban via `hub.ban_user` (chat trigger `PLZBANME`) disconnects
+   the user and blocks their reconnect;
+3. a plugin-driven unban via `hub.unban` (operator trigger `PLZUNBAN <nick>`)
+   restores access.
+
+```sh
+BUILD=/path/to/build test/e2e/run_plugin_e2e.sh [port]
+```
+
+`mod_e2e_test` also implements `on_validate_cid` (deny a CID given as
+`deny_cid=<cid>`), sharing the exact login code path as nick validation. It is
+not asserted end-to-end because `adc_cmd`'s CID is randomised per run, so a fixed
+CID can't be pre-configured for rejection.

@@ -325,6 +325,10 @@ if(UNIX)
 	add_executable(adc_cmd ${CMAKE_SOURCE_DIR}/test/e2e/adc_cmd.c)
 	target_include_directories(adc_cmd PRIVATE ${UHUB_SOURCE_DIR}/tools)
 	target_link_libraries(adc_cmd adcclient adc network utils pthread)
+	# Test-only plugin exercising the validate/ban hooks (not installed).
+	add_library(mod_e2e_test MODULE ${CMAKE_SOURCE_DIR}/test/e2e/mod_e2e_test.c)
+	set_target_properties(mod_e2e_test PROPERTIES PREFIX "")
+	target_link_libraries(mod_e2e_test utils)
 	target_link_libraries(uhub pthread)
 	target_link_libraries(autotest-bin pthread)
 
