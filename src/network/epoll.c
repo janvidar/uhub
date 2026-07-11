@@ -145,6 +145,12 @@ void net_con_backend_del_epoll(struct net_backend* data, struct net_connection* 
 	struct net_backend_epoll* backend = (struct net_backend_epoll*) data;
 	struct net_connection_epoll* con = (struct net_connection_epoll*) con_;
 
+	/* Mirror the add-time guard: an fd that add rejected (>= max) or a
+	   connection closed before it was given a descriptor (sd == -1) must not
+	   index conns[], or we corrupt the heap. */
+	if (con->sd < 0 || (size_t) con->sd >= backend->common->max)
+		return;
+
 	backend->conns[con->sd] = 0;
 
 	if (epoll_ctl(backend->epfd, EPOLL_CTL_DEL, con->sd, &con->ev) == -1)

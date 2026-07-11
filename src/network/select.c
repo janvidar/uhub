@@ -175,6 +175,11 @@ void net_con_backend_mod_select(struct net_backend* data, struct net_connection*
 void net_con_backend_del_select(struct net_backend* data, struct net_connection* con)
 {
 	struct net_backend_select* backend = (struct net_backend_select*) data;
+	/* Mirror the add-time guard: conns[] is indexed by fd value, so an fd that
+	   add rejected (>= max) or a connection closed before it was ever given a
+	   descriptor (sd == -1) must not index the array, or we corrupt the heap. */
+	if (con->sd < 0 || (size_t) con->sd >= backend->max)
+		return;
 	backend->conns[con->sd] = 0;
 }
 

@@ -183,7 +183,11 @@ void net_con_backend_del_kqueue(struct net_backend* data, struct net_connection*
 	   it is automatically removed when the descriptor is closed... */
 	add_change(backend, con, CHANGE_ACTION_DEL);
 
-	// Unmap the socket descriptor.
+	// Unmap the socket descriptor. Mirror the add-time guard: an fd that add
+	// rejected (>= max) or a connection closed before it was given a descriptor
+	// (sd == -1) must not index conns[], or we corrupt the heap.
+	if (con->sd < 0 || (size_t) con->sd >= backend->common->max)
+		return;
 	backend->conns[con->sd] = 0;
 }
 
