@@ -130,12 +130,17 @@ jobs:
     runs-on: windows-latest
     env:
       ZIG_VERSION: "0.16.0"
+      # Keep zig's package cache on a short, dedicated path. From the default
+      # deep, workspace-relative location the SQLite-amalgamation .zip fetch
+      # fails on Windows ("failed to create temporary zip file: FileNotFound").
+      ZIG_GLOBAL_CACHE_DIR: 'D:\zig-cache'
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install zig ${{ env.ZIG_VERSION }}
         shell: pwsh
         run: |
+          New-Item -ItemType Directory -Force -Path $env:ZIG_GLOBAL_CACHE_DIR | Out-Null
           $url = "https://ziglang.org/download/$env:ZIG_VERSION/zig-x86_64-windows-$env:ZIG_VERSION.zip"
           Invoke-WebRequest -Uri $url -OutFile zig.zip
           Expand-Archive -Path zig.zip -DestinationPath "$HOME\zig"
