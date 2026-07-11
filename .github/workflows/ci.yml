@@ -116,6 +116,44 @@ jobs:
             EVENT_NOKQUEUE=1 ./build/autotest-bin
 
   # ---------------------------------------------------------------------------
+  # Windows build on a native runner. uhub's Windows support is the build.zig
+  # (WinSock/MinGW) path -- CMake is not ported to Windows. We build the tested
+  # x86_64-windows-gnu (MinGW ABI) target with zig, which produces a
+  # self-contained PE, then run it (uhub -V) so the job exercises the binary at
+  # runtime -- linking, CRT startup, getopt -- not just that a PE was emitted.
+  # zig fetches the bundled LibreSSL and SQLite from build.zig.zon (hash-pinned).
+  # The autotest binary is POSIX-only (socket-fd semantics that do not map onto
+  # WinSock) and is intentionally not built for Windows.
+  # ---------------------------------------------------------------------------
+  windows:
+    name: windows (native, zig)
+    runs-on: windows-latest
+    env:
+      ZIG_VERSION: "0.16.0"
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install zig ${{ env.ZIG_VERSION }}
+        shell: pwsh
+        run: |
+          $url = "https://ziglang.org/download/$env:ZIG_VERSION/zig-x86_64-windows-$env:ZIG_VERSION.zip"
+          Invoke-WebRequest -Uri $url -OutFile zig.zip
+          Expand-Archive -Path zig.zip -DestinationPath "$HOME\zig"
+          "$HOME\zig\zig-x86_64-windows-$env:ZIG_VERSION" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Build (x86_64-windows-gnu)
+        run: zig build -Dtarget=x86_64-windows-gnu
+
+      - name: Smoke test + artifacts
+        shell: pwsh
+        run: |
+          & .\zig-out\bin\uhub.exe -V
+          if (-not (Test-Path .\zig-out\bin\uhub-passwd.exe)) { throw "uhub-passwd.exe missing" }
+          $dlls = Get-ChildItem .\zig-out\lib\*.dll
+          if ($dlls.Count -eq 0) { throw "no plugin DLLs built" }
+          $dlls | ForEach-Object { $_.Name }
+
+  # ---------------------------------------------------------------------------
   # AddressSanitizer + UndefinedBehaviorSanitizer over the full test suite.
   # This is a hard gate: any memory error or UB fails the build.
   # ---------------------------------------------------------------------------
