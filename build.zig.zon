@@ -10,16 +10,15 @@
             .url = "git+https://github.com/allyourcodebase/libressl?ref=4.0.0+6#8c63fadf71925d74942a847b9a6b3a28930792a3",
             .hash = "libressl-4.0.0--kqV4FHUAABdqKrbT3i3K-m1m7s_HyZZMMoBpbHjCiNQ",
         },
-        .sqlite3 = .{
-            .url = "git+https://github.com/allyourcodebase/sqlite3?ref=main#7a615f5af79009cd733e3480658586d9b0d28b35",
-            .hash = "sqlite3-3.53.2-DMxLWuAOAAA_Px0arJOIOaP4AKEu5prbsQgPMA35W1zz",
-        },
+        // SQLite is vendored in third_party/sqlite3 (see its README): zig's
+        // .zip-URL package fetch fails on Windows, so it is not a dependency.
     },
 
     .paths = .{
         "build.zig",
         "build.zig.zon",
         "src",
+        "third_party",
         "README.md",
         "COPYING",
     },

@@ -136,7 +136,7 @@ const Ctx = struct {
     libressl: ?*std.Build.Dependency,
     // The bundled SQLite dependency (build.zig.zon), used by uhub-passwd and the
     // sqlite-backed plugins.
-    sqlite3: *std.Build.Dependency,
+    sqlite3: *std.Build.Step.Compile,
 
     // A fresh module carrying the include paths, generated headers and libc
     // that every C target in this build needs.
@@ -159,13 +159,13 @@ const Ctx = struct {
         m.addCSourceFiles(.{ .files = files, .flags = ctx.cflags });
     }
 
-    // Link the bundled SQLite (a zig dependency, see build.zig.zon). CMake links
-    // a system sqlite3; building it from the package keeps the zig build
-    // self-contained. Linking the artifact propagates <sqlite3.h> to the
-    // consumer, and the port defaults to SQLITE_THREADSAFE=1 (SQLite's own
-    // default), matching what the in-tree amalgamation was compiled with.
+    // Link the vendored SQLite (third_party/sqlite3, built into ctx.sqlite3) and
+    // put its header on the consumer's include path -- the amalgamation defaults
+    // to SQLITE_THREADSAFE=1 (SQLite's own default). CMake links a system
+    // sqlite3 instead; this is the zig build's copy.
     fn addSqlite(ctx: *const Ctx, m: *std.Build.Module) void {
-        m.linkLibrary(ctx.sqlite3.artifact("sqlite3"));
+        m.linkLibrary(ctx.sqlite3);
+        m.addIncludePath(ctx.b.path("third_party/sqlite3"));
     }
 
     // Generate the autotest driver (autotest/test.c) from the *.tcc sources
@@ -306,14 +306,24 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    // SQLite, built from the package dependency (used by uhub-passwd and the
-    // sqlite-backed plugins). Always bundled, as the in-tree amalgamation was.
-    // Force ReleaseFast regardless of our own optimize mode: it is third-party C
-    // we never debug into, and a Debug build of the port emits __ubsan_handle_*
-    // references that our sanitize_c=off consumers do not resolve.
-    const sqlite3 = b.dependency("sqlite3", .{
+    // SQLite, compiled from the vendored amalgamation in third_party/sqlite3
+    // (used by uhub-passwd and the sqlite-backed plugins). CMake links the
+    // system libsqlite3 instead. Force ReleaseFast regardless of our own
+    // optimize mode: it is third-party C we never debug into, and a Debug build
+    // emits __ubsan_handle_* references that our sanitize_c=off consumers do not
+    // resolve. PIC so it can link into the plugin shared objects.
+    const sqlite3_mod = b.createModule(.{
         .target = target,
         .optimize = .ReleaseFast,
+        .link_libc = true,
+        .sanitize_c = .off,
+    });
+    sqlite3_mod.pic = true;
+    sqlite3_mod.addCSourceFile(.{ .file = b.path("third_party/sqlite3/sqlite3.c"), .flags = &.{} });
+    const sqlite3 = b.addLibrary(.{
+        .linkage = .static,
+        .name = "sqlite3",
+        .root_module = sqlite3_mod,
     });
 
     // The shared static library (adc + network + utils). Built PIC so it can
