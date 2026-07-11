@@ -47,6 +47,7 @@ static struct chat_only_data* co_initialize()
 	data->num_users = 0;
 	data->max_users = 512;
 	data->users = hub_malloc_zero(sizeof(struct user_info) * data->max_users);
+	data->operator_override = 1; // operators may still search and connect (default on).
 	return data;
 }
 
