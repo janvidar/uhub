@@ -253,6 +253,8 @@ int net_set_close_on_exec(int fd, int toggle)
 #ifdef WINSOCK
 	/* No-op on Windows: there is no exec()-style call that would inherit
 	   the socket, so close-on-exec semantics do not apply. */
+	(void) fd;
+	(void) toggle;
 	return 0;
 #else
 	return fcntl(fd, F_SETFD, toggle);
@@ -733,6 +735,7 @@ const char* net_get_local_address(int fd)
 		else
 #else
 		int af = AF_INET;
+		(void) name6; /* IPv6 branch is POSIX-only; unused under WinSock */
 #endif
 		{
 			net_address_to_string(af, (void*) &name4->sin_addr, address, sizeof(address));

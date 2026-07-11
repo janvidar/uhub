@@ -28,6 +28,15 @@
 #include "network/common.h"
 #include "network/backend.h"
 
+/* con->sd is a plain int, but a Windows fd_set stores SOCKET (unsigned), so the
+   comparisons inside FD_SET()/FD_ISSET() warn about signed/unsigned mismatch.
+   Cast to the platform's descriptor type (SOCKET on WinSock, int elsewhere). */
+#ifdef WINSOCK
+#define UHUB_SD(con) ((SOCKET) (con)->sd)
+#else
+#define UHUB_SD(con) ((con)->sd)
+#endif
+
 struct net_connection_select
 {
 	NET_CON_STRUCT_COMMON
@@ -71,8 +80,8 @@ int net_backend_poll_select(struct net_backend* data, int ms)
 		struct net_connection_select* con = backend->conns[n];
 		if (con)
 		{
-			if (con->flags & NET_EVENT_READ)  FD_SET(con->sd, &backend->rfds);
-			if (con->flags & NET_EVENT_WRITE) FD_SET(con->sd, &backend->wfds);
+			if (con->flags & NET_EVENT_READ)  FD_SET(UHUB_SD(con), &backend->rfds);
+			if (con->flags & NET_EVENT_WRITE) FD_SET(UHUB_SD(con), &backend->wfds);
 			found++;
 			backend->maxfd = con->sd;
 		}
@@ -110,8 +119,8 @@ void net_backend_process_select(struct net_backend* data, int res)
 		if (con)
 		{
 			int ev = 0;
-			if (FD_ISSET(con->sd, &backend->rfds)) ev |= NET_EVENT_READ;
-			if (FD_ISSET(con->sd, &backend->wfds)) ev |= NET_EVENT_WRITE;
+			if (FD_ISSET(UHUB_SD(con), &backend->rfds)) ev |= NET_EVENT_READ;
+			if (FD_ISSET(UHUB_SD(con), &backend->wfds)) ev |= NET_EVENT_WRITE;
 
 			if (ev)
 			{

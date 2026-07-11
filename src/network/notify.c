@@ -104,5 +104,8 @@ void net_notify_signal(struct uhub_notify_handle* handle, char data)
 #ifndef WIN32
 	ssize_t written = write(handle->pipe_fd[1], &data, 1);
 	(void) written;
+#else
+	(void) handle;
+	(void) data;
 #endif
 }

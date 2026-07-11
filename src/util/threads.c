@@ -118,7 +118,11 @@ struct winthread_data
 static DWORD WINAPI uhub_winthread_start(void* ptr)
 {
 	struct winthread_data* data = (struct winthread_data*) ptr;
-	DWORD ret = (DWORD) data->start(data->arg);
+	/* uhub_thread_start returns void*; go through uintptr_t so the truncation to
+	   the 32-bit Windows thread exit code (DWORD) is explicit rather than a
+	   "cast to smaller integer type from void*" error. The value is only ever a
+	   thread exit status, so the narrowing is harmless. */
+	DWORD ret = (DWORD) (uintptr_t) data->start(data->arg);
 	return ret;
 }
 

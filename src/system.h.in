@@ -46,6 +46,17 @@
 #ifndef FD_SETSIZE
 #define FD_SETSIZE 4096
 #endif
+/* <winsock2.h> pulls in <windows.h>, which by default drags in <wincrypt.h>.
+   WinCrypt defines X509_NAME, PKCS7_SIGNER_INFO, X509_EXTENSIONS, ... as macros
+   that collide with OpenSSL's types (ossl_typ.h aborts with "overriding WinCrypt
+   defines"). uhub does not use WinCrypt, so keep it out; WIN32_LEAN_AND_MEAN
+   also trims the legacy winsock.h that would clash with winsock2.h. */
+#ifndef NOCRYPT
+#define NOCRYPT
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #else
@@ -66,6 +77,10 @@
 #include <stdint.h>
 #endif
 
+/* <inttypes.h> (PRIu64 etc.) is standard C99 and present on MinGW too, so it is
+   included unconditionally -- core/metrics.c uses PRIu64 directly. */
+#include <inttypes.h>
+
 #include <signal.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -75,7 +90,6 @@
 #include <time.h>
 
 #if !defined(WIN32)
-#include <inttypes.h>
 #include <unistd.h>
 #include <grp.h>
 #include <pwd.h>
@@ -84,9 +98,19 @@
 #define HAVE_GETOPT
 #include <dlfcn.h>
 #define HAVE_GETRLIMIT
+#else
+/* Windows compatibility shims for the POSIX calls uhub uses. */
+#include <process.h>   /* _getpid */
+#define getpid _getpid
 #endif
 #cmakedefine HAVE_SSIZE_T
 #cmakedefine HAVE_STRNDUP
+/* strndup() fallback lives in util/misc.c. Declare it globally so a TU that only
+   pulls in memory.h (hub_strndup -> strndup) still sees a prototype where the
+   platform <string.h> does not provide one (e.g. Windows). */
+#ifndef HAVE_STRNDUP
+extern char* strndup(const char* string, size_t n);
+#endif
 #cmakedefine HAVE_MEMMEM
 #cmakedefine HAVE_SYS_UIO_H
 #cmakedefine HAVE_FUNC_WRITEV
@@ -277,9 +301,14 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #endif
 
-#ifndef HAVE_SSIZE_T
-typedef int ssize_t;
+/* ssize_t must be pointer-sized: a plain int truncates on 64-bit (LLP64 on
+   Windows especially). Skip the fallback when the platform already provides it
+   -- MinGW's CRT defines ssize_t and sets _SSIZE_T_DEFINED, so redefining it
+   here is a "different types (int vs long long)" error. */
+#if !defined(HAVE_SSIZE_T) && !defined(_SSIZE_T_DEFINED)
+typedef intptr_t ssize_t;
 #define HAVE_SSIZE_T
+#define _SSIZE_T_DEFINED
 #endif
 
 #ifdef _MSC_VER

@@ -26,6 +26,7 @@
 #include "core/config.h"
 #include "core/hub.h"
 #include "core/regserver.h"
+#include "util/getopt.h" /* bundled getopt on platforms without one (NEED_GETOPT; e.g. Windows) */
 
 #ifndef WIN32
 #include <sys/wait.h>

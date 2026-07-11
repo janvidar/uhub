@@ -248,10 +248,14 @@ pub fn build(b: *std.Build) void {
     // BIND_NOW and a non-executable stack are the Zig linker defaults; PIE is
     // set per-executable below.
     flags.append("-fstack-protector-strong") catch @panic("OOM");
-    // -fstack-clash-protection is unimplemented on Darwin, where clang emits
-    // "argument unused" -- which -Werror would turn into a build failure -- so
-    // add it only off macOS. CMake achieves the same via a compiler probe.
-    if (target.result.os.tag != .macos) flags.append("-fstack-clash-protection") catch @panic("OOM");
+    // -fstack-clash-protection is only implemented for ELF targets (Linux/BSD).
+    // On Darwin and Windows clang emits "argument unused" -- which -Werror would
+    // turn into a build failure -- so add it only there. CMake achieves the same
+    // via a compiler probe.
+    switch (target.result.os.tag) {
+        .macos, .windows => {},
+        else => flags.append("-fstack-clash-protection") catch @panic("OOM"),
+    }
     if (optimize != .Debug) flags.append("-D_FORTIFY_SOURCE=2") catch @panic("OOM");
     // Give defined behaviour to the two things the code relies on that are
     // otherwise UB: signed overflow (-fwrapv) and cast-based type punning
@@ -368,16 +372,21 @@ pub fn build(b: *std.Build) void {
     uhub.pie = true; // ASLR for the executable itself, not just the PIC libs
     b.installArtifact(uhub);
 
-    // autotest-bin
-    const autotest_mod = ctx.module();
-    ctx.addSources(autotest_mod, &core_sources);
-    ctx.addAutotest(autotest_mod);
-    autotest_mod.linkLibrary(common);
-    ctx.linkExternal(autotest_mod);
-    const autotest = b.addExecutable(.{ .name = "autotest-bin", .root_module = autotest_mod });
-    autotest.rdynamic = true;
-    autotest.pie = true;
-    b.installArtifact(autotest);
+    // autotest-bin. The suite drives POSIX socket-fd semantics (socketpair, and
+    // write()/close() on socket descriptors) that do not map onto WinSock, and
+    // there is no Windows test runner, so it is not built for Windows.
+    const autotest: ?*std.Build.Step.Compile = if (is_windows) null else blk: {
+        const autotest_mod = ctx.module();
+        ctx.addSources(autotest_mod, &core_sources);
+        ctx.addAutotest(autotest_mod);
+        autotest_mod.linkLibrary(common);
+        ctx.linkExternal(autotest_mod);
+        const exe = b.addExecutable(.{ .name = "autotest-bin", .root_module = autotest_mod });
+        exe.rdynamic = true;
+        exe.pie = true;
+        b.installArtifact(exe);
+        break :blk exe;
+    };
 
     // uhub-passwd (needs SQLite for the password database)
     const passwd_mod = ctx.module();
@@ -418,7 +427,9 @@ pub fn build(b: *std.Build) void {
         }
     }
 
-    // Plugins -> mod_*.so (CMake sets PREFIX "" so there is no "lib" prefix).
+    // Plugins -> mod_*.{so,dll} (CMake sets PREFIX "" so there is no "lib"
+    // prefix, and produces the platform-native suffix -- .dll on Windows).
+    const plugin_ext = if (is_windows) "dll" else "so";
     for (plugins) |plugin| {
         const mod = ctx.module();
         mod.addCSourceFiles(.{
@@ -436,7 +447,7 @@ pub fn build(b: *std.Build) void {
         const install = b.addInstallFileWithDir(
             lib.getEmittedBin(),
             .lib,
-            b.fmt("{s}.so", .{plugin.name}),
+            b.fmt("{s}.{s}", .{ plugin.name, plugin_ext }),
         );
         b.getInstallStep().dependOn(&install.step);
     }
@@ -446,9 +457,11 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| run_step.addArgs(args);
     b.step("run", "Run uhub").dependOn(&run_step.step);
 
-    // `zig build test` -> run the autotest suite.
-    const test_run = b.addRunArtifact(autotest);
-    b.step("test", "Run the autotest suite").dependOn(&test_run.step);
+    // `zig build test` -> run the autotest suite (POSIX targets only).
+    if (autotest) |t| {
+        const test_run = b.addRunArtifact(t);
+        b.step("test", "Run the autotest suite").dependOn(&test_run.step);
+    }
 }
 
 // Reproduce CMake's git-revision lookup: "git-<short hash>", or "release"

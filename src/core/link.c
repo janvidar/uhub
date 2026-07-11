@@ -106,7 +106,9 @@ int link_make_nonce(char* out)
 #include "network/connection.h"
 #include "network/network.h"
 #include "network/ipcalc.h"
-#include <sys/un.h>
+#ifndef WINSOCK
+#include <sys/un.h>   /* Unix-domain worker links; POSIX only (see UDS section) */
+#endif
 #include <unistd.h>
 #include "core/config.h"
 #include "core/hub.h"
@@ -728,6 +730,10 @@ static void link_connect_callback(struct net_connect_handle* handle, enum net_co
  * only the listen/connect plumbing differs.
  * ------------------------------------------------------------------------- */
 
+/* Unix-domain worker-to-worker links are a POSIX-only transport (no sockaddr_un
+   on Windows, and the multi-worker model that needs them is fork-based). TCP
+   links remain available everywhere. */
+#ifndef WINSOCK
 static struct net_connection* g_uds_listen = 0;
 static char g_uds_path[108] = {0}; /* sun_path is ~108 bytes */
 
@@ -863,6 +869,7 @@ static void link_uds_connect(struct hub_info* hub, const char* path)
 	if (link_attach_fd(hub, sd, 1, path))
 		LOG_INFO("link: connected to peer hub on unix socket %s", path);
 }
+#endif /* !WINSOCK */
 
 static void link_connect(struct hub_info* hub, const char* peer)
 {
@@ -949,7 +956,13 @@ void link_start(struct hub_info* hub)
 	   detects "LCHA"); additionally listen on a Unix socket if configured, for
 	   same-host worker-to-worker links that bypass the shared client port. */
 	if (*cfg->link_socket)
+	{
+#ifndef WINSOCK
 		link_uds_listen(hub, cfg->link_socket);
+#else
+		LOG_WARN("link: link_socket is set but Unix-domain links are not supported on this platform; ignoring");
+#endif
+	}
 
 	/* link_peer may be a comma-separated list of peers (to form a mesh of
 	   worker processes); connect to each. A peer beginning with "/" is a Unix
@@ -974,7 +987,13 @@ void link_start(struct hub_info* hub)
 					if (!*peer)
 						continue;
 					if (peer[0] == '/')
+					{
+#ifndef WINSOCK
 						link_uds_connect(hub, peer);
+#else
+						LOG_WARN("link: Unix-domain peer '%s' ignored; not supported on this platform", peer);
+#endif
+					}
 					else
 						link_connect(hub, peer);
 				}
@@ -1005,6 +1024,7 @@ void link_stop(struct hub_info* hub)
 		g_auth_pending = 0;
 	}
 
+#ifndef WINSOCK
 	if (g_uds_listen)
 	{
 		net_con_close(g_uds_listen);
@@ -1015,6 +1035,7 @@ void link_stop(struct hub_info* hub)
 		unlink(g_uds_path);
 		g_uds_path[0] = 0;
 	}
+#endif
 
 	hub_free(g_win_used);
 	g_win_used = 0;

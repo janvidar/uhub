@@ -67,6 +67,9 @@ static const char* prefixes[] =
 
 void hub_log_initialize(const char* file, int syslog)
 {
+#ifdef WIN32
+	(void) syslog; /* no syslog on Windows */
+#endif
 
 	setlocale(LC_ALL, "C");
 
