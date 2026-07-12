@@ -20,6 +20,7 @@
 #include "util/log.h"
 #include "util/memory.h"
 #include "adc/message.h"
+#include "network/tls.h"
 #include "core/auth.h"
 #include "core/commands.h"
 #include "core/config.h"
@@ -274,6 +275,18 @@ static size_t cbfunc_get_usercount(struct plugin_handle* plugin)
 	return hub->users->count;
 }
 
+static const char* cbfunc_get_tls_version(struct plugin_handle* plugin, struct plugin_user* user)
+{
+	(void) plugin;
+	struct hub_user* huser = as_hub_user(user);
+
+	/* No local socket: plaintext, or a remote user learned over federation. */
+	if (!huser->connection || !net_con_is_ssl(huser->connection))
+		return NULL;
+
+	return net_ssl_get_tls_version(huser->connection);
+}
+
 static char* cbfunc_get_hub_name(struct plugin_handle* plugin)
 {
 	struct hub_info* hub = plugin_get_hub(plugin);
@@ -343,6 +356,7 @@ void plugin_register_callback_functions(struct plugin_handle* handle)
 	handle->hub.set_name = cbfunc_set_hub_name;
 	handle->hub.get_description = cbfunc_get_hub_description;
 	handle->hub.set_description = cbfunc_set_hub_description;
+	handle->hub.get_tls_version = cbfunc_get_tls_version;
 }
 
 void plugin_unregister_callback_functions(struct plugin_handle* handle)

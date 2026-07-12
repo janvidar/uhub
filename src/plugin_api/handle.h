@@ -154,6 +154,11 @@ typedef struct plugin_command_arg_data* (*hfunc_command_arg_next)(struct plugin_
 
 typedef size_t (*hfunc_get_usercount)(struct plugin_handle*);
 
+/* Returns the negotiated TLS protocol version string (e.g. "TLSv1.3") for a
+ * user's connection, or NULL if the user is not connected over TLS (plaintext
+ * adc://, or a remote user learned over federation with no local socket). */
+typedef const char* (*hfunc_get_tls_version)(struct plugin_handle*, struct plugin_user*);
+
 typedef char* (*hfunc_get_hub_name)(struct plugin_handle*);
 typedef void  (*hfunc_set_hub_name)(struct plugin_handle*, const char*);
 typedef char* (*hfunc_get_hub_description)(struct plugin_handle*);
@@ -185,6 +190,7 @@ struct plugin_hub_funcs
 	hfunc_set_hub_name set_name;
 	hfunc_get_hub_description get_description;
 	hfunc_set_hub_description set_description;
+	hfunc_get_tls_version get_tls_version;
 };
 
 struct plugin_handle

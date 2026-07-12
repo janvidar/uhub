@@ -158,7 +158,7 @@ cleanup_parse_error:
 }
 
 
-static struct cbuffer* parse_message(struct plugin_user* user, const char* msg)
+static struct cbuffer* parse_message(struct plugin_handle* plugin, struct plugin_user* user, const char* msg)
 {
 	struct cbuffer* buf = cbuf_create(strlen(msg));
 	const char* start = msg;
@@ -183,6 +183,28 @@ static struct cbuffer* parse_message(struct plugin_user* user, const char* msg)
 			case 'c':
 				cbuf_append(buf, auth_cred_to_string(user->credentials));
 				break;
+
+			case 't':
+			{
+				/* get_tls_version may be absent if this plugin is loaded by
+				 * an older hub that predates the accessor. */
+				const char* tls_version = plugin->hub.get_tls_version
+					? plugin->hub.get_tls_version(plugin, user) : NULL;
+				if (tls_version)
+				{
+					/* net_ssl_get_tls_version() returns the full provider
+					 * string (e.g. "TLSv1.3" or "SSLv3"); show only the
+					 * numeric version. */
+					if (!strncmp(tls_version, "TLSv", 4) || !strncmp(tls_version, "SSLv", 4))
+						tls_version += 4;
+					cbuf_append(buf, tls_version);
+				}
+				else
+				{
+					cbuf_append(buf, "none");
+				}
+				break;
+			}
 
 			case '%':
 				cbuf_append(buf, "%");
@@ -228,7 +250,7 @@ static void send_motd(struct plugin_handle* plugin, struct plugin_user* user)
 	struct cbuffer* buf = NULL;
 	if (data->motd)
 	{
-		buf = parse_message(user, data->motd);
+		buf = parse_message(plugin, user, data->motd);
 		plugin->hub.send_message(plugin, user, cbuf_get(buf));
 		cbuf_destroy(buf);
 	}
@@ -240,7 +262,7 @@ static void send_rules(struct plugin_handle* plugin, struct plugin_user* user)
 	struct cbuffer* buf = NULL;
 	if (data->rules)
 	{
-		buf = parse_message(user, data->rules);
+		buf = parse_message(plugin, user, data->rules);
 		plugin->hub.send_message(plugin, user, cbuf_get(buf));
 		cbuf_destroy(buf);
 	}

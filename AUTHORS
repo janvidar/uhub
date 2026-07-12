@@ -9,3 +9,4 @@ Boris Pek (tehnick), Debian/Ubuntu packaging
 Tillmann Karras (Tilka), Misc. bug fixes
 Yoran Heling (Yorhel), TLS/SSL handshake detection bugfixes
 Blair Bonnett, Misc. bug fixes
+1o1o1, get_tls_version plugin accessor and %t motd substitution
