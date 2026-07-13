@@ -66,17 +66,33 @@ static int command_showtopic_handler(struct plugin_handle* plugin, struct plugin
 int plugin_register(struct plugin_handle* plugin, const char* config)
 {
 	(void) config;
-	struct topic_plugin_data* data = (struct topic_plugin_data*) hub_malloc(sizeof(struct topic_plugin_data));
+	struct topic_plugin_data* data = (struct topic_plugin_data*) hub_malloc_zero(sizeof(struct topic_plugin_data));
+
+	PLUGIN_INITIALIZE(plugin, "Topic plugin", "1.0", "Add commands for changing the hub topic (description)");
+
+	if (!data)
+	{
+		plugin->error_msg = "Out of memory";
+		return -1;
+	}
 
 	data->topic = (struct plugin_command_handle*) hub_malloc_zero(sizeof(struct plugin_command_handle));
 	data->resettopic = (struct plugin_command_handle*) hub_malloc_zero(sizeof(struct plugin_command_handle));
 	data->showtopic = (struct plugin_command_handle*) hub_malloc_zero(sizeof(struct plugin_command_handle));
 
-	PLUGIN_INITIALIZE(plugin, "Topic plugin", "1.0", "Add commands for changing the hub topic (description)");
+	if (!data->topic || !data->resettopic || !data->showtopic)
+	{
+		hub_free(data->topic);
+		hub_free(data->resettopic);
+		hub_free(data->showtopic);
+		hub_free(data);
+		plugin->error_msg = "Out of memory";
+		return -1;
+	}
 
-	PLUGIN_COMMAND_INITIALIZE(data->topic, (void*) data, "topic", "+m", auth_cred_operator, command_topic_handler, "Set new topic");
-	PLUGIN_COMMAND_INITIALIZE(data->resettopic, (void*) data, "resettopic", "", auth_cred_operator, command_resettopic_handler, "Set topic to default");
-	PLUGIN_COMMAND_INITIALIZE(data->showtopic, (void*) data, "showtopic", "", auth_cred_guest, command_showtopic_handler, "Shows the current topic");
+	PLUGIN_COMMAND_INITIALIZE(data->topic, plugin, "topic", "+m", auth_cred_operator, command_topic_handler, "Set new topic");
+	PLUGIN_COMMAND_INITIALIZE(data->resettopic, plugin, "resettopic", "", auth_cred_operator, command_resettopic_handler, "Set topic to default");
+	PLUGIN_COMMAND_INITIALIZE(data->showtopic, plugin, "showtopic", "", auth_cred_guest, command_showtopic_handler, "Shows the current topic");
 
 	plugin->hub.command_add(plugin, data->topic);
 	plugin->hub.command_add(plugin, data->resettopic);

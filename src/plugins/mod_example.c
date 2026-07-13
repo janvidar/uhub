@@ -33,13 +33,21 @@ static int example_command_handler(struct plugin_handle* plugin, struct plugin_u
 	return 0;
 }
 
-static void command_register(struct plugin_handle* plugin)
+static int command_register(struct plugin_handle* plugin)
 {
 	struct example_plugin_data* data = (struct example_plugin_data*) hub_malloc(sizeof(struct example_plugin_data));
+	if (!data)
+		return -1;
 	data->example = hub_malloc_zero(sizeof(struct plugin_command_handle));
-	PLUGIN_COMMAND_INITIALIZE(data->example, (void*) data, "example", "", auth_cred_guest, example_command_handler, "This is an example command that is added dynamically by loading the mod_example plug-in.");
+	if (!data->example)
+	{
+		hub_free(data);
+		return -1;
+	}
+	PLUGIN_COMMAND_INITIALIZE(data->example, plugin, "example", "", auth_cred_guest, example_command_handler, "This is an example command that is added dynamically by loading the mod_example plug-in.");
 	plugin->hub.command_add(plugin, data->example);
 	plugin->ptr = data;
+	return 0;
 }
 
 static void command_unregister(struct plugin_handle* plugin)
@@ -57,7 +65,11 @@ int plugin_register(struct plugin_handle* plugin, const char* config)
 {
 	(void) config;
 	PLUGIN_INITIALIZE(plugin, "Example plugin", "1.0", "A simple example plugin");
-	command_register(plugin);
+	if (command_register(plugin) < 0)
+	{
+		plugin->error_msg = "Out of memory";
+		return -1;
+	}
 	return 0;
 }
 
