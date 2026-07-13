@@ -1790,10 +1790,15 @@ void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason
 	if (user->connection && !ioq_send_is_empty(user->send_queue))
 		handle_net_write(user);
 
-	/* stop reading from user */
-	net_shutdown_r(net_con_get_sd(user->connection));
-	net_con_close(user->connection);
-	user->connection = 0;
+	/* stop reading from user. A remote/federated user (learned over a link) has
+	   no local socket, and a plugin may call user_disconnect on one, so guard the
+	   connection before dereferencing it. */
+	if (user->connection)
+	{
+		net_shutdown_r(net_con_get_sd(user->connection));
+		net_con_close(user->connection);
+		user->connection = 0;
+	}
 
 	LOG_TRACE("hub_disconnect_user(), user=%p, reason=%d, state=%d", user, reason, user->state);
 

@@ -38,7 +38,8 @@ struct plugin_callback_data
 
 static struct plugin_callback_data* get_callback_data(struct plugin_handle* plugin)
 {
-	return get_internals(plugin)->callback_data;
+	struct plugin_hub_internals* internals = get_internals(plugin);
+	return internals ? internals->callback_data : NULL;
 }
 
 /*
@@ -91,6 +92,9 @@ static int plugin_command_dispatch(struct command_base* cbase, struct hub_user* 
 
 	LOG_PLUGIN("plugin_command_dispatch: cmd=%s", cmd->prefix);
 
+	if (!data)
+		return 0;
+
 	LIST_FOREACH(struct plugin_command_handle*, cmdh, data->commands,
 	{
 		if (strcmp(cmdh->prefix, cmd->prefix) == 0)
@@ -101,7 +105,10 @@ static int plugin_command_dispatch(struct command_base* cbase, struct hub_user* 
 
 static int cbfunc_send_message(struct plugin_handle* plugin, struct plugin_user* user, const char* message)
 {
-	char* buffer = adc_msg_escape(message);
+	char* buffer;
+	if (!user || !message)
+		return 0;
+	buffer = adc_msg_escape(message);
 	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
 	adc_msg_add_argument(command, buffer);
 	route_to_user(plugin_get_hub(plugin), as_hub_user(user), command);
@@ -112,7 +119,10 @@ static int cbfunc_send_message(struct plugin_handle* plugin, struct plugin_user*
 
 static int cbfunc_send_broadcast(struct plugin_handle* plugin, const char* message)
 {
-	char* buffer = adc_msg_escape(message);
+	char* buffer;
+	if (!message)
+		return 0;
+	buffer = adc_msg_escape(message);
 	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
 	adc_msg_add_argument(command, buffer);
 	route_to_all(plugin_get_hub(plugin), command);
@@ -124,7 +134,10 @@ static int cbfunc_send_broadcast(struct plugin_handle* plugin, const char* messa
 static int cbfunc_send_status(struct plugin_handle* plugin, struct plugin_user* user, int code, const char* message)
 {
 	char code_str[4];
-	char* buffer = adc_msg_escape(message);
+	char* buffer;
+	if (!user || !message)
+		return 0;
+	buffer = adc_msg_escape(message);
 	struct adc_message* command = adc_msg_construct(ADC_CMD_ISTA, strlen(buffer) + 10);
 	snprintf(code_str, sizeof(code_str), "%03d", code);
 	adc_msg_add_argument(command, code_str);
@@ -137,7 +150,10 @@ static int cbfunc_send_status(struct plugin_handle* plugin, struct plugin_user* 
 
 static int cbfunc_send_user_command(struct plugin_handle* plugin, struct plugin_user* user, const char* name, int context, const char* command)
 {
-	char* esc_name = adc_msg_escape(name);
+	char* esc_name;
+	if (!user || !name)
+		return 0;
+	esc_name = adc_msg_escape(name);
 	struct adc_message* msg = adc_msg_construct(ADC_CMD_ICMD, strlen(esc_name) + (command ? strlen(command) : 0) + 32);
 	adc_msg_add_argument(msg, esc_name);                 /* positional: menu name (submenus split by '/') */
 	if (command)
@@ -156,17 +172,23 @@ static int cbfunc_send_user_command(struct plugin_handle* plugin, struct plugin_
 
 static int cbfunc_user_disconnect(struct plugin_handle* plugin, struct plugin_user* user)
 {
+	if (!user)
+		return -1;
 	hub_disconnect_user(plugin_get_hub(plugin), as_hub_user(user), quit_kicked);
 	return 0;
 }
 
 static int cbfunc_ban_user(struct plugin_handle* plugin, struct plugin_user* user, int seconds, const char* reason)
 {
-	struct hub_user* huser = as_hub_user(user);
+	struct hub_user* huser;
+	time_t expiry;
+	if (!user)
+		return -1;
+	huser = as_hub_user(user);
 	/* Same path as the operator !ban: ban by cid+nick, disconnect, persist, and
 	   propagate cluster-wide. seconds > 0 makes it a timed ban; 0 is permanent.
 	   reason may be NULL. */
-	time_t expiry = (seconds > 0) ? time(NULL) + seconds : 0;
+	expiry = (seconds > 0) ? time(NULL) + seconds : 0;
 	hub_apply_ban(plugin_get_hub(plugin), huser->id.cid, huser->id.nick, expiry, reason, 1);
 	return 0;
 }
@@ -199,7 +221,14 @@ static int cbfunc_auth_update_user(struct plugin_handle* plugin, struct auth_inf
 static int cbfunc_command_add(struct plugin_handle* plugin, struct plugin_command_handle* cmdh)
 {
 	struct plugin_callback_data* data = get_callback_data(plugin);
-	struct command_handle* command = (struct command_handle*) hub_malloc_zero(sizeof(struct command_handle));
+	struct command_handle* command;
+
+	if (!data || !cmdh)
+		return -1;
+
+	command = (struct command_handle*) hub_malloc_zero(sizeof(struct command_handle));
+	if (!command)
+		return -1;
 
 	command->prefix = cmdh->prefix;
 	command->length = cmdh->length;
@@ -218,8 +247,12 @@ static int cbfunc_command_add(struct plugin_handle* plugin, struct plugin_comman
 static int cbfunc_command_del(struct plugin_handle* plugin, struct plugin_command_handle* cmdh)
 {
 	struct plugin_callback_data* data = get_callback_data(plugin);
-	struct command_handle* command = (struct command_handle*) cmdh->internal_handle;
+	struct command_handle* command;
 
+	if (!data || !cmdh)
+		return -1;
+
+	command = (struct command_handle*) cmdh->internal_handle;
 	list_remove(data->commands, cmdh);
 	command_del(plugin_get_hub(plugin)->commands, command);
 	hub_free(command);

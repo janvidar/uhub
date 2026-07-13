@@ -67,6 +67,19 @@ extern struct node* list_get_first_node(struct linked_list*);
 extern struct node* list_get_last_node(struct linked_list*);
 
 /**
+ * Stateless (reentrant) iteration. Unlike list_get_first/list_get_next, which
+ * keep the cursor inside the list object, these keep it in a caller-provided
+ * `struct node*`, so it is safe to nest a second walk of the same list inside
+ * the first (e.g. a plugin hook invoked mid-dispatch that itself triggers
+ * plugin dispatch). Use LIST_FOREACH_SAFE with a local cursor variable.
+ *
+ * Removing the current node during the walk still invalidates the cursor, just
+ * as it does for the shared-cursor variant; do not mutate the list mid-walk.
+ */
+extern void* list_iterator_first(struct linked_list* list, struct node** cursor);
+extern void* list_iterator_next(struct node** cursor);
+
+/**
  * Remove the first element, and call the free_handle function (if not NULL)
  * to ensure the data is freed also.
  */
@@ -74,6 +87,15 @@ extern void list_remove_first(struct linked_list* list, void (*free_handle)(void
 
 #define LIST_FOREACH(TYPE, ITEM, LIST, BLOCK) \
 		for (ITEM = (TYPE) list_get_first(LIST); ITEM; ITEM = (TYPE) list_get_next(LIST)) \
+			BLOCK
+
+/**
+ * Reentrant variant of LIST_FOREACH. CURSOR must be a caller-declared
+ * `struct node*`; it holds the iteration state instead of the list, so nested
+ * walks of the same list do not clobber each other.
+ */
+#define LIST_FOREACH_SAFE(TYPE, ITEM, LIST, CURSOR, BLOCK) \
+		for (ITEM = (TYPE) list_iterator_first((LIST), &(CURSOR)); ITEM; ITEM = (TYPE) list_iterator_next(&(CURSOR))) \
 			BLOCK
 
 #endif /* HAVE_UHUB_LINKED_LIST_H */

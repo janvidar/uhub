@@ -218,3 +218,65 @@ EXO_TEST(list_destroy_2, {
 	return 1;
 });
 
+
+/* Stateless (reentrant) iterator: list_iterator_first/next + LIST_FOREACH_SAFE. */
+
+EXO_TEST(list_iterator_empty, {
+	struct linked_list* l = list_create();
+	struct node* cur;
+	int ok = (list_iterator_first(l, &cur) == NULL) && (list_iterator_next(&cur) == NULL);
+	list_destroy(l);
+	return ok;
+});
+
+EXO_TEST(list_iterator_basic, {
+	struct linked_list* l = list_create();
+	struct node* cur;
+	char* item;
+	int n = 0;
+	int ok = 1;
+	list_append(l, A);
+	list_append(l, B);
+	list_append(l, C);
+	LIST_FOREACH_SAFE(char*, item, l, cur, {
+		if (n == 0 && item != A) ok = 0;
+		if (n == 1 && item != B) ok = 0;
+		if (n == 2 && item != C) ok = 0;
+		n++;
+	});
+	list_clear(l, &null_free);
+	list_destroy(l);
+	return ok && n == 3;
+});
+
+/*
+ * The reason the reentrant iterator exists: a walk nested inside another walk of
+ * the SAME list must not disturb the outer walk. With the old shared-cursor
+ * list_get_first/next this re-ran the outer loop from the top (potential infinite
+ * loop); LIST_FOREACH_SAFE must visit each outer element exactly once.
+ */
+EXO_TEST(list_iterator_nested, {
+	struct linked_list* l = list_create();
+	struct node* outer;
+	char* o;
+	int outer_visits = 0;
+	int inner_total = 0;
+	list_append(l, A);
+	list_append(l, B);
+	list_append(l, C);
+	LIST_FOREACH_SAFE(char*, o, l, outer, {
+		struct node* inner;
+		char* i;
+		(void) o;
+		outer_visits++;
+		LIST_FOREACH_SAFE(char*, i, l, inner, {
+			(void) i;
+			inner_total++;
+		});
+	});
+	list_clear(l, &null_free);
+	list_destroy(l);
+	/* outer visits each of 3 once; each drives a full 3-element inner walk. */
+	return outer_visits == 3 && inner_total == 9;
+});
+

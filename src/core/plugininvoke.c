@@ -27,12 +27,17 @@
 #define PLUGIN_DEBUG(hub, name) LOG_PLUGIN("Invoke %s on %d plugins", name, (hub->plugins ? (int) list_size(hub->plugins->loaded) : -1));
 
 
+/* Uses the reentrant LIST_FOREACH_SAFE with a local cursor: a hook invoked here
+   may call back into the hub (e.g. on_flood_detected -> ban_user -> plugin_ban_add)
+   and trigger a nested INVOKE over the same list. A shared cursor would corrupt
+   the outer walk; the per-call cursor keeps them independent. */
 #define INVOKE(HUB, FUNCNAME, CODE) \
 	PLUGIN_DEBUG(HUB, # FUNCNAME) \
 	if (HUB->plugins && HUB->plugins->loaded) \
 	{ \
 		struct plugin_handle* plugin;\
-		LIST_FOREACH(struct plugin_handle*, plugin, HUB->plugins->loaded, \
+		struct node* plugin_cursor; \
+		LIST_FOREACH_SAFE(struct plugin_handle*, plugin, HUB->plugins->loaded, plugin_cursor, \
 		{ \
 			if (plugin->funcs.FUNCNAME) \
 				CODE \
