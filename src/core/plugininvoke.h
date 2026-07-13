@@ -44,9 +44,13 @@ plugin_st plugin_check_ip_late(struct hub_info* hub, struct hub_user* user, stru
 plugin_st plugin_check_nick(struct hub_info* hub, const char* nick);
 plugin_st plugin_check_cid(struct hub_info* hub, const char* cid);
 
-/* Nickname allow/deny handling */
-plugin_st plugin_check_nickname_valid(struct hub_info* hub, const char* nick);
-plugin_st plugin_check_nickname_reserved(struct hub_info* hub, const char* nick);
+/* A logged-in user wants to change nick. st_allow permits the (local) rename;
+   st_deny/st_default leaves it disallowed (the hub's default). */
+plugin_st plugin_change_nick(struct hub_info* hub, struct hub_user* user, const char* new_nick);
+
+/* Hub lifecycle notifications (no interception). */
+void plugin_hub_started(struct hub_info* hub);
+void plugin_hub_shutdown(struct hub_info* hub);
 
 /* Handle chat messages */
 plugin_st plugin_handle_chat_message(struct hub_info* hub, struct hub_user* from, const char* message, int flags);

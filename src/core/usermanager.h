@@ -133,6 +133,17 @@ extern struct hub_user* uman_get_user_by_cid(struct hub_user_manager* users, con
 extern struct hub_user* uman_get_user_by_nick(struct hub_user_manager* users, const char* nick);
 
 /**
+ * Change a logged-in local user's nick and re-index it in the nick map.
+ * The nick map is keyed on user->id.nick, so the entry must be removed and
+ * re-inserted around the buffer change. Rejects a collision with a different
+ * user (local scope only; cluster-wide uniqueness is not consulted here).
+ *
+ * @return 0 on success (or no-op when new_nick equals the current nick),
+ *         -1 on collision or invalid arguments.
+ */
+extern int uman_change_nick(struct hub_user_manager* users, struct hub_user* user, const char* new_nick);
+
+/**
  * Lookup users based on an ip address range.
  *
  * @param[out] target the list of users matching the address

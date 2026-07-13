@@ -235,6 +235,30 @@ struct hub_user* uman_get_user_by_nick(struct hub_user_manager* users, const cha
 	return user;
 }
 
+int uman_change_nick(struct hub_user_manager* users, struct hub_user* user, const char* new_nick)
+{
+	struct hub_user* existing;
+
+	if (!users || !user || !new_nick)
+		return -1;
+
+	existing = uman_get_user_by_nick(users, new_nick);
+	if (existing == user)
+		return 0;    /* nick unchanged */
+	if (existing)
+		return -1;   /* taken by someone else */
+
+	/* Re-index: the map key is user->id.nick, so remove under the old key, swap
+	   the buffer, then insert under the new key. */
+	rb_tree_remove(users->nickmap, user->id.nick);
+	strncpy(user->id.nick, new_nick, MAX_NICK_LEN);
+	user->id.nick[MAX_NICK_LEN] = '\0';
+	if (!rb_tree_insert(users->nickmap, user->id.nick, user))
+		return -1;   /* should not happen: collision already ruled out */
+
+	return 0;
+}
+
 size_t uman_get_user_by_addr(struct hub_user_manager* users, struct linked_list* target, struct ip_range* range)
 {
 	size_t num = 0;

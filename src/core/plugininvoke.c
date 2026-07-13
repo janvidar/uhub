@@ -20,6 +20,7 @@
 #include "util/list.h"
 #include "util/log.h"
 #include "core/hub.h"
+#include "core/config.h"
 #include "core/plugininvoke.h"
 #include "core/pluginloader.h"
 #include "plugin_api/handle.h"
@@ -107,6 +108,26 @@ plugin_st plugin_check_nick(struct hub_info* hub, const char* nick)
 plugin_st plugin_check_cid(struct hub_info* hub, const char* cid)
 {
 	PLUGIN_INVOKE_STATUS_1(hub, on_validate_cid, cid);
+}
+
+plugin_st plugin_change_nick(struct hub_info* hub, struct hub_user* who, const char* new_nick)
+{
+	struct plugin_user* user = convert_user_type(who);
+	PLUGIN_INVOKE_STATUS_2(hub, on_change_nick, user, new_nick);
+}
+
+void plugin_hub_started(struct hub_info* hub)
+{
+	struct plugin_hub_info info;
+	info.description = hub->config ? hub->config->hub_description : NULL;
+	PLUGIN_INVOKE_1(hub, on_hub_started, &info);
+}
+
+void plugin_hub_shutdown(struct hub_info* hub)
+{
+	struct plugin_hub_info info;
+	info.description = hub->config ? hub->config->hub_description : NULL;
+	PLUGIN_INVOKE_1(hub, on_hub_shutdown, &info);
 }
 
 void plugin_log_connection_accepted(struct hub_info* hub, struct ip_addr_encap* ipaddr)
