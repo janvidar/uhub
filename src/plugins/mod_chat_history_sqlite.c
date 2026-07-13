@@ -122,10 +122,17 @@ static int get_messages_callback(void* ptr, int argc, char **argv, char **colNam
 	struct linked_list* messages = (struct linked_list*) ptr;
 	struct chat_history_line* line = hub_malloc(sizeof(struct chat_history_line));
 	int i = 0;
-	
+
+	if (!line)
+		return 0;
+
 	memset(line, 0, sizeof(struct chat_history_line));
-	
+
 	for (; i < argc; i++) {
+		/* A NULL column value is possible (the schema does not enforce NOT NULL);
+		   skip it rather than passing NULL to strncpy. */
+		if (!argv[i])
+			continue;
 		if (strcmp(colName[i], "from_nick") == 0)
 		{
 			strncpy(line->from, argv[i], MAX_NICK_LEN - 1);
@@ -262,7 +269,14 @@ static struct chat_history_data* parse_config(const char* line, struct plugin_ha
 	struct cfg_tokens* tokens = cfg_tokenize(line);
 	char* token = cfg_token_get_first(tokens);
 
-	uhub_assert(data != NULL);
+	/* hub_malloc is plain malloc in release builds, so uhub_assert (a no-op under
+	   -DNDEBUG) is not enough -- check for real. */
+	if (!data)
+	{
+		cfg_tokens_free(tokens);
+		set_error_message(plugin, "Out of memory");
+		return 0;
+	}
 
 	data->history_max = 200;
 	data->history_default = 25;

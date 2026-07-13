@@ -71,7 +71,10 @@ static struct acl_data* parse_config(const char* line)
 	char* token = cfg_token_get_first(tokens);
 
 	if (!data)
+	{
+		cfg_tokens_free(tokens);
 		return 0;
+	}
 
 	// set defaults
 	data->readonly = 1;
@@ -168,8 +171,13 @@ static struct acl_data* load_acl(const char* config, struct plugin_handle* handl
 
 	if (file_read_lines(data->file, data->users, &parse_line) == -1)
 	{
+		/* Fail closed: a configured-but-unreadable ACL file is a misconfiguration.
+		   Returning success here would load an empty ACL, which with exclusive=1
+		   silently locks every user out. Fail the plugin load instead. */
 		fprintf(stderr, "Unable to load %s\n", data->file);
 		set_error_message(handle, "Unable to load file");
+		free_acl(data);
+		return 0;
 	}
 
 	return data;
