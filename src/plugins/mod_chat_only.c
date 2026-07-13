@@ -27,62 +27,47 @@ enum Warnings
 	WARN_EXTRA          = 0x08, ///<<< "Warn about unknown protocol data."
 };
 
+// Per-user state, stored in the hub's per-user plugin slot and freed on user
+// destroy. Tracks which one-time warnings have already been sent.
 struct user_info
 {
-	sid_t sid;      // The SID of the user
-	int warnings;   // The number of denies (used to track whether or not a warning should be sent). @see enum Warnings.
+	int warnings;   // Bitmask of warnings already sent. @see enum Warnings.
 };
 
 struct chat_only_data
 {
-	size_t num_users;        // number of users tracked.
-	size_t max_users;        // max users (hard limit max 1M users due to limitations in the SID (20 bits)).
-	struct user_info* users; // array of max_users
 	int operator_override;   // operators are allowed to override these limitations.
 };
 
 static struct chat_only_data* co_initialize()
 {
-	struct chat_only_data* data = (struct chat_only_data*) hub_malloc(sizeof(struct chat_only_data));
-	data->num_users = 0;
-	data->max_users = 512;
-	data->users = hub_malloc_zero(sizeof(struct user_info) * data->max_users);
+	struct chat_only_data* data = (struct chat_only_data*) hub_malloc_zero(sizeof(struct chat_only_data));
+	if (!data)
+		return NULL;
 	data->operator_override = 1; // operators may still search and connect (default on).
 	return data;
 }
 
 static void co_shutdown(struct chat_only_data* data)
 {
-	if (data)
-	{
-		hub_free(data->users);
-		hub_free(data);
-	}
+	hub_free(data);
 }
 
-static struct user_info* get_user_info(struct chat_only_data* data, sid_t sid)
+static void free_user_info(struct plugin_handle* plugin, void* data)
 {
-	struct user_info* u;
+	(void) plugin;
+	hub_free(data);
+}
 
-	// resize buffer if needed.
-	if (sid >= data->max_users)
+static struct user_info* get_user_info(struct plugin_handle* plugin, struct plugin_user* user)
+{
+	struct user_info* u = (struct user_info*) plugin->hub.get_user_data(plugin, user);
+	if (!u)
 	{
-		u = hub_malloc_zero(sizeof(struct user_info) * (sid + 1));
-		memcpy(u, data->users, sizeof(struct user_info) * data->max_users);
-		hub_free(data->users);
-		data->users = u;
-		data->max_users = sid + 1;
-		u = NULL;
-	}
-
-	u = &data->users[sid];
-
-	// reset counters if the user was not previously known.
-	if (!u->sid)
-	{
-		u->sid = sid;
-		u->warnings = 0;
-		data->num_users++;
+		u = (struct user_info*) hub_malloc_zero(sizeof(struct user_info));
+		if (!u)
+			return NULL;
+		plugin->hub.set_user_data(plugin, user, u, free_user_info);
 	}
 	return u;
 }
@@ -97,12 +82,13 @@ static plugin_st on_search(struct plugin_handle* plugin, struct plugin_user* use
 {
 	(void) search_data;
 	struct chat_only_data* data = (struct chat_only_data*) plugin->ptr;
-	struct user_info* info = get_user_info(data, user->sid);
+	struct user_info* info;
 
 	if (user->credentials >= auth_cred_operator && data->operator_override)
 		return st_allow;
 
-	if (!(info->warnings & WARN_SEARCH))
+	info = get_user_info(plugin, user);
+	if (info && !(info->warnings & WARN_SEARCH))
 	{
 		plugin->hub.send_status_message(plugin, user, 000, "Searching is disabled. This is a chat only hub.");
 		info->warnings |= WARN_SEARCH;
@@ -114,12 +100,13 @@ static plugin_st on_p2p_connect(struct plugin_handle* plugin, struct plugin_user
 {
 	(void) to;
 	struct chat_only_data* data = (struct chat_only_data*) plugin->ptr;
-	struct user_info* info = get_user_info(data, from->sid);
+	struct user_info* info;
 
 	if (from->credentials >= auth_cred_operator && data->operator_override)
 		return st_allow;
 
-	if (!(info->warnings & WARN_CONNECT))
+	info = get_user_info(plugin, from);
+	if (info && !(info->warnings & WARN_CONNECT))
 	{
 		plugin->hub.send_status_message(plugin, from, 000, "Connection setup denied. This is a chat only hub.");
 		info->warnings |= WARN_CONNECT;
@@ -127,36 +114,18 @@ static plugin_st on_p2p_connect(struct plugin_handle* plugin, struct plugin_user
 	return st_deny;
 }
 
-static void on_user_login(struct plugin_handle* plugin, struct plugin_user* user)
-{
-	struct chat_only_data* data = (struct chat_only_data*) plugin->ptr;
-	/*struct user_info* info = */
-	get_user_info(data, user->sid);
-}
-
-static void on_user_logout(struct plugin_handle* plugin, struct plugin_user* user, const char* reason)
-{
-	(void) reason;
-	struct chat_only_data* data = (struct chat_only_data*) plugin->ptr;
-	struct user_info* info = get_user_info(data, user->sid);
-	if (info->sid)
-		data->num_users--;
-	info->warnings = 0;
-	info->sid = 0;
-}
-
 int plugin_register(struct plugin_handle* plugin, const char* config)
 {
 	(void) config;
 	PLUGIN_INITIALIZE(plugin, "Chat only hub", "1.0", "Disables connection setup, search and results.");
 	plugin->ptr = co_initialize();
+	if (!plugin->ptr)
+		return -1;
 
 	plugin->funcs.on_search = on_search;
 	plugin->funcs.on_search_result = on_search_result;
 	plugin->funcs.on_p2p_connect = on_p2p_connect;
 	plugin->funcs.on_p2p_revconnect = on_p2p_connect;
-	plugin->funcs.on_user_login = on_user_login;
-	plugin->funcs.on_user_logout = on_user_logout;
 
 	return 0;
 }

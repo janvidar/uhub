@@ -18,6 +18,7 @@
  */
 
 #include "util/log.h"
+#include "util/list.h"
 #include "util/memory.h"
 #include "adc/message.h"
 #include "network/tls.h"
@@ -60,6 +61,16 @@ _Static_assert(offsetof(struct plugin_user, credentials) == offsetof(struct hub_
 _Static_assert(offsetof(struct plugin_command, message) == offsetof(struct hub_command, message), "plugin_command/hub_command layout mismatch");
 _Static_assert(offsetof(struct plugin_command, prefix)  == offsetof(struct hub_command, prefix),  "plugin_command/hub_command layout mismatch");
 _Static_assert(offsetof(struct plugin_command, args)    == offsetof(struct hub_command, args),    "plugin_command/hub_command layout mismatch");
+
+/* cbfunc_command_arg_next casts the public arg-type enum straight to the internal
+   one, so their shared values must stay numerically identical. The offset asserts
+   above catch struct reordering; these catch enum reordering. */
+_Static_assert((int) plugin_cmd_arg_type_integer     == (int) type_integer,     "command arg-type enum mismatch");
+_Static_assert((int) plugin_cmd_arg_type_string      == (int) type_string,      "command arg-type enum mismatch");
+_Static_assert((int) plugin_cmd_arg_type_user        == (int) type_user,        "command arg-type enum mismatch");
+_Static_assert((int) plugin_cmd_arg_type_address     == (int) type_address,     "command arg-type enum mismatch");
+_Static_assert((int) plugin_cmd_arg_type_range       == (int) type_range,       "command arg-type enum mismatch");
+_Static_assert((int) plugin_cmd_arg_type_credentials == (int) type_credentials, "command arg-type enum mismatch");
 
 static struct hub_user* as_hub_user(struct plugin_user* user)
 {
@@ -308,6 +319,128 @@ static size_t cbfunc_get_usercount(struct plugin_handle* plugin)
 	return hub->users->count;
 }
 
+/* Per-user plugin storage. Entries live on hub_user.plugin_data, at most one per
+   owning plugin. */
+struct plugin_user_data_entry
+{
+	struct plugin_handle* owner;
+	void* data;
+	plugin_user_data_free cleanup;
+};
+
+static struct plugin_user_data_entry* find_user_data_entry(struct hub_user* huser, struct plugin_handle* owner)
+{
+	struct plugin_user_data_entry* e;
+	struct node* cur;
+	if (!huser->plugin_data)
+		return NULL;
+	LIST_FOREACH_SAFE(struct plugin_user_data_entry*, e, huser->plugin_data, cur,
+	{
+		if (e->owner == owner)
+			return e;
+	});
+	return NULL;
+}
+
+static void cbfunc_set_user_data(struct plugin_handle* plugin, struct plugin_user* user, void* data, plugin_user_data_free cleanup)
+{
+	struct hub_user* huser;
+	struct plugin_user_data_entry* e;
+
+	if (!user)
+		return;
+	huser = as_hub_user(user);
+	e = find_user_data_entry(huser, plugin);
+
+	if (e)
+	{
+		/* Replacing (or clearing) an existing value: run its cleanup first. */
+		if (e->cleanup)
+			e->cleanup(plugin, e->data);
+		if (data)
+		{
+			e->data = data;
+			e->cleanup = cleanup;
+		}
+		else
+		{
+			list_remove(huser->plugin_data, e);
+			hub_free(e);
+		}
+		return;
+	}
+
+	if (!data)
+		return;
+
+	if (!huser->plugin_data)
+	{
+		huser->plugin_data = list_create();
+		if (!huser->plugin_data)
+			return;
+	}
+
+	e = (struct plugin_user_data_entry*) hub_malloc_zero(sizeof(*e));
+	if (!e)
+		return;
+	e->owner = plugin;
+	e->data = data;
+	e->cleanup = cleanup;
+	list_append(huser->plugin_data, e);
+}
+
+static void* cbfunc_get_user_data(struct plugin_handle* plugin, struct plugin_user* user)
+{
+	struct plugin_user_data_entry* e;
+	if (!user)
+		return NULL;
+	e = find_user_data_entry(as_hub_user(user), plugin);
+	return e ? e->data : NULL;
+}
+
+static uint64_t cbfunc_get_user_connection_id(struct plugin_handle* plugin, struct plugin_user* user)
+{
+	(void) plugin;
+	if (!user)
+		return 0;
+	return as_hub_user(user)->connection_id;
+}
+
+void plugin_user_data_destroy(struct hub_user* user)
+{
+	struct plugin_user_data_entry* e;
+	if (!user || !user->plugin_data)
+		return;
+	while ((e = (struct plugin_user_data_entry*) list_get_first(user->plugin_data)))
+	{
+		if (e->cleanup)
+			e->cleanup(e->owner, e->data);
+		list_remove(user->plugin_data, e);
+		hub_free(e);
+	}
+	list_destroy(user->plugin_data);
+	user->plugin_data = NULL;
+}
+
+void plugin_user_data_purge_owner(struct hub_info* hub, struct plugin_handle* owner)
+{
+	struct hub_user* huser;
+	struct node* ucur;
+	if (!hub || !hub->users || !hub->users->list)
+		return;
+	LIST_FOREACH_SAFE(struct hub_user*, huser, hub->users->list, ucur,
+	{
+		struct plugin_user_data_entry* e = find_user_data_entry(huser, owner);
+		if (e)
+		{
+			if (e->cleanup)
+				e->cleanup(owner, e->data);
+			list_remove(huser->plugin_data, e);
+			hub_free(e);
+		}
+	});
+}
+
 static const char* cbfunc_get_tls_version(struct plugin_handle* plugin, struct plugin_user* user)
 {
 	(void) plugin;
@@ -385,6 +518,9 @@ void plugin_register_callback_functions(struct plugin_handle* handle)
 	handle->hub.command_arg_reset = cbfunc_command_arg_reset;
 	handle->hub.command_arg_next = cbfunc_command_arg_next;
 	handle->hub.get_usercount = cbfunc_get_usercount;
+	handle->hub.set_user_data = cbfunc_set_user_data;
+	handle->hub.get_user_data = cbfunc_get_user_data;
+	handle->hub.get_user_connection_id = cbfunc_get_user_connection_id;
 	handle->hub.get_name = cbfunc_get_hub_name;
 	handle->hub.set_name = cbfunc_set_hub_name;
 	handle->hub.get_description = cbfunc_get_hub_description;

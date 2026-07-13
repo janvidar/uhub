@@ -165,6 +165,14 @@ struct hub_user
 	/* Reason for the ban that rejected this login, resolved during the ACL check
 	   and appended to the ban message in hub_send_status ("" when none). */
 	char ban_reason[128];
+
+	/* Stable, non-recycled connection identifier (see uman/user_create), exposed
+	   to plugins via get_user_connection_id. Unlike id.sid it is never reused. */
+	uint64_t connection_id;
+
+	/* Per-user plugin storage: list of struct plugin_user_data_entry, one per
+	   plugin that attached data. NULL until first use. Cleaned up on destroy. */
+	struct linked_list* plugin_data;
 };
 
 /**

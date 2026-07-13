@@ -196,7 +196,13 @@ struct plugin_handle* plugin_load(const char* filename, const char* config, stru
 		ret = register_f(handle, config);
 		if (ret == 0)
 		{
-			if (handle->plugin_api_version == PLUGIN_API_VERSION && handle->plugin_funcs_size == sizeof(struct plugin_funcs))
+			/* Accept any ABI in [MIN, current]. struct plugin_funcs is unchanged
+			   across those versions, so an older plugin's (<=) table is
+			   forward-compatible; a table larger than ours means a newer plugin
+			   against an older hub, which we must reject. */
+			if (handle->plugin_api_version >= PLUGIN_API_VERSION_MIN
+				&& handle->plugin_api_version <= PLUGIN_API_VERSION
+				&& handle->plugin_funcs_size <= sizeof(struct plugin_funcs))
 			{
 				LOG_INFO("Loaded plugin: %s: %s, version %s.", filename, handle->name, handle->version);
 				LOG_PLUGIN("Plugin API version: %d (func table size: " PRINTF_SIZE_T ")", handle->plugin_api_version, handle->plugin_funcs_size);
@@ -227,7 +233,16 @@ struct plugin_handle* plugin_load(const char* filename, const char* config, stru
 void plugin_unload(struct plugin_handle* plugin)
 {
 	struct plugin_hub_internals* internals = get_internals(plugin);
-	internals->unregister(plugin);
+	if (internals)
+	{
+		/* Run this plugin's per-user cleanups while its code and state are still
+		   valid: before unregister frees handle->ptr and before dlclose unmaps
+		   the cleanup callbacks. */
+		if (internals->hub)
+			plugin_user_data_purge_owner(internals->hub, plugin);
+		if (internals->unregister)
+			internals->unregister(plugin);
+	}
 	plugin_unregister_callback_functions(plugin);
 	plugin_close(plugin->handle);
 	hub_free(plugin);

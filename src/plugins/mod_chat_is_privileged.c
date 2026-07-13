@@ -44,18 +44,15 @@ enum Warnings
 	WARN_PRIVCHAT = 0x02, // A private-chat denial notice has been sent.
 };
 
+// Per-user state, stored in the hub's per-user plugin slot and freed on user
+// destroy. Tracks which one-time warnings have already been sent.
 struct user_info
 {
-	sid_t sid;
 	int warnings;
 };
 
 struct chat_data
 {
-	size_t num_users;		 // number of users tracked.
-	size_t max_users;		 // max users (hard limit max 1M users due to limitations in the SID (20 bits)).
-	struct user_info *users; // array of max_users
-
 	enum auth_credentials allow_privchat;	// minimum credentials to allow using private chat
 	enum auth_credentials allow_op_contact; // minimum credentials to allow private chat to operators (including super and admins).
 	enum auth_credentials allow_mainchat;	// minimum credentials to allow using main chat
@@ -78,14 +75,18 @@ static int parse_cred(struct plugin_handle *plugin, struct cfg_settings *setting
 
 static struct chat_data *parse_config(struct plugin_handle *plugin, const char *line)
 {
-	struct chat_data *data = (struct chat_data *)hub_malloc(sizeof(struct chat_data));
+	struct chat_data *data = (struct chat_data *)hub_malloc_zero(sizeof(struct chat_data));
 	struct cfg_tokens *tokens = cfg_tokenize(line);
 	char *token = cfg_token_get_first(tokens);
 
+	if (!data)
+	{
+		cfg_tokens_free(tokens);
+		set_error_message(plugin, "Out of memory");
+		return 0;
+	}
+
 	// defaults
-	data->num_users = 0;
-	data->max_users = 512;
-	data->users = hub_malloc_zero(sizeof(struct user_info) * data->max_users);
 	data->allow_mainchat = auth_cred_guest;
 	data->allow_op_contact = auth_cred_guest;
 	data->allow_privchat = auth_cred_guest;
@@ -99,7 +100,6 @@ static struct chat_data *parse_config(struct plugin_handle *plugin, const char *
 		{
 			set_error_message(plugin, "Unable to parse startup parameters");
 			cfg_tokens_free(tokens);
-			hub_free(data->users);
 			hub_free(data);
 			return 0;
 		}
@@ -121,7 +121,6 @@ static struct chat_data *parse_config(struct plugin_handle *plugin, const char *
 		if (!ok)
 		{
 			cfg_tokens_free(tokens);
-			hub_free(data->users);
 			hub_free(data);
 			return 0;
 		}
@@ -133,57 +132,31 @@ static struct chat_data *parse_config(struct plugin_handle *plugin, const char *
 	return data;
 }
 
-static struct user_info *get_user_info(struct chat_data *data, sid_t sid)
+static void free_user_info(struct plugin_handle *plugin, void *data)
 {
-	struct user_info *u;
+	(void) plugin;
+	hub_free(data);
+}
 
-	// resize buffer if needed.
-	if (sid >= data->max_users)
+static struct user_info *get_user_info(struct plugin_handle *plugin, struct plugin_user *user)
+{
+	struct user_info *u = (struct user_info *) plugin->hub.get_user_data(plugin, user);
+	if (!u)
 	{
-		u = hub_malloc_zero(sizeof(struct user_info) * (sid + 1));
-		memcpy(u, data->users, sizeof(struct user_info) * data->max_users);
-		hub_free(data->users);
-		data->users = u;
-		data->max_users = sid + 1;
-		u = NULL;
-	}
-
-	u = &data->users[sid];
-
-	// reset counters if the user was not previously known.
-	if (!u->sid)
-	{
-		u->sid = sid;
-		u->warnings = 0;
-		data->num_users++;
+		u = (struct user_info *) hub_malloc_zero(sizeof(struct user_info));
+		if (!u)
+			return NULL;
+		plugin->hub.set_user_data(plugin, user, u, free_user_info);
 	}
 	return u;
 }
 
-static void on_user_login(struct plugin_handle *plugin, struct plugin_user *user)
-{
-	struct chat_data *data = (struct chat_data *)plugin->ptr;
-	/*struct user_info* info = */
-	get_user_info(data, user->sid);
-}
-
-static void on_user_logout(struct plugin_handle *plugin, struct plugin_user *user, const char *reason)
-{
-	struct chat_data *data = (struct chat_data *)plugin->ptr;
-	struct user_info *info = get_user_info(data, user->sid);
-	(void) reason;
-	if (info->sid)
-		data->num_users--;
-	info->warnings = 0;
-	info->sid = 0;
-}
-
 // Send a one-time notice to the user when a message is denied, tracked per
 // warning bit so we do not repeat it on every blocked message.
-static void warn_once(struct plugin_handle *plugin, struct chat_data *data, struct plugin_user *user, int bit, const char *msg)
+static void warn_once(struct plugin_handle *plugin, struct plugin_user *user, int bit, const char *msg)
 {
-	struct user_info *info = get_user_info(data, user->sid);
-	if (!(info->warnings & bit))
+	struct user_info *info = get_user_info(plugin, user);
+	if (info && !(info->warnings & bit))
 	{
 		plugin->hub.send_status_message(plugin, user, 000, msg);
 		info->warnings |= bit;
@@ -196,7 +169,7 @@ plugin_st on_chat_msg(struct plugin_handle *plugin, struct plugin_user *from, co
 	(void) message;
 	if (from->credentials >= data->allow_mainchat)
 		return st_default;
-	warn_once(plugin, data, from, WARN_MAINCHAT, "Main chat is reserved for privileged users.");
+	warn_once(plugin, from, WARN_MAINCHAT, "Main chat is reserved for privileged users.");
 	return st_deny;
 }
 
@@ -213,7 +186,7 @@ plugin_st on_private_msg(struct plugin_handle *plugin, struct plugin_user *from,
 
 	if (from->credentials >= required)
 		return st_default;
-	warn_once(plugin, data, from, WARN_PRIVCHAT, "Private messaging is reserved for privileged users.");
+	warn_once(plugin, from, WARN_PRIVCHAT, "Private messaging is reserved for privileged users.");
 	return st_deny;
 }
 
@@ -224,8 +197,6 @@ int plugin_register(struct plugin_handle *plugin, const char *config)
 	if (!plugin->ptr)
 		return -1;
 
-	plugin->funcs.on_user_login = on_user_login;
-	plugin->funcs.on_user_logout = on_user_logout;
 	plugin->funcs.on_chat_msg = on_chat_msg;
 	plugin->funcs.on_private_msg = on_private_msg;
 
@@ -235,10 +206,6 @@ int plugin_register(struct plugin_handle *plugin, const char *config)
 int plugin_unregister(struct plugin_handle *plugin)
 {
 	struct chat_data *data = (struct chat_data *)plugin->ptr;
-	if (data)
-	{
-		hub_free(data->users);
-		hub_free(data);
-	}
+	hub_free(data);
 	return 0;
 }

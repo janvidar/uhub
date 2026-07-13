@@ -26,7 +26,18 @@
 #include "core/ioqueue.h"
 #include "core/ipcount.h"
 #include "core/netevent.h"
+#include "core/plugincallback.h"
 #include "core/user.h"
+
+/* Monotonic source for hub_user.connection_id. Single-threaded hub, so a plain
+   counter is fine; starts at 1 so 0 can mean "unset". Wrap after 2^64 is not a
+   practical concern. */
+static uint64_t g_next_connection_id = 1;
+
+static uint64_t next_connection_id(void)
+{
+	return g_next_connection_id++;
+}
 
 struct hub_user* user_create(struct hub_info* hub, struct net_connection* con, struct ip_addr_encap* addr)
 {
@@ -57,6 +68,7 @@ struct hub_user* user_create(struct hub_info* hub, struct net_connection* con, s
 
 	memcpy(&user->id.addr, addr, sizeof(struct ip_addr_encap));
 	user->tm_connected = time(NULL);
+	user->connection_id = next_connection_id();
 	user_set_state(user, state_protocol);
 
 	flood_control_reset(&user->flood_chat);
@@ -90,6 +102,9 @@ void user_destroy(struct hub_user* user)
 		LOG_TRACE("user_destory() -> net_con_close(%p)", user->connection);
 		net_con_close(user->connection);
 	}
+
+	/* Run every plugin's per-user cleanup before the user memory goes away. */
+	plugin_user_data_destroy(user);
 
 	adc_msg_free(user->info);
 	adc_msg_free(user->auth_pending_inf);
@@ -394,6 +409,7 @@ struct hub_user* user_create_remote(struct hub_info* hub, struct hub_link* link,
 	user->credentials = auth_cred_guest;
 	user->info = adc_msg_incref(info); /* the BINF we re-broadcast locally */
 	user->tm_connected = time(NULL);
+	user->connection_id = next_connection_id();
 	user_set_state(user, state_normal);
 
 	hub_free(nick);

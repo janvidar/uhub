@@ -39,19 +39,24 @@
 #include "util/memory.h"
 #include "util/misc.h"
 
-struct user_strikes
-{
-	sid_t sid;       // SID of the tracked user (0 means slot is unused).
-	int strikes;     // Number of flood events seen for this user so far.
-};
-
 struct flood_data
 {
 	int grace;                  // Flood events tolerated (hub warns) before the user is disconnected.
 	int operator_override;      // Non-zero: operators and above are never acted upon.
-	size_t max_users;           // Size of the strikes array (indexed by SID).
-	struct user_strikes* users; // Array of max_users entries.
 };
+
+// Per-user strike counter, stored in the hub's per-user plugin slot and freed
+// automatically when the user is destroyed (no SID bookkeeping, no stale reuse).
+struct user_strikes
+{
+	int strikes;
+};
+
+static void free_user_strikes(struct plugin_handle* plugin, void* data)
+{
+	(void) plugin;
+	hub_free(data);
+}
 
 static void set_error_message(struct plugin_handle* plugin, const char* msg)
 {
@@ -71,27 +76,17 @@ static const char* flood_type_name(enum plugin_flood_type type)
 	return "unknown";
 }
 
-static struct user_strikes* get_user_strikes(struct flood_data* data, sid_t sid)
+static struct user_strikes* get_user_strikes(struct plugin_handle* plugin, struct plugin_user* user)
 {
-	struct user_strikes* u;
-
-	// Grow the array if this SID does not fit yet.
-	if (sid >= data->max_users)
+	struct user_strikes* info = (struct user_strikes*) plugin->hub.get_user_data(plugin, user);
+	if (!info)
 	{
-		u = hub_malloc_zero(sizeof(struct user_strikes) * (sid + 1));
-		memcpy(u, data->users, sizeof(struct user_strikes) * data->max_users);
-		hub_free(data->users);
-		data->users = u;
-		data->max_users = sid + 1;
+		info = (struct user_strikes*) hub_malloc_zero(sizeof(struct user_strikes));
+		if (!info)
+			return NULL;
+		plugin->hub.set_user_data(plugin, user, info, free_user_strikes);
 	}
-
-	u = &data->users[sid];
-	if (!u->sid)
-	{
-		u->sid = sid;
-		u->strikes = 0;
-	}
-	return u;
+	return info;
 }
 
 static plugin_st on_flood_detected(struct plugin_handle* plugin, struct plugin_user* user, enum plugin_flood_type type)
@@ -103,7 +98,9 @@ static plugin_st on_flood_detected(struct plugin_handle* plugin, struct plugin_u
 	if (data->operator_override && user->credentials >= auth_cred_operator)
 		return st_allow;
 
-	info = get_user_strikes(data, user->sid);
+	info = get_user_strikes(plugin, user);
+	if (!info)
+		return st_default;
 	info->strikes++;
 
 	if (info->strikes >= data->grace)
@@ -119,30 +116,21 @@ static plugin_st on_flood_detected(struct plugin_handle* plugin, struct plugin_u
 	return st_default;
 }
 
-static void on_user_logout(struct plugin_handle* plugin, struct plugin_user* user, const char* reason)
-{
-	(void) reason;
-	struct flood_data* data = (struct flood_data*) plugin->ptr;
-	if (user->sid < data->max_users)
-	{
-		struct user_strikes* info = &data->users[user->sid];
-		info->sid = 0;
-		info->strikes = 0;
-	}
-}
-
 static struct flood_data* parse_config(const char* line, struct plugin_handle* plugin)
 {
 	struct flood_data* data = (struct flood_data*) hub_malloc_zero(sizeof(struct flood_data));
 	struct cfg_tokens* tokens = cfg_tokenize(line);
 	char* token = cfg_token_get_first(tokens);
 
-	uhub_assert(data != NULL);
+	if (!data)
+	{
+		cfg_tokens_free(tokens);
+		set_error_message(plugin, "Out of memory");
+		return 0;
+	}
 
 	data->grace = 3;
 	data->operator_override = 1;
-	data->max_users = 512;
-	data->users = hub_malloc_zero(sizeof(struct user_strikes) * data->max_users);
 
 	while (token)
 	{
@@ -152,7 +140,6 @@ static struct flood_data* parse_config(const char* line, struct plugin_handle* p
 		{
 			set_error_message(plugin, "Unable to parse startup parameters");
 			cfg_tokens_free(tokens);
-			hub_free(data->users);
 			hub_free(data);
 			return 0;
 		}
@@ -172,7 +159,6 @@ static struct flood_data* parse_config(const char* line, struct plugin_handle* p
 			set_error_message(plugin, "Unknown startup parameters given");
 			cfg_settings_free(setting);
 			cfg_tokens_free(tokens);
-			hub_free(data->users);
 			hub_free(data);
 			return 0;
 		}
@@ -195,7 +181,8 @@ int plugin_register(struct plugin_handle* plugin, const char* config)
 
 	plugin->ptr = data;
 	plugin->funcs.on_flood_detected = on_flood_detected;
-	plugin->funcs.on_user_logout = on_user_logout;
+	/* Per-user strike counters are freed by the hub on user destroy (and on
+	   plugin unload), so no logout hook or teardown bookkeeping is needed. */
 
 	return 0;
 }
@@ -203,10 +190,6 @@ int plugin_register(struct plugin_handle* plugin, const char* config)
 int plugin_unregister(struct plugin_handle* plugin)
 {
 	struct flood_data* data = (struct flood_data*) plugin->ptr;
-	if (data)
-	{
-		hub_free(data->users);
-		hub_free(data);
-	}
+	hub_free(data);
 	return 0;
 }

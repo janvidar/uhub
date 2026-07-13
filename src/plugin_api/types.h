@@ -26,9 +26,19 @@
 #include "util/credentials.h"
 #include "network/ipcalc.h"
 
-#define PLUGIN_API_VERSION 5
+#define PLUGIN_API_VERSION 6
+
+/* Oldest plugin ABI the current hub still accepts. struct plugin_funcs (the
+   table a plugin implements) is unchanged across 5->6 -- only plugin_hub_funcs
+   (hub-provided) grew -- so v5 plugins remain binary-compatible. */
+#define PLUGIN_API_VERSION_MIN 5
 
 struct plugin_handle;
+
+/* Cleanup callback for per-user plugin data. Invoked with the owning plugin
+   handle when the user is destroyed, when the value is replaced, or when the
+   plugin is unloaded while users are still connected. */
+typedef void (*plugin_user_data_free)(struct plugin_handle*, void* data);
 
 struct plugin_user
 {
