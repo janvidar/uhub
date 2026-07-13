@@ -154,6 +154,21 @@ typedef struct plugin_command_arg_data* (*hfunc_command_arg_next)(struct plugin_
 
 typedef size_t (*hfunc_get_usercount)(struct plugin_handle*);
 
+/* Per-user plugin storage. Each plugin gets at most one opaque pointer per user,
+   keyed by its own handle. set_user_data(plugin, user, NULL, NULL) clears it.
+   Setting over an existing value first runs the previous value's cleanup. The
+   cleanup (if non-NULL) is guaranteed to run exactly once: when the value is
+   replaced/cleared, when the user is destroyed, or when the plugin is unloaded
+   while the user is still connected -- so a plugin never has to chase user
+   logouts to free per-user state. */
+typedef void  (*hfunc_set_user_data)(struct plugin_handle*, struct plugin_user* user, void* data, plugin_user_data_free cleanup);
+typedef void* (*hfunc_get_user_data)(struct plugin_handle*, struct plugin_user* user);
+
+/* A stable, non-recycled identifier for a connection. Unlike the SID (recycled
+   as users come and go), this is unique for the lifetime of the hub process, so
+   it is safe to use as a key for correlating a user across callbacks. */
+typedef uint64_t (*hfunc_get_user_connection_id)(struct plugin_handle*, struct plugin_user* user);
+
 /* Returns the negotiated TLS protocol version string (e.g. "TLSv1.3") for a
  * user's connection, or NULL if the user is not connected over TLS (plaintext
  * adc://, or a remote user learned over federation with no local socket). */
@@ -186,6 +201,9 @@ struct plugin_hub_funcs
 	hfunc_command_arg_reset command_arg_reset;
 	hfunc_command_arg_next command_arg_next;
 	hfunc_get_usercount get_usercount;
+	hfunc_set_user_data set_user_data;
+	hfunc_get_user_data get_user_data;
+	hfunc_get_user_connection_id get_user_connection_id;
 	hfunc_get_hub_name get_name;
 	hfunc_set_hub_name set_name;
 	hfunc_get_hub_description get_description;
