@@ -228,6 +228,7 @@ pub fn build(b: *std.Build) void {
     const systemd = b.option(bool, "systemd", "Enable systemd notify and journal logging") orelse false;
     const adc_stress = b.option(bool, "adc-stress", "Build the adcrush stress-tester client") orelse false;
     const lowlevel_debug = b.option(bool, "lowlevel-debug", "Enable low level debug messages") orelse false;
+    const javascript = b.option(bool, "javascript", "Build the mod_javascript plugin (embeds QuickJS, a git submodule)") orelse false;
     // TLS is mandatory. By default we build the bundled LibreSSL (a zig
     // dependency, see build.zig.zon), which makes the build self-contained and
     // avoids needing the system OpenSSL headers on the include path (keg-only
@@ -458,6 +459,61 @@ pub fn build(b: *std.Build) void {
             lib.getEmittedBin(),
             .lib,
             b.fmt("{s}.{s}", .{ plugin.name, plugin_ext }),
+        );
+        b.getInstallStep().dependOn(&install.step);
+    }
+
+    // Optional mod_javascript plugin, embedding the QuickJS engine from the
+    // third_party/quickjs git submodule (quickjs-ng). Mirrors the
+    // JAVASCRIPT_SUPPORT block in CMakeLists.txt. QuickJS is built as its own
+    // module with warnings off (-w): it is third-party and does not pass the
+    // project's strict flags.
+    if (javascript) {
+        std.fs.cwd().access("third_party/quickjs/quickjs.c", .{}) catch @panic(
+            "-Djavascript is set but the QuickJS submodule is missing; run: " ++
+                "git submodule update --init third_party/quickjs");
+        const qjs_mod = b.createModule(.{
+            .target = target,
+            .optimize = .ReleaseFast,
+            .link_libc = true,
+            .sanitize_c = .off,
+            .pic = true,
+        });
+        qjs_mod.addCSourceFiles(.{
+            .files = &.{
+                "third_party/quickjs/quickjs.c",
+                "third_party/quickjs/libregexp.c",
+                "third_party/quickjs/libunicode.c",
+                "third_party/quickjs/dtoa.c",
+            },
+            .flags = &.{ "-w", "-D_GNU_SOURCE" },
+        });
+        qjs_mod.addIncludePath(b.path("third_party/quickjs"));
+        const quickjs = b.addLibrary(.{
+            .linkage = .static,
+            .name = "quickjs",
+            .root_module = qjs_mod,
+        });
+
+        const mod = ctx.module();
+        mod.addCSourceFiles(.{
+            .files = &.{"src/plugins/mod_javascript.c"},
+            .flags = cflags,
+        });
+        mod.addIncludePath(b.path("third_party/quickjs"));
+        mod.linkLibrary(quickjs);
+        mod.linkLibrary(common);
+        ctx.linkExternal(mod);
+        if (!is_windows) mod.linkSystemLibrary("m", .{});
+        const lib = b.addLibrary(.{
+            .linkage = .dynamic,
+            .name = "mod_javascript",
+            .root_module = mod,
+        });
+        const install = b.addInstallFileWithDir(
+            lib.getEmittedBin(),
+            .lib,
+            b.fmt("mod_javascript.{s}", .{plugin_ext}),
         );
         b.getInstallStep().dependOn(&install.step);
     }

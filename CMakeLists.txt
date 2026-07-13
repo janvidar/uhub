@@ -29,6 +29,7 @@ option(LOWLEVEL_DEBUG "Enable low level debug messages." OFF)
 option(SYSTEMD_SUPPORT "Enable systemd notify and journal logging" OFF)
 option(ADC_STRESS "Enable the stress tester client" OFF)
 option(FUZZING "Build libFuzzer fuzz targets (requires clang)" OFF)
+option(JAVASCRIPT_SUPPORT "Build the mod_javascript plugin (embeds QuickJS, a git submodule)" OFF)
 
 find_package(Git)
 find_package(SQLite3 REQUIRED)
@@ -278,6 +279,45 @@ add_library(mod_flood MODULE ${UHUB_SOURCE_DIR}/plugins/mod_flood.c)
 add_library(mod_auth_sqlite MODULE ${UHUB_SOURCE_DIR}/plugins/mod_auth_sqlite.c)
 add_library(mod_selfregister MODULE ${UHUB_SOURCE_DIR}/plugins/mod_selfregister.c)
 
+if(JAVASCRIPT_SUPPORT)
+	# QuickJS engine, pulled in as a git submodule at third_party/quickjs
+	# (quickjs-ng, pinned by .gitmodules + the recorded commit). Built as its own
+	# static lib so the project-wide -Werror/-W4 does not apply to it: QuickJS is
+	# third-party and is compiled with warnings disabled.
+	set(QUICKJS_DIR ${CMAKE_SOURCE_DIR}/third_party/quickjs)
+	if(NOT EXISTS ${QUICKJS_DIR}/quickjs.c)
+		message(FATAL_ERROR
+			"JAVASCRIPT_SUPPORT is ON but the QuickJS submodule is missing. "
+			"Run: git submodule update --init third_party/quickjs")
+	endif()
+	add_library(quickjs STATIC
+		${QUICKJS_DIR}/quickjs.c
+		${QUICKJS_DIR}/libregexp.c
+		${QUICKJS_DIR}/libunicode.c
+		${QUICKJS_DIR}/dtoa.c)
+	target_compile_definitions(quickjs PRIVATE _GNU_SOURCE)
+	target_include_directories(quickjs PUBLIC ${QUICKJS_DIR})
+	set_target_properties(quickjs PROPERTIES POSITION_INDEPENDENT_CODE ON)
+	if(MSVC)
+		target_compile_options(quickjs PRIVATE /w)
+		target_compile_definitions(quickjs PRIVATE WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0601)
+	else()
+		target_compile_options(quickjs PRIVATE -w)
+	endif()
+
+	add_library(mod_javascript MODULE ${UHUB_SOURCE_DIR}/plugins/mod_javascript.c)
+	set_target_properties(mod_javascript PROPERTIES PREFIX "")
+	target_link_libraries(mod_javascript quickjs utils)
+	if(UNIX)
+		# QuickJS uses libm and the dynamic loader / pthreads.
+		find_library(M_LIBRARIES m)
+		if(M_LIBRARIES)
+			target_link_libraries(mod_javascript ${M_LIBRARIES})
+		endif()
+		target_link_libraries(mod_javascript ${CMAKE_DL_LIBS} pthread)
+	endif()
+endif()
+
 set_target_properties(
 	mod_example
 	mod_welcome
@@ -430,5 +470,8 @@ endif()
 if (UNIX)
 	install( TARGETS uhub uhub-passwd RUNTIME DESTINATION bin )
 	install( TARGETS mod_example mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_selfregister mod_chat_history mod_chat_history_sqlite mod_chat_only mod_topic mod_no_guest_downloads mod_flood mod_ucmd DESTINATION /usr/lib/uhub/ OPTIONAL )
+	if(JAVASCRIPT_SUPPORT)
+		install( TARGETS mod_javascript DESTINATION /usr/lib/uhub/ OPTIONAL )
+	endif()
 	install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub.conf ${CMAKE_CURRENT_SOURCE_DIR}/doc/plugins.conf ${CMAKE_CURRENT_SOURCE_DIR}/doc/rules.txt ${CMAKE_CURRENT_SOURCE_DIR}/doc/motd.txt DESTINATION /etc/uhub OPTIONAL )
 endif()
