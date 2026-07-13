@@ -38,10 +38,11 @@ struct plugin_callback_data;
 
 struct plugin_hub_internals* get_internals(struct plugin_handle* handle)
 {
-	struct plugin_hub_internals* internals;
-	uhub_assert(handle && handle->handle && handle->handle->internals);
-	internals = (struct plugin_hub_internals*) handle->handle->internals;
-	return internals;
+	/* Checked unconditionally (not just via uhub_assert, which is a no-op under
+	   -DNDEBUG): a NULL here would otherwise be a release-build crash. */
+	if (!handle || !handle->handle || !handle->handle->internals)
+		return NULL;
+	return (struct plugin_hub_internals*) handle->handle->internals;
 }
 
 struct uhub_plugin* plugin_open(const char* filename)
@@ -203,7 +204,13 @@ struct plugin_handle* plugin_load(const char* filename, const char* config, stru
 			}
 			else
 			{
-				LOG_ERROR("Unable to load plugin: %s - API version mistmatch", filename);
+				LOG_ERROR("Unable to load plugin: %s - API version mismatch", filename);
+				/* plugin_register() succeeded, so the plugin allocated its state
+				   (handle->ptr) and may have registered commands. Undo that with
+				   its own unregister before we tear the handle down, mirroring the
+				   normal plugin_unload path -- otherwise handle->ptr leaks. */
+				unregister_f(handle);
+				plugin_unregister_callback_functions(handle);
 			}
 		}
 		else
@@ -329,6 +336,8 @@ static int plugin_parse_line(char* line, int line_count, void* ptr_data)
 	return -1;
 }
 
+static void plugin_unload_ptr(void* ptr);
+
 int plugin_initialize(struct hub_config* config, struct hub_info* hub)
 {
 	int ret;
@@ -345,7 +354,11 @@ int plugin_initialize(struct hub_config* config, struct hub_info* hub)
 		ret = file_read_lines(config->file_plugins, hub, &plugin_parse_line);
 		if (ret == -1)
 		{
-			list_clear(hub->plugins->loaded, hub_free_handle);
+			/* The list holds fully-loaded plugin_handle*; they must go through
+			   plugin_unload (unregister + dlclose + free filename/internals), not
+			   a plain hub_free_handle which would leak the library handle and skip
+			   each plugin's unregister. */
+			list_clear(hub->plugins->loaded, plugin_unload_ptr);
 			list_destroy(hub->plugins->loaded);
 			hub->plugins->loaded = 0;
 			return -1;
@@ -373,6 +386,6 @@ void plugin_shutdown(struct uhub_plugins* handle)
 struct hub_info* plugin_get_hub(struct plugin_handle* plugin)
 {
 	struct plugin_hub_internals* data = get_internals(plugin);
-	return data->hub;
+	return data ? data->hub : NULL;
 }
 

@@ -262,3 +262,19 @@ void* list_get_prev(struct linked_list* list)
 	return list->iterator->ptr;
 }
 
+
+void* list_iterator_first(struct linked_list* list, struct node** cursor)
+{
+	*cursor = list->first;
+	return *cursor ? (*cursor)->ptr : NULL;
+}
+
+void* list_iterator_next(struct node** cursor)
+{
+	if (*cursor == NULL)
+		return NULL;
+
+	*cursor = (*cursor)->next;
+	return *cursor ? (*cursor)->ptr : NULL;
+}
+
