@@ -663,6 +663,14 @@ static int check_acl(struct hub_info* hub, struct hub_user* user, struct adc_mes
 		return status_msg_inf_error_cid_invalid;
 	}
 
+	/* Late IP check: the user object and its resolved address are known now (the
+	   early check at accept time only had the raw address), so plugins get a
+	   second, user-aware chance to reject the connection. */
+	if (plugin_check_ip_late(hub, user, &user->id.addr) == st_deny)
+	{
+		return status_msg_ban_permanently;
+	}
+
 	return 0;
 }
 
@@ -1113,12 +1121,36 @@ int hub_handle_info(struct hub_info* hub, struct hub_user* user, const struct ad
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_CLIENT_ID);
 
 		/*
-		 * If the nick is not accepted, do not relay it.
-		 * Otherwise, the nickname will be updated.
+		 * Post-login nick changes are disabled by default: the NI is stripped so
+		 * it is neither applied nor relayed. A plugin may opt one in per-change by
+		 * returning st_allow from on_change_nick, but only after the new nick has
+		 * passed the same validation as at login and does not collide with another
+		 * user. On success the nick is re-indexed and the NI is kept so it is
+		 * applied (user_update_info) and broadcast. Local scope only -- cluster
+		 * nick uniqueness across linked hubs is not consulted here.
 		 */
 		if (adc_msg_has_named_argument(cmd, ADC_INF_FLAG_NICK))
 		{
-			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_NICK);
+			int applied = 0;
+			char* enc = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_NICK);
+			char* new_nick = enc ? adc_msg_unescape(enc) : NULL;
+			hub_free(enc);
+
+			if (new_nick
+				&& nick_length_ok(new_nick) == nick_ok
+				&& nick_bad_characters(new_nick) == nick_ok
+				&& nick_is_utf8(new_nick) == nick_ok
+				&& plugin_change_nick(hub, user, new_nick) == st_allow
+				&& uman_change_nick(hub->users, user, new_nick) == 0)
+			{
+				applied = 1;
+				on_nick_change(hub, user, new_nick);
+			}
+
+			hub_free(new_nick);
+
+			if (!applied)
+				adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_NICK);
 		}
 
 		ret = check_limits(hub, user, cmd);

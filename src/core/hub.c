@@ -1189,6 +1189,10 @@ int hub_plugins_load(struct hub_info* hub)
 		hub->plugins = 0;
 		return -1;
 	}
+
+	/* Notify plugins that they are all loaded and the hub is up. Also fires on
+	   the !reload path (unload then load), which is the intended semantics. */
+	plugin_hub_started(hub);
 	return 0;
 }
 
@@ -1196,6 +1200,8 @@ void hub_plugins_unload(struct hub_info* hub)
 {
 	if (hub->plugins)
 	{
+		/* Give plugins a chance to flush/persist before they are torn down. */
+		plugin_hub_shutdown(hub);
 		plugin_shutdown(hub->plugins);
 		hub_free(hub->plugins);
 		hub->plugins = 0;
