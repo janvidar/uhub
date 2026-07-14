@@ -1,0 +1,166 @@
+uhub - JavaScript plugins (mod_javascript)
+==========================================
+
+mod_javascript is an optional plugin that embeds the QuickJS engine and lets you
+write uhub plugins in JavaScript instead of C. It is built only when the hub is
+configured with JavaScript support:
+
+    cmake -DJAVASCRIPT_SUPPORT=ON ..        # CMake
+    zig build -Djavascript=true             # zig
+
+The engine (quickjs-ng) is a git submodule at third_party/quickjs, pinned to a
+specific release. Fetch it before building with JavaScript support:
+
+    git submodule update --init third_party/quickjs
+
+(A fresh clone can instead use `git clone --recurse-submodules`.) The build
+compiles only the engine core -- no CLI, no POSIX std/os bindings.
+
+
+Loading scripts
+---------------
+
+mod_javascript is loaded like any other plugin, from the plugin config file
+(see doc/plugins.conf). One or more "script=<file.js>" options name the scripts
+to run; every other key=value option is passed through to the script as
+uhub.config (see below):
+
+    plugin /usr/lib/uhub/mod_javascript.so "script=/etc/uhub/welcome.js motd=Hi %n"
+    plugin /usr/lib/uhub/mod_javascript.so "script=/etc/uhub/flood.js grace=3 script=/etc/uhub/chat_only.js"
+
+Each script runs in its own isolated JavaScript context (its own globals),
+sharing one engine instance. If a script fails to load or throws while being
+evaluated, the hub fails to start and logs the error.
+
+Tunables (options recognised by mod_javascript itself, not passed to the script):
+
+    memory_limit=<bytes>    Engine heap cap                (default 67108864 = 64 MiB)
+    stack_limit=<bytes>     JS stack cap                   (default 1048576 = 1 MiB)
+    time_limit=<ms>         Per-callback wall-clock budget (default 1000)
+
+
+Writing a script
+-----------------
+
+A script registers handlers on the global `uhub` object and, optionally, acts on
+users through the objects it is handed. Nothing runs until an event fires.
+
+    uhub.onUserLogin(function (user) {
+        uhub.log("welcome " + user.nick);
+        user.sendMessage("Welcome to the hub, " + user.nick + "!");
+    });
+
+    uhub.onChatMsg(function (from, message) {
+        if (/badword/i.test(message))
+            return uhub.DENY;        // block this message
+        // returning nothing == uhub.DEFAULT == let the hub decide
+    });
+
+
+Events
+------
+
+Registrars take a single function. Registering again replaces the previous
+handler. "Interceptable" events use the handler's return value (see Verdicts);
+the others ignore it.
+
+    uhub.onUserLogin(fn)        fn(user)                  (notify)
+    uhub.onUserLogout(fn)       fn(user, reason)          (notify)
+    uhub.onChatMsg(fn)          fn(from, message)         -> verdict
+    uhub.onPrivateMsg(fn)       fn(from, to, message)     -> verdict
+    uhub.onSearch(fn)           fn(user, data)            -> verdict
+    uhub.onSearchResult(fn)     fn(user, data)            -> verdict
+    uhub.onP2PConnect(fn)       fn(from)                  -> verdict
+    uhub.onP2PRevConnect(fn)    fn(from)                  -> verdict
+    uhub.onCheckIpLate(fn)      fn(user)                  -> verdict (deny = reject login)
+    uhub.onChangeNick(fn)       fn(user, newNick)         -> verdict (allow = permit rename)
+    uhub.onFloodDetected(fn)    fn(user, type)            -> verdict; type is one of
+                                "chat","connect","search","update","protocol"
+    uhub.onHubStarted(fn)       fn()                      (notify)
+    uhub.onHubShutdown(fn)      fn()                      (notify)
+
+
+Verdicts
+--------
+
+Interceptable handlers return one of:
+
+    uhub.DEFAULT   let the hub apply its normal behaviour   (also: undefined/no return)
+    uhub.ALLOW     force-allow the action
+    uhub.DENY      block the action
+
+A boolean is also accepted: true == ALLOW, false == DENY. When several scripts
+handle the same event, the first one to return a non-DEFAULT verdict wins.
+
+
+Hub services (the `uhub` object)
+--------------------------------
+
+    uhub.broadcast(text)        Send an informational message to every user.
+    uhub.getUserCount()         Number of users currently on the hub.
+    uhub.log(text)              Write a line to the hub log.
+    uhub.config                 Object of the plugin's non-"script" options as
+                                strings, e.g. uhub.config.motd.
+    uhub.DEFAULT / ALLOW / DENY Verdict constants (0 / 1 / -1).
+
+
+The `user` object
+-----------------
+
+Properties (read-only snapshots):
+
+    user.nick           Nick name
+    user.cid            Client ID
+    user.userAgent      Client's user-agent string
+    user.credentials    "guest","user","operator","super","admin", ...
+    user.sid            Session ID (reused as users come and go)
+    user.id             Stable, non-recycled connection id -- safe as a Map key
+
+Methods:
+
+    user.sendMessage(text)        Send an informational message from the hub.
+    user.sendStatus(code, text)   Send a status message.
+    user.disconnect()             Kick the user.
+    user.ban(seconds, reason)     Ban (cid+nick), disconnect, persist and
+                                  propagate cluster-wide. seconds<=0 = permanent;
+                                  reason may be omitted.
+
+Lifetime -- IMPORTANT: a `user` handed to a handler is only valid for the
+duration of that call. If you stash it and use it from a later callback, the
+access throws. To carry per-user state across events, key a Map by user.id and
+clear it in onUserLogout:
+
+    var strikes = new Map();
+    uhub.onFloodDetected(function (user, type) {
+        var n = (strikes.get(user.id) || 0) + 1;
+        strikes.set(user.id, n);
+        if (n >= 3) { user.disconnect(); return uhub.DENY; }
+    });
+    uhub.onUserLogout(function (user) { strikes.delete(user.id); });
+
+Note that onUserLogout only fires for users that completed login. Do not rely on
+it to free state for connections that were rejected before login.
+
+
+Safety model
+------------
+
+  - Scripts get ONLY the `uhub` API. QuickJS's std/os modules are not exposed, so
+    a script has no filesystem, network or process access.
+  - Each callback runs under a wall-clock watchdog (time_limit). A script stuck
+    in a loop is interrupted rather than wedging the single-threaded hub.
+  - The engine has memory and stack caps (memory_limit, stack_limit).
+  - Script files are subject to the same integrity check as .so plugins: the hub
+    refuses to load one that is group- or world-writable, or not a regular file.
+  - Handlers run inline on the reactor thread and must return promptly; there is
+    no async/await on the hot path.
+
+
+Examples
+--------
+
+Ready-to-use ports of the built-in C plugins live in doc/js/:
+
+    welcome.js     - message of the day on login          (cf. mod_welcome)
+    chat_only.js   - deny search / transfers              (cf. mod_chat_only)
+    flood.js       - strike-based flood action            (cf. mod_flood)
