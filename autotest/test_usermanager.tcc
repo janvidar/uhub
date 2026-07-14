@@ -196,3 +196,49 @@ EXO_TEST(um_dynamic_lease, {
 	uman_shutdown(p);
 	return ok;
 });
+
+/* uman_change_nick: re-indexes a user in the nick map (used by the on_change_nick
+   plugin hook). Self-contained: its own manager and users. */
+static struct hub_user_manager* cn_uman = 0;
+static struct hub_user cn_a;
+static struct hub_user cn_b;
+
+EXO_TEST(um_change_nick_setup, {
+	cn_uman = uman_init(0, 1);
+	if (!cn_uman) return 0;
+	memset(&cn_a, 0, sizeof(cn_a));
+	memset(&cn_b, 0, sizeof(cn_b));
+	cn_a.id.sid = 1; snprintf(cn_a.id.nick, sizeof(cn_a.id.nick), "Alice"); snprintf(cn_a.id.cid, sizeof(cn_a.id.cid), "CIDA");
+	cn_b.id.sid = 2; snprintf(cn_b.id.nick, sizeof(cn_b.id.nick), "Bob");   snprintf(cn_b.id.cid, sizeof(cn_b.id.cid), "CIDB");
+	return uman_add(cn_uman, &cn_a) == 0 && uman_add(cn_uman, &cn_b) == 0;
+});
+
+EXO_TEST(um_change_nick_rename, {
+	if (uman_change_nick(cn_uman, &cn_a, "Alice2") != 0)
+		return 0;
+	/* Findable by the new nick, not the old; the buffer was updated. */
+	return uman_get_user_by_nick(cn_uman, "Alice2") == &cn_a
+	    && uman_get_user_by_nick(cn_uman, "Alice") == 0
+	    && strcmp(cn_a.id.nick, "Alice2") == 0;
+});
+
+EXO_TEST(um_change_nick_noop, {
+	/* Setting the same nick is a no-op success. */
+	return uman_change_nick(cn_uman, &cn_a, "Alice2") == 0
+	    && uman_get_user_by_nick(cn_uman, "Alice2") == &cn_a;
+});
+
+EXO_TEST(um_change_nick_collision, {
+	/* Renaming Bob onto Alice2's nick must be rejected and leave both intact. */
+	if (uman_change_nick(cn_uman, &cn_b, "Alice2") != -1)
+		return 0;
+	return uman_get_user_by_nick(cn_uman, "Alice2") == &cn_a
+	    && uman_get_user_by_nick(cn_uman, "Bob") == &cn_b
+	    && strcmp(cn_b.id.nick, "Bob") == 0;
+});
+
+EXO_TEST(um_change_nick_teardown, {
+	uman_remove(cn_uman, &cn_a);
+	uman_remove(cn_uman, &cn_b);
+	return uman_shutdown(cn_uman) == 0;
+});

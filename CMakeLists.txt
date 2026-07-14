@@ -316,6 +316,14 @@ if(JAVASCRIPT_SUPPORT)
 		endif()
 		target_link_libraries(mod_javascript ${CMAKE_DL_LIBS} pthread)
 	endif()
+
+	# Host test: dlopen's mod_javascript.so and drives the example scripts.
+	# Run with `test_mod_javascript ./mod_javascript.so <srcdir>/doc/js`.
+	if(UNIX)
+		add_executable(test_mod_javascript ${CMAKE_SOURCE_DIR}/test/js/test_mod_javascript.c)
+		target_link_libraries(test_mod_javascript ${CMAKE_DL_LIBS})
+		add_dependencies(test_mod_javascript mod_javascript)
+	endif()
 endif()
 
 set_target_properties(
