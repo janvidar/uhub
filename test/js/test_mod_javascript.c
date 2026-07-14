@@ -241,6 +241,48 @@ static void test_lifetime(const char* dir)
 	free(script);
 }
 
+/* dir=<dir> loads every *.js in the directory; the three example scripts must
+   coexist (welcome's login message AND chat_only's search deny both fire). */
+static void test_dir_load(const char* dir)
+{
+	struct plugin_handle h;
+	struct plugin_user user = make_user("Erin", 7, auth_cred_user);
+	char cfg[512];
+	printf("dir= load:\n");
+	wire_hub_funcs(&h);
+	snprintf(cfg, sizeof(cfg), "dir=%s motd=Hi_%%n", dir);
+	if (p_register(&h, cfg) != 0) { CHECK(0, "register dir="); return; }
+	reset_recorders();
+	h.funcs.on_user_login(&h, &user);
+	CHECK(strcmp(g_last_message, "Hi_Erin") == 0, "welcome.js loaded from dir= (login message)");
+	CHECK(h.funcs.on_search(&h, &user, "TOx") == st_deny, "chat_only.js loaded from dir= (search denied)");
+	p_unregister(&h);
+}
+
+/* config=<file> lists scripts with per-script options that override globals. */
+static void test_config_list(const char* dir)
+{
+	struct plugin_handle h;
+	struct plugin_user user = make_user("Frank", 8, auth_cred_user);
+	char* listfile;
+	char listbody[600];
+	char cfg[512];
+	printf("config= list:\n");
+	snprintf(listbody, sizeof(listbody),
+		"# scripts\n%s/welcome.js motd=FromList_%%n\n", dir);
+	listfile = write_temp_script(listbody);
+	if (!listfile) { CHECK(0, "write list file"); return; }
+	wire_hub_funcs(&h);
+	snprintf(cfg, sizeof(cfg), "config=%s motd=Global_%%n", listfile);
+	if (p_register(&h, cfg) != 0) { CHECK(0, "register config="); remove(listfile); free(listfile); return; }
+	reset_recorders();
+	h.funcs.on_user_login(&h, &user);
+	CHECK(strcmp(g_last_message, "FromList_Frank") == 0, "per-script config overrides global (config= list)");
+	p_unregister(&h);
+	remove(listfile);
+	free(listfile);
+}
+
 int main(int argc, char** argv)
 {
 	void* lib;
@@ -254,6 +296,8 @@ int main(int argc, char** argv)
 	test_welcome(argv[2]);
 	test_chat_only(argv[2]);
 	test_flood(argv[2]);
+	test_dir_load(argv[2]);
+	test_config_list(argv[2]);
 	test_watchdog(argv[2]);
 	test_lifetime(argv[2]);
 

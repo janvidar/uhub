@@ -20,17 +20,37 @@ compiles only the engine core -- no CLI, no POSIX std/os bindings.
 Loading scripts
 ---------------
 
-mod_javascript is loaded like any other plugin, from the plugin config file
-(see doc/plugins.conf). One or more "script=<file.js>" options name the scripts
-to run; every other key=value option is passed through to the script as
-uhub.config (see below):
+mod_javascript is loaded once, like any other plugin, from the plugin config
+file (see doc/plugins.conf). Rather than listing every script on that line, you
+point it at a directory or a secondary list file:
 
+    # Load every *.js in a directory (sorted, each validated):
+    plugin /usr/lib/uhub/mod_javascript.so "dir=/etc/uhub/js.d"
+
+    # Or list scripts (with per-script options) in a secondary config file:
+    plugin /usr/lib/uhub/mod_javascript.so "config=/etc/uhub/javascript.conf"
+
+    # A single script is also fine (convenience):
     plugin /usr/lib/uhub/mod_javascript.so "script=/etc/uhub/welcome.js motd=Hi %n"
-    plugin /usr/lib/uhub/mod_javascript.so "script=/etc/uhub/flood.js grace=3 script=/etc/uhub/chat_only.js"
+
+dir=, config= and script= may be combined and repeated. Every OTHER key=value on
+the plugin line is passed to all scripts as uhub.config (see below).
+
+The secondary config file (config=) has one script per line:
+
+    # /etc/uhub/javascript.conf -- '#' starts a comment, blank lines ignored.
+    welcome.js     motd=Welcome %n!      # per-script options follow the path
+    chat_only.js
+    flood.js       grace=5
+
+Relative script paths in that file resolve against the file's own directory. The
+per-script key=value options become that script's uhub.config, overriding any
+set on the plugin line.
 
 Each script runs in its own isolated JavaScript context (its own globals),
 sharing one engine instance. If a script fails to load or throws while being
-evaluated, the hub fails to start and logs the error.
+evaluated, the hub fails to start and logs the error. (dir= is POSIX-only;
+on Windows use config= or script=.)
 
 Tunables (options recognised by mod_javascript itself, not passed to the script):
 
@@ -161,6 +181,7 @@ Examples
 
 Ready-to-use ports of the built-in C plugins live in doc/js/:
 
-    welcome.js     - message of the day on login          (cf. mod_welcome)
-    chat_only.js   - deny search / transfers              (cf. mod_chat_only)
-    flood.js       - strike-based flood action            (cf. mod_flood)
+    welcome.js       - message of the day on login        (cf. mod_welcome)
+    chat_only.js     - deny search / transfers            (cf. mod_chat_only)
+    flood.js         - strike-based flood action          (cf. mod_flood)
+    javascript.conf  - example config= script list
