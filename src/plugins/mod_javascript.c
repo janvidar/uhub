@@ -45,6 +45,9 @@
 
 #include <time.h>
 #include <sys/stat.h>
+#ifndef WIN32
+#include <dirent.h>
+#endif
 
 #include "quickjs.h"
 
@@ -719,8 +722,23 @@ static void script_free_handlers(struct js_script* s)
 		JS_FreeValue(s->ctx, all[i]);
 }
 
-/* Build the per-context `uhub` global and the User prototype. */
-static int script_setup_globals(struct js_script* s, struct linked_list* config_kv)
+static void apply_config_kv(JSContext* ctx, JSValue config, struct linked_list* kv)
+{
+	struct cfg_settings* s;
+	struct node* cur;
+	if (!kv)
+		return;
+	LIST_FOREACH_SAFE(struct cfg_settings*, s, kv, cur,
+	{
+		JS_SetPropertyStr(ctx, config, cfg_settings_get_key(s),
+			JS_NewString(ctx, cfg_settings_get_value(s)));
+	});
+}
+
+/* Build the per-context `uhub` global and the User prototype. uhub.config is the
+   plugin-line options shared by all scripts (global_kv), overlaid with this
+   script's own options (extra_kv, from a config-file line) which take priority. */
+static int script_setup_globals(struct js_script* s, struct linked_list* global_kv, struct linked_list* extra_kv)
 {
 	JSContext* ctx = s->ctx;
 	JSValue global, uhub, proto, config;
@@ -737,18 +755,9 @@ static int script_setup_globals(struct js_script* s, struct linked_list* config_
 	JS_SetPropertyFunctionList(ctx, uhub, js_uhub_funcs,
 		(int) (sizeof(js_uhub_funcs) / sizeof(js_uhub_funcs[0])));
 
-	/* uhub.config: the plugin's non-"script" key=value options as strings. */
 	config = JS_NewObject(ctx);
-	if (config_kv)
-	{
-		struct cfg_settings* kv;
-		struct node* cur;
-		LIST_FOREACH_SAFE(struct cfg_settings*, kv, config_kv, cur,
-		{
-			JS_SetPropertyStr(ctx, config, cfg_settings_get_key(kv),
-				JS_NewString(ctx, cfg_settings_get_value(kv)));
-		});
-	}
+	apply_config_kv(ctx, config, global_kv);
+	apply_config_kv(ctx, config, extra_kv);
 	JS_SetPropertyStr(ctx, uhub, "config", config);
 
 	JS_SetPropertyStr(ctx, global, "uhub", uhub);
@@ -774,7 +783,8 @@ static void free_script_handle(void* ptr)
 	script_destroy((struct js_script*) ptr);
 }
 
-static struct js_script* script_load(struct js_plugin* jp, const char* path, struct linked_list* config_kv)
+static struct js_script* script_load(struct js_plugin* jp, const char* path,
+	struct linked_list* global_kv, struct linked_list* extra_kv)
 {
 	struct js_script* s;
 	char* source;
@@ -810,7 +820,7 @@ static struct js_script* script_load(struct js_plugin* jp, const char* path, str
 		return NULL;
 	}
 	JS_SetContextOpaque(s->ctx, s);
-	script_setup_globals(s, config_kv);
+	script_setup_globals(s, global_kv, extra_kv);
 
 	js_arm_watchdog(jp);
 	result = JS_Eval(s->ctx, source, len, path, JS_EVAL_TYPE_GLOBAL);
@@ -836,23 +846,230 @@ static void free_cfg_setting(void* ptr)
 	cfg_settings_free((struct cfg_settings*) ptr);
 }
 
+static int path_is_absolute(const char* p)
+{
+#ifdef WIN32
+	if (p[0] == '\\' || p[0] == '/')
+		return 1;
+	return (p[0] && p[1] == ':');
+#else
+	return p[0] == '/';
+#endif
+}
+
+/* Join dir and name with a separator (unless dir already ends in one). */
+static char* join_path(const char* dir, const char* name)
+{
+	size_t dl = strlen(dir);
+	int sep = (dl > 0 && dir[dl - 1] != '/' && dir[dl - 1] != '\\');
+	size_t len = dl + (sep ? 1 : 0) + strlen(name) + 1;
+	char* out = (char*) hub_malloc(len);
+	if (!out)
+		return NULL;
+	snprintf(out, len, sep ? "%s/%s" : "%s%s", dir, name);
+	return out;
+}
+
+/* Directory portion of a path (own copy); "." when there is none. */
+static char* dir_of(const char* path)
+{
+	const char* slash = strrchr(path, '/');
+#ifdef WIN32
+	const char* bslash = strrchr(path, '\\');
+	if (bslash > slash)
+		slash = bslash;
+#endif
+	if (!slash)
+		return hub_strdup(".");
+	return hub_strndup(path, (size_t) (slash - path));
+}
+
+/* Resolve a script path from a list file: relative paths are taken against the
+   directory containing that list file. */
+static char* resolve_against(const char* base_dir, const char* path)
+{
+	if (path_is_absolute(path))
+		return hub_strdup(path);
+	return join_path(base_dir, path);
+}
+
+#ifndef WIN32
+static int has_js_ext(const char* name)
+{
+	size_t n = strlen(name);
+	return n > 3 && strcmp(name + n - 3, ".js") == 0;
+}
+
+static int cmp_cstr(const void* a, const void* b)
+{
+	return strcmp(*(const char* const*) a, *(const char* const*) b);
+}
+
+/* Load every *.js in `dir`, in sorted (deterministic) order. Each file is
+   validated (regular, not group/world-writable) by script_load. */
+static int load_from_dir(struct js_plugin* jp, const char* dir, struct linked_list* global_kv)
+{
+	DIR* d = opendir(dir);
+	struct dirent* de;
+	char** names = NULL;
+	size_t count = 0, cap = 0, i;
+	int ok = 1;
+
+	if (!d)
+	{
+		jp->handle->error_msg = "Unable to open script directory (dir=)";
+		return -1;
+	}
+	while ((de = readdir(d)) != NULL)
+	{
+		if (de->d_name[0] == '.' || !has_js_ext(de->d_name))
+			continue;
+		if (count == cap)
+		{
+			char** grown;
+			cap = cap ? cap * 2 : 16;
+			grown = (char**) hub_realloc(names, cap * sizeof(char*));
+			if (!grown) { ok = 0; break; }
+			names = grown;
+		}
+		names[count++] = hub_strdup(de->d_name);
+	}
+	closedir(d);
+
+	if (ok)
+		qsort(names, count, sizeof(char*), cmp_cstr);
+
+	for (i = 0; ok && i < count; i++)
+	{
+		char* full = join_path(dir, names[i]);
+		struct js_script* s = full ? script_load(jp, full, global_kv, NULL) : NULL;
+		hub_free(full);
+		if (!s)
+			ok = 0; /* error_msg already set */
+		else
+			list_append(jp->scripts, s);
+	}
+
+	for (i = 0; i < count; i++)
+		hub_free(names[i]);
+	hub_free(names);
+	return ok ? 0 : -1;
+}
+#else
+static int load_from_dir(struct js_plugin* jp, const char* dir, struct linked_list* global_kv)
+{
+	(void) dir; (void) global_kv;
+	jp->handle->error_msg = "dir= is not supported on this platform; use config=";
+	return -1;
+}
+#endif
+
+/* Load scripts listed in a secondary config file: one script per line,
+   "<path> [key=value ...]"; '#' begins a comment; blank lines are ignored.
+   Relative paths resolve against the config file's own directory. The per-line
+   key=value options are exposed to that script as uhub.config (over the globals). */
+static int load_from_config(struct js_plugin* jp, const char* cfgfile, struct linked_list* global_kv)
+{
+	FILE* f = fopen(cfgfile, "r");
+	char* base;
+	char line[2048];
+	int ok = 1;
+
+	if (!f)
+	{
+		jp->handle->error_msg = "Unable to open config file (config=)";
+		return -1;
+	}
+	base = dir_of(cfgfile);
+
+	while (ok && fgets(line, sizeof(line), f))
+	{
+		struct cfg_tokens* tokens;
+		struct linked_list* extra;
+		char* first;
+		char* tok;
+		char* full;
+		struct js_script* s;
+		char* hash = strchr(line, '#');
+		if (hash)
+			*hash = '\0';
+		line[strcspn(line, "\r\n")] = '\0'; /* fgets keeps the newline; drop it */
+
+		tokens = cfg_tokenize(line);
+		if (!tokens || cfg_token_count(tokens) == 0)
+		{
+			if (tokens) cfg_tokens_free(tokens);
+			continue; /* blank / comment-only */
+		}
+
+		first = cfg_token_get_first(tokens);
+		extra = list_create();
+		for (tok = cfg_token_get_next(tokens); tok; tok = cfg_token_get_next(tokens))
+		{
+			struct cfg_settings* setting = cfg_settings_split(tok);
+			if (setting)
+				list_append(extra, setting);
+		}
+
+		full = resolve_against(base, first);
+		s = full ? script_load(jp, full, global_kv, extra) : NULL;
+		hub_free(full);
+		if (!s)
+			ok = 0; /* error_msg already set */
+		else
+			list_append(jp->scripts, s);
+
+		list_clear(extra, free_cfg_setting);
+		list_destroy(extra);
+		cfg_tokens_free(tokens);
+	}
+
+	hub_free(base);
+	fclose(f);
+	return ok ? 0 : -1;
+}
+
+/* A script source named on the plugin line, processed after the whole line is
+   parsed so a script always sees the complete global config. */
+enum src_kind { SRC_SCRIPT, SRC_CONFIG, SRC_DIR };
+struct src { enum src_kind kind; char* value; };
+
+static void free_src(void* ptr)
+{
+	struct src* s = (struct src*) ptr;
+	hub_free(s->value);
+	hub_free(s);
+}
+
+static void add_src(struct linked_list* srcs, enum src_kind kind, const char* value)
+{
+	struct src* s = (struct src*) hub_malloc_zero(sizeof(struct src));
+	if (!s)
+		return;
+	s->kind = kind;
+	s->value = hub_strdup(value);
+	list_append(srcs, s);
+}
+
 /*
- * Parse the plugin config line. "script=<file>" options (repeatable) name the
- * scripts to load; every other key=value is exposed to scripts as uhub.config.
- * Recognised tunables: memory_limit (bytes), stack_limit (bytes),
- * time_limit (ms per callback).
+ * Parse the plugin config line. Scripts are named by:
+ *   config=<file>   a secondary list file (one script per line, +options)
+ *   dir=<directory> load every *.js in the directory (sorted, validated)
+ *   script=<file>   a single script (convenience; repeatable)
+ * Every other key=value is exposed to all scripts as uhub.config. Recognised
+ * tunables: memory_limit (bytes), stack_limit (bytes), time_limit (ms).
  */
 static int parse_and_load(struct js_plugin* jp, const char* line)
 {
 	struct cfg_tokens* tokens = cfg_tokenize(line);
-	struct linked_list* script_paths = list_create();
-	struct linked_list* config_kv = list_create();
+	struct linked_list* global_kv = list_create();
+	struct linked_list* srcs = list_create();
 	char* token;
 	size_t mem_limit = DEFAULT_MEMORY_LIMIT;
 	size_t stack_limit = DEFAULT_STACK_LIMIT;
 	int ok = 1;
 
-	if (!tokens || !script_paths || !config_kv)
+	if (!tokens || !global_kv || !srcs)
 	{
 		jp->handle->error_msg = "Out of memory";
 		ok = 0;
@@ -871,7 +1088,11 @@ static int parse_and_load(struct js_plugin* jp, const char* line)
 		}
 		key = cfg_settings_get_key(setting);
 		if (strcmp(key, "script") == 0)
-			list_append(script_paths, hub_strdup(cfg_settings_get_value(setting)));
+			add_src(srcs, SRC_SCRIPT, cfg_settings_get_value(setting));
+		else if (strcmp(key, "config") == 0)
+			add_src(srcs, SRC_CONFIG, cfg_settings_get_value(setting));
+		else if (strcmp(key, "dir") == 0)
+			add_src(srcs, SRC_DIR, cfg_settings_get_value(setting));
 		else if (strcmp(key, "memory_limit") == 0)
 			mem_limit = (size_t) strtoull(cfg_settings_get_value(setting), NULL, 10);
 		else if (strcmp(key, "stack_limit") == 0)
@@ -880,15 +1101,15 @@ static int parse_and_load(struct js_plugin* jp, const char* line)
 			jp->time_limit_ms = atoi(cfg_settings_get_value(setting));
 		else
 		{
-			list_append(config_kv, setting);
+			list_append(global_kv, setting);
 			continue; /* keep it: exposed via uhub.config, freed later */
 		}
 		cfg_settings_free(setting);
 	}
 
-	if (list_size(script_paths) == 0)
+	if (list_size(srcs) == 0)
 	{
-		jp->handle->error_msg = "No script given, use script=<file.js>";
+		jp->handle->error_msg = "No scripts given; use config=<file>, dir=<directory> or script=<file>";
 		ok = 0;
 		goto done;
 	}
@@ -899,30 +1120,38 @@ static int parse_and_load(struct js_plugin* jp, const char* line)
 	JS_SetMaxStackSize(jp->rt, stack_limit);
 
 	{
-		char* path;
+		struct src* src;
 		struct node* cur;
-		LIST_FOREACH_SAFE(char*, path, script_paths, cur,
+		LIST_FOREACH_SAFE(struct src*, src, srcs, cur,
 		{
-			struct js_script* s = script_load(jp, path, config_kv);
-			if (!s)
+			int r;
+			if (src->kind == SRC_SCRIPT)
+			{
+				struct js_script* s = script_load(jp, src->value, global_kv, NULL);
+				r = s ? (list_append(jp->scripts, s), 0) : -1;
+			}
+			else if (src->kind == SRC_CONFIG)
+				r = load_from_config(jp, src->value, global_kv);
+			else
+				r = load_from_dir(jp, src->value, global_kv);
+			if (r != 0)
 			{
 				ok = 0;
 				break; /* error_msg already set */
 			}
-			list_append(jp->scripts, s);
 		});
 	}
 
 done:
-	if (script_paths)
+	if (srcs)
 	{
-		list_clear(script_paths, hub_free);
-		list_destroy(script_paths);
+		list_clear(srcs, free_src);
+		list_destroy(srcs);
 	}
-	if (config_kv)
+	if (global_kv)
 	{
-		list_clear(config_kv, free_cfg_setting);
-		list_destroy(config_kv);
+		list_clear(global_kv, free_cfg_setting);
+		list_destroy(global_kv);
 	}
 	if (tokens)
 		cfg_tokens_free(tokens);
