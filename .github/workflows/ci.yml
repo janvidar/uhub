@@ -294,7 +294,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y cmake perl libsqlite3-dev libssl-dev clang
+          sudo apt-get install -y cmake perl libsqlite3-dev libssl-dev clang gdb
 
       - name: Configure (ASan/UBSan + stress tools)
         run: |
@@ -306,9 +306,11 @@ jobs:
         run: cmake --build build-stress --target uhub adcrush -j
 
       - name: Run adcrush churn under ASan
+        timeout-minutes: 5
         run: BUILD=build-stress test/e2e/run_adcrush_asan.sh
 
       - name: Run federation (linked-hub) churn under ASan
+        timeout-minutes: 5
         run: BUILD=build-stress test/e2e/run_link_stress_asan.sh
 
   # ---------------------------------------------------------------------------

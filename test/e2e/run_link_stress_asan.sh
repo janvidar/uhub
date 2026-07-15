@@ -72,6 +72,45 @@ wait_for() { # pattern file [tries]
 	return 1
 }
 
+# Best-effort dump of a stuck process: state, an all-thread backtrace (gdb if
+# available) and the tail of its log. Never fails the shell. On CI gdb may need
+# sudo to attach to a sibling (yama ptrace_scope); fall back to plain gdb, then
+# to the kernel task stacks under /proc.
+diag_stuck() { # pid label log
+	local pid=$1 label=$2 log=$3 gdb_cmd="" t
+	echo "===== DIAG $label (pid $pid) ====="
+	ps -o pid,ppid,stat,etime,comm -p "$pid" 2>/dev/null || true
+	if command -v gdb >/dev/null 2>&1; then
+		if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then gdb_cmd="sudo gdb"; else gdb_cmd="gdb"; fi
+		echo "----- $gdb_cmd: thread apply all bt (pid $pid) -----"
+		$gdb_cmd -p "$pid" -batch -nx -ex 'set pagination off' \
+			-ex 'thread apply all bt' -ex detach -ex quit 2>&1 | sed 's/^/  /' || true
+	else
+		echo "(gdb unavailable; kernel task stacks:)"
+		for t in /proc/"$pid"/task/*/stack; do
+			[ -r "$t" ] && { echo "-- $t --"; cat "$t" 2>/dev/null; }
+		done
+	fi
+	echo "----- $label log tail -----"; tail -50 "$log" 2>/dev/null || true
+	echo "===== END DIAG $label ====="
+}
+
+# Wait for a pid up to N seconds. Returns the child's exit status on a clean
+# exit; on timeout, dumps diagnostics, SIGKILLs it, and returns 124. This turns
+# a shutdown deadlock into a fast, self-diagnosing failure instead of a job that
+# hangs until the CI limit.
+wait_timeout() { # pid secs label log
+	local pid=$1 secs=$2 label=$3 log=$4 i
+	for (( i = 0; i < secs * 10; i++ )); do
+		kill -0 "$pid" 2>/dev/null || { wait "$pid"; return $?; }
+		sleep 0.1
+	done
+	echo "FAIL: $label (pid $pid) did not exit within ${secs}s -- likely deadlock"
+	diag_stuck "$pid" "$label" "$log"
+	kill -9 "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+	return 124
+}
+
 start_hub "$DIR/hub_a.conf" "$DIR/hubA.log" "$PA" || exit 1
 HUBA_PID=$HUB_PID
 start_hub "$DIR/hub_b.conf" "$DIR/hubB.log" "$PB" || exit 1
@@ -87,7 +126,9 @@ PIDS+=("$!"); CA=$!
 "$CRUSH" "adc://127.0.0.1:$PB" -n 40 -l 3 -q > "$DIR/crushB.log" 2>&1 &
 PIDS+=("$!"); CB=$!
 sleep 10
-kill "$CA" "$CB" 2>/dev/null; wait "$CA" "$CB" 2>/dev/null
+kill "$CA" "$CB" 2>/dev/null
+wait_timeout "$CA" 15 "adcrush A" "$DIR/crushA.log" || true
+wait_timeout "$CB" 15 "adcrush B" "$DIR/crushB.log" || true
 
 for pair in "A:$HUBA_PID:$DIR/hubA.log" "B:$HUBB_PID:$DIR/hubB.log"; do
 	name=${pair%%:*}; rest=${pair#*:}; pid=${rest%%:*}; log=${rest#*:}
@@ -97,9 +138,11 @@ for pair in "A:$HUBA_PID:$DIR/hubA.log" "B:$HUBB_PID:$DIR/hubB.log"; do
 done
 
 # Shut both down with local + remote users still attached (link teardown).
+# Bounded waits: a shutdown deadlock is reported (with a backtrace) and killed
+# rather than hanging the job. 30s is far beyond a healthy shutdown (sub-second).
 kill -TERM "$HUBA_PID" "$HUBB_PID"
-wait "$HUBA_PID"; rcA=$?
-wait "$HUBB_PID"; rcB=$?
+wait_timeout "$HUBA_PID" 30 "hub A" "$DIR/hubA.log"; rcA=$?
+wait_timeout "$HUBB_PID" 30 "hub B" "$DIR/hubB.log"; rcB=$?
 
 for pair in "A:$rcA:$DIR/hubA.log" "B:$rcB:$DIR/hubB.log"; do
 	name=${pair%%:*}; rest=${pair#*:}; rc=${rest%%:*}; log=${rest#*:}
