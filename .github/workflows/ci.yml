@@ -416,6 +416,7 @@ jobs:
   coverage:
     name: coverage
     runs-on: ubuntu-latest
+    timeout-minutes: 20   # backstop: never let a stuck scenario hang the job before the Codecov upload
     env:
       CC: gcc
     steps:
@@ -480,6 +481,7 @@ jobs:
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}   # repo secret; required for reliable uploads (badge stays "unknown" without it)
           fail_ci_if_error: false   # a Codecov hiccup must not fail the build
 
       - name: Upload HTML coverage report
