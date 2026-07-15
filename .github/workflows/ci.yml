@@ -426,12 +426,17 @@ jobs:
 
       - name: Configure (coverage)
         run: |
-          cmake -S . -B build-cov -DRELEASE=OFF \
+          cmake -S . -B build-cov -DRELEASE=OFF -DADC_STRESS=ON \
             -DCMAKE_C_FLAGS="--coverage -O0 -g" \
             -DCMAKE_EXE_LINKER_FLAGS="--coverage"
 
+      # Also build the real hub, the load/scripted clients and the plugins the
+      # runtime scenarios drive, so their .gcda contributes to the report.
       - name: Build
-        run: cmake --build build-cov --target autotest-bin -j
+        run: |
+          cmake --build build-cov -j --target \
+            autotest-bin uhub uhub-passwd adc_cmd adcrush \
+            mod_auth_sqlite mod_e2e_test
 
       # Two runs so both event backends are covered: the default (epoll) and,
       # forced via EVENT_NOEPOLL, the select fallback. .gcda counters accumulate
@@ -441,6 +446,19 @@ jobs:
           ./build-cov/autotest-bin
           EVENT_NOEPOLL=1 ./build-cov/autotest-bin
 
+      # Drive the instrumented hub through real client / linked-hub scenarios so
+      # the accept, login-pipeline, routing, plugin-dispatch, federation and
+      # clean-shutdown paths -- which the unit suite barely reaches -- are
+      # counted. gcov flushes .gcda when the hub exits on SIGTERM. These are
+      # best-effort for the report; the sanitizer/stress jobs are the crash gate.
+      - name: Run runtime scenarios (real clients + links)
+        run: |
+          for s in run_adcrush_asan run_link_stress_asan \
+                   run_plugin_e2e run_ban_e2e run_link_e2e; do
+            echo "== $s =="
+            BUILD=build-cov bash "test/e2e/$s.sh" || echo "($s did not pass; coverage still counted)"
+          done
+
       - name: Generate coverage report
         run: |
           mkdir -p coverage-html
@@ -448,7 +466,9 @@ jobs:
           # GCC bug 68080); gcovr treats that as a fatal parse error by default.
           # Downgrade it to a per-file warning so a gcov quirk does not fail the
           # (best-effort, informational) coverage job.
-          gcovr --root . --filter 'src/' \
+          # Exclude the test-only tooling (load/scripted clients) so the metric
+          # reflects the hub/library product code, not the harness.
+          gcovr --root . --filter 'src/' --exclude 'src/tools/' \
             --gcov-ignore-parse-errors=negative_hits.warn_once_per_file \
             --print-summary \
             --xml coverage.xml \
