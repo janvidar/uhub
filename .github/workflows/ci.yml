@@ -441,7 +441,12 @@ jobs:
       - name: Generate coverage report
         run: |
           mkdir -p coverage-html
+          # gcov can emit a bogus negative branch count ("branch N taken -3",
+          # GCC bug 68080); gcovr treats that as a fatal parse error by default.
+          # Downgrade it to a per-file warning so a gcov quirk does not fail the
+          # (best-effort, informational) coverage job.
           gcovr --root . --filter 'src/' \
+            --gcov-ignore-parse-errors=negative_hits.warn_once_per_file \
             --print-summary \
             --xml coverage.xml \
             --html-details coverage-html/index.html
