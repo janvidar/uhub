@@ -120,6 +120,48 @@ EXO_TEST(netbackend_update_disables_write, {
 	return (nb_state.events & NET_EVENT_READ) && !(nb_state.events & NET_EVENT_WRITE);
 });
 
+/*
+ * Exercise the close / backend-deregister path (con_del, and on kqueue the
+ * deferred change_list DEL processed by create_change_list) that the cases
+ * above deliberately avoid. Register a second connection, flush its add, close
+ * it, then pump once more so the backend actually processes the queued
+ * deregistration. nb_con is kept readable so the poll returns promptly instead
+ * of blocking on the idle timeout. This covers the previously-untested del path
+ * that the kqueue create_change_list bounds fix hardens.
+ */
+EXO_TEST(netbackend_close_deregister, {
+	int sv2[2];
+	int i;
+	struct net_connection* c2;
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv2) != 0)
+		return 0;
+	c2 = net_con_create();
+	net_con_initialize(c2, sv2[0], nb_callback, &nb_state, NET_EVENT_READ);
+
+	/* Flush c2's registration; keep nb_con readable so the poll returns. */
+	nb_reset(&nb_state);
+	if (write(nb_sv[1], "a", 1) != 1)
+		return 0;
+	net_backend_process();
+
+	/* Close c2: deregisters the fd now, queues the backend DEL for next poll. */
+	net_con_close(c2);
+	close(sv2[1]);
+
+	/* Pump so create_change_list (kqueue) processes c2's DEL entry; a bad
+	   deregister index would fault here under ASan. The DEL is flushed on the
+	   first poll after close; keep nb_con readable and pump until it delivers,
+	   recovering from the single-cycle kevent perturbation the DEL can cause. */
+	nb_reset(&nb_state);
+	if (write(nb_sv[1], "b", 1) != 1)
+		return 0;
+	for (i = 0; i < 100 && nb_state.reads == 0; i++)
+		net_backend_process();
+
+	/* Backend survived the deregister and still delivers to the live connection. */
+	return nb_state.reads >= 1;
+});
+
 EXO_TEST(netbackend_teardown, {
 	/* net_con_close() synchronously deregisters the fd; the struct free is
 	   deferred and flushed by net_destroy() at shutdown. No poll here: with
