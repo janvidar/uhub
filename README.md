@@ -11,19 +11,23 @@ ADC clients (DC++, AirDC++, and others) meet in a shared space to chat and to
 search each other's shared files; the actual file transfers happen directly
 between clients, peer to peer.
 
-It is written in C as a single-threaded, event-driven server, so it stays
-lightweight even with thousands of connected users. TLS is mandatory, and the
-feature set can be extended at runtime through loadable plugins.
+It is written in C as a mostly single-threaded, event-driven server with a small
+memory footprint, and scales from a Raspberry Pi or OpenWrt router up to
+multi-core machines and linked clusters that present a single logical hub. It
+supports TLS (OpenSSL or LibreSSL), and its feature set can be extended at
+runtime with plugins written in C or JavaScript.
 
 ## Features
 
 - **Efficient** — one thread, a hand-rolled event loop (epoll / kqueue / select),
   and coalesced broadcast writes keep CPU and memory low under load.
-- **Secure by default** — TLS is required (OpenSSL or LibreSSL), passwords are
-  compared in constant time, privileges are dropped and verified, and the wire
-  parser is fuzzed and hardened against untrusted input.
-- **Extensible** — loadable `mod_*.so` plugins for authentication, logging, chat
-  history, topic control, flood handling, welcome messages, and more.
+- **Secure by default** — TLS is available (OpenSSL or LibreSSL) and can be
+  required per hub, passwords are compared in constant time, privileges are
+  dropped and verified, and the wire parser is fuzzed and hardened against
+  untrusted input.
+- **Extensible** — loadable plugins for authentication, logging, chat history,
+  topic control, flood handling, welcome messages, and more, written in C
+  (`mod_*.so`) or in JavaScript via an embedded QuickJS engine.
 - **Federated** — multiple hubs can be linked into a single logical hub with a
   shared user list, cross-hub routing, and cluster-wide bans (see
   [`doc/linking.txt`](doc/linking.txt)).
