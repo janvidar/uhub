@@ -269,6 +269,14 @@ static size_t create_change_list(struct net_backend_kqueue* backend)
 	for (; n < backend->change_list_len; n++)
 	{
 		sd = backend->change_list[n];
+		/* add_change() queues con->sd unconditionally, including for a del of an
+		   fd that add rejected (>= max) or a connection closed before it was
+		   given a descriptor (sd == -1). Guard the array index here -- the single
+		   point that consumes the queued descriptor -- so such an entry cannot
+		   index conns[] out of bounds (conns[-1] / past the end). Nothing was ever
+		   registered for it, so there is no kqueue filter to remove either. */
+		if (sd < 0 || (size_t) sd >= backend->common->max)
+			continue;
 		con = backend->conns[sd];
 		if (con)
 		{
