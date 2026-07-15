@@ -228,6 +228,69 @@ EXO_TEST(connect_dns_owner_frees_sync, {
 	return dns_owner_fired == 1;
 });
 
+/*
+ * Concurrency stress for the DNS worker pool. The rest of the suite only ever
+ * has one lookup in flight at a time; here many are queued before the loop is
+ * pumped, so up to pool-size worker threads race on the shared queue/results
+ * list, the mutex/condvars, and the notify-pipe handoff back to the event
+ * thread. Numeric-literal hosts resolve offline (getaddrinfo, no DNS traffic),
+ * keeping it fast and deterministic. Run under ASan (and TSan, once wired) this
+ * exercises the threaded paths that a single serial lookup never reaches.
+ */
+static int dns_stress_count = 0;
+static int dns_stress_cb(struct net_dns_job* job, const struct net_dns_result* result)
+{
+	(void) job; (void) result;   /* delivered on the event thread; single-threaded here */
+	dns_stress_count++;
+	return 1;                    /* decline ownership: net_dns_process frees the result */
+}
+
+EXO_TEST(connect_dns_pool_concurrent, {
+	int i;
+	int pumps;
+	const int N = 64;
+	dns_stress_count = 0;
+	/* Queue every lookup first so the workers have a backlog to contend over. */
+	for (i = 0; i < N; i++)
+	{
+		const char* host = (i & 1) ? "127.0.0.1" : "::1";
+		if (!net_dns_gethostbyname(host, AF_UNSPEC, dns_stress_cb, 0))
+			return 0;
+	}
+	for (pumps = 0; pumps < 100000 && dns_stress_count < N; pumps++)
+		net_backend_process();
+	return dns_stress_count == N;
+});
+
+/*
+ * Cancel a job in each pre-delivery state. Cancelling before any pump means the
+ * targets are QUEUED, RUNNING, or DONE-but-undelivered -- every branch of
+ * net_dns_job_cancel -- and a cancelled job must never invoke its callback.
+ */
+EXO_TEST(connect_dns_cancel_races, {
+	int i;
+	int pumps;
+	const int N = 16;
+	struct net_dns_job* jobs[16];
+	dns_stress_count = 0;
+	for (i = 0; i < N; i++)
+	{
+		jobs[i] = net_dns_gethostbyname("127.0.0.1", AF_UNSPEC, dns_stress_cb, 0);
+		if (!jobs[i])
+			return 0;
+	}
+	/* Cancel the even-indexed jobs (no pump yet, so none have delivered). */
+	for (i = 0; i < N; i += 2)
+		net_dns_job_cancel(jobs[i]);
+	/* Only the odd (non-cancelled) half may call back. */
+	for (pumps = 0; pumps < 100000 && dns_stress_count < N / 2; pumps++)
+		net_backend_process();
+	/* A few more pumps: a cancelled job must not sneak in a late callback. */
+	for (pumps = 0; pumps < 50; pumps++)
+		net_backend_process();
+	return dns_stress_count == N / 2;
+});
+
 EXO_TEST(connect_shutdown, {
 	return net_destroy() == 0;
 });
