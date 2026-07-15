@@ -187,3 +187,11 @@ void net_notify_signal(struct uhub_notify_handle* handle, char data)
 	LOG_TRACE("net_notify_signal()");
 	(void) notify_pipe_write(handle->pipe_fd[1], data);
 }
+
+void net_notify_signal_async(struct uhub_notify_handle* handle)
+{
+	/* No logging or other async-signal-unsafe calls here: this runs from a
+	   signal handler. write()/send() of a single byte is async-signal-safe. */
+	if (handle)
+		(void) notify_pipe_write(handle->pipe_fd[1], 1);
+}

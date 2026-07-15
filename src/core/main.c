@@ -22,6 +22,7 @@
 #include "util/log.h"
 #include "util/memory.h"
 #include "network/network.h"
+#include "network/notify.h"
 #include "core/auth.h"
 #include "core/config.h"
 #include "core/hub.h"
@@ -55,6 +56,25 @@ static int arg_log_syslog = 0;
 
 #if !defined(WIN32)
 extern struct hub_info* g_hub;
+
+/* Wakes the reactor from a signal handler. The handlers are installed with
+   SA_RESTART (so ordinary I/O is not disturbed by EINTR), which means merely
+   setting hub->status does not break a blocking poll -- the syscall is
+   restarted and the loop cannot observe the new status until the poll returns
+   on its own (up to TIMEOUT_QUEUE_MAX seconds on an idle hub). Writing a byte
+   to this self-pipe makes the (restarted) poll return at once, so shutdown and
+   reload take effect immediately. */
+static struct uhub_notify_handle* g_signal_wake = 0;
+
+static void signal_wake_callback(struct uhub_notify_handle* handle, void* ptr)
+{
+	/* The wake itself is the point; the event loop re-checks hub->status once
+	   the poll returns. Nothing to do here beyond draining the byte, which the
+	   notify layer already did before invoking this callback. */
+	(void) handle;
+	(void) ptr;
+}
+
 void hub_handle_signal(int sig)
 {
 	struct hub_info* hub = g_hub;
@@ -72,7 +92,7 @@ void hub_handle_signal(int sig)
 			break;
 
 		case SIGPIPE:
-			break;
+			return; /* nothing to react to; do not wake the loop */
 
 		case SIGHUP:
 			hub->status = hub_status_restart;
@@ -83,6 +103,8 @@ void hub_handle_signal(int sig)
 			hub->status = hub_status_shutdown;
 			break;
 	}
+
+	net_notify_signal_async(g_signal_wake);
 }
 
 static int signals[] =
@@ -101,6 +123,13 @@ void setup_signal_handlers(struct hub_info* hub)
 	struct sigaction act;
 	int i;
 
+	/* Self-pipe the handlers use to break the reactor out of a blocking poll.
+	   Created before the handlers are armed so it is always valid when one fires
+	   (net_initialize() has already set up the backend by this point). */
+	g_signal_wake = net_notify_create(signal_wake_callback, 0);
+	if (!g_signal_wake)
+		LOG_ERROR("Unable to create signal wake pipe; shutdown may be delayed.");
+
 	sigemptyset(&sig_set);
 	act.sa_mask = sig_set;
 	act.sa_flags = SA_ONSTACK | SA_RESTART;
@@ -118,6 +147,11 @@ void setup_signal_handlers(struct hub_info* hub)
 void shutdown_signal_handlers(struct hub_info* hub)
 {
 	(void) hub;
+	if (g_signal_wake)
+	{
+		net_notify_destroy(g_signal_wake);
+		g_signal_wake = 0;
+	}
 }
 #endif /* !WIN32 */
 

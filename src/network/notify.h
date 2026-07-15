@@ -52,5 +52,12 @@ void net_notify_destroy(struct uhub_notify_handle*);
  */
 void net_notify_signal(struct uhub_notify_handle*, char data);
 
+/**
+ * Async-signal-safe variant of net_notify_signal(): writes a single wake byte
+ * with no logging or other unsafe calls, so it may be called from a POSIX
+ * signal handler to break the event loop out of a blocking poll.
+ */
+void net_notify_signal_async(struct uhub_notify_handle*);
+
 
 #endif /* HAVE_UHUB_NETWORK_NOTIFY_API_H */
