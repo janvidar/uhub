@@ -404,3 +404,33 @@ struct hub_info* plugin_get_hub(struct plugin_handle* plugin)
 	return data ? data->hub : NULL;
 }
 
+int plugin_is_loaded(struct hub_info* hub, const char* soname)
+{
+	struct plugin_handle* plugin;
+	size_t len = strlen(soname);
+
+	if (!hub->plugins || !hub->plugins->loaded)
+		return 0;
+
+	LIST_FOREACH(struct plugin_handle*, plugin, hub->plugins->loaded,
+	{
+		const char* fn = plugin->handle ? plugin->handle->filename : NULL;
+		const char* base;
+		const char* p;
+
+		if (!fn)
+			continue;
+
+		/* Reduce the stored path to its basename. */
+		base = fn;
+		for (p = fn; *p; p++)
+			if (*p == '/' || *p == '\\')
+				base = p + 1;
+
+		/* Match the soname, ignoring any ".so"/".dll" extension. */
+		if (strncmp(base, soname, len) == 0 && (base[len] == '\0' || base[len] == '.'))
+			return 1;
+	});
+	return 0;
+}
+

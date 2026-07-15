@@ -1356,12 +1356,14 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 		hub_free(tmp);
 	}
 
-	hub->command_support = adc_msg_construct(ADC_CMD_ISUP, 6 + strlen(ADC_PROTO_SUPPORT) + 7);
+	/* Reserve room for the base features plus the two runtime-appended,
+	 * optional ones (" ADHBRI" and " ADUCM0", 7 bytes each). */
+	hub->command_support = adc_msg_construct(ADC_CMD_ISUP, 6 + strlen(ADC_PROTO_SUPPORT) + 14);
 	if (hub->command_support)
 	{
 		adc_msg_add_argument(hub->command_support, ADC_PROTO_SUPPORT);
 		if (hbri_is_enabled(hub))
-			adc_msg_add_argument(hub->command_support, "ADHBRI");
+			adc_msg_add_argument(hub->command_support, ADC_SUP_FLAG_ADD ADC_EXT_HBRI);
 	}
 
 	hub->command_banner = adc_msg_construct(ADC_CMD_ISTA, 100 + (server ? strlen(server) : 0));
@@ -1384,8 +1386,15 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 		hub->status = hub_status_shutdown;
 	}
 	else
+	{
+		hub->status = (hub->config->hub_enabled ? hub_status_running : hub_status_disabled);
 
-	hub->status = (hub->config->hub_enabled ? hub_status_running : hub_status_disabled);
+		/* UCM0 (ADC user commands) is only meaningful when mod_ucmd is loaded to
+		 * publish the ICMD entries; advertise it only then. */
+		if (hub->command_support && plugin_is_loaded(hub, "mod_ucmd"))
+			adc_msg_add_argument(hub->command_support, ADC_SUP_FLAG_ADD ADC_EXT_UCMD);
+	}
+
 	hub_free(server);
 }
 

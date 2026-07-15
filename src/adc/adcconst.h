@@ -32,150 +32,186 @@ typedef uint32_t fourcc_t;
 /* Cast through unsigned char -> uint32_t so high bytes (e.g. UTF-8 lead bytes
  * in adc_msg_parse) are not left-shifted as a negative signed char, which is
  * undefined behaviour. Results for ASCII literal call sites are unchanged. */
-#define FOURCC(a,b,c,d) (fourcc_t) (((uint32_t)(unsigned char)(a) << 24) | ((uint32_t)(unsigned char)(b) << 16) | ((uint32_t)(unsigned char)(c) << 8) | (uint32_t)(unsigned char)(d))
+#define FOURCC(a, b, c, d)                                                     \
+  (fourcc_t)(((uint32_t)(unsigned char)(a) << 24) |                            \
+             ((uint32_t)(unsigned char)(b) << 16) |                            \
+             ((uint32_t)(unsigned char)(c) << 8) |                             \
+             (uint32_t)(unsigned char)(d))
 
-/* default welcome protocol support message, as sent by this server */
-#define ADC_PROTO_SUPPORT "ADBASE ADTIGR ADPING ADNATT UCM0"
+/* default welcome protocol support message, as sent by this server.
+ * Features whose support depends on a loaded plugin (e.g. ADUCM0, provided by
+ * mod_ucmd) are appended at runtime, not listed here. */
+#define ADC_PROTO_SUPPORT "ADBASE ADTIGR ADPING ADNATT"
+
+#define ADC_EXT_BASE "BASE"
+#define ADC_EXT_HBRI "HBRI"
+#define ADC_EXT_PING "PING"
+#define ADC_EXT_NATT "NATT"
+#define ADC_EXT_TIGR "TIGR"
+#define ADC_EXT_UCMD "UCM0"
 
 /* Server sent commands */
-#define ADC_CMD_ISID FOURCC('I','S','I','D')
-#define ADC_CMD_ISUP FOURCC('I','S','U','P')
-#define ADC_CMD_IGPA FOURCC('I','G','P','A')
-#define ADC_CMD_ISTA FOURCC('I','S','T','A')
-#define ADC_CMD_IINF FOURCC('I','I','N','F')
-#define ADC_CMD_IMSG FOURCC('I','M','S','G')
-#define ADC_CMD_IQUI FOURCC('I','Q','U','I')
+#define ADC_CMD_ISID FOURCC('I', 'S', 'I', 'D')
+#define ADC_CMD_ISUP FOURCC('I', 'S', 'U', 'P')
+#define ADC_CMD_IGPA FOURCC('I', 'G', 'P', 'A')
+#define ADC_CMD_ISTA FOURCC('I', 'S', 'T', 'A')
+#define ADC_CMD_IINF FOURCC('I', 'I', 'N', 'F')
+#define ADC_CMD_IMSG FOURCC('I', 'M', 'S', 'G')
+#define ADC_CMD_IQUI FOURCC('I', 'Q', 'U', 'I')
 
 /* Handshake and login/passwordstuff */
-#define ADC_CMD_HSUP FOURCC('H','S','U','P')
-#define ADC_CMD_HPAS FOURCC('H','P','A','S')
-#define ADC_CMD_HINF FOURCC('H','I','N','F')
-#define ADC_CMD_BINF FOURCC('B','I','N','F')
+#define ADC_CMD_HSUP FOURCC('H', 'S', 'U', 'P')
+#define ADC_CMD_HPAS FOURCC('H', 'P', 'A', 'S')
+#define ADC_CMD_HINF FOURCC('H', 'I', 'N', 'F')
+#define ADC_CMD_BINF FOURCC('B', 'I', 'N', 'F')
 
 /* This is a Admin extension */
-#define ADC_CMD_HDSC FOURCC('H','D','S','C')
+#define ADC_CMD_HDSC FOURCC('H', 'D', 'S', 'C')
 
 /* Status/error messages */
-#define ADC_CMD_HSTA FOURCC('H','S','T','A')
-#define ADC_CMD_DSTA FOURCC('D','S','T','A')
+#define ADC_CMD_HSTA FOURCC('H', 'S', 'T', 'A')
+#define ADC_CMD_DSTA FOURCC('D', 'S', 'T', 'A')
 
 /* searches */
-#define ADC_CMD_BSCH FOURCC('B','S','C','H')
-#define ADC_CMD_DSCH FOURCC('D','S','C','H')
-#define ADC_CMD_ESCH FOURCC('E','S','C','H')
-#define ADC_CMD_FSCH FOURCC('F','S','C','H')
-#define ADC_CMD_DRES FOURCC('D','R','E','S')
+#define ADC_CMD_BSCH FOURCC('B', 'S', 'C', 'H')
+#define ADC_CMD_DSCH FOURCC('D', 'S', 'C', 'H')
+#define ADC_CMD_ESCH FOURCC('E', 'S', 'C', 'H')
+#define ADC_CMD_FSCH FOURCC('F', 'S', 'C', 'H')
+#define ADC_CMD_DRES FOURCC('D', 'R', 'E', 'S')
 
 /* invalid search results (spam) */
-#define ADC_CMD_BRES FOURCC('B','R','E','S')
-#define ADC_CMD_ERES FOURCC('E','R','E','S')
-#define ADC_CMD_FRES FOURCC('F','R','E','S')
+#define ADC_CMD_BRES FOURCC('B', 'R', 'E', 'S')
+#define ADC_CMD_ERES FOURCC('E', 'R', 'E', 'S')
+#define ADC_CMD_FRES FOURCC('F', 'R', 'E', 'S')
 
 /* connection setup */
-#define ADC_CMD_DCTM FOURCC('D','C','T','M')
-#define ADC_CMD_DRCM FOURCC('D','R','C','M')
-#define ADC_CMD_ECTM FOURCC('E','C','T','M')
-#define ADC_CMD_ERCM FOURCC('E','R','C','M')
-#define ADC_CMD_DNAT FOURCC('D','N','A','T') /* NATT: NAT traversal request (relayed client->client) */
-#define ADC_CMD_DRNT FOURCC('D','R','N','T') /* NATT: NAT traversal reply (relayed client->client) */
+#define ADC_CMD_DCTM FOURCC('D', 'C', 'T', 'M')
+#define ADC_CMD_DRCM FOURCC('D', 'R', 'C', 'M')
+#define ADC_CMD_ECTM FOURCC('E', 'C', 'T', 'M')
+#define ADC_CMD_ERCM FOURCC('E', 'R', 'C', 'M')
+#define ADC_CMD_DNAT FOURCC('D', 'N', 'A', 'T') /* NATT: NAT Extension */
+#define ADC_CMD_DRNT FOURCC('D', 'R', 'N', 'T') /* NATT: NAT Extension */
 
 /* chat messages */
-#define ADC_CMD_BMSG FOURCC('B','M','S','G')
-#define ADC_CMD_DMSG FOURCC('D','M','S','G')
-#define ADC_CMD_EMSG FOURCC('E','M','S','G')
-#define ADC_CMD_FMSG FOURCC('F','M','S','G')
+#define ADC_CMD_BMSG FOURCC('B', 'M', 'S', 'G')
+#define ADC_CMD_DMSG FOURCC('D', 'M', 'S', 'G')
+#define ADC_CMD_EMSG FOURCC('E', 'M', 'S', 'G')
+#define ADC_CMD_FMSG FOURCC('F', 'M', 'S', 'G')
 
 /* disallowed messages */
-#define ADC_CMD_DINF FOURCC('D','I','N','F')
-#define ADC_CMD_EINF FOURCC('E','I','N','F')
-#define ADC_CMD_FINF FOURCC('F','I','N','F')
-#define ADC_CMD_BQUI FOURCC('B','Q','U','I')
-#define ADC_CMD_DQUI FOURCC('D','Q','U','I')
-#define ADC_CMD_EQUI FOURCC('E','Q','U','I')
-#define ADC_CMD_FQUI FOURCC('F','Q','U','I')
+#define ADC_CMD_DINF FOURCC('D', 'I', 'N', 'F')
+#define ADC_CMD_EINF FOURCC('E', 'I', 'N', 'F')
+#define ADC_CMD_FINF FOURCC('F', 'I', 'N', 'F')
+#define ADC_CMD_BQUI FOURCC('B', 'Q', 'U', 'I')
+#define ADC_CMD_DQUI FOURCC('D', 'Q', 'U', 'I')
+#define ADC_CMD_EQUI FOURCC('E', 'Q', 'U', 'I')
+#define ADC_CMD_FQUI FOURCC('F', 'Q', 'U', 'I')
 
 /* Extension messages */
-#define ADC_CMD_HCHK FOURCC('H','C','H','K')
+#define ADC_CMD_HCHK FOURCC('H', 'C', 'H', 'K')
 
 /* UCMD Extension */
-#define ADC_CMD_BCMD FOURCC('B','C','M','D')
-#define ADC_CMD_DCMD FOURCC('D','C','M','D')
-#define ADC_CMD_ECMD FOURCC('E','C','M','D')
-#define ADC_CMD_FCMD FOURCC('F','C','M','D')
-#define ADC_CMD_HCMD FOURCC('H','C','M','D')
-#define ADC_CMD_ICMD FOURCC('I','C','M','D')
+#define ADC_CMD_BCMD FOURCC('B', 'C', 'M', 'D')
+#define ADC_CMD_DCMD FOURCC('D', 'C', 'M', 'D')
+#define ADC_CMD_ECMD FOURCC('E', 'C', 'M', 'D')
+#define ADC_CMD_FCMD FOURCC('F', 'C', 'M', 'D')
+#define ADC_CMD_HCMD FOURCC('H', 'C', 'M', 'D')
+#define ADC_CMD_ICMD FOURCC('I', 'C', 'M', 'D')
 
 /* HBRI Extension (hybrid IPv4/IPv6 connectivity) */
-#define ADC_CMD_ITCP FOURCC('I','T','C','P') /* hub -> client: secondary-protocol validation request */
-#define ADC_CMD_HTCP FOURCC('H','T','C','P') /* client -> hub: reply over the secondary protocol */
+#define ADC_CMD_ITCP                                                           \
+  FOURCC('I', 'T', 'C', 'P') /* hub -> client: protocol validation request */
+#define ADC_CMD_HTCP                                                           \
+  FOURCC('H', 'T', 'C', 'P') /* client -> hub: reply protocol */
 
-
-#define ADC_INF_FLAG_IPV4_ADDR          "I4" /* ipv4 address */
-#define ADC_INF_FLAG_IPV6_ADDR          "I6" /* ipv6 address */
-#define ADC_INF_FLAG_IPV4_UDP_PORT      "U4" /* port number */
-#define ADC_INF_FLAG_IPV6_UDP_PORT      "U6" /* port number */
-#define ADC_INF_FLAG_IPV4_TCP_PORT      "P4" /* tcp port number (HBRI validation request) */
-#define ADC_INF_FLAG_IPV6_TCP_PORT      "P6" /* tcp port number (HBRI validation request) */
-#define ADC_INF_FLAG_TOKEN              "TO" /* token (HBRI validation request) */
-#define ADC_INF_FLAG_CLIENT_TYPE        "CT" /* client type */
-#define ADC_INF_FLAG_PRIVATE_ID         "PD" /* private id, aka PID */
-#define ADC_INF_FLAG_CLIENT_ID          "ID" /* client id, aka CID */
-#define ADC_INF_FLAG_NICK               "NI" /* nick name */
-#define ADC_INF_FLAG_DESCRIPTION        "DE" /* user description */
+#define ADC_INF_FLAG_IPV4_ADDR "I4"     /* ipv4 address */
+#define ADC_INF_FLAG_IPV6_ADDR "I6"     /* ipv6 address */
+#define ADC_INF_FLAG_IPV4_UDP_PORT "U4" /* port number */
+#define ADC_INF_FLAG_IPV6_UDP_PORT "U6" /* port number */
+#define ADC_INF_FLAG_IPV4_TCP_PORT "P4" /* tcp port number (HBRI) */
+#define ADC_INF_FLAG_IPV6_TCP_PORT "P6" /* tcp port number (HBRI) */
+#define ADC_INF_FLAG_TOKEN "TO"         /* token (HBRI) */
+#define ADC_INF_FLAG_CLIENT_TYPE "CT"   /* client type */
+#define ADC_INF_FLAG_PRIVATE_ID "PD"    /* private id, aka PID */
+#define ADC_INF_FLAG_CLIENT_ID "ID"     /* client id, aka CID */
+#define ADC_INF_FLAG_NICK "NI"          /* nick name */
+#define ADC_INF_FLAG_DESCRIPTION "DE"   /* user description */
 
 #define ADC_INF_FLAG_USER_AGENT_PRODUCT "AP" /* software name */
 #define ADC_INF_FLAG_USER_AGENT_VERSION "VE" /* software version */
 
-#define ADC_INF_FLAG_SUPPORT            "SU" /* support (extensions, feature cast) */
-#define ADC_INF_FLAG_SHARED_SIZE        "SS" /* size of total files shared in bytes */
-#define ADC_INF_FLAG_SHARED_FILES       "SF" /* number of files shared */
-#define ADC_INF_FLAG_UPLOAD_SPEED       "US" /* maximum upload speed achieved in bytes/sec */
-#define ADC_INF_FLAG_DOWNLOAD_SPEED     "DS" /* maximum download speed achieved in bytes/sec */
-#define ADC_INF_FLAG_UPLOAD_SLOTS       "SL" /* maximum upload slots (concurrent uploads) */
-#define ADC_INF_FLAG_AUTO_SLOTS         "AS" /* automatic slot if upload speed is less than this in bytes/sec */
-#define ADC_INF_FLAG_AUTO_SLOTS_MAX     "AM" /* maximum number of automatic slots */
-#define ADC_INF_FLAG_COUNT_HUB_NORMAL   "HN" /* user is logged into this amount of hubs as a normal user (guest) */
-#define ADC_INF_FLAG_COUNT_HUB_REGISTER "HR" /* user is logged into this amount of hubs as a registered user (password) */
-#define ADC_INF_FLAG_COUNT_HUB_OPERATOR "HO" /* user is logged into this amount of hubs as an operator */
-#define ADC_INF_FLAG_AWAY               "AW" /* away flag, 1=away, 2=extended away */
-#define ADC_INF_FLAG_REFERER            "RF" /* URL to referer in case of hub redirect */
-#define ADC_INF_FLAG_EMAIL              "EM" /* E-mail address */
+#define ADC_INF_FLAG_SUPPORT "SU" /* support (extensions, feature cast) */
+#define ADC_INF_FLAG_SHARED_SIZE                                               \
+  "SS"                                 /* size of total files shared in bytes  \
+                                        */
+#define ADC_INF_FLAG_SHARED_FILES "SF" /* number of files shared */
+#define ADC_INF_FLAG_UPLOAD_SPEED                                              \
+  "US" /* maximum upload speed achieved in bytes/sec */
+#define ADC_INF_FLAG_DOWNLOAD_SPEED                                            \
+  "DS" /* maximum download speed achieved in bytes/sec */
+#define ADC_INF_FLAG_UPLOAD_SLOTS                                              \
+  "SL" /* maximum upload slots (concurrent uploads) */
+#define ADC_INF_FLAG_AUTO_SLOTS                                                \
+  "AS" /* automatic slot if upload speed is less than this in bytes/sec */
+#define ADC_INF_FLAG_AUTO_SLOTS_MAX                                            \
+  "AM" /* maximum number of automatic slots                                    \
+        */
+#define ADC_INF_FLAG_COUNT_HUB_NORMAL                                          \
+  "HN" /* user is logged into this amount of hubs as a normal user (guest) */
+#define ADC_INF_FLAG_COUNT_HUB_REGISTER                                        \
+  "HR" /* user is logged into this amount of hubs as a registered user         \
+          (password) */
+#define ADC_INF_FLAG_COUNT_HUB_OPERATOR                                        \
+  "HO" /* user is logged into this amount of hubs as an operator */
+#define ADC_INF_FLAG_AWAY "AW"    /* away flag, 1=away, 2=extended away */
+#define ADC_INF_FLAG_REFERER "RF" /* URL to referer in case of hub redirect */
+#define ADC_INF_FLAG_EMAIL "EM"   /* E-mail address */
 
-#define ADC_MSG_FLAG_ACTION             "ME" /* message is an *action* message */
-#define ADC_MSG_FLAG_PRIVATE            "PM" /* message is a private message */
+#define ADC_MSG_FLAG_ACTION "ME"  /* message is an *action* message */
+#define ADC_MSG_FLAG_PRIVATE "PM" /* message is a private message */
 
-#define ADC_SCH_FLAG_INCLUDE            "AN" /* include given search term */
-#define ADC_SCH_FLAG_EXCLUDE            "NO" /* exclude given search term */
-#define ADC_SCH_FLAG_FILE_EXTENSION     "EX" /* search only for files with the given file extension */
-#define ADC_SCH_FLAG_FILE_TYPE          "TY" /* search only for files with this file type (separate type) */
-#define ADC_SCH_FLAG_LESS_THAN          "LE" /* search for files with this size or less */
-#define ADC_SCH_FLAG_GREATER_THAN       "GE" /* search for files with this size or greater */
-#define ADC_SCH_FLAG_EQUAL              "EQ" /* search only for files with this exact size */
-#define ADC_SCH_FLAG_TOKEN              "TO" /* use this token for search replies */
-#define ADC_SCH_FLAG_TTH                "TR" /* search for a file with this exact TTH root */
+#define ADC_SCH_FLAG_INCLUDE "AN" /* include given search term */
+#define ADC_SCH_FLAG_EXCLUDE "NO" /* exclude given search term */
+#define ADC_SCH_FLAG_FILE_EXTENSION                                            \
+  "EX" /* search only for files with the given file extension */
+#define ADC_SCH_FLAG_FILE_TYPE                                                 \
+  "TY" /* search only for files with this file type (separate type) */
+#define ADC_SCH_FLAG_LESS_THAN                                                 \
+  "LE" /* search for files with this size or less */
+#define ADC_SCH_FLAG_GREATER_THAN                                              \
+  "GE" /* search for files with this size or greater */
+#define ADC_SCH_FLAG_EQUAL                                                     \
+  "EQ"                          /* search only for files with this exact size  \
+                                 */
+#define ADC_SCH_FLAG_TOKEN "TO" /* use this token for search replies */
+#define ADC_SCH_FLAG_TTH "TR"   /* search for a file with this exact TTH root */
 
-#define ADC_RES_FLAG_FILE_NAME          "FN" /* file name */
-#define ADC_RES_FLAG_FILE_SIZE          "SI" /* file size */
-#define ADC_RES_FLAG_UPLOAD_SLOTS       "SL" /* number of upload slots available (if > 0, download is possible) */
-#define ADC_RES_FLAG_TOKEN              "TO" /* token, same as the token in the search request */
+#define ADC_RES_FLAG_FILE_NAME "FN" /* file name */
+#define ADC_RES_FLAG_FILE_SIZE "SI" /* file size */
+#define ADC_RES_FLAG_UPLOAD_SLOTS                                              \
+  "SL" /* number of upload slots available (if > 0, download is possible) */
+#define ADC_RES_FLAG_TOKEN                                                     \
+  "TO" /* token, same as the token in the search request */
 
-#define ADC_QUI_FLAG_TIME_LEFT          "TL" /* time in seconds before reconnect is allowed, or -1 forever */
-#define ADC_QUI_FLAG_MESSAGE            "MS" /* kick/leave message */
-#define ADC_QUI_FLAG_DISCONNECT         "DI" /* all further transfers with this user should be disconnected */
-#define ADC_QUI_FLAG_REDIRECT           "RD" /* redirect to URL */
-#define ADC_QUI_FLAG_KICK_OPERATOR      "ID" /* SID of operator who disconnected the user */
+#define ADC_QUI_FLAG_TIME_LEFT                                                 \
+  "TL" /* time in seconds before reconnect is allowed, or -1 forever */
+#define ADC_QUI_FLAG_MESSAGE "MS" /* kick/leave message */
+#define ADC_QUI_FLAG_DISCONNECT                                                \
+  "DI" /* all further transfers with this user should be disconnected */
+#define ADC_QUI_FLAG_REDIRECT "RD" /* redirect to URL */
+#define ADC_QUI_FLAG_KICK_OPERATOR                                             \
+  "ID" /* SID of operator who disconnected the user */
 
-#define ADC_SUP_FLAG_ADD                "AD"
-#define ADC_SUP_FLAG_REMOVE             "RM"
+#define ADC_SUP_FLAG_ADD "AD"
+#define ADC_SUP_FLAG_REMOVE "RM"
 
-#define ADC_CLIENT_TYPE_BOT              "1"
-#define ADC_CLIENT_TYPE_REGISTERED_USER  "2"
-#define ADC_CLIENT_TYPE_OPERATOR         "4"
-#define ADC_CLIENT_TYPE_HUBBOT           "5"  /* 1 + 4 */
-#define ADC_CLIENT_TYPE_SUPER_USER      "12"  /* 8 + 4 */
-#define ADC_CLIENT_TYPE_ADMIN           "20"  /* 16 + 4 = hub owner */
-#define ADC_CLIENT_TYPE_HUB             "32"  /* the hub itself */
-
+#define ADC_CLIENT_TYPE_BOT "1"
+#define ADC_CLIENT_TYPE_REGISTERED_USER "2"
+#define ADC_CLIENT_TYPE_OPERATOR "4"
+#define ADC_CLIENT_TYPE_HUBBOT "5"      /* 1 + 4 */
+#define ADC_CLIENT_TYPE_SUPER_USER "12" /* 8 + 4 */
+#define ADC_CLIENT_TYPE_ADMIN "20"      /* 16 + 4 = hub owner */
+#define ADC_CLIENT_TYPE_HUB "32"        /* the hub itself */
 
 /* ADC ISTA/IQUI status error codes.
  *
@@ -183,23 +219,25 @@ typedef uint32_t fourcc_t;
  * enum msg_status_level - 0 info, 1 recoverable, 2 fatal) followed by these
  * two-digit error codes. set_status_code() in hub.c combines the two. Values
  * follow the ADC specification's general defined codes. */
-#define ADC_STATUS_GENERIC               0  /* 00: generic / undefined */
-#define ADC_STATUS_HUB_GENERIC          10  /* 10: generic hub error */
-#define ADC_STATUS_HUB_FULL             11  /* 11: hub is full */
-#define ADC_STATUS_HUB_DISABLED         12  /* 12: hub is disabled */
-#define ADC_STATUS_LOGIN_GENERIC        20  /* 20: generic login/access error */
-#define ADC_STATUS_NICK_INVALID         21  /* 21: invalid nick (formatting/length/charset) */
-#define ADC_STATUS_NICK_TAKEN           22  /* 22: nick already taken */
-#define ADC_STATUS_INVALID_PASSWORD     23  /* 23: invalid password */
-#define ADC_STATUS_CID_TAKEN            24  /* 24: CID already taken */
-#define ADC_STATUS_REGISTERED_ONLY      26  /* 26: registered users only */
-#define ADC_STATUS_INVALID_PID          27  /* 27: invalid PID */
-#define ADC_STATUS_DISCONNECT_GENERIC   30  /* 30: generic kick/ban/disconnect */
-#define ADC_STATUS_BANNED_PERMANENTLY   31  /* 31: permanently banned */
-#define ADC_STATUS_BANNED_TEMPORARILY   32  /* 32: temporarily banned (TL seconds) */
-#define ADC_STATUS_PROTOCOL_GENERIC     40  /* 40: generic protocol error */
-#define ADC_STATUS_INF_FIELD_BAD        43  /* 43: required INF field missing or bad (FC field) */
-#define ADC_STATUS_NO_COMMON_HASH       47  /* 47: no common hash algorithm */
-
+#define ADC_STATUS_GENERIC 0        /* 00: generic / undefined */
+#define ADC_STATUS_HUB_GENERIC 10   /* 10: generic hub error */
+#define ADC_STATUS_HUB_FULL 11      /* 11: hub is full */
+#define ADC_STATUS_HUB_DISABLED 12  /* 12: hub is disabled */
+#define ADC_STATUS_LOGIN_GENERIC 20 /* 20: generic login/access error */
+#define ADC_STATUS_NICK_INVALID                                                \
+  21 /* 21: invalid nick (formatting/length/charset) */
+#define ADC_STATUS_NICK_TAKEN 22         /* 22: nick already taken */
+#define ADC_STATUS_INVALID_PASSWORD 23   /* 23: invalid password */
+#define ADC_STATUS_CID_TAKEN 24          /* 24: CID already taken */
+#define ADC_STATUS_REGISTERED_ONLY 26    /* 26: registered users only */
+#define ADC_STATUS_INVALID_PID 27        /* 27: invalid PID */
+#define ADC_STATUS_DISCONNECT_GENERIC 30 /* 30: generic kick/ban/disconnect */
+#define ADC_STATUS_BANNED_PERMANENTLY 31 /* 31: permanently banned */
+#define ADC_STATUS_BANNED_TEMPORARILY                                          \
+  32                                   /* 32: temporarily banned (TL seconds) */
+#define ADC_STATUS_PROTOCOL_GENERIC 40 /* 40: generic protocol error */
+#define ADC_STATUS_INF_FIELD_BAD                                               \
+  43 /* 43: required INF field missing or bad (FC field) */
+#define ADC_STATUS_NO_COMMON_HASH 47 /* 47: no common hash algorithm */
 
 #endif /* HAVE_UHUB_ADC_CONSTANTS_H */

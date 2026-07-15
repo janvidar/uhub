@@ -65,4 +65,8 @@ struct plugin_hub_internals
 extern struct plugin_hub_internals* get_internals(struct plugin_handle*);
 extern struct hub_info* plugin_get_hub(struct plugin_handle*);
 
+/* Return non-zero if a plugin whose shared-object basename matches `soname`
+ * (extension-insensitive, e.g. "mod_ucmd") is currently loaded. */
+extern int plugin_is_loaded(struct hub_info* hub, const char* soname);
+
 #endif /* HAVE_UHUB_PLUGIN_LOADER_H */
