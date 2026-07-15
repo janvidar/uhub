@@ -308,6 +308,9 @@ jobs:
       - name: Run adcrush churn under ASan
         run: BUILD=build-stress test/e2e/run_adcrush_asan.sh
 
+      - name: Run federation (linked-hub) churn under ASan
+        run: BUILD=build-stress test/e2e/run_link_stress_asan.sh
+
   # ---------------------------------------------------------------------------
   # Time-boxed regression fuzzing of the pre-auth ADC parser. Seeded from the
   # checked-in corpus + dictionary. A crash fails the job and uploads the
