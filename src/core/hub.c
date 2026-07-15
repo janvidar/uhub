@@ -1771,6 +1771,7 @@ void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason
 {
 	struct event_data post;
 	int need_notify = 0;
+	int was_logged_in;
 
 	/* is user already being disconnected ? */
 	if (user_is_disconnecting(user))
@@ -1796,7 +1797,10 @@ void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason
 
 	LOG_TRACE("hub_disconnect_user(), user=%p, reason=%d, state=%d", user, reason, user->state);
 
-	need_notify = user_is_logged_in(user) && hub->status == hub_status_running;
+	/* Capture "logged in" (i.e. present in the user manager) before the cleanup
+	   state transition below flips it. */
+	was_logged_in = user_is_logged_in(user);
+	need_notify = was_logged_in && hub->status == hub_status_running;
 	user->quit_reason = reason;
 	user_set_state(user, state_cleanup);
 
@@ -1809,6 +1813,15 @@ void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason
 	}
 	else
 	{
+		/* This path does not go through UHUB_EVENT_USER_QUIT, which is what
+		   unlinks a user from the user manager. A logged-in user reaches here
+		   only when the hub is not running (e.g. shutting down); if left linked
+		   it would be freed by UHUB_EVENT_USER_DESTROY yet still sit in the user
+		   list, and the UHUB_EVENT_HUB_SHUTDOWN sweep -- which calls uman_remove
+		   on every listed user -- would then touch freed memory. Unlink it here
+		   so destroy operates on an already-removed user. */
+		if (was_logged_in)
+			uman_remove(hub->users, user);
 		hub_schedule_destroy_user(hub, user);
 	}
 }
