@@ -467,11 +467,10 @@ pub fn build(b: *std.Build) void {
     // third_party/quickjs git submodule (quickjs-ng). Mirrors the
     // JAVASCRIPT_SUPPORT block in CMakeLists.txt. QuickJS is built as its own
     // module with warnings off (-w): it is third-party and does not pass the
-    // project's strict flags.
+    // project's strict flags. If the submodule is not checked out, the build
+    // fails on the missing source below -- run:
+    //   git submodule update --init third_party/quickjs
     if (javascript) {
-        std.fs.cwd().access("third_party/quickjs/quickjs.c", .{}) catch @panic(
-            "-Djavascript is set but the QuickJS submodule is missing; run: " ++
-                "git submodule update --init third_party/quickjs");
         const qjs_mod = b.createModule(.{
             .target = target,
             .optimize = .ReleaseFast,
