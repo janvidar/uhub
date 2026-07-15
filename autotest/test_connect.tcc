@@ -269,7 +269,6 @@ EXO_TEST(connect_dns_pool_concurrent, {
  */
 EXO_TEST(connect_dns_cancel_races, {
 	int i;
-	int pumps;
 	const int N = 16;
 	struct net_dns_job* jobs[16];
 	dns_stress_count = 0;
@@ -282,12 +281,19 @@ EXO_TEST(connect_dns_cancel_races, {
 	/* Cancel the even-indexed jobs (no pump yet, so none have delivered). */
 	for (i = 0; i < N; i += 2)
 		net_dns_job_cancel(jobs[i]);
-	/* Only the odd (non-cancelled) half may call back. */
-	for (pumps = 0; pumps < 100000 && dns_stress_count < N / 2; pumps++)
-		net_backend_process();
-	/* A few more pumps: a cancelled job must not sneak in a late callback. */
-	for (pumps = 0; pumps < 50; pumps++)
-		net_backend_process();
+
+	/* Let the races settle deterministically: on return every job is terminal
+	   -- the odd half has parked results awaiting delivery, the cancelled even
+	   half has been discarded. Waiting on the pool (rather than pumping the
+	   reactor a fixed number of times) avoids blocking on the idle poll, which
+	   waits up to TIMEOUT_QUEUE_MAX seconds when there is nothing to deliver. */
+	net_dns_wait_idle();
+
+	/* Deliver the parked results directly, bypassing the event loop. A
+	   cancelled job that wrongly delivered would have parked a result too and
+	   would surface here, pushing the tally past N/2. */
+	net_dns_process();
+
 	return dns_stress_count == N / 2;
 });
 

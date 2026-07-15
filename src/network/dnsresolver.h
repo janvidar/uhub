@@ -105,6 +105,14 @@ extern int net_dns_job_cancel(struct net_dns_job* job);
 extern struct net_dns_result* net_dns_job_sync_wait(struct net_dns_job* job);
 
 /**
+ * Block until the DNS worker pool is idle: nothing queued and no lookup still
+ * held by a worker. On return every job started so far has reached a terminal
+ * state (delivered result parked, or discarded if cancelled). Intended for
+ * tests that need to quiesce the pool deterministically before asserting.
+ */
+extern void net_dns_wait_idle(void);
+
+/**
  * Returns the user specified pointer assigned to the resolving job
 */
 extern void* net_dns_job_get_ptr(const struct net_dns_job* job);

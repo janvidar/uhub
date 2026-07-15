@@ -124,6 +124,7 @@ struct net_dns_subsystem
 	uhub_mutex_t mutex;
 	uhub_cond_t work_cond;
 	uhub_cond_t done_cond;
+	int running;                 // jobs a worker currently holds (picked up, not yet finished)
 	int shutdown;
 
 	uhub_thread_t* workers[DNS_MAX_WORKERS];
@@ -358,11 +359,13 @@ static void* dns_worker_thread(void* ptr)
 		job = (struct net_dns_job*) list_get_first(dns->queue);
 		list_remove(dns->queue, job);
 		job->state = JOB_RUNNING;
+		dns->running++;
 		uhub_mutex_unlock(&dns->mutex);
 
 		res = do_resolve(job);
 
 		uhub_mutex_lock(&dns->mutex);
+		dns->running--;
 		if (job->cancelled)
 		{
 			// The caller abandoned this job via net_dns_job_cancel() while we
@@ -373,9 +376,11 @@ static void* dns_worker_thread(void* ptr)
 		{
 			job->state = JOB_DONE;
 			list_append(dns->results, res);
-			uhub_cond_broadcast(&dns->done_cond);
 			net_notify_signal(dns->notify_handle, 1);
 		}
+		// Broadcast for both outcomes so net_dns_job_sync_wait() and
+		// net_dns_wait_idle() observe every completion, cancelled or not.
+		uhub_cond_broadcast(&dns->done_cond);
 		uhub_mutex_unlock(&dns->mutex);
 	}
 
@@ -485,6 +490,22 @@ extern struct net_dns_result* net_dns_job_sync_wait(struct net_dns_job* job)
 	free_job(job);
 	uhub_mutex_unlock(&g_dns->mutex);
 	return res;
+}
+
+extern void net_dns_wait_idle(void)
+{
+	// Block until the worker pool has drained: nothing queued and no job still
+	// held by a worker. On return every lookup has reached a terminal state --
+	// delivered result parked in the results list, or discarded (cancelled) --
+	// so a caller can then flush deliveries and assert on the final tally
+	// without racing an in-flight worker.
+	if (!g_dns)
+		return;
+
+	uhub_mutex_lock(&g_dns->mutex);
+	while (list_size(g_dns->queue) > 0 || g_dns->running > 0)
+		uhub_cond_wait(&g_dns->done_cond, &g_dns->mutex);
+	uhub_mutex_unlock(&g_dns->mutex);
 }
 
 void* net_dns_job_get_ptr(const struct net_dns_job* job)
