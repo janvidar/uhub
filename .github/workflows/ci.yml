@@ -278,6 +278,37 @@ jobs:
         run: EVENT_NOKQUEUE=1 ./build-asan/autotest-bin
 
   # ---------------------------------------------------------------------------
+  # Connection-churn stress under ASan/UBSan: run the adcrush load generator
+  # against a live hub, then shut the hub down with clients still attached. This
+  # drives the accept/login/route/teardown lifecycle under load -- churn the unit
+  # suite never produces -- and guards the shutdown-time user-manager UAF.
+  # ---------------------------------------------------------------------------
+  stress:
+    name: adcrush churn (asan)
+    runs-on: ubuntu-latest
+    env:
+      CC: clang
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake perl libsqlite3-dev libssl-dev clang
+
+      - name: Configure (ASan/UBSan + stress tools)
+        run: |
+          cmake -S . -B build-stress -DRELEASE=OFF -DADC_STRESS=ON \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+
+      - name: Build hub + adcrush
+        run: cmake --build build-stress --target uhub adcrush -j
+
+      - name: Run adcrush churn under ASan
+        run: BUILD=build-stress test/e2e/run_adcrush_asan.sh
+
+  # ---------------------------------------------------------------------------
   # Time-boxed regression fuzzing of the pre-auth ADC parser. Seeded from the
   # checked-in corpus + dictionary. A crash fails the job and uploads the
   # reproducer as an artifact.
