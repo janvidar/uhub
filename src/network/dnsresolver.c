@@ -253,17 +253,16 @@ void net_dns_process()
 		DNS_LOG_LOOKUP_TIME(job);
 		if (job->callback(job, delivered))
 		{
+			/* Callback declined ownership: we release the result (and, via
+			 * net_dns_result_free, the job it carries). */
 			net_dns_result_free(result);
 		}
-		else
-		{
-			/* Caller wants to keep the result data, and
-			 * thus needs to call net_dns_result_free() to release it later.
-			 * We only clean up the job data here and keep the results intact.
-			 */
-			result->job = NULL;
-			free_job(job);
-		}
+		/* else: the callback took ownership of the result -- and the job it
+		 * carries -- and will release both with net_dns_result_free() later.
+		 * We must NOT touch result or job here: a callback is allowed to free
+		 * the result synchronously (e.g. net_con_connect_dns_callback frees it
+		 * via net_connect_destroy when a connect completes/fails synchronously),
+		 * so any access after the call would be a use-after-free / double-free. */
 	});
 
 	list_clear(ready, NULL); // free the nodes only; results were freed above

@@ -1,6 +1,7 @@
 #include "network/network.h"
 #include "network/connection.h"
 #include "network/backend.h"
+#include "network/dnsresolver.h"
 
 /*
  * Tests for the outbound-connect / happy-eyeballs failover path in
@@ -189,6 +190,42 @@ EXO_TEST(connect_failover_localhost, {
 	return ct_state.calls == 1
 		&& ct_state.status != net_connect_status_ok
 		&& ct_state.con == 0;
+});
+
+/*
+ * Regression: a DNS callback that takes ownership of the result (returns 0)
+ * and frees it synchronously must not lead net_dns_process to touch the freed
+ * result/job afterwards. This mirrors net_con_connect_dns_callback, which frees
+ * handle->result (via net_connect_destroy) on its synchronous-completion paths
+ * -- "no usable addresses" and "every connect failed synchronously" -- and then
+ * returns 0. Previously net_dns_process would still run
+ * "result->job = NULL; free_job(job);", a use-after-free write plus a double
+ * free of the job -- heap corruption that showed up as an intermittent,
+ * platform-dependent crash. Deterministic here: a numeric-literal host resolves
+ * offline, and the callback frees the delivered result and returns 0.
+ * Under ASan this aborts before the fix and passes after it.
+ */
+static int dns_owner_fired = 0;
+static int dns_owner_free_callback(struct net_dns_job* job, const struct net_dns_result* result)
+{
+	(void) job;
+	dns_owner_fired = 1;
+	if (result)
+		net_dns_result_free(result);   /* take ownership and free it now */
+	return 0;                          /* 0 == "caller owns the result" */
+}
+
+EXO_TEST(connect_dns_owner_frees_sync, {
+	int i;
+	struct net_dns_job* job;
+	dns_owner_fired = 0;
+	/* A numeric literal resolves offline (getaddrinfo, no DNS query). */
+	job = net_dns_gethostbyname("127.0.0.1", AF_UNSPEC, dns_owner_free_callback, 0);
+	if (!job)
+		return 0;
+	for (i = 0; i < 10000 && !dns_owner_fired; i++)
+		net_backend_process();
+	return dns_owner_fired == 1;
 });
 
 EXO_TEST(connect_shutdown, {
