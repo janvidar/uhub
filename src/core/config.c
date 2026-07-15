@@ -51,15 +51,16 @@ static int config_check_regexp(const char* key, const char* data, const char* re
 {
 	regex_t preg;
 	char* pattern;
+	size_t pattern_sz = strlen(regexp) + 5; /* "^(" + regexp + ")$" + NUL */
 	int rc;
 
-	pattern = hub_malloc(strlen(regexp) + 5); /* "^(" + regexp + ")$" + NUL */
+	pattern = hub_malloc(pattern_sz);
 	if (!pattern)
 	{
 		LOG_ERROR("Out of memory validating config key '%s'", key);
 		return 0;
 	}
-	sprintf(pattern, "^(%s)$", regexp);
+	snprintf(pattern, pattern_sz, "^(%s)$", regexp);
 
 	rc = regcomp(&preg, pattern, REG_EXTENDED | REG_NOSUB);
 	hub_free(pattern);
