@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/janvidar/uhub/actions/workflows/ci.yml/badge.svg)](https://github.com/janvidar/uhub/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/janvidar/uhub/actions/workflows/codeql.yml/badge.svg)](https://github.com/janvidar/uhub/actions/workflows/codeql.yml)
+[![codecov](https://codecov.io/gh/janvidar/uhub/graph/badge.svg)](https://codecov.io/gh/janvidar/uhub)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](COPYING)
 
 **uhub** is a small, fast, and secure peer-to-peer hub server for the
