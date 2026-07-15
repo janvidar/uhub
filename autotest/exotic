@@ -89,6 +89,9 @@ if ($#ARGV >= 0)
 # Write a main() that will start the test run
 print "int main(int argc, char** argv)\n{\n";
 print "\tstruct exotic_handle handle;\n\n";
+print "\t/* Line-buffer stdout so results are not lost in the block buffer when a\n";
+print "\t   test crashes (e.g. over a pipe in CI). */\n";
+print "\tsetvbuf(stdout, NULL, _IOLBF, 0);\n\n";
 print "\tif (exotic_initialize(&handle, argc, argv) == -1)\n\t\treturn -1;\n\n";
 
 if ($#tests > 0)
@@ -166,6 +169,8 @@ print '
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
+#include <unistd.h>
 
 static void exotic_version();
 
@@ -322,21 +327,56 @@ void exotic_add_test(struct exotic_handle* handle, exo_test_t func, const char* 
 }
 
 
+/* Name of the test currently executing, for the crash handler below. */
+static const char* volatile exo_running_test = 0;
+
+/*
+ * On a fatal signal, name the test that was running before re-raising with the
+ * default handler (so a core is still dumped). This makes an intermittent crash
+ * self-identifying instead of relying on the last flushed line of buffered
+ * stdout, which lags the actual point of failure over a pipe. Uses only
+ * write() so it is safe from a signal handler.
+ */
+/* write() is declared warn_unused_result under _FORTIFY_SOURCE; consume the
+   result (nothing useful to do with it from a crash handler anyway). */
+static void exo_emit(const char* s, size_t n)
+{
+	ssize_t r = write(2, s, n);
+	(void) r;
+}
+
+static void exo_crash_handler(int sig)
+{
+	static const char pre[] = "\n*** exotic: crashed while running test: ";
+	const char* name = exo_running_test;
+	exo_emit(pre, sizeof(pre) - 1);
+	if (name)
+		exo_emit(name, strlen(name));
+	exo_emit("\n", 1);
+	signal(sig, SIG_DFL);
+	raise(sig);
+}
+
 int exotic_run(struct exotic_handle* handle)
 {
 	struct exo_test_data* tmp = NULL;
-	
+
 	if (!handle)
 	{
 		fprintf(stderr, "Error: exotic is not initialized\n");
 		return -1;
 	}
 
+	signal(SIGSEGV, exo_crash_handler);
+	signal(SIGBUS, exo_crash_handler);
+	signal(SIGABRT, exo_crash_handler);
+
 	handle->current = handle->first;
 	while (handle->current)
 	{
 		tmp = handle->current;
-		
+		exo_running_test = tmp->name;
+
 		if (handle->current->test()) {
 			if (handle->config_show_pass == cfg_on) printf("* PASS test \'%s\'\n", tmp->name);
 			handle->pass++;
