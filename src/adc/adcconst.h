@@ -79,6 +79,14 @@ typedef uint32_t fourcc_t;
 #define ADC_CMD_FSCH FOURCC('F', 'S', 'C', 'H')
 #define ADC_CMD_DRES FOURCC('D', 'R', 'E', 'S')
 
+/* PFSR: partial file sharing responses */
+#define ADC_CMD_DPSR FOURCC('D', 'P', 'S', 'R')
+#define ADC_CMD_FPSR FOURCC('F', 'P', 'S', 'R')
+
+/* invalid partial file sharing responses (spam) */
+#define ADC_CMD_BPSR FOURCC('B', 'P', 'S', 'R')
+#define ADC_CMD_EPSR FOURCC('E', 'P', 'S', 'R')
+
 /* invalid search results (spam) */
 #define ADC_CMD_BRES FOURCC('B', 'R', 'E', 'S')
 #define ADC_CMD_ERES FOURCC('E', 'R', 'E', 'S')
