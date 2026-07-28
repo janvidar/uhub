@@ -149,6 +149,9 @@ static void metrics_build_body(struct hub_info* hub, struct cbuffer* body)
 	METRIC("uhub_search_results_total", "counter", "Search results relayed.");
 	cbuf_append_format(body, "uhub_search_results_total %" PRIu64 "\n", hub->metrics.search_results);
 
+	METRIC("uhub_partial_results_total", "counter", "Partial file sharing responses relayed (PFSR).");
+	cbuf_append_format(body, "uhub_partial_results_total %" PRIu64 "\n", hub->metrics.partial_results);
+
 	METRIC("uhub_private_messages_total", "counter", "Private chat messages accepted for routing.");
 	cbuf_append_format(body, "uhub_private_messages_total %" PRIu64 "\n", hub->metrics.private_messages);
 

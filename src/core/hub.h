@@ -118,6 +118,7 @@ struct metrics_counters
 	uint64_t private_messages;      /**<< Private chat messages accepted for routing */
 	uint64_t searches;              /**<< Search requests accepted for routing */
 	uint64_t search_results;        /**<< Search results relayed (DRES) */
+	uint64_t partial_results;       /**<< Partial file sharing responses relayed (PSR) */
 	uint64_t connect_requests;      /**<< Active connect requests (CTM) */
 	uint64_t rev_connect_requests;  /**<< Passive/reverse connect requests (RCM) */
 	uint64_t broadcasts;            /**<< Messages broadcast to all users */

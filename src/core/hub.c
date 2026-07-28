@@ -217,6 +217,7 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 				   silently rather than warned about. */
 				cmd->priority = -1;
 				CHECK_FLOOD(search, 0);
+				hub->metrics.partial_results++;
 				ROUTE_MSG;
 
 			case ADC_CMD_BPSR: // spam

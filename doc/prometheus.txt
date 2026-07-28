@@ -136,6 +136,7 @@ Counters (monotonic, suffix _total):
   uhub_private_messages_total       Private chat messages accepted for routing.
   uhub_searches_total               Search requests accepted for routing.
   uhub_search_results_total         Search results relayed.
+  uhub_partial_results_total        Partial file sharing responses relayed (PFSR).
   uhub_connect_requests_total       Active connect requests (ConnectToMe).
   uhub_rev_connect_requests_total   Passive connect requests (ReverseConnectToMe).
   uhub_broadcasts_total             Messages broadcast to all users.
