@@ -1,4 +1,5 @@
 #include "system.h"
+#include "util/memory.h"
 #include "network/network.h"
 #include "core/config.h"
 #include "core/hub.h"

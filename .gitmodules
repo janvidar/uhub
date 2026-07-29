@@ -1,3 +1,6 @@
 [submodule "third_party/quickjs"]
 	path = third_party/quickjs
 	url = https://github.com/quickjs-ng/quickjs.git
+[submodule "third_party/exotic"]
+	path = third_party/exotic
+	url = https://github.com/janvidar/exotic.git

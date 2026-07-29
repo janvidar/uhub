@@ -33,9 +33,8 @@ option(JAVASCRIPT_SUPPORT "Build the mod_javascript plugin (embeds QuickJS, a gi
 
 find_package(Git)
 find_package(SQLite3 REQUIRED)
-# autotest/test.c is generated at build time from the *.tcc sources by the
-# exotic Perl script (see the autotest-bin target below).
-find_package(Perl REQUIRED)
+
+enable_testing()
 
 include(CheckSymbolExists)
 include(CheckIncludeFile)
@@ -229,35 +228,61 @@ set_target_properties(utils network PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_dependencies(adc utils)
 add_dependencies(network utils)
 
-# Generate the autotest driver (autotest/test.c) from the *.tcc test sources.
-# This replaces the manual `autotest/update.sh` step: editing or adding a .tcc
-# file re-runs exotic at build time. CONFIGURE_DEPENDS re-globs when a .tcc is
-# added or removed; the explicit DEPENDS re-runs exotic when one is edited.
+# exotic, the test framework, pulled in as a git submodule at third_party/exotic
+# (pinned by .gitmodules + the recorded commit). Unlike the optional QuickJS
+# submodule this one is required, since autotest-bin cannot be built without it.
+set (EXOTIC_DIR ${CMAKE_SOURCE_DIR}/third_party/exotic)
+if (NOT EXISTS ${EXOTIC_DIR}/CMakeLists.txt)
+	message(FATAL_ERROR
+		"The exotic submodule is missing. "
+		"Run: git submodule update --init third_party/exotic")
+endif()
+# exotic declares add_library() without an explicit type, so it would follow a
+# consumer's BUILD_SHARED_LIBS. Force static for its subdirectory only, so
+# autotest-bin needs no RPATH, then restore whatever the user asked for.
+set (_uhub_saved_shared_libs ${BUILD_SHARED_LIBS})
+set (BUILD_SHARED_LIBS OFF)
+# EXOTIC_INSTALL / EXOTIC_BUILD_TESTS default to "am I the top-level project",
+# so both turn themselves off here; exotic contributes only its two libraries.
+add_subdirectory(${EXOTIC_DIR} EXCLUDE_FROM_ALL)
+set (BUILD_SHARED_LIBS ${_uhub_saved_shared_libs})
+# Upstream code, not ours: exempt it from the project-wide -Werror, as QuickJS is.
+if (MSVC)
+	target_compile_options(exotic PRIVATE /w)
+	target_compile_options(exotic_main PRIVATE /w)
+else()
+	target_compile_options(exotic PRIVATE -w)
+	target_compile_options(exotic_main PRIVATE -w)
+endif()
+
+# Build the autotest driver from the *.tcc test sources. exotic_add_tests() in
+# MODE AUTO (the default) compiles each .tcc as its own translation unit and
+# relies on the constructor each EXO_TEST emits to self-register, so there is no
+# code generation step and no Perl. CONFIGURE_DEPENDS re-globs when a .tcc is
+# added or removed.
+#
+# Deliberately NOT using DISCOVER (one CTest entry per EXO_TEST): the suite is
+# order-dependent. 19 of the 29 .tcc files share state across tests through
+# *_setup / *_teardown pairs (route_setup allocates the hub the route_maxq_*
+# tests then dereference, and so on), so running a test on its own crashes or
+# fails. The whole binary is registered as a single CTest entry instead, which
+# preserves the registration order the tests rely on.
 set (AUTOTEST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/autotest")
-set (AUTOTEST_GENERATED "${PROJECT_BINARY_DIR}/autotest_test.c")
 file (GLOB autotest_TCC CONFIGURE_DEPENDS ${AUTOTEST_DIR}/test_*.tcc)
 list (SORT autotest_TCC)
-# exotic embeds each argument verbatim as #include "<arg>", so pass bare
-# basenames and run from AUTOTEST_DIR; autotest-bin adds AUTOTEST_DIR to its
-# include path so those quoted includes resolve from the build tree.
-set (autotest_TCC_NAMES "")
-foreach (_tcc ${autotest_TCC})
-	get_filename_component (_tcc_name ${_tcc} NAME)
-	list (APPEND autotest_TCC_NAMES ${_tcc_name})
-endforeach()
-add_custom_command(
-	OUTPUT ${AUTOTEST_GENERATED}
-	COMMAND ${PERL_EXECUTABLE} ${AUTOTEST_DIR}/exotic ${autotest_TCC_NAMES} > ${AUTOTEST_GENERATED}
-	DEPENDS ${AUTOTEST_DIR}/exotic ${autotest_TCC}
-	WORKING_DIRECTORY ${AUTOTEST_DIR}
-	COMMENT "Generating autotest driver from *.tcc (exotic)"
-	VERBATIM)
 
 add_executable(uhub ${UHUB_SOURCE_DIR}/core/main.c ${uhub_SOURCES})
+
+exotic_add_tests(autotest-bin
+	SOURCES ${autotest_TCC}
+	WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
+
 # mod_auth_sqlite.c is compiled into the test binary (not just built as a
 # loadable module) so test_mod_auth_sqlite.tcc can drive its auth functions
 # directly via plugin_register(); it pulls in SQLite, hence the extra link.
-add_executable(autotest-bin ${AUTOTEST_GENERATED} ${uhub_SOURCES} ${UHUB_SOURCE_DIR}/plugins/mod_auth_sqlite.c)
+target_sources(autotest-bin PRIVATE
+	${uhub_SOURCES}
+	${UHUB_SOURCE_DIR}/plugins/mod_auth_sqlite.c)
 target_include_directories(autotest-bin PRIVATE ${AUTOTEST_DIR})
 # Absolute path to the autotest/ dir so tests can locate checked-in fixtures
 # (e.g. the TLS test certificate) regardless of the working directory.
@@ -345,7 +370,7 @@ set_target_properties(
 
 target_link_libraries(uhub ${CMAKE_DL_LIBS} adc network utils)
 target_link_libraries(uhub-passwd SQLite::SQLite3 utils)
-target_link_libraries(autotest-bin ${CMAKE_DL_LIBS} adc network utils SQLite::SQLite3)
+target_link_libraries(autotest-bin PRIVATE ${CMAKE_DL_LIBS} adc network utils SQLite::SQLite3)
 target_link_libraries(mod_example utils)
 target_link_libraries(mod_welcome network utils)
 target_link_libraries(mod_auth_simple utils)
@@ -363,7 +388,7 @@ target_link_libraries(mod_ucmd utils)
 
 if(WIN32)
 	target_link_libraries(uhub ws2_32)
-	target_link_libraries(autotest-bin ws2_32)
+	target_link_libraries(autotest-bin PRIVATE ws2_32)
 	target_link_libraries(mod_logging ws2_32)
 	target_link_libraries(mod_welcome ws2_32)
 endif()
@@ -381,7 +406,7 @@ if(UNIX)
 	set_target_properties(mod_e2e_test PROPERTIES PREFIX "")
 	target_link_libraries(mod_e2e_test utils)
 	target_link_libraries(uhub pthread)
-	target_link_libraries(autotest-bin pthread)
+	target_link_libraries(autotest-bin PRIVATE pthread)
 
 	if (ADC_STRESS)
 		add_executable(adcrush ${UHUB_SOURCE_DIR}/tools/adcrush.c ${adcclient_SOURCES})
@@ -412,7 +437,7 @@ message (STATUS "Configuring uhub version: ${UHUB_GIT_VERSION}")
 set(SSL_LIBS OpenSSL::SSL OpenSSL::Crypto)
 
 target_link_libraries(uhub ${SSL_LIBS})
-target_link_libraries(autotest-bin ${SSL_LIBS})
+target_link_libraries(autotest-bin PRIVATE ${SSL_LIBS})
 if(UNIX)
 	target_link_libraries(uhub-admin ${SSL_LIBS})
 	target_link_libraries(adc_cmd ${SSL_LIBS})
@@ -426,7 +451,7 @@ endif()
 
 if (SYSTEMD_SUPPORT)
 	target_link_libraries(uhub PkgConfig::SD)
-	target_link_libraries(autotest-bin PkgConfig::SD)
+	target_link_libraries(autotest-bin PRIVATE PkgConfig::SD)
 	target_link_libraries(uhub-passwd PkgConfig::SD)
 	target_link_libraries(uhub-admin PkgConfig::SD)
 	if(UNIX)

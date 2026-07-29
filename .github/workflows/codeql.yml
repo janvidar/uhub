@@ -24,13 +24,15 @@ jobs:
       actions: read
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          submodules: true
 
       - name: Install build dependencies
         run: |
           sudo apt-get update -qq
-          # CMake requires SQLite3 and a TLS library; Perl generates the
-          # autotest driver. Same set as the build jobs in ci.yml.
-          sudo apt-get install -y cmake perl libsqlite3-dev libssl-dev
+          # CMake requires SQLite3 and a TLS library. Same set as the build
+          # jobs in ci.yml.
+          sudo apt-get install -y cmake libsqlite3-dev libssl-dev
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@411c4c9a36b3fca4d674f06b6396b2c6d23522c6 # v3.36.3

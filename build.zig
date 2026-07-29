@@ -75,6 +75,7 @@ const core_sources = [_][]const u8{
 // source sets above) rather than globbed at build time; add a new .tcc here.
 const tcc_sources = [_][]const u8{
     "test_auth.tcc",
+    "test_cbuffer.tcc",
     "test_commands.tcc",
     "test_config.tcc",
     "test_connect.tcc",
@@ -88,13 +89,18 @@ const tcc_sources = [_][]const u8{
     "test_list.tcc",
     "test_memory.tcc",
     "test_message.tcc",
+    "test_metrics.tcc",
     "test_misc.tcc",
+    "test_mod_auth_sqlite.tcc",
     "test_netbackend.tcc",
+    "test_probe.tcc",
     "test_rbtree.tcc",
     "test_regserver.tcc",
+    "test_route.tcc",
     "test_sid.tcc",
     "test_tiger.tcc",
     "test_timer.tcc",
+    "test_tls.tcc",
     "test_tokenizer.tcc",
     "test_usermanager.tcc",
 };
@@ -168,31 +174,51 @@ const Ctx = struct {
         m.addIncludePath(ctx.b.path("third_party/sqlite3"));
     }
 
-    // Generate the autotest driver (autotest/test.c) from the *.tcc sources
-    // with the exotic Perl script, mirroring the add_custom_command in
-    // CMakeLists.txt. This replaces the manual autotest/update.sh step:
-    // editing or adding a .tcc re-runs exotic on the next build. The captured
-    // stdout is compiled into the module; exotic embeds each .tcc as
-    // #include "<basename>", so the autotest dir goes on the include path.
+    // Build the autotest driver from the *.tcc sources, mirroring the
+    // exotic_add_tests() call in CMakeLists.txt. This is exotic's MODE AUTO:
+    // each .tcc is its own translation unit and the constructor emitted by
+    // EXO_TEST self-registers the test, so nothing is generated and Perl is not
+    // involved. exotic itself (third_party/exotic, a git submodule) supplies the
+    // runtime and the main().
     fn addAutotest(ctx: *const Ctx, m: *std.Build.Module) void {
         const b = ctx.b;
-        const exotic = b.addSystemCommand(&.{ b.findProgram(&.{"perl"}, &.{}) catch "perl", "exotic" });
-        exotic.setCwd(b.path("autotest"));
-        exotic.addFileInput(b.path("autotest/exotic"));
 
-        // Feed exotic the sorted test_*.tcc list (see tcc_sources), matching
-        // the `file(GLOB ...)` + `list(SORT ...)` in CMakeLists.txt.
-        for (tcc_sources) |name| {
-            exotic.addArg(name);
-            exotic.addFileInput(b.path(b.fmt("autotest/{s}", .{name})));
-        }
+        // exotic's runtime and its main(). Both include "autotest.h" relative to
+        // their own directory, so upstream's configure_file() mirror to
+        // <exotic/exotic.h> is not reproduced here -- the header is force-included
+        // below straight from src/ instead. VERSION is what upstream's CMake
+        // passes via target_compile_definitions; autotest.c needs it for
+        // --version, so bump it when the submodule is bumped. -w because this is
+        // upstream code and the build is -Wall -W -Werror.
+        m.addCSourceFiles(.{
+            .root = b.path("third_party/exotic/src"),
+            .files = &.{ "autotest.c", "exotic_main.c" },
+            .flags = &.{ "-w", "-DVERSION=\"0.5.0\"" },
+        });
+        m.addIncludePath(b.path("third_party/exotic/src"));
 
-        // exotic writes the driver to stdout; capture it, then copy to a .c
-        // basename so Zig classifies it as a C source (the captured file is
-        // otherwise named "stdout" with no extension).
-        const wf = b.addWriteFiles();
-        const test_c = wf.addCopyFile(exotic.captureStdOut(.{}), "test.c");
-        m.addCSourceFile(.{ .file = test_c, .flags = ctx.cflags });
+        // The .tcc files do not include the exotic header themselves, so it is
+        // force-included, as exotic_add_tests() does in CMake. The path must be
+        // absolute: with a relative -include, zig cannot resolve the header when
+        // hashing the compilation's inputs and fails the cache check.
+        // (".tcc" is a C++ header extension to clang, but `.language = .c`
+        // below already makes zig pass -x c, so that needs no flag here.)
+        // UHUB_TEST_DIR is the absolute path to autotest/, so tests can find the
+        // checked-in fixtures (the TLS certificate) whatever the cwd is. Matches
+        // the target_compile_definitions() in CMakeLists.txt.
+        const tcc_flags = std.mem.concat(b.allocator, []const u8, &.{
+            ctx.cflags,
+            &.{
+                "-include", b.pathFromRoot("third_party/exotic/src/autotest.h"),
+                b.fmt("-DUHUB_TEST_DIR=\"{s}\"", .{b.pathFromRoot("autotest")}),
+            },
+        }) catch @panic("OOM");
+        m.addCSourceFiles(.{
+            .root = b.path("autotest"),
+            .files = &tcc_sources,
+            .flags = tcc_flags,
+            .language = .c,
+        });
         m.addIncludePath(b.path("autotest"));
     }
 
@@ -389,6 +415,11 @@ pub fn build(b: *std.Build) void {
     const autotest: ?*std.Build.Step.Compile = if (is_windows) null else blk: {
         const autotest_mod = ctx.module();
         ctx.addSources(autotest_mod, &core_sources);
+        // mod_auth_sqlite.c is compiled in (not just built as a loadable
+        // module) so test_mod_auth_sqlite.tcc can drive its auth functions
+        // directly via plugin_register(); it pulls in SQLite, hence addSqlite.
+        ctx.addSources(autotest_mod, &.{"src/plugins/mod_auth_sqlite.c"});
+        ctx.addSqlite(autotest_mod);
         ctx.addAutotest(autotest_mod);
         autotest_mod.linkLibrary(common);
         ctx.linkExternal(autotest_mod);
