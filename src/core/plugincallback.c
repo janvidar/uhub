@@ -128,6 +128,30 @@ static int cbfunc_send_message(struct plugin_handle* plugin, struct plugin_user*
 	return 1;
 }
 
+static int cbfunc_send_rich_message(struct plugin_handle* plugin, struct plugin_user* user, const char* message)
+{
+	char* buffer;
+	struct adc_message* command;
+	struct hub_info* hub = plugin_get_hub(plugin);
+
+	if (!user || !message)
+		return 0;
+
+	/* The RT flag is only meaningful when the hub allows rich text and the
+	 * client negotiated RTF0; otherwise send it as an ordinary message. */
+	if (!hub->config->chat_rich_text || !user_flag_get(as_hub_user(user), feature_rtf0))
+		return cbfunc_send_message(plugin, user, message);
+
+	buffer = adc_msg_escape(message);
+	command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 10);
+	adc_msg_add_argument(command, buffer);
+	adc_msg_add_named_argument(command, ADC_MSG_FLAG_RICH_TEXT, "1");
+	route_to_user(hub, as_hub_user(user), command);
+	adc_msg_free(command);
+	hub_free(buffer);
+	return 1;
+}
+
 static int cbfunc_send_broadcast(struct plugin_handle* plugin, const char* message)
 {
 	char* buffer;
@@ -503,6 +527,7 @@ static void cbfunc_set_hub_description(struct plugin_handle* plugin, const char*
 void plugin_register_callback_functions(struct plugin_handle* handle)
 {
 	handle->hub.send_message = cbfunc_send_message;
+	handle->hub.send_rich_message = cbfunc_send_rich_message;
 	handle->hub.send_broadcast_message = cbfunc_send_broadcast;
 	handle->hub.send_status_message = cbfunc_send_status;
 	handle->hub.send_user_command = cbfunc_send_user_command;

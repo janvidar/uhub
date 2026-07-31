@@ -24,6 +24,7 @@
 #include "plugin_api/handle.h"
 #include "plugin_api/command_api.h"
 
+#include "util/misc.h"
 #include "util/config_token.h"
 
 #define MAX_WELCOME_SIZE 16384
@@ -34,6 +35,7 @@ struct welcome_data
 	char* motd;
 	char* rules_file;
 	char* rules;
+	int rtf0; /* send the motd/rules as rich text (RTF0) where supported */
 	struct plugin_command_handle* cmd_motd;
 	struct plugin_command_handle* cmd_rules;
 };
@@ -136,6 +138,15 @@ static struct welcome_data* parse_config(const char* line, struct plugin_handle*
 
 			data->cmd_rules = hub_malloc_zero(sizeof(struct plugin_command_handle));
 			PLUGIN_COMMAND_INITIALIZE(data->cmd_rules, plugin, "rules", "", auth_cred_guest, command_handler_rules, "Show the hub rules.");
+		}
+		else if (strcmp(cfg_settings_get_key(setting), "rtf0") == 0)
+		{
+			if (!string_to_boolean(cfg_settings_get_value(setting), &data->rtf0))
+			{
+				set_error_message(plugin, "Unable to parse the rtf0 parameter.");
+				cfg_settings_free(setting);
+				goto cleanup_parse_error;
+			}
 		}
 		else
 		{
@@ -244,28 +255,36 @@ static struct cbuffer* parse_message(struct plugin_handle* plugin, struct plugin
 	return buf;
 }
 
+static void send_welcome_text(struct plugin_handle* plugin, struct plugin_user* user, const char* text)
+{
+	struct welcome_data* data = (struct welcome_data*) plugin->ptr;
+	struct cbuffer* buf = parse_message(plugin, user, text);
+
+	/* With rtf0=true the text is sent as rich text, so a client supporting the
+	 * extension renders it -- including image embeds, ![description](url). The
+	 * hub falls back to a plain message where rich text is not available, and
+	 * send_rich_message itself may be absent if this plugin is loaded by an
+	 * older hub that predates the accessor. */
+	if (data->rtf0 && plugin->hub.send_rich_message)
+		plugin->hub.send_rich_message(plugin, user, cbuf_get(buf));
+	else
+		plugin->hub.send_message(plugin, user, cbuf_get(buf));
+
+	cbuf_destroy(buf);
+}
+
 static void send_motd(struct plugin_handle* plugin, struct plugin_user* user)
 {
 	struct welcome_data* data = (struct welcome_data*) plugin->ptr;
-	struct cbuffer* buf = NULL;
 	if (data->motd)
-	{
-		buf = parse_message(plugin, user, data->motd);
-		plugin->hub.send_message(plugin, user, cbuf_get(buf));
-		cbuf_destroy(buf);
-	}
+		send_welcome_text(plugin, user, data->motd);
 }
 
 static void send_rules(struct plugin_handle* plugin, struct plugin_user* user)
 {
 	struct welcome_data* data = (struct welcome_data*) plugin->ptr;
-	struct cbuffer* buf = NULL;
 	if (data->rules)
-	{
-		buf = parse_message(plugin, user, data->rules);
-		plugin->hub.send_message(plugin, user, cbuf_get(buf));
-		cbuf_destroy(buf);
-	}
+		send_welcome_text(plugin, user, data->rules);
 }
 
 static void on_user_login(struct plugin_handle* plugin, struct plugin_user* user)

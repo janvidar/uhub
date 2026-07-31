@@ -131,6 +131,12 @@ struct plugin_command;
 struct plugin_command_arg_data;
 
 typedef int (*hfunc_send_message)(struct plugin_handle*, struct plugin_user* user, const char* message);
+/* Like send_message, but marks the message as rich text formatted (RTF0's RT1
+ * flag) so a supporting client renders it -- including image embeds written as
+ * ![description](url). Falls back to a plain message when the hub disallows
+ * rich text (chat_rich_text) or the client did not negotiate RTF0, so a caller
+ * never has to check either itself. */
+typedef int (*hfunc_send_rich_message)(struct plugin_handle*, struct plugin_user* user, const char* message);
 typedef int (*hfunc_send_broadcast_message)(struct plugin_handle*, const char* message);
 typedef int (*hfunc_send_status)(struct plugin_handle*, struct plugin_user* to, int code, const char* message);
 typedef int (*hfunc_send_user_command)(struct plugin_handle*, struct plugin_user* user, const char* name, int context, const char* command);
@@ -209,6 +215,7 @@ struct plugin_hub_funcs
 	hfunc_get_hub_description get_description;
 	hfunc_set_hub_description set_description;
 	hfunc_get_tls_version get_tls_version;
+	hfunc_send_rich_message send_rich_message;
 };
 
 struct plugin_handle

@@ -26,10 +26,10 @@
 #include "util/credentials.h"
 #include "network/ipcalc.h"
 
-#define PLUGIN_API_VERSION 6
+#define PLUGIN_API_VERSION 7
 
 /* Oldest plugin ABI the current hub still accepts. struct plugin_funcs (the
-   table a plugin implements) is unchanged across 5->6 -- only plugin_hub_funcs
+   table a plugin implements) is unchanged across 5->7 -- only plugin_hub_funcs
    (hub-provided) grew -- so v5 plugins remain binary-compatible. */
 #define PLUGIN_API_VERSION_MIN 5
 
