@@ -702,7 +702,7 @@ void hub_send_handshake(struct hub_info* hub, struct hub_user* u)
 void hub_send_password_challenge(struct hub_info* hub, struct hub_user* u)
 {
 	struct adc_message* igpa;
-	igpa = adc_msg_construct(ADC_CMD_IGPA, 38);
+	igpa = adc_msg_construct(ADC_CMD_IGPA, 41);
 	if (!igpa)
 		return; /* OOM */
 	adc_msg_add_argument(igpa, acl_password_generate_challenge(hub, u));
