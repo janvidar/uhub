@@ -453,6 +453,25 @@ void hub_auth_proxy_verified(struct hub_info* hub, struct hub_user* user, int ok
 }
 
 
+int hub_chat_message_is_command(struct hub_info* hub, struct hub_user* u, struct adc_message* cmd, const char* message)
+{
+	if (message[0] != '!' && message[0] != '+')
+		return 0;
+
+	/* RTF0: in a rich text message, a leading "![" starts an inline image
+	 * embed -- ![description](url) -- and not a hub command. */
+	if (hub->config->chat_rich_text && message[0] == '!' && message[1] == '[' && user_flag_get(u, feature_rtf0))
+	{
+		char* rich_text = adc_msg_get_named_argument(cmd, ADC_MSG_FLAG_RICH_TEXT);
+		int is_rich_text = (rich_text && strcmp(rich_text, "1") == 0);
+		hub_free(rich_text);
+		if (is_rich_text)
+			return 0;
+	}
+
+	return 1;
+}
+
 int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc_message* cmd)
 {
 	char* message = adc_msg_get_argument(cmd, 0);
@@ -483,7 +502,7 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 
 	broadcast = (cmd->cache[0] == 'B');
 	private_msg = (cmd->cache[0] == 'D' || cmd->cache[0] == 'E');
-	command = (message[0] == '!' || message[0] == '+');
+	command = hub_chat_message_is_command(hub, u, cmd, message);
 
 	if (broadcast && command)
 	{
@@ -1376,14 +1395,18 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 		hub_free(tmp);
 	}
 
-	/* Reserve room for the base features plus the two runtime-appended,
-	 * optional ones (" ADHBRI" and " ADUCM0", 7 bytes each). */
-	hub->command_support = adc_msg_construct(ADC_CMD_ISUP, 6 + strlen(ADC_PROTO_SUPPORT) + 14);
+	/* Reserve room for the base features plus the three runtime-appended,
+	 * optional ones (" ADHBRI", " ADUCM0" and " ADRTF0", 7 bytes each). */
+	hub->command_support = adc_msg_construct(ADC_CMD_ISUP, 6 + strlen(ADC_PROTO_SUPPORT) + 21);
 	if (hub->command_support)
 	{
 		adc_msg_add_argument(hub->command_support, ADC_PROTO_SUPPORT);
 		if (hbri_is_enabled(hub))
 			adc_msg_add_argument(hub->command_support, ADC_SUP_FLAG_ADD ADC_EXT_HBRI);
+		/* RTF0 lets clients embed images in chat by URL, so it is only offered
+		 * when rich text is allowed. */
+		if (hub->config->chat_rich_text)
+			adc_msg_add_argument(hub->command_support, ADC_SUP_FLAG_ADD ADC_EXT_RTF0);
 	}
 
 	hub->command_banner = adc_msg_construct(ADC_CMD_ISTA, 100 + (server ? strlen(server) : 0));

@@ -38,6 +38,31 @@ extern int route_message(struct hub_info* hub, struct hub_user* u, struct adc_me
 extern size_t get_max_send_queue(struct hub_info* hub);
 extern size_t get_max_send_queue_soft(struct hub_info* hub);
 
+/* RTF0 rich text relay (exposed for unit testing). A message carrying the RT
+   flag is relayed in two variants, since clients that did not negotiate RTF0
+   must not see the flag. */
+
+/**
+ * Build an RT-stripped copy of a rich text MSG.
+ * @return the stripped copy, which the caller must adc_msg_free(), or NULL if
+ *         the message is not a rich text MSG (or the copy could not be made).
+ */
+extern struct adc_message* route_rtf0_strip(struct adc_message* msg);
+
+/**
+ * Pick the message every recipient starts from: normally the original, but the
+ * stripped copy when rich text is disabled hub-wide (chat_rich_text), so that
+ * no client -- and no linked hub -- is handed the RT flag.
+ * @param plain the RT-stripped copy, or NULL if the message is not rich text.
+ */
+extern struct adc_message* route_rtf0_baseline(struct hub_info* hub, struct adc_message* msg, struct adc_message* plain);
+
+/**
+ * Pick the variant of a message a given user is allowed to see.
+ * @param plain the RT-stripped copy, or NULL if the message is not rich text.
+ */
+extern struct adc_message* route_rtf0_variant(struct hub_user* user, struct adc_message* rich, struct adc_message* plain);
+
 /**
  * Send queued messages.
  */

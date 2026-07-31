@@ -381,6 +381,29 @@
 		<since>0.2.4</since>
 	</option>
 
+	<option name="chat_rich_text" type="boolean" default="1">
+		<short>Allow rich text formatted chat messages</short>
+		<description><![CDATA[
+			<p>
+			When enabled the hub advertises the <code>RTF0</code> extension, which lets
+			clients mark a chat message as rich text formatted with the <code>RT1</code>
+			flag. Rich text messages may embed images by URL, using the form
+			<code>![description](url)</code>, so clients that support the extension will
+			fetch and display remote images posted in chat.
+			</p>
+			<p>
+			Disable this on hubs where that is unwanted: the hub then stops advertising
+			<code>RTF0</code> and removes the <code>RT</code> flag from every relayed
+			message, so no client renders posted images.
+			</p>
+			<p>
+			Clients that do not support <code>RTF0</code> never receive the
+			<code>RT</code> flag and see the plain message text either way.
+			</p>
+		]]></description>
+		<since>0.7.1</since>
+	</option>
+
 	<option name="hub_name" type="string" default="uhub">
 		<short>Name of hub</short>
 		<description><![CDATA[

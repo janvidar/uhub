@@ -585,8 +585,11 @@ static void set_ban_reason(struct hub_user* user, const char* reason)
 {
 	if (reason && *reason)
 	{
-		strncpy(user->ban_reason, reason, sizeof(user->ban_reason) - 1);
-		user->ban_reason[sizeof(user->ban_reason) - 1] = '\0';
+		/* Truncation is intentional; copy an explicit length so the compiler
+		 * does not read this as an accidentally unterminated strncpy. */
+		size_t len = MIN(strlen(reason), sizeof(user->ban_reason) - 1);
+		memcpy(user->ban_reason, reason, len);
+		user->ban_reason[len] = '\0';
 	}
 	else
 		user->ban_reason[0] = '\0';

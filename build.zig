@@ -97,6 +97,7 @@ const tcc_sources = [_][]const u8{
     "test_rbtree.tcc",
     "test_regserver.tcc",
     "test_route.tcc",
+    "test_rtf0.tcc",
     "test_sid.tcc",
     "test_tiger.tcc",
     "test_timer.tcc",

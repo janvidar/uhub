@@ -27,22 +27,77 @@
 #include "core/route.h"
 #include "core/usermanager.h"
 
+/*
+ * RTF0: the RT flag is only meaningful to clients that negotiated RTF0, so a
+ * rich text message is relayed in two variants -- the original to RTF0 clients,
+ * and an RT-stripped copy to everyone else. Returns NULL when no stripped copy
+ * is needed, which is the common case: only MSG commands can carry the flag, so
+ * ordinary traffic never pays for a copy (and an unknown "RT" in some other
+ * command is left alone). NULL is also returned when the copy fails, in which
+ * case every client simply sees the original.
+ */
+struct adc_message* route_rtf0_strip(struct adc_message* msg)
+{
+	struct adc_message* plain;
+
+	if (msg->cmd != ADC_CMD_BMSG && msg->cmd != ADC_CMD_DMSG &&
+	    msg->cmd != ADC_CMD_EMSG && msg->cmd != ADC_CMD_FMSG)
+		return NULL;
+
+	if (!adc_msg_has_named_argument(msg, ADC_MSG_FLAG_RICH_TEXT))
+		return NULL;
+
+	plain = adc_msg_copy(msg);
+	if (plain)
+		adc_msg_remove_named_argument(plain, ADC_MSG_FLAG_RICH_TEXT);
+	return plain;
+}
+
+/**
+ * Pick the message every recipient starts from: normally the original, but the
+ * stripped copy when rich text is disabled hub-wide, so that no client -- and
+ * no linked hub -- is handed the RT flag.
+ * @param plain the RT-stripped copy, or NULL if the message is not rich text.
+ */
+struct adc_message* route_rtf0_baseline(struct hub_info* hub, struct adc_message* msg, struct adc_message* plain)
+{
+	if (plain && !hub->config->chat_rich_text)
+		return plain;
+	return msg;
+}
+
+/**
+ * Pick the variant of a message a given user is allowed to see.
+ * @param plain the RT-stripped copy, or NULL if the message is not rich text.
+ */
+struct adc_message* route_rtf0_variant(struct hub_user* user, struct adc_message* rich, struct adc_message* plain)
+{
+	if (plain && !user_flag_get(user, feature_rtf0))
+		return plain;
+	return rich;
+}
+
+static int route_to_all_ex(struct hub_info* hub, struct adc_message* rich, struct adc_message* plain);
+static int route_to_subscribers_ex(struct hub_info* hub, struct adc_message* rich, struct adc_message* plain);
+
 int route_message(struct hub_info* hub, struct hub_user* u, struct adc_message* msg)
 {
 	struct hub_user* target = NULL;
+	struct adc_message* plain = route_rtf0_strip(msg);
+	struct adc_message* rich = route_rtf0_baseline(hub, msg, plain);
 
 	switch (msg->cache[0])
 	{
 		case 'B': /* Broadcast to all logged in clients */
-			route_to_all(hub, msg);
-			link_relay_broadcast(hub, msg); /* + linked hubs (chat/search only) */
+			route_to_all_ex(hub, rich, plain);
+			link_relay_broadcast(hub, rich); /* + linked hubs (chat/search only) */
 			break;
 
 		case 'D':
 			target = uman_get_user_by_sid(hub->users, msg->target);
 			if (target)
 			{
-				route_to_user(hub, target, msg);
+				route_to_user(hub, target, route_rtf0_variant(target, rich, plain));
 			}
 			break;
 
@@ -50,20 +105,23 @@ int route_message(struct hub_info* hub, struct hub_user* u, struct adc_message* 
 			target = uman_get_user_by_sid(hub->users, msg->target);
 			if (target)
 			{
-				route_to_user(hub, target, msg);
-				route_to_user(hub, u, msg);
+				route_to_user(hub, target, route_rtf0_variant(target, rich, plain));
+				route_to_user(hub, u, route_rtf0_variant(u, rich, plain));
 			}
 			break;
 
 		case 'F':
-			route_to_subscribers(hub, msg);
-			link_relay_broadcast(hub, msg); /* + linked hubs (feature-cast chat/search) */
+			route_to_subscribers_ex(hub, rich, plain);
+			link_relay_broadcast(hub, rich); /* + linked hubs (feature-cast chat/search) */
 			break;
 
 		default:
 			/* Ignore the message */
 			break;
 	}
+
+	/* Each recipient took its own reference in ioq_send_add(). */
+	adc_msg_free(plain);
 	return 0;
 }
 
@@ -212,19 +270,24 @@ int route_flush_pipeline(struct hub_info* hub, struct hub_user* u)
 }
 
 
-int route_to_all(struct hub_info* hub, struct adc_message* command) /* iterate users */
+static int route_to_all_ex(struct hub_info* hub, struct adc_message* rich, struct adc_message* plain) /* iterate users */
 {
 	struct hub_user* user;
 	hub->metrics.broadcasts++;
 	LIST_FOREACH(struct hub_user*, user, hub->users->list,
 	{
-		route_to_user(hub, user, command);
+		route_to_user(hub, user, route_rtf0_variant(user, rich, plain));
 	});
 
 	return 0;
 }
 
-int route_to_subscribers(struct hub_info* hub, struct adc_message* command) /* iterate users */
+int route_to_all(struct hub_info* hub, struct adc_message* command) /* iterate users */
+{
+	return route_to_all_ex(hub, command, NULL);
+}
+
+static int route_to_subscribers_ex(struct hub_info* hub, struct adc_message* command, struct adc_message* plain) /* iterate users */
 {
 	int do_send;
 	char* tmp;
@@ -259,11 +322,16 @@ int route_to_subscribers(struct hub_info* hub, struct adc_message* command) /* i
 			});
 
 			if (do_send)
-				route_to_user(hub, user, command);
+				route_to_user(hub, user, route_rtf0_variant(user, command, plain));
 		}
 	});
 
 	return 0;
+}
+
+int route_to_subscribers(struct hub_info* hub, struct adc_message* command) /* iterate users */
+{
+	return route_to_subscribers_ex(hub, command, NULL);
 }
 
 int route_info_message(struct hub_info* hub, struct hub_user* u)
