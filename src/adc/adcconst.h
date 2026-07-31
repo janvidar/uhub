@@ -49,6 +49,7 @@ typedef uint32_t fourcc_t;
 #define ADC_EXT_NATT "NATT"
 #define ADC_EXT_TIGR "TIGR"
 #define ADC_EXT_UCMD "UCM0"
+#define ADC_EXT_RTF0 "RTF0"
 
 /* Server sent commands */
 #define ADC_CMD_ISID FOURCC('I', 'S', 'I', 'D')
@@ -177,6 +178,8 @@ typedef uint32_t fourcc_t;
 
 #define ADC_MSG_FLAG_ACTION "ME"  /* message is an *action* message */
 #define ADC_MSG_FLAG_PRIVATE "PM" /* message is a private message */
+#define ADC_MSG_FLAG_RICH_TEXT                                                 \
+  "RT" /* RTF0: "1" = message is rich text formatted */
 
 #define ADC_SCH_FLAG_INCLUDE "AN" /* include given search term */
 #define ADC_SCH_FLAG_EXCLUDE "NO" /* exclude given search term */

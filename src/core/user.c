@@ -246,6 +246,9 @@ static int convert_support_fourcc(int fourcc)
 		case FOURCC('H','B','R','I'):
 			return feature_hbri;
 
+		case FOURCC('R','T','F','0'):
+			return feature_rtf0;
+
 		// ignore these extensions, they are not useful for the hub.
 		case FOURCC('D','H','T','0'):
 			return 0;

@@ -199,6 +199,18 @@ extern int hub_handle_password(struct hub_info* hub, struct hub_user* u, struct 
 extern int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc_message* cmd);
 
 /**
+ * Decide if a chat message should be handed to the hub's command parser.
+ * A message starting with '!' or '+' is a command, except when rich text is
+ * enabled, the sender supports RTF0, and the sender marked the message as rich
+ * text (RT1) starting with "![", which is an inline image embed:
+ * ![description](url)
+ *
+ * @param message the (still escaped) first argument of the MSG command.
+ * @return 1 if the message is a hub command, 0 if it is ordinary chat.
+ */
+extern int hub_chat_message_is_command(struct hub_info* hub, struct hub_user* u, struct adc_message* cmd, const char* message);
+
+/**
  * Used internally by hub_handle_info
  * @return 1 if nickname is OK, or 0 if nickname is not accepted.
  */
