@@ -46,6 +46,25 @@ static int cd_connect(void)
 	return 1;
 }
 
+/*
+ * Loopback delivery is not synchronous with send(): Linux completes it inline
+ * in the send path, but the BSDs hand it to a software interrupt that runs
+ * after the syscall returns. Block until the socket is readable -- data, EOF or
+ * a reset all end the wait -- instead of assuming it already is.
+ */
+static int cd_wait_readable(int sd)
+{
+	struct timeval tv;
+	fd_set fds;
+
+	FD_ZERO(&fds);
+	FD_SET(sd, &fds);
+	tv.tv_sec = 2;
+	tv.tv_usec = 0;
+
+	return select(sd + 1, &fds, NULL, NULL, &tv) == 1;
+}
+
 static void cd_disconnect(void)
 {
 	if (cd_peer != -1)   net_close(cd_peer);
@@ -88,6 +107,8 @@ EXO_TEST(condead_pending_data_is_alive, {
 	char buf[4];
 	if (send(cd_peer, "x", 1, 0) != 1)
 		return 0;
+	if (!cd_wait_readable(cd_local))
+		return 0;
 	if (net_con_is_dead(cd_con) != 0)
 		return 0;
 	if (recv(cd_local, buf, sizeof(buf), 0) != 1)
@@ -98,6 +119,8 @@ EXO_TEST(condead_pending_data_is_alive, {
 EXO_TEST(condead_peer_fin_is_dead, {
 	net_close(cd_peer);
 	cd_peer = -1;
+	if (!cd_wait_readable(cd_local))
+		return 0;
 	return net_con_is_dead(cd_con) == 1;
 });
 
@@ -114,7 +137,8 @@ EXO_TEST(condead_peer_reset_is_dead, {
 	net_close(cd_peer);
 	cd_peer = -1;
 
-	usleep(50000);
+	if (!cd_wait_readable(cd_local))
+		return 0;
 	return net_con_is_dead(cd_con) == 1;
 });
 
