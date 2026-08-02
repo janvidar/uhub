@@ -285,8 +285,8 @@ static int check_required_login_flags(struct hub_info* hub, struct hub_user* use
  */
 /*
  * @return 1 if cmd advertises a syntactically valid address in the given
- * protocol family (used to decide whether an HBRI second-family address is
- * worth keeping for later validation).
+ * protocol family. The address itself is not used; this only answers whether
+ * the client claims connectivity over that family.
  */
 static int check_network_secondary_ok(struct adc_message* cmd, int af)
 {
@@ -298,18 +298,18 @@ static int check_network_secondary_ok(struct adc_message* cmd, int af)
 }
 
 /*
- * When a logged-in HBRI client advertises a new second-family address in an INF
- * update, ask it to prove the address over a secondary connection. Does nothing
- * if HBRI is disabled, the client does not support it, or the advertised
- * address is missing/invalid/unchanged from what we already hold.
+ * When a logged-in HBRI client signals second-family connectivity in an INF
+ * update, ask it to prove that over a secondary connection. Does nothing if
+ * HBRI is disabled, the client does not support it, or we already hold an
+ * address for that family. The advertised value is only a trigger; the address
+ * itself comes from the validation connection.
  */
 static void check_hbri_update(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	int sec_af;
 	const char* flag;
-	char* advertised;
 	char* current;
-	int is_new;
+	int have_address;
 
 	if (!hbri_is_enabled(hub) || !user_flag_get(user, feature_hbri))
 		return;
@@ -319,14 +319,11 @@ static void check_hbri_update(struct hub_info* hub, struct hub_user* user, struc
 		return;
 
 	flag = (sec_af == AF_INET6) ? ADC_INF_FLAG_IPV6_ADDR : ADC_INF_FLAG_IPV4_ADDR;
-	advertised = adc_msg_get_named_argument(cmd, flag);
 	current = user->info ? adc_msg_get_named_argument(user->info, flag) : 0;
-
-	is_new = advertised && (!current || strcmp(advertised, current) != 0);
-	hub_free(advertised);
+	have_address = current && *current;
 	hub_free(current);
 
-	if (is_new)
+	if (!have_address)
 		hbri_send_validation_request(hub, user);
 }
 
@@ -350,34 +347,26 @@ static int check_network(struct hub_info* hub, struct hub_user* user, struct adc
 	}
 
 	/*
-	 * The hub overrides the connecting-family address with the one it actually
-	 * sees. The other family is normally stripped, since a client cannot prove
-	 * an address it did not connect from -- except when HBRI is in play: a
-	 * dual-stack client may advertise its second-family address here and prove
-	 * it later over a secondary connection (see hbri.c). In that case we keep
-	 * the advertised second-family address for now; it is stripped again before
-	 * broadcast and only re-added once validated.
+	 * Both advertised addresses are discarded and replaced with the one the hub
+	 * observes. If the client signalled the other protocol family and supports
+	 * HBRI, that intent is recorded as a flag; only a successful validation
+	 * connection (see hbri.c) puts a second-family address in the INF.
 	 */
-	int hbri = hbri_is_enabled(hub) && user_flag_get(user, feature_hbri);
+	if (hbri_is_enabled(hub) && user_flag_get(user, feature_hbri)
+		&& check_network_secondary_ok(cmd, (user->id.addr.af == AF_INET) ? AF_INET6 : AF_INET))
+		user_flag_set(user, flag_hbri_want);
 
-	if (strchr(address, '.'))
+	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
+	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
+
+	if (user->id.addr.af == AF_INET)
 	{
-		if (!(hbri && check_network_secondary_ok(cmd, AF_INET6)))
-		{
-			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
-			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_UDP_PORT);
-		}
-		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
+		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_UDP_PORT);
 		adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR, address);
 	}
-	else if (strchr(address, ':'))
+	else if (user->id.addr.af == AF_INET6)
 	{
-		if (!(hbri && check_network_secondary_ok(cmd, AF_INET)))
-		{
-			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
-			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_UDP_PORT);
-		}
-		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
+		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_UDP_PORT);
 		adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR, address);
 	}
 	return 0;
