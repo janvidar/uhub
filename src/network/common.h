@@ -32,7 +32,9 @@ struct ssl_handle; /* abstract type */
 	uint32_t             flags;     /** Connection flags */ \
 	void*                ptr;       /** data pointer */ \
 	net_connection_cb    callback;  /** Callback function */ \
-	struct timeout_evt*  timeout;   /** timeout event handler */
+	struct timeout_evt*  timeout;   /** timeout event handler */ \
+	time_t               last_send; \
+	time_t               last_recv;
 
 #define NET_CON_STRUCT_SSL \
 	struct ssl_handle* ssl;         /** SSL handle */

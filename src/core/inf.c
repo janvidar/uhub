@@ -17,6 +17,7 @@
  *
  */
 
+#include "uhub_limits.h"
 #include "util/log.h"
 #include "util/memory.h"
 #include "util/misc.h"
@@ -488,6 +489,34 @@ static int check_nick(struct hub_info* hub, struct hub_user* user, struct adc_me
 }
 
 
+/*
+ * Drop a colliding session that is a ghost rather than a live user, either
+ * because its connection is already finished, or because the newcomer proved
+ * the same identity (check_cid() only accepts a CID matching the tiger hash of
+ * the presented PID) and the incumbent has been silent for `silence` seconds.
+ * The quit is queued ahead of this login's join event, so the user manager is
+ * clean by the time the new user is added (see hub_event_dispatcher).
+ *
+ * @return 1 if the user was evicted and the collision is resolved.
+ */
+static int evict_ghost(struct hub_info* hub, struct hub_user* incumbent, struct hub_user* user, int silence)
+{
+	int same_identity;
+
+	if (user_is_remote(incumbent) || !incumbent->connection)
+		return 0;
+
+	same_identity = !strcmp(incumbent->id.cid, user->id.cid);
+
+	if (!net_con_is_dead(incumbent->connection) &&
+	    !(same_identity && user_is_silent(incumbent, net_get_time(), silence)))
+		return 0;
+
+	LOG_DEBUG("check_logged_in: evicting ghost session for %s (CID %s)", incumbent->id.nick, incumbent->id.cid);
+	hub_disconnect_user(hub, incumbent, quit_ghost_timeout);
+	return 1;
+}
+
 static int check_logged_in(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
     (void) cmd;
@@ -498,6 +527,22 @@ static int check_logged_in(struct hub_info* hub, struct hub_user* user, struct a
 	{
 		return 0;
 	}
+
+	/* A live client is expected to be heard from at least as often as the hub
+	   pokes it, so the keepalive interval doubles as the silence a ghost has to
+	   have kept; with the keepalive disabled, fall back to how long TCP waits
+	   before probing. */
+	int silence = hub->config->keepalive_interval > 0 ? hub->config->keepalive_interval : KEEPALIVE_IDLE;
+
+	if (lookup1 && evict_ghost(hub, lookup1, user, silence))
+	{
+		if (lookup2 == lookup1)
+			lookup2 = NULL;
+		lookup1 = NULL;
+	}
+
+	if (lookup2 && evict_ghost(hub, lookup2, user, silence))
+		lookup2 = NULL;
 
 	if (lookup1 || lookup2)
 	{

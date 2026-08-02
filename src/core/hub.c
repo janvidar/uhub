@@ -898,6 +898,48 @@ static void hub_timer_statistics(struct timeout_evt* t)
 	timeout_queue_reschedule(net_backend_get_timeout_queue(), hub->stats.timeout, TIMEOUT_STATS);
 }
 
+static size_t hub_keepalive_tick(struct hub_info* hub)
+{
+	int interval = hub->config->keepalive_interval;
+	if (interval > 0 && interval < TIMEOUT_KEEPALIVE)
+		return (size_t) interval;
+	return TIMEOUT_KEEPALIVE;
+}
+
+static void hub_timer_keepalive(struct timeout_evt* t)
+{
+	struct hub_info* hub = (struct hub_info*) t->ptr;
+	int interval = hub->config->keepalive_interval;
+
+	if (interval > 0)
+	{
+		struct adc_message* msg = NULL;
+		struct hub_user* user;
+		struct node* it;
+		time_t now = net_get_time();
+
+		LIST_FOREACH_SAFE(struct hub_user*, user, hub->users->list, it,
+		{
+			if (!user_keepalive_due(user, now, interval))
+				continue;
+
+			if (!msg)
+			{
+				msg = adc_msg_construct_keepalive();
+				if (!msg)
+					break;
+			}
+
+			route_to_user(hub, user, msg);
+			hub->metrics.keepalives++;
+		});
+
+		adc_msg_free(msg);
+	}
+
+	timeout_queue_reschedule(net_backend_get_timeout_queue(), hub->keepalive, hub_keepalive_tick(hub));
+}
+
 static struct net_connection* start_listening_socket(const char* bind_addr, uint16_t port, int backlog, int reuseport, struct hub_info* hub)
 {
 	struct net_connection* server;
@@ -1170,6 +1212,10 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		hub->stats.timeout = hub_malloc_zero(sizeof(struct timeout_evt));
 		timeout_evt_initialize(hub->stats.timeout, hub_timer_statistics, hub);
 		timeout_queue_insert(net_backend_get_timeout_queue(), hub->stats.timeout, TIMEOUT_STATS);
+
+		hub->keepalive = hub_malloc_zero(sizeof(struct timeout_evt));
+		timeout_evt_initialize(hub->keepalive, hub_timer_keepalive, hub);
+		timeout_queue_insert(net_backend_get_timeout_queue(), hub->keepalive, hub_keepalive_tick(hub));
 	}
 
 	// Start the hub command sub-system
@@ -1191,6 +1237,9 @@ void hub_shutdown_service(struct hub_info* hub)
 	{
 		timeout_queue_remove(net_backend_get_timeout_queue(), hub->stats.timeout);
 		hub_free(hub->stats.timeout);
+
+		timeout_queue_remove(net_backend_get_timeout_queue(), hub->keepalive);
+		hub_free(hub->keepalive);
 	}
 
 	unload_ssl_certificates(hub);

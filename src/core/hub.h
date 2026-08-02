@@ -123,6 +123,7 @@ struct metrics_counters
 	uint64_t rev_connect_requests;  /**<< Passive/reverse connect requests (RCM) */
 	uint64_t broadcasts;            /**<< Messages broadcast to all users */
 	uint64_t feature_casts;         /**<< Feature-cast messages routed to subscribers */
+	uint64_t keepalives;            /**<< Keepalives sent to idle connections */
 };
 
 struct hub_logout_info
@@ -154,6 +155,8 @@ struct hub_info
 
 	struct linked_list* logout_info;     /* Log of people logging out. */
 	struct linked_list* write_queue;     /* Users with deferred writes, flushed once per event-loop iteration. */
+
+	struct timeout_evt* keepalive;       /* Periodic sweep sending keepalives to idle connections. */
 
 	struct command_base* commands;       /* Hub command handler */
 	struct uhub_plugins* plugins;        /* Plug-ins loaded for this hub instance. */

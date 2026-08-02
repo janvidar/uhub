@@ -141,6 +141,7 @@ Counters (monotonic, suffix _total):
   uhub_rev_connect_requests_total   Passive connect requests (ReverseConnectToMe).
   uhub_broadcasts_total             Messages broadcast to all users.
   uhub_feature_casts_total          Feature-cast messages routed to subscribers.
+  uhub_keepalives_total             Keepalives sent to idle connections.
   uhub_net_tx_bytes_total           Total bytes transmitted by the hub.
   uhub_net_rx_bytes_total           Total bytes received by the hub.
   uhub_connections_accepted_total   Connections accepted.

@@ -26,6 +26,12 @@ New features:
   by a storage plugin, and propagated to linked hubs.
 - New plugin mod_selfregister: the self-service !regme / !passwd commands,
   split out of mod_auth_sqlite so any auth storage backend can offer them.
+- The hub now sends a keepalive to connections it has not written to for
+  keepalive_interval seconds (default 120), so a connection dropped in the
+  middle is reaped in seconds instead of minutes. A login colliding with a dead
+  or long-silent session of the same identity takes its place rather than being
+  refused as "CID taken"; a session that is still talking is never displaced.
+  New metric: uhub_keepalives_total.
 
 Configuration:
 - NAT override moved out of the acl file into the nat_override option in

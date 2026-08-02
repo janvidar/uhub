@@ -97,6 +97,11 @@ extern struct adc_message* adc_msg_create(const char* string);
 extern struct adc_message* adc_msg_construct(fourcc_t fourcc, size_t size);
 
 /**
+ * Construct a keepalive message: a single line terminator, no command.
+ */
+extern struct adc_message* adc_msg_construct_keepalive();
+
+/**
  * Construct a message for the given 'fourcc' and add a source SID to it,
  * in addition pre-allocate 'size' bytes at the end of the message.
  */

@@ -56,6 +56,8 @@ ssize_t net_con_send(struct net_connection* con, const void* buf, size_t len)
 	{
 		ret = net_ssl_send(con, buf, len);
 	}
+	if (ret > 0)
+		con->last_send = net_get_time();
 	return ret;
 }
 
@@ -72,6 +74,7 @@ ssize_t net_con_writev(struct net_connection* con, const struct iovec* iov, int 
 			return 0;
 		return -1;
 	}
+	con->last_send = net_get_time();
 	return ret;
 }
 #endif
@@ -97,6 +100,8 @@ ssize_t net_con_recv(struct net_connection* con, void* buf, size_t len)
 	{
 		ret = net_ssl_recv(con, buf, len);
 	}
+	if (ret > 0)
+		con->last_recv = net_get_time();
 	return ret;
 }
 
@@ -123,6 +128,29 @@ int net_con_is_ssl(struct net_connection* con)
 	return !!con->ssl;
 }
 
+int net_con_is_dead(struct net_connection* con)
+{
+	char byte;
+	ssize_t ret;
+
+	if (!con || con->sd == -1 || (con->flags & NET_CLEANUP))
+		return 1;
+
+	if (net_get_socket_error(con->sd) != 0)
+		return 1;
+
+	/* The raw socket, not net_con_peek(): that goes through SSL_peek() on a TLS
+	   connection, which drains the socket into OpenSSL's buffer and leaves
+	   level-triggered epoll with no read event to re-fire. */
+	ret = net_recv(con->sd, &byte, 1, MSG_PEEK);
+	if (ret == 0)
+		return 1;
+	if (ret == -1 && !is_blocked_or_interrupted())
+		return 1;
+
+	return 0;
+}
+
 int net_con_get_sd(struct net_connection* con)
 {
 	return con->sd;
@@ -131,6 +159,16 @@ int net_con_get_sd(struct net_connection* con)
 void* net_con_get_ptr(struct net_connection* con)
 {
 	return con->ptr;
+}
+
+time_t net_con_get_last_send(struct net_connection* con)
+{
+	return con->last_send;
+}
+
+time_t net_con_get_last_recv(struct net_connection* con)
+{
+	return con->last_recv;
 }
 
 void net_con_update(struct net_connection* con, int events)

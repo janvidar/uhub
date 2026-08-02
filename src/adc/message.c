@@ -551,6 +551,18 @@ struct adc_message* adc_msg_create(const char* line)
 	return adc_msg_parse(line, strlen(line));
 }
 
+struct adc_message* adc_msg_construct_keepalive()
+{
+	struct adc_message* msg = adc_msg_construct(0, 1);
+	if (!msg)
+		return NULL; /* OOM */
+
+	msg->cache[0] = '\n';
+	adc_msg_set_length(msg, 1);
+	msg->cache[msg->length] = 0;
+	return msg;
+}
+
 struct adc_message* adc_msg_construct_source(fourcc_t fourcc, sid_t source, size_t size)
 {
 	struct adc_message* msg = adc_msg_construct(fourcc, size + 4 + 1);

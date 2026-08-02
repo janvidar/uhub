@@ -45,6 +45,7 @@
 #define TIMEOUT_HANDSHAKE 30
 #define TIMEOUT_SENDQ     120
 #define TIMEOUT_STATS     10
+#define TIMEOUT_KEEPALIVE 10
 
 /*
  * Size of the network timeout wheel, in seconds. Timeout events are hashed into

@@ -366,6 +366,31 @@ int user_is_remote(struct hub_user* user)
 	return user->origin_link != NULL;
 }
 
+int user_is_silent(struct hub_user* user, time_t now, int seconds)
+{
+	if (user_is_remote(user) || !user->connection)
+		return 0;
+
+	return difftime(now, net_con_get_last_recv(user->connection)) >= (double) seconds;
+}
+
+int user_keepalive_due(struct hub_user* user, time_t now, int interval)
+{
+	if (interval <= 0)
+		return 0;
+
+	if (user_is_remote(user) || !user->connection)
+		return 0;
+
+	if (!user_is_logged_in(user) || user_is_disconnecting(user))
+		return 0;
+
+	if (ioq_send_get_bytes(user->send_queue))
+		return 0;
+
+	return difftime(now, net_con_get_last_send(user->connection)) >= (double) interval;
+}
+
 struct hub_user* user_create_remote(struct hub_info* hub, struct hub_link* link, struct adc_message* info)
 {
 	struct hub_user* user;

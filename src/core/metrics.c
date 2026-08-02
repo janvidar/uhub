@@ -167,6 +167,9 @@ static void metrics_build_body(struct hub_info* hub, struct cbuffer* body)
 	METRIC("uhub_feature_casts_total", "counter", "Feature-cast messages routed to subscribers.");
 	cbuf_append_format(body, "uhub_feature_casts_total %" PRIu64 "\n", hub->metrics.feature_casts);
 
+	METRIC("uhub_keepalives_total", "counter", "Keepalives sent to idle connections.");
+	cbuf_append_format(body, "uhub_keepalives_total %" PRIu64 "\n", hub->metrics.keepalives);
+
 	METRIC("uhub_net_tx_bytes_total", "counter", "Total bytes transmitted by the hub.");
 	cbuf_append_format(body, "uhub_net_tx_bytes_total " PRINTF_SIZE_T "\n", hub->stats.net_tx_total);
 

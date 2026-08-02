@@ -347,6 +347,23 @@
 		]]></example>
 	</option>
 
+	<option name="keepalive_interval" type="int" default="120">
+		<check min="0" max="3600" />
+		<short>Seconds of write silence before the hub pokes an idle client</short>
+		<description><![CDATA[
+			How long a logged-in connection may go without the hub writing anything to it before the hub sends an empty line (<code>\n</code>) as a keepalive. Clients ignore empty lines, so this is only there to make the hub write: a write to a connection the peer has already forgotten (a NAT or firewall dropped the state, or the client went away without a FIN) fails or is reset, and the hub reaps the stale user.<br />
+			This matters because clients do the same thing in the other direction. A client whose keepalive is reset reconnects immediately, and if the hub is still holding the dead connection the new login is rejected as "CID taken". Poking idle connections closes that window.<br />
+			The same value doubles as how long a session must have been silent before a login presenting the same CID may take its place: a live client is expected to be heard from at least that often, so a session that is still talking is never displaced, while one that has gone quiet gives way to its owner reconnecting. A different CID never displaces anything that is still alive.<br />
+			If this is 0 the keepalive is disabled and stale connections are only detected by TCP keepalive, which takes several minutes. Connections that already have data queued are skipped: they have a pending write of their own, and adding to the backlog would not tell the hub anything new.
+		]]></description>
+		<syntax>0 = off</syntax>
+		<since>0.8.0</since>
+		<example><![CDATA[
+			To poke idle connections every minute:<br />
+				keepalive_interval = 60
+		]]></example>
+	</option>
+
 	<option name="registered_users_only" type="boolean" default="0">
 		<short>Allow registered users only</short>
 		<description><![CDATA[

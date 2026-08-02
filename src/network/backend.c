@@ -210,6 +210,8 @@ int net_backend_process()
 
 time_t net_get_time()
 {
+	if (!g_backend)
+		return time(NULL);
 	return g_backend->now;
 }
 
@@ -227,6 +229,8 @@ size_t net_backend_get_max_connections()
 void net_con_initialize(struct net_connection* con, int sd, net_connection_cb callback, const void* ptr, int events)
 {
 	g_backend->handler.con_init(g_backend->data, con, sd, callback, ptr);
+
+	con->last_send = con->last_recv = net_get_time();
 
 	net_set_nonblocking(net_con_get_sd(con), 1);
 	net_set_nosigpipe(net_con_get_sd(con), 1);

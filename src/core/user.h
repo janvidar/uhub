@@ -254,6 +254,19 @@ extern int user_is_disconnecting(struct hub_user *user);
 extern int user_is_remote(struct hub_user *user);
 
 /**
+ * Returns 1 if nothing has been received from this user for at least `seconds`.
+ * A remote (federated) user is never considered silent.
+ */
+extern int user_is_silent(struct hub_user *user, time_t now, int seconds);
+
+/**
+ * Returns 1 if the hub has not written to this user's connection for `interval`
+ * seconds and it should be sent a keepalive. Only logged-in local users with an
+ * empty send queue qualify; an interval of 0 disables the check.
+ */
+extern int user_keepalive_due(struct hub_user *user, time_t now, int interval);
+
+/**
  * Returns 1 if a user is protected, which includes users
  * having any form of elevated privileges.
  */

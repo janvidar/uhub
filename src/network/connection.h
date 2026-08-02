@@ -54,6 +54,20 @@ typedef void (*net_connect_cb)(struct net_connect_handle*, enum net_connect_stat
 extern int   net_con_get_sd(struct net_connection* con);
 extern void* net_con_get_ptr(struct net_connection* con);
 
+/**
+ * Returns 1 if the connection is closed, holds an undelivered socket error or
+ * has the peer's FIN waiting, and 0 if it still looks alive. A peer that
+ * vanished silently looks alive until TCP gives up on it.
+ */
+extern int net_con_is_dead(struct net_connection* con);
+
+/**
+ * Wall-clock time of the last successful write, respectively read, on this
+ * connection. Seeded when the connection is initialized.
+ */
+extern time_t net_con_get_last_send(struct net_connection* con);
+extern time_t net_con_get_last_recv(struct net_connection* con);
+
 extern struct net_connection* net_con_create();
 
 /**
