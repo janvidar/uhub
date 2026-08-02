@@ -1,5 +1,6 @@
 #include "util/memory.h"
 #include "adc/message.h"
+#include "network/ipcalc.h"
 #include "network/network.h"
 #include "core/auth.h"
 #include "core/config.h"
@@ -225,6 +226,120 @@ EXO_TEST(inf_su_no_adc0,    { return check_su_strip("BINF AAAB SUTCP4,UDP4\n", "
 EXO_TEST(inf_su_adcs_kept,  { return check_su_strip("BINF AAAB SUADCS,TCP4\n", "ADCS,TCP4"); }); /* ADCS must not be confused with ADC0 */
 EXO_TEST(inf_su_adcs_adc0,  { return check_su_strip("BINF AAAB SUADCS,ADC0,TCP4\n", "ADCS,TCP4"); });
 EXO_TEST(inf_su_none,       { return check_su_strip("BINF AAAB NIFriend\n", NULL); }); /* no SU field at all */
+
+/*
+ * Run a login INF through hub_handle_info_login() and check the I4/I6 left in
+ * the stored INF against 'expect4'/'expect6', where NULL means the flag must be
+ * absent entirely.
+ */
+static int check_network_override(const char* observed, const char* msg_text, const char* expect4, const char* expect6)
+{
+	struct adc_message* msg;
+	char* got4;
+	char* got6;
+	int ok;
+
+	if (!ip_convert_to_binary(observed, &inf_user->id.addr))
+		return 0;
+
+	msg = adc_msg_parse_verify(inf_user, msg_text, strlen(msg_text));
+	if (!msg)
+		return 0;
+
+	ok = (hub_handle_info_login(inf_hub, inf_user, msg) == 0);
+	adc_msg_free(msg);
+	if (!ok)
+		return 0;
+
+	got4 = adc_msg_get_named_argument(inf_user->info, "I4");
+	got6 = adc_msg_get_named_argument(inf_user->info, "I6");
+
+	ok = (expect4 ? (got4 && strcmp(got4, expect4) == 0) : (got4 == NULL))
+	  && (expect6 ? (got6 && strcmp(got6, expect6) == 0) : (got6 == NULL));
+
+	if (!ok)
+		printf("address mismatch: got I4='%s' I6='%s', expected I4='%s' I6='%s'\n",
+			got4 ? got4 : "(null)", got6 ? got6 : "(null)",
+			expect4 ? expect4 : "(null)", expect6 ? expect6 : "(null)");
+
+	hub_free(got4);
+	hub_free(got6);
+	return ok;
+}
+
+#define INF_LOGIN(EXTRA) "BINF AAAB NI" USER_NICK " ID" USER_CID " PD" USER_PID " " EXTRA "\n"
+
+/* Clear the hub-count limits left behind by inf_limit_hubs_setup, which would
+   otherwise reject these logins before check_network() ever runs. */
+EXO_TEST(inf_addr_setup,
+{
+	inf_hub->config->limit_max_hubs_user = 0;
+	inf_hub->config->limit_max_hubs_reg  = 0;
+	inf_hub->config->limit_max_hubs_op   = 0;
+	inf_hub->config->limit_min_hubs_user = 0;
+	inf_hub->config->limit_min_hubs_reg  = 0;
+	inf_hub->config->limit_min_hubs_op   = 0;
+	inf_hub->config->limit_max_hubs      = 0;
+	return 1;
+});
+
+/* check that advertised addresses are discarded and replaced */
+EXO_TEST(inf_addr_zero_replaced, {
+	return check_network_override("10.20.30.40", INF_LOGIN("I40.0.0.0"), "10.20.30.40", NULL);
+});
+
+EXO_TEST(inf_addr_spoof_discarded, {
+	return check_network_override("10.20.30.40", INF_LOGIN("I4192.0.2.66"), "10.20.30.40", NULL);
+});
+
+EXO_TEST(inf_addr_other_family_dropped, {
+	return check_network_override("10.20.30.40", INF_LOGIN("I42001:db8::1 I62001:db8::1"), "10.20.30.40", NULL);
+});
+
+EXO_TEST(inf_addr_ipv6_replaced, {
+	if (!net_is_ipv6_supported()) return 1;
+	return check_network_override("2001:db8::5", INF_LOGIN("I6:: I40.0.0.0"), NULL, "2001:db8::5");
+});
+
+/* With HBRI the second-family address is still discarded; only flag_hbri_want
+   is set, and the orphaned UDP port goes with the address. */
+EXO_TEST(inf_addr_hbri_still_discarded, {
+	int ok;
+
+	inf_hub->config->hbri_enable = 1;
+	hub_free(inf_hub->config->hbri_address4);
+	hub_free(inf_hub->config->hbri_address6);
+	inf_hub->config->hbri_address4 = hub_strdup("192.0.2.1");
+	inf_hub->config->hbri_address6 = hub_strdup("2001:db8::1");
+	user_flag_set(inf_user, feature_hbri);
+	user_flag_unset(inf_user, flag_hbri_want);
+
+	ok = check_network_override("10.20.30.40", INF_LOGIN("I40.0.0.0 I62001:db8::99 U612345"), "10.20.30.40", NULL)
+	  && user_flag_get(inf_user, flag_hbri_want);
+
+	if (ok)
+	{
+		char* u6 = adc_msg_get_named_argument(inf_user->info, "U6");
+		ok = (u6 == NULL);
+		hub_free(u6);
+	}
+
+	user_flag_unset(inf_user, feature_hbri);
+	inf_hub->config->hbri_enable = 0;
+	return ok;
+});
+
+EXO_TEST(inf_addr_hbri_not_supported, {
+	inf_hub->config->hbri_enable = 1;
+	user_flag_unset(inf_user, feature_hbri);
+	user_flag_unset(inf_user, flag_hbri_want);
+
+	int ok = check_network_override("10.20.30.40", INF_LOGIN("I62001:db8::99"), "10.20.30.40", NULL)
+	      && !user_flag_get(inf_user, flag_hbri_want);
+
+	inf_hub->config->hbri_enable = 0;
+	return ok;
+});
 
 EXO_TEST(inf_destroy_setup,
 {

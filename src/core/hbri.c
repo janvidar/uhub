@@ -104,58 +104,20 @@ static const char* hbri_inf_udp_flag(int af)
 	return (af == AF_INET6) ? ADC_INF_FLAG_IPV6_UDP_PORT : ADC_INF_FLAG_IPV4_UDP_PORT;
 }
 
-static int hbri_addr_is_valid(int af, const char* addr)
-{
-	if (af == AF_INET6)
-		return ip_is_valid_ipv6(addr);
-	return ip_is_valid_ipv4(addr);
-}
-
-/*
- * Remove the secondary-family address (and matching UDP port) from a stored
- * INF. Used when validation fails or is impossible so the unverified address
- * is never broadcast.
- */
-static void hbri_strip_secondary(struct hub_user* user)
-{
-	int af = hbri_secondary_af(user);
-	if (af == -1 || !user->info)
-		return;
-	adc_msg_remove_named_argument(user->info, hbri_inf_addr_flag(af));
-	adc_msg_remove_named_argument(user->info, hbri_inf_udp_flag(af));
-}
-
 int hbri_is_candidate(struct hub_info* hub, struct hub_user* user)
 {
-	int af;
-	char* addr;
-	int valid;
-
 	if (!hbri_is_enabled(hub))
 		return 0;
 
 	if (!user_flag_get(user, feature_hbri))
 		return 0;
 
-	if (!user->info)
+	if (hbri_secondary_af(user) == -1)
 		return 0;
 
-	af = hbri_secondary_af(user);
-	if (af == -1)
-		return 0;
-
-	/* The user must advertise an address in the protocol family it did not
-	   connect over -- that is the address we will ask it to prove. */
-	addr = adc_msg_get_named_argument(user->info, hbri_inf_addr_flag(af));
-	if (!addr || !*addr)
-	{
-		hub_free(addr);
-		return 0;
-	}
-
-	valid = hbri_addr_is_valid(af, addr);
-	hub_free(addr);
-	return valid;
+	/* The client must have signalled second-family connectivity in its login
+	   INF; check_network() recorded that as a flag. */
+	return user_flag_get(user, flag_hbri_want);
 }
 
 /*
@@ -254,17 +216,16 @@ void hbri_send_validation_request(struct hub_info* hub, struct hub_user* user)
 void hbri_on_login(struct hub_info* hub, struct hub_user* user)
 {
 	/*
-	 * The user logs in over its primary protocol now; its INF has already been
-	 * broadcast by the caller. Strip the (still unverified) second-family
-	 * address from the stored INF so it is not advertised yet, then ask the
-	 * client to prove it. If validation later succeeds the address is added
-	 * back via an INF update. If it never comes, the user simply stays
-	 * primary-only -- no timeout, nothing held.
+	 * The user logs in over its primary protocol now, with a primary-only INF:
+	 * check_network() already discarded whatever second-family address it
+	 * advertised. Ask the client to prove that family over a secondary
+	 * connection. If validation succeeds the address observed there is added via
+	 * an INF update. If it never comes, the user simply stays primary-only --
+	 * no timeout, nothing held.
 	 */
 	if (!hbri_is_candidate(hub, user))
 		return;
 
-	hbri_strip_secondary(user);
 	hbri_send_validation_request(hub, user);
 }
 
@@ -277,7 +238,6 @@ int hbri_handle_validation(struct hub_info* hub, struct hub_user* vuser, struct 
 	int sec_af;
 	const char* real_addr;
 	char real_addr_copy[INET6_ADDRSTRLEN + 1];
-	char* claimed_addr;
 	char* claimed_udp;
 	struct adc_message* sta;
 
@@ -324,23 +284,12 @@ int hbri_handle_validation(struct hub_info* hub, struct hub_user* vuser, struct 
 
 	sec_af = vuser->id.addr.af;
 
-	/* The authoritative second-family address is the validation connection's
-	   real remote IP. If the client also advertised one it must match (unless
-	   the advertised value is empty), mirroring the main login IP check. */
+	/* The second-family address is the validation connection's real remote IP.
+	   Whatever the reply advertises in I4/I6 is discarded, as on the primary
+	   connection. */
 	real_addr = ip_convert_to_string(&vuser->id.addr);
 	strncpy(real_addr_copy, real_addr ? real_addr : "", sizeof(real_addr_copy) - 1);
 	real_addr_copy[sizeof(real_addr_copy) - 1] = 0;
-
-	claimed_addr = adc_msg_get_named_argument(cmd, hbri_inf_addr_flag(sec_af));
-	if (claimed_addr && *claimed_addr && strcmp(claimed_addr, real_addr_copy) != 0)
-	{
-		LOG_DEBUG("HBRI: advertised %s does not match real address %s", claimed_addr, real_addr_copy);
-		hbri_send_status(hub, vuser, "152", "Advertised address does not match");
-		hub_free(claimed_addr);
-		/* The user simply keeps whatever address it already had. */
-		return -1;
-	}
-	hub_free(claimed_addr);
 
 	/* Merge the proven address (and the advertised secondary UDP port) into the
 	   main user's INF, and broadcast the update only if it actually changed

@@ -45,8 +45,8 @@ extern int hbri_is_enabled(struct hub_info* hub);
 
 /**
  * @return 1 if the user is a candidate for HBRI secondary-protocol validation:
- * HBRI is enabled, the user supports the HBRI feature, and its stored INF
- * advertises an address in the protocol family it did NOT connect over.
+ * HBRI is enabled, the user supports the HBRI feature, and its login INF
+ * signalled connectivity over the protocol family it did NOT connect over.
  */
 extern int hbri_is_candidate(struct hub_info* hub, struct hub_user* user);
 
@@ -67,9 +67,9 @@ extern void hbri_on_login(struct hub_info* hub, struct hub_user* user);
 
 /**
  * Handle an HTCP validation reply received on a fresh (validation) connection.
- * On success the proven second-family address is merged into the referenced
- * user's INF and broadcast as an update. The validation connection is always
- * closed afterwards (returns -1).
+ * On success the address observed on that connection is merged into the
+ * referenced user's INF and broadcast as an update. The validation connection
+ * is always closed afterwards (returns -1).
  */
 extern int hbri_handle_validation(struct hub_info* hub, struct hub_user* vuser, struct adc_message* cmd);
 
