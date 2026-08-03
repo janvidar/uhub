@@ -22,6 +22,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <time.h>
 #include "adc/adcconst.h"
 #include "util/list.h"
 
@@ -162,6 +163,16 @@ extern char* adc_msg_get_argument(struct adc_message* cmd, int offset);
  * @return  0 if successful, or -1 if an error occurred.
  */
 extern int adc_msg_replace_named_argument(struct adc_message* cmd, const char prefix[2], const char* string);
+
+/**
+ * Stamp a message with the time it is relayed, as the "TS" named argument
+ * (seconds since the Unix epoch). Any TS already present is replaced, so a
+ * timestamp supplied by a client is never passed on to the recipients.
+ *
+ * @arg timestamp seconds since the Unix epoch; negative values are clamped to 0.
+ * @return  0 if successful, or -1 if an error occurred.
+ */
+extern int adc_msg_add_timestamp(struct adc_message* cmd, time_t timestamp);
 
 /**
  * Append an argument

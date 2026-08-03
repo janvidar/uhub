@@ -560,6 +560,13 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 	if (relay)
 	{
 		/* adc_msg_remove_named_argument(cmd, "PM"); */
+
+		/* Stamp the message with the hub's clock before it is relayed, so every
+		   recipient -- and every linked hub -- sees the same time. A TS sent by
+		   the client is discarded: the timestamp is the hub's view of when the
+		   message was relayed, not a value the sender gets to choose. */
+		adc_msg_add_timestamp(cmd, net_get_time());
+
 		if (broadcast)
 		{
 			plugin_log_chat_message(hub, u, message_decoded, 0);

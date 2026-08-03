@@ -762,6 +762,25 @@ int adc_msg_replace_named_argument(struct adc_message* cmd, const char prefix[2]
 }
 
 
+int adc_msg_add_timestamp(struct adc_message* cmd, time_t timestamp)
+{
+	const char* value;
+
+	ADC_MSG_ASSERT(cmd);
+
+	/* Times before the epoch cannot be expressed in the TS flag; a hub whose
+	   clock is that far off relays 0 rather than a negative timestamp. */
+	if (timestamp < 0)
+		timestamp = 0;
+
+	value = uhub_ulltoa((uint64_t) timestamp);
+	if (!value)
+		return -1;
+
+	return adc_msg_replace_named_argument(cmd, ADC_MSG_FLAG_TIMESTAMP, value);
+}
+
+
 void adc_msg_terminate(struct adc_message* cmd)
 {
 	if (cmd->length == 0 || cmd->cache[cmd->length - 1] != '\n')

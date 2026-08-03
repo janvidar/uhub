@@ -720,6 +720,65 @@ EXO_TEST(adc_message_empty_3, {
 	return ok;
 });
 
+/* Timestamps: the TS flag holds seconds since the Unix epoch. */
+EXO_TEST(adc_message_timestamp_add, {
+	struct adc_message* msg = adc_msg_parse_verify(g_user, test_string2, strlen(test_string2));
+	int ok = msg && adc_msg_add_timestamp(msg, (time_t) 1234567890) == 0;
+	if (ok)
+		ok = strcmp(msg->cache, "BMSG AAAB Hello\\sWorld! TS1234567890\n") == 0;
+	adc_msg_free(msg);
+	return ok;
+});
+
+/* A timestamp sent by the client is replaced, not appended to. */
+EXO_TEST(adc_message_timestamp_replace, {
+	const char* line = "BMSG AAAB Hi TS1\n";
+	struct adc_message* msg = adc_msg_parse_verify(g_user, line, strlen(line));
+	int ok = msg && adc_msg_add_timestamp(msg, (time_t) 1700000000) == 0;
+	if (ok)
+		ok = strcmp(msg->cache, "BMSG AAAB Hi TS1700000000\n") == 0;
+	adc_msg_free(msg);
+	return ok;
+});
+
+EXO_TEST(adc_message_timestamp_single, {
+	struct adc_message* msg = adc_msg_parse_verify(g_user, test_string2, strlen(test_string2));
+	int ok = msg != NULL;
+	if (ok)
+	{
+		adc_msg_add_timestamp(msg, (time_t) 1);
+		adc_msg_add_timestamp(msg, (time_t) 2);
+		ok = adc_msg_has_named_argument(msg, ADC_MSG_FLAG_TIMESTAMP) == 1;
+	}
+	adc_msg_free(msg);
+	return ok;
+});
+
+/* A clock before the epoch relays 0 rather than a negative timestamp. */
+EXO_TEST(adc_message_timestamp_negative, {
+	struct adc_message* msg = adc_msg_parse_verify(g_user, test_string2, strlen(test_string2));
+	int ok = msg && adc_msg_add_timestamp(msg, (time_t) -1) == 0;
+	if (ok)
+		ok = strcmp(msg->cache, "BMSG AAAB Hello\\sWorld! TS0\n") == 0;
+	adc_msg_free(msg);
+	return ok;
+});
+
+/* The stamped message still parses, and TS reads back as written. */
+EXO_TEST(adc_message_timestamp_readback, {
+	struct adc_message* msg = adc_msg_parse_verify(g_user, test_string2, strlen(test_string2));
+	char* ts = NULL;
+	int ok = msg && adc_msg_add_timestamp(msg, (time_t) 1234567890) == 0;
+	if (ok)
+	{
+		ts = adc_msg_get_named_argument(msg, ADC_MSG_FLAG_TIMESTAMP);
+		ok = ts && strcmp(ts, "1234567890") == 0;
+	}
+	hub_free(ts);
+	adc_msg_free(msg);
+	return ok;
+});
+
 EXO_TEST(adc_message_last, {
 	hub_free(g_user);
 	g_user = 0;
