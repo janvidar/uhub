@@ -197,7 +197,7 @@ const Ctx = struct {
         m.addCSourceFiles(.{
             .root = b.path("third_party/exotic/src"),
             .files = &.{ "autotest.c", "exotic_main.c" },
-            .flags = &.{ "-w", "-DVERSION=\"0.5.0\"" },
+            .flags = &.{ "-w", "-DVERSION=\"0.6.0\"" },
         });
         m.addIncludePath(b.path("third_party/exotic/src"));
 
