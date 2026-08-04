@@ -34,6 +34,29 @@ extern void cbuf_append(struct cbuffer* buf, const char* msg);
 extern void cbuf_append_format(struct cbuffer* buf, const char* format, ...);
 extern void cbuf_append_strftime(struct cbuffer* buf, const char* format, const struct tm* tm);
 
+/**
+ * Append @p text with the CommonMark inline markup characters escaped, for use
+ * in a message marked as rich text by the ADC RTF0 extension. Text that a user
+ * controls -- nicks, chat messages, plugin supplied strings -- must go through
+ * this, or it can alter the formatting and break out of a table cell.
+ *
+ * Only inline constructs are parsed inside a table cell, so the block level
+ * markers ('#', '-', '1.', ...) are left alone; '>' is escaped regardless, as
+ * the closing half of an autolink. Note that a markdown backslash escape goes
+ * on the wire as "\\", which is exactly what adc_msg_escape() turns the single
+ * '\' written here into.
+ */
+extern void cbuf_append_markdown(struct cbuffer* buf, const char* text);
+
+/**
+ * Append @p text as a markdown code span.
+ *
+ * Only for hub generated tokens -- addresses, counts, version strings. A code
+ * span has no escape mechanism, so a backtick in the text would end the span
+ * early; anything a user controls must go through cbuf_append_markdown().
+ */
+extern void cbuf_append_markdown_code(struct cbuffer* buf, const char* text);
+
 extern const char* cbuf_get(struct cbuffer* buf);
 extern size_t cbuf_size(struct cbuffer* buf);
 

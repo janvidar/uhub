@@ -36,6 +36,12 @@
 #define MAX_HELP_MSG 16384
 #define MAX_HELP_LINE 512
 
+/* The !log listing can hold up to max_logout_log (<= 2000) entries, which is far
+ * too much for one message, so the rich text variant is split into several
+ * tables of at most this many bytes -- each one self-contained, header and all. */
+#define LOG_TABLE_HEADER "| Time | Nick | CID | Address | Reason |\n| --- | --- | --- | --- | --- |\n"
+#define LOG_TABLE_CHUNK 4096
+
 static int send_command_access_denied(struct command_base* cbase, struct hub_user* user, const char* prefix);
 static int send_command_not_found(struct command_base* cbase, struct hub_user* user, const char* prefix);
 static int send_command_syntax_error(struct command_base* cbase, struct hub_user* user);
@@ -180,6 +186,32 @@ void send_message(struct command_base* cbase, struct hub_user* user, struct cbuf
 	cbuf_destroy(buf);
 }
 
+/**
+ * Returns 1 if a message to @p user may be marked as rich text formatted, ie.
+ * the hub allows rich text and the client negotiated RTF0.
+ */
+static int command_rich_text_ok(struct command_base* cbase, struct hub_user* user)
+{
+	return cbase->hub && cbase->hub->config && cbase->hub->config->chat_rich_text &&
+		user_flag_get(user, feature_rtf0);
+}
+
+/**
+ * Like send_message(), but marks the message as rich text formatted (RTF0's
+ * RT1 flag). Only call this when command_rich_text_ok() holds for @p user.
+ */
+static void send_rich_message(struct command_base* cbase, struct hub_user* user, struct cbuffer* buf)
+{
+	char* buffer = adc_msg_escape(cbuf_get(buf));
+	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 10);
+	adc_msg_add_argument(command, buffer);
+	adc_msg_add_named_argument(command, ADC_MSG_FLAG_RICH_TEXT, "1");
+	route_to_user(cbase->hub, user, command);
+	adc_msg_free(command);
+	hub_free(buffer);
+	cbuf_destroy(buf);
+}
+
 static int send_command_access_denied(struct command_base* cbase, struct hub_user* user, const char* prefix)
 {
 	struct cbuffer* buf = cbuf_create(128);
@@ -301,12 +333,62 @@ static int command_status(struct command_base* cbase, struct hub_user* user, str
 	return 0;
 }
 
+/**
+ * The !help output for a client that negotiated RTF0: the command listing is a
+ * markdown table, and a single command is a bold "Usage:" label followed by the
+ * syntax as a code span. The status prefix ("*** help: ") is left out here, as
+ * a leading "***" is markdown emphasis rather than decoration.
+ */
+void command_help_rich(struct command_base* cbase, struct hub_user* user, struct cbuffer* buf, struct command_handle* command)
+{
+	if (!command)
+	{
+		struct command_handle* handle;
+
+		cbuf_append(buf, "**Available commands**\n\n");
+		cbuf_append(buf, "| Command | Description |\n");
+		cbuf_append(buf, "| --- | --- |\n");
+
+		LIST_FOREACH(struct command_handle*, handle, cbase->handlers,
+		{
+			if (command_is_available(handle, user->credentials))
+			{
+				/* Command prefixes are plain identifiers, so a code span
+				 * needs no escaping -- descriptions are free text. */
+				cbuf_append_format(buf, "| `!%s` | ", handle->prefix);
+				cbuf_append_markdown(buf, handle->description);
+				cbuf_append(buf, " |\n");
+			}
+		});
+
+		cbuf_append(buf, "\nUse `!help <command>` for the syntax of a single command.");
+	}
+	else if (command_is_available(command, user->credentials))
+	{
+		cbuf_append(buf, "**Usage:** `");
+		command_get_syntax(command, buf);
+		cbuf_append(buf, "`\n\n");
+		cbuf_append_markdown(buf, command->description);
+	}
+	else
+	{
+		cbuf_append(buf, "This command is not available to you.");
+	}
+}
+
 static int command_help(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
 	size_t n;
 	struct cbuffer* buf = cbuf_create(MAX_HELP_LINE);
 	struct hub_command_arg_data* data = hub_command_arg_next(cmd, type_command);
 	struct command_handle* command;
+
+	if (command_rich_text_ok(cbase, user))
+	{
+		command_help_rich(cbase, user, buf, data ? data->data.command : NULL);
+		send_rich_message(cbase, user, buf);
+		return 0;
+	}
 
 	if (!data)
 	{
@@ -560,6 +642,15 @@ static int command_version(struct command_base* cbase, struct hub_user* user, st
 static int command_myip(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
 	struct cbuffer* buf = cbuf_create(128);
+
+	if (command_rich_text_ok(cbase, user))
+	{
+		cbuf_append(buf, "Your address is ");
+		cbuf_append_markdown_code(buf, user_get_address(user));
+		send_rich_message(cbase, user, buf);
+		return 0;
+	}
+
 	cbuf_append_format(buf, "Your address is \"%s\"", user_get_address(user));
 	return command_status(cbase, user, cmd, buf);
 }
@@ -568,6 +659,17 @@ static int command_getip(struct command_base* cbase, struct hub_user* user, stru
 {
 	struct cbuffer* buf = cbuf_create(128);
 	struct hub_command_arg_data* arg = hub_command_arg_next(cmd, type_user);
+
+	if (command_rich_text_ok(cbase, user))
+	{
+		cbuf_append(buf, "**");
+		cbuf_append_markdown(buf, arg->data.user->id.nick);
+		cbuf_append(buf, "** has address ");
+		cbuf_append_markdown_code(buf, user_get_address(arg->data.user));
+		send_rich_message(cbase, user, buf);
+		return 0;
+	}
+
 	cbuf_append_format(buf, "\"%s\" has address \"%s\"", arg->data.user->id.nick, user_get_address(arg->data.user));
 	return command_status(cbase, user, cmd, buf);
 }
@@ -578,6 +680,7 @@ static int command_whoip(struct command_base* cbase, struct hub_user* user, stru
 	struct hub_command_arg_data* arg = hub_command_arg_next(cmd, type_range);
 	struct linked_list* users = (struct linked_list*) list_create();
 	struct hub_user* u;
+	int rich = command_rich_text_ok(cbase, user);
 	int ret = 0;
 
 	ret = uman_get_user_by_addr(cbase->hub->users, users, arg->data.range);
@@ -588,16 +691,44 @@ static int command_whoip(struct command_base* cbase, struct hub_user* user, stru
 		return command_status(cbase, user, cmd, cbuf_create_const("No users found."));
 	}
 
-	buf = cbuf_create(128 + ((MAX_NICK_LEN + INET6_ADDRSTRLEN + 5) * ret));
-	cbuf_append_format(buf, "*** %s: Found %d match%s:\n", cmd->prefix, ret, ((ret != 1) ? "es" : ""));
+	buf = cbuf_create(128 + ((MAX_NICK_LEN + INET6_ADDRSTRLEN + 8) * ret));
+
+	if (rich)
+	{
+		cbuf_append_format(buf, "**Found %d match%s**\n\n", ret, ((ret != 1) ? "es" : ""));
+		cbuf_append(buf, "| Nick | Address |\n| --- | --- |\n");
+	}
+	else
+	{
+		cbuf_append_format(buf, "*** %s: Found %d match%s:\n", cmd->prefix, ret, ((ret != 1) ? "es" : ""));
+	}
 
 	LIST_FOREACH(struct hub_user*, u, users,
 	{
-		cbuf_append_format(buf, "%s (%s)\n", u->id.nick, user_get_address(u));
+		if (rich)
+		{
+			cbuf_append(buf, "| ");
+			cbuf_append_markdown(buf, u->id.nick);
+			cbuf_append(buf, " | ");
+			cbuf_append_markdown_code(buf, user_get_address(u));
+			cbuf_append(buf, " |\n");
+		}
+		else
+		{
+			cbuf_append_format(buf, "%s (%s)\n", u->id.nick, user_get_address(u));
+		}
 	});
-	cbuf_append(buf, "\n");
 
-	send_message(cbase, user, buf);
+	if (rich)
+	{
+		send_rich_message(cbase, user, buf);
+	}
+	else
+	{
+		cbuf_append(buf, "\n");
+		send_message(cbase, user, buf);
+	}
+
 	list_clear(users, NULL);
 	list_destroy(users);
 	return 0;
@@ -656,22 +787,40 @@ static int command_log(struct command_base* cbase, struct hub_user* user, struct
 	char* search = arg ? arg->data.string : "";
 	size_t search_len = strlen(search);
 	size_t search_hits = 0;
+	int rich;
 
 	if (!list_size(messages))
 	{
 		return command_status(cbase, user, cmd, cbuf_create_const("No entries logged."));
 	}
 
+	rich = command_rich_text_ok(cbase, user);
 	buf = cbuf_create(128);
-	cbuf_append_format(buf, "Logged entries: " PRINTF_SIZE_T, list_size(messages));
 
-	if (search_len)
+	if (rich)
 	{
-		cbuf_append_format(buf, ", searching for \"%s\"", search);
+		cbuf_append_format(buf, "**Logged entries: " PRINTF_SIZE_T "**", list_size(messages));
+		if (search_len)
+		{
+			cbuf_append(buf, ", searching for ");
+			cbuf_append_markdown_code(buf, search);
+		}
+		send_rich_message(cbase, user, buf);
 	}
-	command_status(cbase, user, cmd, buf);
+	else
+	{
+		cbuf_append_format(buf, "Logged entries: " PRINTF_SIZE_T, list_size(messages));
+		if (search_len)
+		{
+			cbuf_append_format(buf, ", searching for \"%s\"", search);
+		}
+		command_status(cbase, user, cmd, buf);
+	}
 
 	buf = cbuf_create(MAX_HELP_LINE);
+	if (rich)
+		cbuf_append(buf, LOG_TABLE_HEADER);
+
 	LIST_FOREACH(struct hub_logout_info*, log, messages,
 	{
 		const char* address = ip_convert_to_string(&log->addr);
@@ -690,7 +839,27 @@ static int command_log(struct command_base* cbase, struct hub_user* user, struct
 			show = 1;
 		}
 
-		if (show)
+		if (show && rich)
+		{
+			/* One row per entry, but a table only renders as a table if the
+			 * whole thing is a single message -- so flush and start a new one
+			 * (header included) once a chunk gets large. */
+			cbuf_append_format(buf, "| %s | ", get_timestamp(log->time));
+			cbuf_append_markdown(buf, log->nick);
+			cbuf_append(buf, " | ");
+			cbuf_append_markdown(buf, log->cid);
+			cbuf_append(buf, " | ");
+			cbuf_append_markdown_code(buf, address);
+			cbuf_append_format(buf, " | %s |\n", user_get_quit_reason_string(log->reason));
+
+			if (cbuf_size(buf) >= LOG_TABLE_CHUNK)
+			{
+				send_rich_message(cbase, user, buf);
+				buf = cbuf_create(MAX_HELP_LINE);
+				cbuf_append(buf, LOG_TABLE_HEADER);
+			}
+		}
+		else if (show)
 		{
 			cbuf_append_format(buf, "* %s %s, %s [%s] - %s", get_timestamp(log->time), log->cid, log->nick, ip_convert_to_string(&log->addr), user_get_quit_reason_string(log->reason));
 			send_message(cbase, user, buf);
@@ -698,10 +867,25 @@ static int command_log(struct command_base* cbase, struct hub_user* user, struct
 		}
 	});
 
+	/* Flush the last chunk, unless it is a bare header with no rows under it. */
+	if (rich && cbuf_size(buf) > strlen(LOG_TABLE_HEADER))
+	{
+		send_rich_message(cbase, user, buf);
+		buf = cbuf_create(MAX_HELP_LINE);
+	}
+
 	if (search_len)
 	{
-		cbuf_append_format(buf, PRINTF_SIZE_T " entries shown.", search_hits);
-		command_status(cbase, user, cmd, buf);
+		if (rich)
+		{
+			cbuf_append_format(buf, "**" PRINTF_SIZE_T "** entries shown.", search_hits);
+			send_rich_message(cbase, user, buf);
+		}
+		else
+		{
+			cbuf_append_format(buf, PRINTF_SIZE_T " entries shown.", search_hits);
+			command_status(cbase, user, cmd, buf);
+		}
 		buf = NULL;
 	}
 
@@ -716,6 +900,30 @@ static int command_stats(struct command_base* cbase, struct hub_user* user, stru
 	struct hub_info* hub = cbase->hub;
 	static char rxbuf[64] = { "0 B" };
 	static char txbuf[64] = { "0 B" };
+
+	if (command_rich_text_ok(cbase, user))
+	{
+		cbuf_append(buf, "**Hub statistics**\n\n| | Value |\n| --- | --- |\n");
+		cbuf_append_format(buf, "| Users | " PRINTF_SIZE_T "/" PRINTF_SIZE_T " (peak %d) |\n",
+			hub->users->count, hub->config->max_users, hub->users->count_peak);
+
+		format_size(hub->stats.net_rx, rxbuf, sizeof(rxbuf));
+		format_size(hub->stats.net_tx, txbuf, sizeof(txbuf));
+		cbuf_append_format(buf, "| Network | tx=%s/s, rx=%s/s |\n", txbuf, rxbuf);
+
+#ifdef SHOW_PEAK_NET_STATS /* currently disabled */
+		format_size(hub->stats.net_rx_peak, rxbuf, sizeof(rxbuf));
+		format_size(hub->stats.net_tx_peak, txbuf, sizeof(txbuf));
+		cbuf_append_format(buf, "| Peak | tx=%s/s, rx=%s/s |\n", txbuf, rxbuf);
+#endif
+
+		format_size(hub->stats.net_rx_total, rxbuf, sizeof(rxbuf));
+		format_size(hub->stats.net_tx_total, txbuf, sizeof(txbuf));
+		cbuf_append_format(buf, "| Total | tx=%s, rx=%s |\n", txbuf, rxbuf);
+
+		send_rich_message(cbase, user, buf);
+		return 0;
+	}
 
 	cbuf_append(buf, "Hub statistics: ");
 	cbuf_append_format(buf, PRINTF_SIZE_T "/" PRINTF_SIZE_T " users (peak %d). ", hub->users->count, hub->config->max_users, hub->users->count_peak);

@@ -137,6 +137,12 @@ typedef int (*hfunc_send_message)(struct plugin_handle*, struct plugin_user* use
  * rich text (chat_rich_text) or the client did not negotiate RTF0, so a caller
  * never has to check either itself. */
 typedef int (*hfunc_send_rich_message)(struct plugin_handle*, struct plugin_user* user, const char* message);
+/* Returns 1 if a message to `user` may be sent as rich text, ie. the hub allows
+ * it and the client negotiated RTF0. Needed when the rich and the plain variant
+ * of a message differ in more than the RT flag: send_rich_message() falls back
+ * by sending the very same string unformatted, which would expose markdown
+ * markup and backslash escapes to a client that cannot render them. */
+typedef int (*hfunc_user_supports_rich_text)(struct plugin_handle*, struct plugin_user* user);
 typedef int (*hfunc_send_broadcast_message)(struct plugin_handle*, const char* message);
 typedef int (*hfunc_send_status)(struct plugin_handle*, struct plugin_user* to, int code, const char* message);
 typedef int (*hfunc_send_user_command)(struct plugin_handle*, struct plugin_user* user, const char* name, int context, const char* command);
@@ -216,6 +222,7 @@ struct plugin_hub_funcs
 	hfunc_set_hub_description set_description;
 	hfunc_get_tls_version get_tls_version;
 	hfunc_send_rich_message send_rich_message;
+	hfunc_user_supports_rich_text user_supports_rich_text;
 };
 
 struct plugin_handle

@@ -196,6 +196,34 @@ static JSValue js_user_send_message(JSContext* ctx, JSValueConst this_val, int a
 	return JS_UNDEFINED;
 }
 
+/* RTF0: the text is CommonMark, rendered by clients that negotiated the
+   extension. Scripts should gate on supportsRichText() rather than rely on the
+   fallback, which sends the very same string unformatted -- markup and all. */
+static JSValue js_user_send_rich_message(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
+{
+	struct js_user* u = js_user_live(ctx, this_val);
+	const char* text;
+	if (!u)
+		return JS_EXCEPTION;
+	if (argc < 1)
+		return JS_ThrowTypeError(ctx, "sendRichMessage(text) requires a string");
+	text = JS_ToCString(ctx, argv[0]);
+	if (!text)
+		return JS_EXCEPTION;
+	u->plugin->hub.send_rich_message(u->plugin, u->user, text);
+	JS_FreeCString(ctx, text);
+	return JS_UNDEFINED;
+}
+
+static JSValue js_user_supports_rich_text(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
+{
+	struct js_user* u = js_user_live(ctx, this_val);
+	(void) argc; (void) argv;
+	if (!u)
+		return JS_EXCEPTION;
+	return JS_NewBool(ctx, u->plugin->hub.user_supports_rich_text(u->plugin, u->user));
+}
+
 static JSValue js_user_send_status(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
 {
 	struct js_user* u = js_user_live(ctx, this_val);
@@ -248,6 +276,8 @@ static JSValue js_user_ban(JSContext* ctx, JSValueConst this_val, int argc, JSVa
 
 static const JSCFunctionListEntry js_user_proto_funcs[] = {
 	JS_CFUNC_DEF("sendMessage", 1, js_user_send_message),
+	JS_CFUNC_DEF("sendRichMessage", 1, js_user_send_rich_message),
+	JS_CFUNC_DEF("supportsRichText", 0, js_user_supports_rich_text),
 	JS_CFUNC_DEF("sendStatus", 2, js_user_send_status),
 	JS_CFUNC_DEF("disconnect", 0, js_user_disconnect),
 	JS_CFUNC_DEF("ban", 2, js_user_ban),

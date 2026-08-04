@@ -105,3 +105,62 @@ EXO_TEST(cbuf_const, {
 	cbuf_destroy(b);
 	return ok;
 });
+
+/*
+ * RTF0 markdown escaping (used to build the rich text variant of !help, !whoip,
+ * the topic, ... from text the hub does not control).
+ */
+
+static int cbuf_md_is(const char* in, const char* expected)
+{
+	struct cbuffer* b = cbuf_create(16);
+	int ok;
+	if (!b) return 0;
+	cbuf_append_markdown(b, in);
+	ok = !strcmp(cbuf_get(b), expected);
+	cbuf_destroy(b);
+	return ok;
+}
+
+static int cbuf_md_code_is(const char* in, const char* expected)
+{
+	struct cbuffer* b = cbuf_create(16);
+	int ok;
+	if (!b) return 0;
+	cbuf_append_markdown_code(b, in);
+	ok = !strcmp(cbuf_get(b), expected);
+	cbuf_destroy(b);
+	return ok;
+}
+
+EXO_TEST(cbuf_markdown_plain, { return cbuf_md_is("nothing to escape", "nothing to escape"); });
+EXO_TEST(cbuf_markdown_empty, { return cbuf_md_is("", ""); });
+
+/* Every inline markup character is neutralised... */
+EXO_TEST(cbuf_markdown_emphasis, { return cbuf_md_is("*bold* _em_", "\\*bold\\* \\_em\\_"); });
+EXO_TEST(cbuf_markdown_code_span, { return cbuf_md_is("a `b` c", "a \\`b\\` c"); });
+EXO_TEST(cbuf_markdown_link, { return cbuf_md_is("[x](y)", "\\[x\\](y)"); });
+EXO_TEST(cbuf_markdown_autolink, { return cbuf_md_is("<http://x>", "\\<http://x\\>"); });
+EXO_TEST(cbuf_markdown_strike, { return cbuf_md_is("~~gone~~", "\\~\\~gone\\~\\~"); });
+
+/* ... including the backslash itself, so an escape cannot be forged. */
+EXO_TEST(cbuf_markdown_backslash, { return cbuf_md_is("a\\*b", "a\\\\\\*b"); });
+
+/* A '|' would otherwise split a table cell. */
+EXO_TEST(cbuf_markdown_pipe, { return cbuf_md_is("a|b", "a\\|b"); });
+
+/* Block level markers are inline-safe inside a table cell and stay literal --
+ * except '>', which is escaped anyway as the closing half of an autolink. */
+EXO_TEST(cbuf_markdown_block_markers, { return cbuf_md_is("# - > 1.", "# - \\> 1."); });
+
+/* An image embed cannot be smuggled in by a user-supplied string. */
+EXO_TEST(cbuf_markdown_image, {
+	return cbuf_md_is("![x](magnet:?xt=y)", "!\\[x\\](magnet:?xt=y)");
+});
+
+EXO_TEST(cbuf_markdown_code_wraps, { return cbuf_md_code_is("1.2.3.4", "`1.2.3.4`"); });
+EXO_TEST(cbuf_markdown_code_empty, { return cbuf_md_code_is("", "``"); });
+
+/* Markup inside a code span is literal, so only the cell separator is escaped. */
+EXO_TEST(cbuf_markdown_code_literal, { return cbuf_md_code_is("*a* _b_", "`*a* _b_`"); });
+EXO_TEST(cbuf_markdown_code_pipe, { return cbuf_md_code_is("a|b", "`a\\|b`"); });

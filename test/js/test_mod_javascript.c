@@ -14,6 +14,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifndef WIN32
+#include <sys/stat.h>
+#endif
 
 /* ---- recording hub-func stubs ------------------------------------------ */
 
@@ -109,7 +112,9 @@ static int64_t now_ms(void)
 	return (int64_t) ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
 
-/* Write text to a temp file and return a malloc'd path (caller frees + unlinks). */
+/* Write text to a temp file and return a malloc'd path (caller frees + unlinks).
+   mod_javascript refuses to load a group- or world-writable script, so drop the
+   umask bits the fixture would otherwise inherit. */
 static char* write_temp_script(const char* text)
 {
 	char* path = malloc(64);
@@ -120,6 +125,14 @@ static char* write_temp_script(const char* text)
 	if (!f) { free(path); return NULL; }
 	fwrite(text, 1, strlen(text), f);
 	fclose(f);
+#ifndef WIN32
+	if (chmod(path, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) != 0)
+	{
+		remove(path);
+		free(path);
+		return NULL;
+	}
+#endif
 	return path;
 }
 

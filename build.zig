@@ -83,6 +83,7 @@ const tcc_sources = [_][]const u8{
     "test_credentials.tcc",
     "test_eventqueue.tcc",
     "test_hbri.tcc",
+    "test_help_rtf0.tcc",
     "test_hub.tcc",
     "test_inf.tcc",
     "test_ipfilter.tcc",

@@ -139,11 +139,27 @@ Properties (read-only snapshots):
 Methods:
 
     user.sendMessage(text)        Send an informational message from the hub.
+    user.sendRichMessage(text)    Same, but marked as rich text (RTF0): `text` is
+                                  CommonMark and a supporting client renders it.
+    user.supportsRichText()       True if this client negotiated RTF0 and the hub
+                                  allows rich text (see the chat_rich_text option).
     user.sendStatus(code, text)   Send a status message.
     user.disconnect()             Kick the user.
     user.ban(seconds, reason)     Ban (cid+nick), disconnect, persist and
                                   propagate cluster-wide. seconds<=0 = permanent;
                                   reason may be omitted.
+
+sendRichMessage() falls back to an ordinary message when the client cannot
+render rich text -- but it sends the very same string, markup and all. Whenever
+the two variants would differ (anything with escapes, tables, or links), branch
+on supportsRichText() and build each one:
+
+    uhub.onUserLogin(function (user) {
+        if (user.supportsRichText())
+            user.sendRichMessage("Welcome, **" + user.nick + "**!");
+        else
+            user.sendMessage("Welcome, " + user.nick + "!");
+    });
 
 Lifetime -- IMPORTANT: a `user` handed to a handler is only valid for the
 duration of that call. If you stash it and use it from a later callback, the

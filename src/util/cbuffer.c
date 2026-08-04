@@ -117,6 +117,31 @@ void cbuf_append(struct cbuffer* buf, const char* msg)
 	cbuf_append_bytes(buf, msg, len);
 }
 
+void cbuf_append_markdown(struct cbuffer* buf, const char* text)
+{
+	size_t n;
+	for (n = 0; text[n]; n++)
+	{
+		if (strchr("\\`*_[]<>~|", text[n]))
+			cbuf_append_bytes(buf, "\\", 1);
+		cbuf_append_bytes(buf, &text[n], 1);
+	}
+}
+
+void cbuf_append_markdown_code(struct cbuffer* buf, const char* text)
+{
+	size_t n;
+	cbuf_append_bytes(buf, "`", 1);
+	for (n = 0; text[n]; n++)
+	{
+		/* GFM: a '|' splits the table cell even inside a code span. */
+		if (text[n] == '|')
+			cbuf_append_bytes(buf, "\\", 1);
+		cbuf_append_bytes(buf, &text[n], 1);
+	}
+	cbuf_append_bytes(buf, "`", 1);
+}
+
 void cbuf_append_format(struct cbuffer* buf, const char* format, ...)
 {
 	static char tmp[MAX_MSG_LEN];

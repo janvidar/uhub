@@ -128,6 +128,14 @@ static int cbfunc_send_message(struct plugin_handle* plugin, struct plugin_user*
 	return 1;
 }
 
+static int cbfunc_user_supports_rich_text(struct plugin_handle* plugin, struct plugin_user* user)
+{
+	struct hub_info* hub = plugin_get_hub(plugin);
+	if (!user)
+		return 0;
+	return hub->config->chat_rich_text && user_flag_get(as_hub_user(user), feature_rtf0) ? 1 : 0;
+}
+
 static int cbfunc_send_rich_message(struct plugin_handle* plugin, struct plugin_user* user, const char* message)
 {
 	char* buffer;
@@ -528,6 +536,7 @@ void plugin_register_callback_functions(struct plugin_handle* handle)
 {
 	handle->hub.send_message = cbfunc_send_message;
 	handle->hub.send_rich_message = cbfunc_send_rich_message;
+	handle->hub.user_supports_rich_text = cbfunc_user_supports_rich_text;
 	handle->hub.send_broadcast_message = cbfunc_send_broadcast;
 	handle->hub.send_status_message = cbfunc_send_status;
 	handle->hub.send_user_command = cbfunc_send_user_command;

@@ -22,6 +22,7 @@
 
 #include "core/command_parser.h"
 
+struct cbuffer;
 struct hub_info;
 struct hub_user;
 
@@ -96,6 +97,15 @@ extern int command_del(struct command_base*, struct command_handle*);
  * for that command if the sufficient access credentials are met.
  */
 extern int command_invoke(struct command_base*, struct hub_user* user, const char* message);
+
+/**
+ * Build the RTF0 (markdown) variant of the !help output into @p buf: the full
+ * command listing as a table when @p command is NULL, or the usage for a single
+ * command otherwise. Only sent to clients that negotiated RTF0 on a hub with
+ * chat_rich_text enabled; everyone else gets the plain aligned listing.
+ * Exposed for testing.
+ */
+void command_help_rich(struct command_base* cbase, struct hub_user* user, struct cbuffer* buf, struct command_handle* command);
 
 /**
  * Returns 1 if the command handle can be used with the given credentials, 0 otherwise.

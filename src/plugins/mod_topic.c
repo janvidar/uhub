@@ -29,16 +29,37 @@ struct topic_plugin_data
 	struct plugin_command_handle* showtopic;
 };
 
-static int command_topic_handler(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_command* cmd)
+/**
+ * Reply with the topic, either as rich text (RTF0) or as the plain quoted form.
+ * The topic is operator supplied text, so the rich variant has to escape it --
+ * which is also why the two variants cannot share a string and be handed to
+ * send_rich_message()'s built-in fallback.
+ */
+static void send_topic_reply(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_command* cmd, const char* label, const char* plain_label, const char* topic)
 {
 	struct cbuffer* buf = cbuf_create(128);
+
+	if (plugin->hub.user_supports_rich_text(plugin, user))
+	{
+		cbuf_append_format(buf, "**%s:** ", label);
+		cbuf_append_markdown(buf, topic);
+		plugin->hub.send_rich_message(plugin, user, cbuf_get(buf));
+	}
+	else
+	{
+		cbuf_append_format(buf, "*** %s: %s \"%s\"", cmd->prefix, plain_label, topic);
+		plugin->hub.send_message(plugin, user, cbuf_get(buf));
+	}
+	cbuf_destroy(buf);
+}
+
+static int command_topic_handler(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_command* cmd)
+{
 	struct plugin_command_arg_data* arg = plugin->hub.command_arg_next(plugin, cmd, plugin_cmd_arg_type_string);
 	char* topic = arg ? arg->data.string : "";
 
 	plugin->hub.set_description(plugin, topic);
-	cbuf_append_format(buf, "*** %s: Topic set to \"%s\"", cmd->prefix, topic);
-	plugin->hub.send_message(plugin, user, cbuf_get(buf));
-	cbuf_destroy(buf);
+	send_topic_reply(plugin, user, cmd, "Topic set to", "Topic set to", topic);
 	return 0;
 }
 
@@ -46,19 +67,25 @@ static int command_resettopic_handler(struct plugin_handle* plugin, struct plugi
 {
 	struct cbuffer* buf = cbuf_create(128);
 	plugin->hub.set_description(plugin, NULL);
-	cbuf_append_format(buf, "*** %s: Topic reset.", cmd->prefix);
-	plugin->hub.send_message(plugin, user, cbuf_get(buf));
+
+	if (plugin->hub.user_supports_rich_text(plugin, user))
+	{
+		cbuf_append(buf, "**Topic reset.**");
+		plugin->hub.send_rich_message(plugin, user, cbuf_get(buf));
+	}
+	else
+	{
+		cbuf_append_format(buf, "*** %s: Topic reset.", cmd->prefix);
+		plugin->hub.send_message(plugin, user, cbuf_get(buf));
+	}
 	cbuf_destroy(buf);
 	return 0;
 }
 
 static int command_showtopic_handler(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_command* cmd)
 {
-	struct cbuffer* buf = cbuf_create(128);
 	char* topic = plugin->hub.get_description(plugin);
-	cbuf_append_format(buf, "*** %s: Current topic is: \"%s\"", cmd->prefix, topic);
-	plugin->hub.send_message(plugin, user, cbuf_get(buf));
-	cbuf_destroy(buf);
+	send_topic_reply(plugin, user, cmd, "Current topic", "Current topic is:", topic);
 	hub_free(topic);
 	return 0;
 }
