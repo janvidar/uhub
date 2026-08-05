@@ -139,7 +139,10 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 				/* HBRI secondary-protocol validation reply. This arrives on a
 				   fresh connection as its very first command (no HSUP), so it
 				   is handled before the normal handshake. The validation
-				   connection is always closed afterwards. */
+				   connection is always closed afterwards. Flood-checked like
+				   the other pre-login commands: the peer is unauthenticated
+				   here and each reply costs a token verification. */
+				CHECK_FLOOD(extras, 0);
 				ret = hbri_handle_validation(hub, u, cmd);
 				break;
 

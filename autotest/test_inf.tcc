@@ -1,9 +1,11 @@
 #include "util/memory.h"
 #include "adc/message.h"
+#include "adc/sid.h"
 #include "network/ipcalc.h"
 #include "network/network.h"
 #include "core/auth.h"
 #include "core/config.h"
+#include "core/hbri.h"
 #include "core/hub.h"
 #include "core/usermanager.h"
 
@@ -338,6 +340,180 @@ EXO_TEST(inf_addr_hbri_not_supported, {
 	      && !user_flag_get(inf_user, flag_hbri_want);
 
 	inf_hub->config->hbri_enable = 0;
+	return ok;
+});
+
+/*
+ * HBRI validation. The secondary-family UDP port is stripped at login (its
+ * address is unproven then) and must come back once the validation connection
+ * proves the address -- otherwise the user ends up reachable but invisible to
+ * UDP search results on that family.
+ */
+
+static struct hub_user* inf_vuser = 0;
+
+/* Log in over IPv4 advertising an IPv6 address plus 'u6', then register the user
+   so hbri_handle_validation() can find it by SID. */
+static int inf_hbri_login(const char* u6)
+{
+	char msg[256];
+
+	inf_hub->config->hbri_enable = 1;
+	user_flag_set(inf_user, feature_hbri);
+	user_flag_unset(inf_user, flag_hbri_want);
+
+	snprintf(msg, sizeof(msg), INF_LOGIN("I40.0.0.0 I62001:db8::99 %s"), u6);
+
+	if (!check_network_override("10.20.30.40", msg, "10.20.30.40", NULL))
+		return 0;
+
+	/* hbri_handle_validation() resolves the token's SID prefix through the SID
+	   pool, so registering there is enough -- no need to disturb the nick/CID
+	   maps, and the user keeps the SID its INF is signed with. */
+	user_set_state(inf_user, state_normal);
+	return sid_pool_insert(inf_hub->users->sids, inf_user->id.sid, inf_user) == 1;
+}
+
+static void inf_hbri_logout(void)
+{
+	sid_free(inf_hub->users->sids, inf_user->id.sid);
+	user_set_state(inf_user, state_protocol);
+	user_flag_unset(inf_user, feature_hbri);
+	user_flag_unset(inf_user, flag_hbri_want);
+	inf_hub->config->hbri_enable = 0;
+}
+
+/* Feed an HTCP reply from an IPv6 peer at 'from' into hbri_handle_validation. */
+static int inf_hbri_validate(const char* from, const char* extra)
+{
+	char token[HBRI_TOKEN_LEN + 1];
+	char text[256];
+	struct adc_message* cmd;
+	int ret;
+
+	inf_vuser = (struct hub_user*) hub_malloc_zero(sizeof(struct hub_user));
+	if (!ip_convert_to_binary(from, &inf_vuser->id.addr))
+		return 0;
+
+	hbri_token_make(inf_hub, inf_user, token);
+	snprintf(text, sizeof(text), "HTCP TO%s%s\n", token, extra);
+
+	cmd = adc_msg_parse_verify(inf_vuser, text, strlen(text));
+	if (!cmd)
+		return 0;
+
+	/* Always returns -1: the validation connection is closed either way. */
+	ret = hbri_handle_validation(inf_hub, inf_vuser, cmd);
+	adc_msg_free(cmd);
+	hub_free(inf_vuser);
+	inf_vuser = 0;
+	return ret == -1;
+}
+
+/* Check the I6/U6 now published in the user's INF. NULL means "must be absent". */
+static int inf_hbri_check_info(const char* expect6, const char* expect_u6)
+{
+	char* got6 = adc_msg_get_named_argument(inf_user->info, "I6");
+	char* gotu = adc_msg_get_named_argument(inf_user->info, "U6");
+	int ok = (expect6 ? (got6 && strcmp(got6, expect6) == 0) : (got6 == NULL))
+	      && (expect_u6 ? (gotu && strcmp(gotu, expect_u6) == 0) : (gotu == NULL));
+
+	if (!ok)
+		printf("hbri info mismatch: got I6='%s' U6='%s', expected I6='%s' U6='%s'\n",
+			got6 ? got6 : "(null)", gotu ? gotu : "(null)",
+			expect6 ? expect6 : "(null)", expect_u6 ? expect_u6 : "(null)");
+
+	hub_free(got6);
+	hub_free(gotu);
+	return ok;
+}
+
+/* The reply carries no U6, so the port remembered from the login INF is used.
+   This is the regression the whole change is about. */
+EXO_TEST(inf_hbri_port_from_login, {
+	int ok = inf_hbri_login("U612345")
+	      && strcmp(inf_user->hbri_udp_port, "12345") == 0
+	      && inf_hbri_check_info(NULL, NULL) /* stripped until proven */
+	      && inf_hbri_validate("2001:db8::5", "")
+	      && inf_hbri_check_info("2001:db8::5", "12345");
+	inf_hbri_logout();
+	return ok;
+});
+
+/* A U6 in the reply wins over the remembered one. */
+EXO_TEST(inf_hbri_port_from_reply, {
+	int ok = inf_hbri_login("U612345")
+	      && inf_hbri_validate("2001:db8::5", " U654321")
+	      && inf_hbri_check_info("2001:db8::5", "54321");
+	inf_hbri_logout();
+	return ok;
+});
+
+/* A bogus port in the reply must not reach the broadcast INF; fall back. */
+EXO_TEST(inf_hbri_port_reply_invalid, {
+	int ok = inf_hbri_login("U612345")
+	      && inf_hbri_validate("2001:db8::5", " U6bogus")
+	      && inf_hbri_check_info("2001:db8::5", "12345");
+	inf_hbri_logout();
+	return ok;
+});
+
+/* Nothing to fall back to: the address is still published, just without a port. */
+EXO_TEST(inf_hbri_port_absent, {
+	int ok = inf_hbri_login("")
+	      && inf_user->hbri_udp_port[0] == 0
+	      && inf_hbri_validate("2001:db8::5", "")
+	      && inf_hbri_check_info("2001:db8::5", NULL);
+	inf_hbri_logout();
+	return ok;
+});
+
+/* The address published is the one observed on the validation connection, not
+   the one the client claimed in either INF. */
+EXO_TEST(inf_hbri_addr_from_connection, {
+	int ok = inf_hbri_login("U612345")
+	      && inf_hbri_validate("2001:db8::5", " I62001:db8::dead")
+	      && inf_hbri_check_info("2001:db8::5", "12345");
+	inf_hbri_logout();
+	return ok;
+});
+
+/* A validation answers the outstanding challenge, so a later address change can
+   trigger a fresh one rather than leaving a stale address published forever. */
+EXO_TEST(inf_hbri_clears_want_flag, {
+	int ok = inf_hbri_login("U612345")
+	      && user_flag_get(inf_user, flag_hbri_want)
+	      && inf_hbri_validate("2001:db8::5", "")
+	      && !user_flag_get(inf_user, flag_hbri_want);
+	inf_hbri_logout();
+	return ok;
+});
+
+/*
+ * hbri_handle_validation() must not edit the INF in place: user_set_info()
+ * shares it by refcount and ioq_send_add() queues that same object, so a peer
+ * may still be part-way through sending it. Hold a reference across the
+ * validation and check the bytes we handed out never changed.
+ */
+EXO_TEST(inf_hbri_does_not_mutate_shared_info, {
+	struct adc_message* held;
+	int ok;
+
+	if (!inf_hbri_login("U612345"))
+	{
+		inf_hbri_logout();
+		return 0;
+	}
+
+	held = adc_msg_incref(inf_user->info);
+	ok = inf_hbri_validate("2001:db8::5", "")
+	  && inf_user->info != held             /* replaced, not mutated */
+	  && strstr(held->cache, " I6") == NULL /* our copy is untouched */
+	  && strstr(held->cache, " U6") == NULL
+	  && inf_hbri_check_info("2001:db8::5", "12345");
+
+	adc_msg_free(held);
+	inf_hbri_logout();
 	return ok;
 });
 

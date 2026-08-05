@@ -39,6 +39,7 @@ typedef uint32_t sid_t;
 #define MAX_NICK_LEN 64
 #define MAX_PASS_LEN 64
 #define MAX_UA_LEN   32
+#define MAX_PORT_LEN  5 /* "65535" */
 
 /* Size of a Tiger hash digest, in bytes. */
 #define TIGERSIZE    24

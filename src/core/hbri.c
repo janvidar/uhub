@@ -29,6 +29,7 @@
 #include "core/config.h"
 #include "core/hbri.h"
 #include "core/hub.h"
+#include "core/link.h"
 #include "core/route.h"
 #include "core/user.h"
 #include "core/usermanager.h"
@@ -102,6 +103,43 @@ static const char* hbri_inf_addr_flag(int af)
 static const char* hbri_inf_udp_flag(int af)
 {
 	return (af == AF_INET6) ? ADC_INF_FLAG_IPV6_UDP_PORT : ADC_INF_FLAG_IPV4_UDP_PORT;
+}
+
+int hbri_port_is_valid(const char* port)
+{
+	unsigned long value = 0;
+	size_t i;
+
+	if (!port || !*port)
+		return 0;
+
+	for (i = 0; port[i]; i++)
+	{
+		if (i >= MAX_PORT_LEN || port[i] < '0' || port[i] > '9')
+			return 0;
+		value = (value * 10) + (unsigned long) (port[i] - '0');
+	}
+
+	return value > 0 && value <= 65535;
+}
+
+void hbri_remember_udp_port(struct hub_user* user, struct adc_message* cmd, int af)
+{
+	char* port = adc_msg_get_named_argument(cmd, hbri_inf_udp_flag(af));
+
+	/* Absent means "unchanged" on an INF update, so only touch the stored value
+	   when the client actually sent the field. A present-but-bogus value clears
+	   it -- we must not keep re-publishing a port the client has withdrawn. */
+	if (port)
+	{
+		if (hbri_port_is_valid(port))
+			strncpy(user->hbri_udp_port, port, sizeof(user->hbri_udp_port) - 1);
+		else
+			user->hbri_udp_port[0] = 0;
+		user->hbri_udp_port[sizeof(user->hbri_udp_port) - 1] = 0;
+	}
+
+	hub_free(port);
 }
 
 int hbri_is_candidate(struct hub_info* hub, struct hub_user* user)
@@ -291,29 +329,73 @@ int hbri_handle_validation(struct hub_info* hub, struct hub_user* vuser, struct 
 	strncpy(real_addr_copy, real_addr ? real_addr : "", sizeof(real_addr_copy) - 1);
 	real_addr_copy[sizeof(real_addr_copy) - 1] = 0;
 
-	/* Merge the proven address (and the advertised secondary UDP port) into the
-	   main user's INF, and broadcast the update only if it actually changed
-	   anything -- this also dedupes repeated validation connections. */
+	/* Merge the proven address (and the secondary UDP port) into the main user's
+	   INF, and broadcast the update only if it actually changed anything -- this
+	   also dedupes repeated validation connections. */
 	if (main_user->info)
 	{
-		char* old_addr = adc_msg_get_named_argument(main_user->info, hbri_inf_addr_flag(sec_af));
-		int changed = !old_addr || strcmp(old_addr, real_addr_copy) != 0;
-		hub_free(old_addr);
+		struct adc_message* updated;
+		char* old_addr;
+		char* old_udp;
+		const char* new_udp;
+		int changed;
 
-		adc_msg_remove_named_argument(main_user->info, hbri_inf_addr_flag(sec_af));
-		adc_msg_add_named_argument(main_user->info, hbri_inf_addr_flag(sec_af), real_addr_copy);
+		/*
+		 * The INF must be copied, never edited in place: user_set_info() shares
+		 * the object by refcount and ioq_send_add() queues that same object, so
+		 * peers may still hold it -- possibly partially sent, with q->offset
+		 * pointing into a cache that adc_msg_cache_append() would realloc.
+		 */
+		updated = adc_msg_copy(main_user->info);
+		if (!updated)
+			return -1;
 
+		/*
+		 * The port the client advertised for this family was stripped at login
+		 * (its address was unproven then) and remembered on the user. Prefer a
+		 * fresh value from the validation reply, and fall back to the remembered
+		 * one -- the reference clients are not guaranteed to repeat it here, and
+		 * without a fallback the user would end up proven but unreachable for
+		 * UDP search results on this family.
+		 */
 		claimed_udp = adc_msg_get_named_argument(cmd, hbri_inf_udp_flag(sec_af));
-		adc_msg_remove_named_argument(main_user->info, hbri_inf_udp_flag(sec_af));
-		if (claimed_udp && *claimed_udp)
-			adc_msg_add_named_argument(main_user->info, hbri_inf_udp_flag(sec_af), claimed_udp);
+		if (hbri_port_is_valid(claimed_udp))
+			new_udp = claimed_udp;
+		else if (hbri_port_is_valid(main_user->hbri_udp_port))
+			new_udp = main_user->hbri_udp_port;
+		else
+			new_udp = 0;
+
+		old_addr = adc_msg_get_named_argument(updated, hbri_inf_addr_flag(sec_af));
+		old_udp = adc_msg_get_named_argument(updated, hbri_inf_udp_flag(sec_af));
+		changed = !old_addr || strcmp(old_addr, real_addr_copy) != 0
+			|| (new_udp ? (!old_udp || strcmp(old_udp, new_udp) != 0) : (old_udp != 0));
+		hub_free(old_addr);
+		hub_free(old_udp);
+
+		adc_msg_remove_named_argument(updated, hbri_inf_addr_flag(sec_af));
+		adc_msg_add_named_argument(updated, hbri_inf_addr_flag(sec_af), real_addr_copy);
+
+		adc_msg_remove_named_argument(updated, hbri_inf_udp_flag(sec_af));
+		if (new_udp)
+			adc_msg_add_named_argument(updated, hbri_inf_udp_flag(sec_af), new_udp);
 		hub_free(claimed_udp);
+
+		user_set_info(main_user, updated);
+		adc_msg_free(updated);
+
+		/* The challenge is answered: allow a later address change to trigger a
+		   fresh one (see check_hbri_update). */
+		user_flag_unset(main_user, flag_hbri_want);
 
 		LOG_DEBUG("HBRI: validated %s address %s for %s",
 			(sec_af == AF_INET6) ? "IPv6" : "IPv4", real_addr_copy, main_user->id.nick);
 
 		if (changed)
+		{
 			route_info_message(hub, main_user);
+			link_broadcast_local_inf(hub, main_user);
+		}
 	}
 
 	/* Tell the validation connection it succeeded, then close it. We send

@@ -174,6 +174,13 @@ struct hub_user
 	/* Per-user plugin storage: list of struct plugin_user_data_entry, one per
 	   plugin that attached data. NULL until first use. Cleaned up on destroy. */
 	struct linked_list* plugin_data;
+
+	/* HBRI: the UDP port the client advertised for the protocol family it did
+	   NOT connect over. That U4/U6 field is stripped from the INF at login
+	   (check_network) because the address it belongs to is unproven, so it is
+	   remembered here and merged back once the validation connection succeeds
+	   (hbri_handle_validation). Empty string when nothing was advertised. */
+	char hbri_udp_port[MAX_PORT_LEN + 1];
 };
 
 /**

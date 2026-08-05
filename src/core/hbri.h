@@ -84,4 +84,21 @@ extern int hbri_handle_validation(struct hub_info* hub, struct hub_user* vuser, 
 extern void hbri_token_make(struct hub_info* hub, struct hub_user* user, char* out /* >= HBRI_TOKEN_LEN+1 */);
 extern int hbri_token_check(struct hub_info* hub, struct hub_user* user, const char* token);
 
+/**
+ * @return 1 if the string is a plausible ADC port: decimal digits only, at most
+ * MAX_PORT_LEN of them, and in the range 1-65535.
+ */
+extern int hbri_port_is_valid(const char* port);
+
+/**
+ * Remember the UDP port the client advertised for protocol family 'af', so it
+ * can be merged back into the INF once that family's address is validated. The
+ * matching U4/U6 field is stripped from the broadcast INF by the caller, since
+ * the address it belongs to is unproven until then.
+ *
+ * Does nothing if 'cmd' carries no U-flag for that family (on an INF update an
+ * absent field means "unchanged"); an invalid value clears the stored port.
+ */
+extern void hbri_remember_udp_port(struct hub_user* user, struct adc_message* cmd, int af);
+
 #endif /* HAVE_UHUB_HBRI_H */

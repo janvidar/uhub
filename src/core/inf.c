@@ -300,16 +300,22 @@ static int check_network_secondary_ok(struct adc_message* cmd, int af)
 /*
  * When a logged-in HBRI client signals second-family connectivity in an INF
  * update, ask it to prove that over a secondary connection. Does nothing if
- * HBRI is disabled, the client does not support it, or we already hold an
- * address for that family. The advertised value is only a trigger; the address
- * itself comes from the validation connection.
+ * HBRI is disabled or the client does not support it. The advertised value is
+ * only a trigger; the address itself comes from the validation connection.
+ *
+ * A re-challenge fires when the client advertises an address that differs from
+ * the one currently published -- otherwise a roaming client's validated address
+ * would be broadcast forever after it stopped being reachable. flag_hbri_want
+ * throttles this: it is set here and cleared on a successful validation, so a
+ * client that never completes one cannot trigger an ITCP per INF update.
  */
 static void check_hbri_update(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
 	int sec_af;
 	const char* flag;
+	char* advertised;
 	char* current;
-	int have_address;
+	int is_new;
 
 	if (!hbri_is_enabled(hub) || !user_flag_get(user, feature_hbri))
 		return;
@@ -318,13 +324,23 @@ static void check_hbri_update(struct hub_info* hub, struct hub_user* user, struc
 	if (!check_network_secondary_ok(cmd, sec_af))
 		return;
 
+	if (user_flag_get(user, flag_hbri_want))
+		return; /* a challenge is already outstanding */
+
 	flag = (sec_af == AF_INET6) ? ADC_INF_FLAG_IPV6_ADDR : ADC_INF_FLAG_IPV4_ADDR;
+	advertised = adc_msg_get_named_argument(cmd, flag);
 	current = user->info ? adc_msg_get_named_argument(user->info, flag) : 0;
-	have_address = current && *current;
+
+	is_new = advertised && *advertised && (!current || strcmp(advertised, current) != 0);
+
+	hub_free(advertised);
 	hub_free(current);
 
-	if (!have_address)
+	if (is_new)
+	{
+		user_flag_set(user, flag_hbri_want);
 		hbri_send_validation_request(hub, user);
+	}
 }
 
 static int check_network(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
@@ -359,24 +375,66 @@ static int check_network(struct hub_info* hub, struct hub_user* user, struct adc
 	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
 	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
 
+	/* The login INF is the client's full state, so an absent secondary U-flag
+	   means "no port" rather than "unchanged": start from empty. */
+	user->hbri_udp_port[0] = 0;
+
 	if (user->id.addr.af == AF_INET)
 	{
+		hbri_remember_udp_port(user, cmd, AF_INET6);
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_UDP_PORT);
 		adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR, address);
 	}
 	else if (user->id.addr.af == AF_INET6)
 	{
+		hbri_remember_udp_port(user, cmd, AF_INET);
 		adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_UDP_PORT);
 		adc_msg_add_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR, address);
 	}
 	return 0;
 }
 
+/*
+ * @return 1 if the hub currently publishes an address for family 'af' in the
+ * user's INF. For the secondary family that means HBRI validation succeeded.
+ */
+static int have_address_for(struct hub_user* user, int af)
+{
+	const char* flag = (af == AF_INET6) ? ADC_INF_FLAG_IPV6_ADDR : ADC_INF_FLAG_IPV4_ADDR;
+	char* current = user->info ? adc_msg_get_named_argument(user->info, flag) : 0;
+	int have = current && *current;
+	hub_free(current);
+	return have;
+}
+
+/*
+ * Post-login INF updates may not change the addresses the hub resolved at login.
+ * The secondary family's UDP port may only be published once that family's
+ * address has been proven over a validation connection; until then it is
+ * remembered and stripped, so a later validation can pick it up.
+ */
 static void strip_network(struct hub_user* user, struct adc_message* cmd)
 {
-    (void) user;
+	int sec_af;
+	const char* udp_flag;
+
 	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
 	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
+
+	sec_af = (user->id.addr.af == AF_INET) ? AF_INET6
+		: (user->id.addr.af == AF_INET6) ? AF_INET : -1;
+	if (sec_af == -1)
+		return;
+
+	hbri_remember_udp_port(user, cmd, sec_af);
+
+	/* Once the address is validated the client owns that port: it can only
+	   redirect traffic to a different port on its own proven address. */
+	if (have_address_for(user, sec_af))
+		return;
+
+	udp_flag = (sec_af == AF_INET6) ? ADC_INF_FLAG_IPV6_UDP_PORT : ADC_INF_FLAG_IPV4_UDP_PORT;
+	adc_msg_remove_named_argument(cmd, udp_flag);
 }
 
 static int nick_length_ok(const char* nick)

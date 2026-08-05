@@ -95,6 +95,59 @@ EXO_TEST(hbri_token_malformed, {
 	    && hbri_token_check(&hbri_hub, &hbri_user, NULL) == 0;
 });
 
+/* Ports coming off the wire are echoed into everyone's INF, so they must be
+   plain decimal numbers in range -- not arbitrary client-supplied text. */
+EXO_TEST(hbri_port_valid, {
+	return hbri_port_is_valid("1")
+	    && hbri_port_is_valid("411")
+	    && hbri_port_is_valid("65535");
+});
+
+EXO_TEST(hbri_port_invalid, {
+	return !hbri_port_is_valid(NULL)
+	    && !hbri_port_is_valid("")
+	    && !hbri_port_is_valid("0")        /* port 0 is not usable */
+	    && !hbri_port_is_valid("65536")    /* out of range */
+	    && !hbri_port_is_valid("123456")   /* too long */
+	    && !hbri_port_is_valid("12a")      /* not a number */
+	    && !hbri_port_is_valid("-1")
+	    && !hbri_port_is_valid(" 12")
+	    && !hbri_port_is_valid("12\\s34"); /* escaped space: must not pass */
+});
+
+/* hbri_remember_udp_port only touches the stored value when the field is
+   present, so an INF update that omits it means "unchanged". */
+EXO_TEST(hbri_remember_port, {
+	struct hub_user user;
+	struct adc_message* msg;
+	int ok = 1;
+
+	memset(&user, 0, sizeof(user));
+	user.id.sid = 1; /* must match the "AAAB" source SID below */
+
+	msg = adc_msg_parse_verify(&user, "BINF AAAB U612345\n", 18);
+	if (!msg) return 0;
+	hbri_remember_udp_port(&user, msg, AF_INET6);
+	ok &= (strcmp(user.hbri_udp_port, "12345") == 0);
+	adc_msg_free(msg);
+
+	/* absent -> unchanged */
+	msg = adc_msg_parse_verify(&user, "BINF AAAB NIx\n", 14);
+	if (!msg) return 0;
+	hbri_remember_udp_port(&user, msg, AF_INET6);
+	ok &= (strcmp(user.hbri_udp_port, "12345") == 0);
+	adc_msg_free(msg);
+
+	/* present but bogus -> cleared, never republished */
+	msg = adc_msg_parse_verify(&user, "BINF AAAB U6bogus\n", 18);
+	if (!msg) return 0;
+	hbri_remember_udp_port(&user, msg, AF_INET6);
+	ok &= (user.hbri_udp_port[0] == 0);
+	adc_msg_free(msg);
+
+	return ok;
+});
+
 /* hbri_is_enabled requires the feature toggle and both advertised addresses. */
 EXO_TEST(hbri_enabled_gating, {
 	struct hub_info hub;
