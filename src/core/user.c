@@ -214,9 +214,6 @@ static int convert_support_fourcc(int fourcc)
 		case FOURCC('B','A','S','E'):
 			return feature_base;
 
-		case FOURCC('A','U','T','0'):
-			return  feature_auto;
-
 		case FOURCC('U','C','M','0'):
 		case FOURCC('U','C','M','D'):
 			return feature_ucmd;

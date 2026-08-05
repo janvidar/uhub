@@ -116,9 +116,6 @@ typedef uint32_t fourcc_t;
 #define ADC_CMD_EQUI FOURCC('E', 'Q', 'U', 'I')
 #define ADC_CMD_FQUI FOURCC('F', 'Q', 'U', 'I')
 
-/* Extension messages */
-#define ADC_CMD_HCHK FOURCC('H', 'C', 'H', 'K')
-
 /* UCMD Extension */
 #define ADC_CMD_BCMD FOURCC('B', 'C', 'M', 'D')
 #define ADC_CMD_DCMD FOURCC('D', 'C', 'M', 'D')
