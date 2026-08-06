@@ -196,6 +196,14 @@ static int cbfunc_send_user_command(struct plugin_handle* plugin, struct plugin_
 	char* esc_name;
 	if (!user || !name)
 		return 0;
+
+	/* ICMD is only meaningful to a client that negotiated UCMD. Others would
+	 * discard it, so sending is pure waste -- one message per registered
+	 * command on every login. Gated here rather than in the plugin because the
+	 * plugin ABI does not expose per-user feature flags. */
+	if (!user_flag_get(as_hub_user(user), feature_ucmd))
+		return 0;
+
 	esc_name = adc_msg_escape(name);
 	struct adc_message* msg = adc_msg_construct(ADC_CMD_ICMD, strlen(esc_name) + (command ? strlen(command) : 0) + 32);
 	adc_msg_add_argument(msg, esc_name);                 /* positional: menu name (submenus split by '/') */

@@ -1455,7 +1455,7 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 	}
 
 	/* Reserve room for the base features plus the three runtime-appended,
-	 * optional ones (" ADHBRI", " ADUCM0" and " ADRTF0", 7 bytes each). */
+	 * optional ones (" ADHBRI", " ADUCMD" and " ADRTF0", 7 bytes each). */
 	hub->command_support = adc_msg_construct(ADC_CMD_ISUP, 6 + strlen(ADC_PROTO_SUPPORT) + 21);
 	if (hub->command_support)
 	{
@@ -1491,7 +1491,7 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 	{
 		hub->status = (hub->config->hub_enabled ? hub_status_running : hub_status_disabled);
 
-		/* UCM0 (ADC user commands) is only meaningful when mod_ucmd is loaded to
+		/* UCMD (ADC user commands) is only meaningful when mod_ucmd is loaded to
 		 * publish the ICMD entries; advertise it only then. */
 		if (hub->command_support && plugin_is_loaded(hub, "mod_ucmd"))
 			adc_msg_add_argument(hub->command_support, ADC_SUP_FLAG_ADD ADC_EXT_UCMD);

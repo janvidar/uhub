@@ -20,10 +20,12 @@
 "DRES "
 
 # SUP feature tokens
-"ADBASE0"
+"ADBASE"
+"ADBAS0"
 "ADTIGR"
-"ADUCM0"
+"ADUCMD"
 "ADBLO0"
+"ADBLOM"
 "ADPING"
 
 # INF named arguments (the get/remove/replace bug surface)

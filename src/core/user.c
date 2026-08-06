@@ -214,8 +214,11 @@ static int convert_support_fourcc(int fourcc)
 		case FOURCC('B','A','S','E'):
 			return feature_base;
 
-		case FOURCC('U','C','M','0'):
+		/* UCMD is the spelling in ADC-EXT 3.7 and what the hub advertises.
+		   UCM0 is accepted only because uhub advertised it by mistake in
+		   0.7.1, so clients that mirrored it keep working. */
 		case FOURCC('U','C','M','D'):
+		case FOURCC('U','C','M','0'):
 			return feature_ucmd;
 
 		case FOURCC('Z','L','I','F'):

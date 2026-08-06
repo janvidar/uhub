@@ -111,10 +111,10 @@ static void emit_command(struct plugin_handle* plugin, const struct plugin_comma
 static void on_user_login(struct plugin_handle* plugin, struct plugin_user* user)
 {
 	/* Enumerate every command available at this user's credential level and
-	 * publish each as a UCMD entry. Clients that did not advertise UCM0 ignore
-	 * the unknown ICMD messages, so sending unconditionally is safe. The
-	 * plugin API does not expose per-user feature flags, so no gate on
-	 * feature_ucmd is applied. */
+	 * publish each as a UCMD entry. The plugin API does not expose per-user
+	 * feature flags, so the UCMD gate lives in the core implementation of
+	 * send_user_command(): entries for a client that did not negotiate UCMD
+	 * are dropped there rather than filtered here. */
 	plugin->hub.command_foreach(plugin, user->credentials, emit_command, user);
 }
 

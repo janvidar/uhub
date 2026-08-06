@@ -39,7 +39,7 @@ typedef uint32_t fourcc_t;
              (uint32_t)(unsigned char)(d))
 
 /* default welcome protocol support message, as sent by this server.
- * Features whose support depends on a loaded plugin (e.g. ADUCM0, provided by
+ * Features whose support depends on a loaded plugin (e.g. ADUCMD, provided by
  * mod_ucmd) are appended at runtime, not listed here. */
 #define ADC_PROTO_SUPPORT "ADBASE ADTIGR ADPING ADNATT"
 
@@ -48,7 +48,7 @@ typedef uint32_t fourcc_t;
 #define ADC_EXT_PING "PING"
 #define ADC_EXT_NATT "NATT"
 #define ADC_EXT_TIGR "TIGR"
-#define ADC_EXT_UCMD "UCM0"
+#define ADC_EXT_UCMD "UCMD" /* ADC-EXT 3.7 */
 #define ADC_EXT_RTF0 "RTF0"
 
 /* Server sent commands */
