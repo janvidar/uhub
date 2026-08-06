@@ -36,6 +36,39 @@ Client gets list of other clients, which ends with the client's own user info.
 At this point the client is successfully logged into the hub.
 
 
+== HBRI (hybrid IPv4/IPv6 connectivity) ==
+
+An unofficial extension (originally from AirDC++) that lets a dual-stack client
+prove it is reachable over both protocols. See src/core/hbri.c.
+
+The hub never trusts an advertised address. check_network() in inf.c discards
+the I4 and I6 a client sends and substitutes the address it observes, so a
+client logging in over one protocol is published with that protocol only. The
+UDP port (U4/U6) for the other family is stripped with it and remembered on the
+user, since the address it belongs to is unproven.
+
+If the client advertised the other family and supports HBRI, the hub sends a
+challenge after login and does not hold the login:
+
+S: ITCP I6<hub address> P6<hub port> TO<token>
+   The hub's own address and listening port for the other protocol, plus a
+   stateless token (SID prefix + Tiger MAC over the per-hub secret, SID and
+   connect time), so a client cannot forge one for another user.
+
+C: HTCP TO<token>
+   Opened as a fresh connection over the other protocol, with HTCP as its very
+   first command -- there is no HSUP handshake. probe.c recognises it and
+   hub.c dispatches it to hbri_handle_validation().
+
+On success the hub adds the address it observed on that connection (not one the
+reply claims) plus the remembered UDP port, and broadcasts the updated INF. The
+validation connection is then closed. A failed validation costs the client
+nothing: it stays logged in with a single-protocol address.
+
+Requires hbri_enable plus both hbri_address4 and hbri_address6; the extension is
+only advertised when all three are set.
+
+
 == The hub architecture ==
 
 Accepting new users

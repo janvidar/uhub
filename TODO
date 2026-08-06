@@ -1,20 +1,66 @@
 # uhub — outstanding work
 
-## Release blockers (0.6.1)
-- Finish version reconciliation: sources are 0.6.1; tag on release
-  (latest tag = 0.6.0).
+State: sources are 0.7.99 (pre-0.8.0) in CMakeLists.txt, build.zig and
+build.zig.zon. Latest tag is 0.7.1. The ChangeLog has a 0.8.0 section in
+progress.
+
+## Release blockers (0.8.0)
+- ChangeLog: the 0.8.0 section is headed "Plugin API (version 4)" but
+  PLUGIN_API_VERSION is 7 (src/plugin_api/types.h:29). Reconcile before
+  tagging; note that PLUGIN_API_VERSION_MIN is 5, so v5 plugins still load.
+- ChangeLog: no entry yet for the HBRI fixes — the secondary U4/U6 now
+  survives validation, post-login port updates are gated on a proven address,
+  and a changed advertised address re-challenges. This changes what peers see.
+- ChangeLog: no entry yet for the UCMD fixes — 0.7.1 advertised the extension
+  as "UCM0" (ADC-EXT 3.7 calls it "UCMD") and sent ICMD to every client
+  regardless of whether it negotiated the extension. Both are corrected; UCM0
+  is still accepted from clients that mirrored the old advertisement.
+- Decide whether the opaque plugin-user refactor (below) lands in 0.8.0. It is
+  ABI-breaking, so deferring it means waiting for 0.9.0.
+- Tag on release.
 
 ## Design / refactor
-- Make the plugin-facing user type opaque. The plugin ABI currently hands
-  plugins a fully-laid-out `struct plugin_user` (src/plugin_api/types.h:33
-  — sid/nick/cid/user_agent/addr/credentials), a by-value mirror of the
-  internal hub_user. Plugins should instead receive an opaque handle (e.g.
-  `plugin_hub_user`) reached through accessor functions, so the hub can
-  evolve its user internals without breaking the plugin ABI and plugins
-  keep a genuinely limited view of hub internals.
+- Make the plugin-facing user type opaque. The plugin ABI still hands plugins a
+  fully-laid-out `struct plugin_user` (src/plugin_api/types.h:44 —
+  sid/nick/cid/user_agent/addr/credentials), a by-value mirror of the internal
+  hub_user. Plugins should instead receive an opaque handle reached through
+  accessor functions, so the hub can evolve its user internals without breaking
+  the plugin ABI and plugins keep a genuinely limited view of hub internals.
+
+## HBRI
+- A NAT-override user cannot use HBRI at all: check_network() (src/core/inf.c)
+  returns early on the nat_override path, before the HBRI intent check, so the
+  flag is never set. NAT'd IPv4 plus native IPv6 is exactly the dual-stack case
+  HBRI targets, so this is worth revisiting.
+- A failed or lost ITCP challenge is not retried within a session; the client
+  must reconnect. Deliberate — one outstanding challenge per session bounds the
+  ITCP-per-INF-update amplification — but revisit if it proves too strict.
+- No e2e coverage (test/e2e/); the unit tests in autotest/test_hbri.tcc and
+  autotest/test_inf.tcc cover the token primitives and the INF merge only.
 
 ## Networking / platform
-- Windows socket support — src/network/network.c. uhub is meant to be
-  portable to Windows (not a tier-1 platform, not covered by CI).
-  net_set_close_on_exec is resolved (deliberate no-op); other WINSOCK
-  paths may still need real implementations.
+- Windows socket support — src/network/network.c. uhub is meant to be portable
+  to Windows (not a tier-1 platform, though CI now has a windows job).
+  net_set_close_on_exec is resolved (deliberate no-op); other WINSOCK paths may
+  still need real implementations.
+
+## Cleanup
+- Stale FIXME at src/core/hub.c:642 claims HH/WS/NE/OW are missing. They are
+  implemented ~50 lines below (hub.c:694-701) and in regserver.c:230-237.
+- The long-standing "flood control should be a plugin" FIXME (hub.c:529) keeps
+  policy in core that the plugin ABI was built to host. Detection is already
+  split from action; the remaining bit is the privileged-chat check.
+- Raw ADC status codes are inlined as magic numbers in hub.c — name them.
+- Branch sprawl: 27 local and 34 remote branches, mostly unmerged historical
+  topic branches (gnutls_work, libevent_work, visual_studio_2010_work, ...).
+  Tag-then-delete historical work; delete locals that only mirror origin.
+
+## Resolved since the 0.6.1 assessment (ASSESSMENT.md)
+ASSESSMENT.md is pinned to 0.6.1 and is stale on these points:
+- Version drift — CMakeLists.txt, build.zig and build.zig.zon now agree.
+- Stale release tooling in admin/ — the directory is gone.
+- Dockerfile in-tree build — now `cmake -S . -B build`.
+- Untested connection.c state machine and TLS — autotest/test_connect.tcc and
+  autotest/test_tls.tcc now exist.
+- HBRI was undocumented — now covered in doc/architecture.txt and
+  doc/uhub.conf.
