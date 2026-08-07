@@ -1,13 +1,8 @@
 # uhub — outstanding work
 
-State: sources are 0.7.99 (pre-0.8.0) in CMakeLists.txt, build.zig and
-build.zig.zon. Latest tag is 0.7.1. The ChangeLog has a 0.8.0 section in
-progress.
-
-## Release blockers (0.8.0)
-- The ChangeLog 0.8.0 section has been reconciled against the commits since the
-  0.7.1 tag. Re-check it before tagging if more lands.
-- Tag on release.
+State: sources are 0.8.0 in CMakeLists.txt, build.zig and build.zig.zon, and
+tagged 0.8.0. The ChangeLog 0.8.0 section is reconciled against the commits
+since the 0.7.1 tag.
 
 ## HBRI
 - A NAT-override user cannot use HBRI at all: check_network() (src/core/inf.c)
