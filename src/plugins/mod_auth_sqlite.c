@@ -346,8 +346,8 @@ static plugin_st is_banned(struct plugin_handle *plugin, struct plugin_user *use
     if (rc != SQLITE_OK)
         return st_default;
 
-    sqlite3_bind_text(stmt, 1, user->nick, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, user->cid, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 1, plugin->hub.get_user_nick(plugin, user), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, plugin->hub.get_user_cid(plugin, user), -1, SQLITE_STATIC);
     sqlite3_bind_int64(stmt, 3, now);
 
     if (sqlite3_step(stmt) == SQLITE_ROW) {

@@ -185,14 +185,14 @@ static struct cbuffer* parse_message(struct plugin_handle* plugin, struct plugin
 		switch (offset[0])
 		{
 			case 'n':
-				cbuf_append(buf, user->nick);
+				cbuf_append(buf, plugin->hub.get_user_nick(plugin, user));
 				break;
 
 			case 'a':
-				cbuf_append(buf, ip_convert_to_string(&user->addr));
+				cbuf_append(buf, ip_convert_to_string(plugin->hub.get_user_address(plugin, user)));
 				break;
 			case 'c':
-				cbuf_append(buf, auth_cred_to_string(user->credentials));
+				cbuf_append(buf, auth_cred_to_string(plugin->hub.get_user_credentials(plugin, user)));
 				break;
 
 			case 't':

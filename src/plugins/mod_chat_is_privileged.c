@@ -167,7 +167,7 @@ plugin_st on_chat_msg(struct plugin_handle *plugin, struct plugin_user *from, co
 {
 	struct chat_data *data = (struct chat_data *)plugin->ptr;
 	(void) message;
-	if (from->credentials >= data->allow_mainchat)
+	if (plugin->hub.get_user_credentials(plugin, from) >= data->allow_mainchat)
 		return st_default;
 	warn_once(plugin, from, WARN_MAINCHAT, "Main chat is reserved for privileged users.");
 	return st_deny;
@@ -182,9 +182,9 @@ plugin_st on_private_msg(struct plugin_handle *plugin, struct plugin_user *from,
 	// threshold, so ordinary users can still reach staff even when
 	// peer-to-peer private messaging is restricted.
 	enum auth_credentials required =
-		(to->credentials >= auth_cred_operator) ? data->allow_op_contact : data->allow_privchat;
+		(plugin->hub.get_user_credentials(plugin, to) >= auth_cred_operator) ? data->allow_op_contact : data->allow_privchat;
 
-	if (from->credentials >= required)
+	if (plugin->hub.get_user_credentials(plugin, from) >= required)
 		return st_default;
 	warn_once(plugin, from, WARN_PRIVCHAT, "Private messaging is reserved for privileged users.");
 	return st_deny;

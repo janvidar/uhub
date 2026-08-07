@@ -115,7 +115,7 @@ static void on_user_login(struct plugin_handle* plugin, struct plugin_user* user
 	 * feature flags, so the UCMD gate lives in the core implementation of
 	 * send_user_command(): entries for a client that did not negotiate UCMD
 	 * are dropped there rather than filtered here. */
-	plugin->hub.command_foreach(plugin, user->credentials, emit_command, user);
+	plugin->hub.command_foreach(plugin, plugin->hub.get_user_credentials(plugin, user), emit_command, user);
 }
 
 int plugin_register(struct plugin_handle* plugin, const char* config)

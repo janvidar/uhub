@@ -84,7 +84,7 @@ static plugin_st on_search(struct plugin_handle* plugin, struct plugin_user* use
 	struct chat_only_data* data = (struct chat_only_data*) plugin->ptr;
 	struct user_info* info;
 
-	if (user->credentials >= auth_cred_operator && data->operator_override)
+	if (plugin->hub.get_user_credentials(plugin, user) >= auth_cred_operator && data->operator_override)
 		return st_allow;
 
 	info = get_user_info(plugin, user);
@@ -102,7 +102,7 @@ static plugin_st on_p2p_connect(struct plugin_handle* plugin, struct plugin_user
 	struct chat_only_data* data = (struct chat_only_data*) plugin->ptr;
 	struct user_info* info;
 
-	if (from->credentials >= auth_cred_operator && data->operator_override)
+	if (plugin->hub.get_user_credentials(plugin, from) >= auth_cred_operator && data->operator_override)
 		return st_allow;
 
 	info = get_user_info(plugin, from);

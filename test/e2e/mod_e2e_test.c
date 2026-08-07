@@ -62,7 +62,7 @@ static plugin_st on_chat_msg(struct plugin_handle* plugin, struct plugin_user* f
 	}
 	if (strncmp(message, "PLZUNBAN ", 9) == 0)
 	{
-		if (from->credentials >= auth_cred_operator)
+		if (plugin->hub.get_user_credentials(plugin, from) >= auth_cred_operator)
 			plugin->hub.unban(plugin, message + 9);
 		return st_deny;
 	}

@@ -97,7 +97,7 @@ int ip_convert_to_binary(const char* taddr, struct ip_addr_encap* raw)
 }
 
 
-const char* ip_convert_to_string(struct ip_addr_encap* raw)
+const char* ip_convert_to_string(const struct ip_addr_encap* raw)
 {
 	/*
 	 * Rotate over a small ring of static buffers so two calls live

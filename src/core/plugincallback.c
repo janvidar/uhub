@@ -44,20 +44,16 @@ static struct plugin_callback_data* get_callback_data(struct plugin_handle* plug
 }
 
 /*
- * The public plugin_* structs are deliberately a layout-compatible "view" of
- * the internal hub_* structs: plugin_command is a prefix of hub_command, and
- * plugin_user mirrors the head of hub_user (its hub_user_info fields followed
- * by credentials). These conversions are the single place that relies on that,
- * guarded by static assertions so that reordering a struct member fails the
+ * struct plugin_command remains a layout-compatible "view" of hub_command (a
+ * prefix of it), and the conversions below are the single place that relies on
+ * that, guarded by static assertions so that reordering a member fails the
  * build rather than corrupting memory at runtime.
+ *
+ * struct plugin_user is NOT such a view: since plugin API version 8 it is
+ * opaque to plugins, which reach its properties through the hub.get_user_*
+ * accessors further down. The cast is a plain handle conversion and hub_user's
+ * layout is free to change, so no assertions are needed here.
  */
-_Static_assert(offsetof(struct plugin_user, sid)         == offsetof(struct hub_user, id.sid),        "plugin_user/hub_user layout mismatch");
-_Static_assert(offsetof(struct plugin_user, nick)        == offsetof(struct hub_user, id.nick),       "plugin_user/hub_user layout mismatch");
-_Static_assert(offsetof(struct plugin_user, cid)         == offsetof(struct hub_user, id.cid),        "plugin_user/hub_user layout mismatch");
-_Static_assert(offsetof(struct plugin_user, user_agent)  == offsetof(struct hub_user, id.user_agent), "plugin_user/hub_user layout mismatch");
-_Static_assert(offsetof(struct plugin_user, addr)        == offsetof(struct hub_user, id.addr),       "plugin_user/hub_user layout mismatch");
-_Static_assert(offsetof(struct plugin_user, credentials) == offsetof(struct hub_user, credentials),   "plugin_user/hub_user layout mismatch");
-
 _Static_assert(offsetof(struct plugin_command, message) == offsetof(struct hub_command, message), "plugin_command/hub_command layout mismatch");
 _Static_assert(offsetof(struct plugin_command, prefix)  == offsetof(struct hub_command, prefix),  "plugin_command/hub_command layout mismatch");
 _Static_assert(offsetof(struct plugin_command, args)    == offsetof(struct hub_command, args),    "plugin_command/hub_command layout mismatch");
@@ -481,6 +477,49 @@ void plugin_user_data_purge_owner(struct hub_info* hub, struct plugin_handle* ow
 	});
 }
 
+/*
+ * Property accessors for the opaque struct plugin_user. Strings and the address
+ * point straight into the hub's user record -- no copying, so they stay valid
+ * only as long as the user does, which the plugin API documents as "for the
+ * duration of the callback". A NULL user yields a harmless empty result so
+ * plugins can chain accessors without guarding each one.
+ */
+static sid_t cbfunc_get_user_sid(struct plugin_handle* plugin, struct plugin_user* user)
+{
+	(void) plugin;
+	return user ? as_hub_user(user)->id.sid : 0;
+}
+
+static const char* cbfunc_get_user_nick(struct plugin_handle* plugin, struct plugin_user* user)
+{
+	(void) plugin;
+	return user ? as_hub_user(user)->id.nick : "";
+}
+
+static const char* cbfunc_get_user_cid(struct plugin_handle* plugin, struct plugin_user* user)
+{
+	(void) plugin;
+	return user ? as_hub_user(user)->id.cid : "";
+}
+
+static const char* cbfunc_get_user_user_agent(struct plugin_handle* plugin, struct plugin_user* user)
+{
+	(void) plugin;
+	return user ? as_hub_user(user)->id.user_agent : "";
+}
+
+static const struct ip_addr_encap* cbfunc_get_user_address(struct plugin_handle* plugin, struct plugin_user* user)
+{
+	(void) plugin;
+	return user ? &as_hub_user(user)->id.addr : NULL;
+}
+
+static enum auth_credentials cbfunc_get_user_credentials(struct plugin_handle* plugin, struct plugin_user* user)
+{
+	(void) plugin;
+	return user ? as_hub_user(user)->credentials : auth_cred_none;
+}
+
 static const char* cbfunc_get_tls_version(struct plugin_handle* plugin, struct plugin_user* user)
 {
 	(void) plugin;
@@ -563,6 +602,12 @@ void plugin_register_callback_functions(struct plugin_handle* handle)
 	handle->hub.set_user_data = cbfunc_set_user_data;
 	handle->hub.get_user_data = cbfunc_get_user_data;
 	handle->hub.get_user_connection_id = cbfunc_get_user_connection_id;
+	handle->hub.get_user_sid = cbfunc_get_user_sid;
+	handle->hub.get_user_nick = cbfunc_get_user_nick;
+	handle->hub.get_user_cid = cbfunc_get_user_cid;
+	handle->hub.get_user_user_agent = cbfunc_get_user_user_agent;
+	handle->hub.get_user_address = cbfunc_get_user_address;
+	handle->hub.get_user_credentials = cbfunc_get_user_credentials;
 	handle->hub.get_name = cbfunc_get_hub_name;
 	handle->hub.set_name = cbfunc_set_hub_name;
 	handle->hub.get_description = cbfunc_get_hub_description;

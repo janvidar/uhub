@@ -59,6 +59,7 @@ static int command_regme_handler(struct plugin_handle* plugin, struct plugin_use
 	struct cbuffer* buf = cbuf_create(256);
 	struct plugin_command_arg_data* arg = plugin->hub.command_arg_next(plugin, cmd, plugin_cmd_arg_type_string);
 	const char* pass = arg ? arg->data.string : NULL;
+	const char* nick = plugin->hub.get_user_nick(plugin, user);
 	struct auth_info info;
 
 	if (!valid_password(pass))
@@ -69,7 +70,7 @@ static int command_regme_handler(struct plugin_handle* plugin, struct plugin_use
 		return 0;
 	}
 
-	if (user->credentials >= auth_cred_user)
+	if (plugin->hub.get_user_credentials(plugin, user) >= auth_cred_user)
 	{
 		cbuf_append_format(buf, "*** %s: You are already logged in as a registered user.", cmd->prefix);
 		plugin->hub.send_message(plugin, user, cbuf_get(buf));
@@ -77,16 +78,16 @@ static int command_regme_handler(struct plugin_handle* plugin, struct plugin_use
 		return 0;
 	}
 
-	if (plugin->hub.auth_get_user(plugin, user->nick, &info))
+	if (plugin->hub.auth_get_user(plugin, nick, &info))
 	{
-		cbuf_append_format(buf, "*** %s: The nick \"%s\" is already registered.", cmd->prefix, user->nick);
+		cbuf_append_format(buf, "*** %s: The nick \"%s\" is already registered.", cmd->prefix, nick);
 		plugin->hub.send_message(plugin, user, cbuf_get(buf));
 		cbuf_destroy(buf);
 		return 0;
 	}
 
 	memset(&info, 0, sizeof(info));
-	snprintf(info.nickname, sizeof(info.nickname), "%s", user->nick);
+	snprintf(info.nickname, sizeof(info.nickname), "%s", nick);
 	snprintf(info.password, sizeof(info.password), "%s", pass);
 	info.credentials = auth_cred_user;
 
@@ -95,7 +96,7 @@ static int command_regme_handler(struct plugin_handle* plugin, struct plugin_use
 		cbuf_append_format(buf,
 			"*** %s: Registered nick \"%s\". To log in: set this password in your "
 			"client, then disconnect and reconnect to the hub.",
-			cmd->prefix, user->nick);
+			cmd->prefix, nick);
 	}
 	else
 	{
@@ -113,9 +114,10 @@ static int command_passwd_handler(struct plugin_handle* plugin, struct plugin_us
 	struct cbuffer* buf = cbuf_create(256);
 	struct plugin_command_arg_data* arg = plugin->hub.command_arg_next(plugin, cmd, plugin_cmd_arg_type_string);
 	const char* pass = arg ? arg->data.string : NULL;
+	const char* nick = plugin->hub.get_user_nick(plugin, user);
 	struct auth_info info;
 
-	if (user->credentials < auth_cred_user)
+	if (plugin->hub.get_user_credentials(plugin, user) < auth_cred_user)
 	{
 		cbuf_append_format(buf, "*** %s: Only registered users can change their password.", cmd->prefix);
 		plugin->hub.send_message(plugin, user, cbuf_get(buf));
@@ -132,7 +134,7 @@ static int command_passwd_handler(struct plugin_handle* plugin, struct plugin_us
 	}
 
 	/* Load the existing record so the credential level is preserved across the update. */
-	if (!plugin->hub.auth_get_user(plugin, user->nick, &info))
+	if (!plugin->hub.auth_get_user(plugin, nick, &info))
 	{
 		cbuf_append_format(buf, "*** %s: Could not find your registration. Contact an operator.", cmd->prefix);
 		plugin->hub.send_message(plugin, user, cbuf_get(buf));

@@ -44,14 +44,15 @@ static void history_add(struct plugin_handle* plugin, struct plugin_user* from, 
 	(void) flags;
 	struct chat_history_data* data = (struct chat_history_data*) plugin->ptr;
 	const char* ts = get_timestamp(time(NULL));
+	const char* nick = plugin->hub.get_user_nick(plugin, from);
 	/* Format: "%s <%s> %s\n" = timestamp + " <" + nick + "> " + message + "\n" */
-	size_t loglen = strlen(ts) + strlen(from->nick) + strlen(message) + 6;
+	size_t loglen = strlen(ts) + strlen(nick) + strlen(message) + 6;
 	char* log = hub_malloc(loglen + 1);
 
 	if (!log)
 		return;
 
-	snprintf(log, loglen + 1, "%s <%s> %s\n", ts, from->nick, message);
+	snprintf(log, loglen + 1, "%s <%s> %s\n", ts, nick, message);
 	list_append(data->chat_history, log);
 	while (list_size(data->chat_history) > data->history_max)
 	{

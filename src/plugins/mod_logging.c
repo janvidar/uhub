@@ -249,28 +249,36 @@ static void log_message(struct log_data* data, const char *format, ...)
 
 static void log_user_login(struct plugin_handle* plugin, struct plugin_user* user)
 {
-	const char* cred = auth_cred_to_string(user->credentials);
-	const char* addr = ip_convert_to_string(&user->addr);
+	const char* cred = auth_cred_to_string(plugin->hub.get_user_credentials(plugin, user));
+	const char* addr = ip_convert_to_string(plugin->hub.get_user_address(plugin, user));
 
-	log_message(plugin->ptr, "LoginOK     %s/%s %s \"%s\" (%s) \"%s\"\n", sid_to_string(user->sid), user->cid, addr, user->nick, cred, user->user_agent);
+	log_message(plugin->ptr, "LoginOK     %s/%s %s \"%s\" (%s) \"%s\"\n",
+		sid_to_string(plugin->hub.get_user_sid(plugin, user)), plugin->hub.get_user_cid(plugin, user),
+		addr, plugin->hub.get_user_nick(plugin, user), cred, plugin->hub.get_user_user_agent(plugin, user));
 }
 
 static void log_user_login_error(struct plugin_handle* plugin, struct plugin_user* user, const char* reason)
 {
-	const char* addr = ip_convert_to_string(&user->addr);
-	log_message(plugin->ptr, "LoginError  %s/%s %s \"%s\" (%s) \"%s\"\n", sid_to_string(user->sid), user->cid, addr, user->nick, reason, user->user_agent);
+	const char* addr = ip_convert_to_string(plugin->hub.get_user_address(plugin, user));
+	log_message(plugin->ptr, "LoginError  %s/%s %s \"%s\" (%s) \"%s\"\n",
+		sid_to_string(plugin->hub.get_user_sid(plugin, user)), plugin->hub.get_user_cid(plugin, user),
+		addr, plugin->hub.get_user_nick(plugin, user), reason, plugin->hub.get_user_user_agent(plugin, user));
 }
 
 static void log_user_logout(struct plugin_handle* plugin, struct plugin_user* user, const char* reason)
 {
-	const char* addr = ip_convert_to_string(&user->addr);
-	log_message(plugin->ptr, "Logout      %s/%s %s \"%s\" (%s) \"%s\"\n", sid_to_string(user->sid), user->cid, addr, user->nick, reason, user->user_agent);
+	const char* addr = ip_convert_to_string(plugin->hub.get_user_address(plugin, user));
+	log_message(plugin->ptr, "Logout      %s/%s %s \"%s\" (%s) \"%s\"\n",
+		sid_to_string(plugin->hub.get_user_sid(plugin, user)), plugin->hub.get_user_cid(plugin, user),
+		addr, plugin->hub.get_user_nick(plugin, user), reason, plugin->hub.get_user_user_agent(plugin, user));
 }
 
 static void log_change_nick(struct plugin_handle* plugin, struct plugin_user* user, const char* new_nick)
 {
-	const char* addr = ip_convert_to_string(&user->addr);
-	log_message(plugin->ptr, "NickChange  %s/%s %s \"%s\" -> \"%s\"\n", sid_to_string(user->sid), user->cid, addr, user->nick, new_nick);
+	const char* addr = ip_convert_to_string(plugin->hub.get_user_address(plugin, user));
+	log_message(plugin->ptr, "NickChange  %s/%s %s \"%s\" -> \"%s\"\n",
+		sid_to_string(plugin->hub.get_user_sid(plugin, user)), plugin->hub.get_user_cid(plugin, user),
+		addr, plugin->hub.get_user_nick(plugin, user), new_nick);
 }
 
 int plugin_register(struct plugin_handle* plugin, const char* config)

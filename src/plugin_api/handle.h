@@ -181,6 +181,18 @@ typedef void* (*hfunc_get_user_data)(struct plugin_handle*, struct plugin_user* 
    it is safe to use as a key for correlating a user across callbacks. */
 typedef uint64_t (*hfunc_get_user_connection_id)(struct plugin_handle*, struct plugin_user* user);
 
+/* Property accessors for the opaque struct plugin_user. The string and address
+   results point into the hub's own storage: they are valid for the duration of
+   the callback only, and must not be modified or freed. Copy anything that has
+   to outlive the call. All of these tolerate a NULL user, returning ""/NULL/0
+   as appropriate, so a caller can chain them without a guard. */
+typedef sid_t (*hfunc_get_user_sid)(struct plugin_handle*, struct plugin_user* user);
+typedef const char* (*hfunc_get_user_nick)(struct plugin_handle*, struct plugin_user* user);
+typedef const char* (*hfunc_get_user_cid)(struct plugin_handle*, struct plugin_user* user);
+typedef const char* (*hfunc_get_user_user_agent)(struct plugin_handle*, struct plugin_user* user);
+typedef const struct ip_addr_encap* (*hfunc_get_user_address)(struct plugin_handle*, struct plugin_user* user);
+typedef enum auth_credentials (*hfunc_get_user_credentials)(struct plugin_handle*, struct plugin_user* user);
+
 /* Returns the negotiated TLS protocol version string (e.g. "TLSv1.3") for a
  * user's connection, or NULL if the user is not connected over TLS (plaintext
  * adc://, or a remote user learned over federation with no local socket). */
@@ -216,6 +228,12 @@ struct plugin_hub_funcs
 	hfunc_set_user_data set_user_data;
 	hfunc_get_user_data get_user_data;
 	hfunc_get_user_connection_id get_user_connection_id;
+	hfunc_get_user_sid get_user_sid;
+	hfunc_get_user_nick get_user_nick;
+	hfunc_get_user_cid get_user_cid;
+	hfunc_get_user_user_agent get_user_user_agent;
+	hfunc_get_user_address get_user_address;
+	hfunc_get_user_credentials get_user_credentials;
 	hfunc_get_hub_name get_name;
 	hfunc_set_hub_name set_name;
 	hfunc_get_hub_description get_description;

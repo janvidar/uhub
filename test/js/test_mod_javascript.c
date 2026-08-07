@@ -18,6 +18,24 @@
 #include <sys/stat.h>
 #endif
 
+/* ---- fake user ----------------------------------------------------------
+ * struct plugin_user is opaque from plugin API 8 on, and this harness does not
+ * link the hub, so it supplies its own stand-in plus the accessor stubs that
+ * mod_javascript reads it back through. Only this file knows the layout.
+ */
+struct test_user
+{
+	sid_t sid;
+	char nick[MAX_NICK_LEN+1];
+	char cid[MAX_CID_LEN+1];
+	char user_agent[MAX_UA_LEN+1];
+	struct ip_addr_encap addr;
+	enum auth_credentials credentials;
+};
+
+static struct plugin_user* as_pu(struct test_user* u) { return (struct plugin_user*) u; }
+static struct test_user* as_tu(struct plugin_user* u) { return (struct test_user*) u; }
+
 /* ---- recording hub-func stubs ------------------------------------------ */
 
 static char g_last_message[1024];
@@ -68,9 +86,34 @@ static int stub_ban(struct plugin_handle* p, struct plugin_user* u, int secs, co
 static uint64_t stub_conn_id(struct plugin_handle* p, struct plugin_user* u)
 {
 	(void) p;
-	return (uint64_t) u->sid;
+	return (uint64_t) as_tu(u)->sid;
 }
 static size_t stub_usercount(struct plugin_handle* p) { (void) p; return 3; }
+
+static sid_t stub_get_sid(struct plugin_handle* p, struct plugin_user* u)
+{
+	(void) p; return u ? as_tu(u)->sid : 0;
+}
+static const char* stub_get_nick(struct plugin_handle* p, struct plugin_user* u)
+{
+	(void) p; return u ? as_tu(u)->nick : "";
+}
+static const char* stub_get_cid(struct plugin_handle* p, struct plugin_user* u)
+{
+	(void) p; return u ? as_tu(u)->cid : "";
+}
+static const char* stub_get_user_agent(struct plugin_handle* p, struct plugin_user* u)
+{
+	(void) p; return u ? as_tu(u)->user_agent : "";
+}
+static const struct ip_addr_encap* stub_get_address(struct plugin_handle* p, struct plugin_user* u)
+{
+	(void) p; return u ? &as_tu(u)->addr : NULL;
+}
+static enum auth_credentials stub_get_credentials(struct plugin_handle* p, struct plugin_user* u)
+{
+	(void) p; return u ? as_tu(u)->credentials : auth_cred_none;
+}
 
 static void wire_hub_funcs(struct plugin_handle* h)
 {
@@ -82,6 +125,12 @@ static void wire_hub_funcs(struct plugin_handle* h)
 	h->hub.ban_user = stub_ban;
 	h->hub.get_user_connection_id = stub_conn_id;
 	h->hub.get_usercount = stub_usercount;
+	h->hub.get_user_sid = stub_get_sid;
+	h->hub.get_user_nick = stub_get_nick;
+	h->hub.get_user_cid = stub_get_cid;
+	h->hub.get_user_user_agent = stub_get_user_agent;
+	h->hub.get_user_address = stub_get_address;
+	h->hub.get_user_credentials = stub_get_credentials;
 }
 
 /* ---- harness ------------------------------------------------------------ */
@@ -94,9 +143,9 @@ static int failures = 0;
 	if (cond) printf("  PASS %s\n", name); \
 	else { printf("  FAIL %s\n", name); failures++; } } while (0)
 
-static struct plugin_user make_user(const char* nick, sid_t sid, enum auth_credentials cred)
+static struct test_user make_user(const char* nick, sid_t sid, enum auth_credentials cred)
 {
-	struct plugin_user u;
+	struct test_user u;
 	memset(&u, 0, sizeof(u));
 	snprintf(u.nick, sizeof(u.nick), "%s", nick);
 	snprintf(u.cid, sizeof(u.cid), "CID%u", (unsigned) sid);
@@ -141,14 +190,14 @@ static char* write_temp_script(const char* text)
 static void test_welcome(const char* dir)
 {
 	struct plugin_handle h;
-	struct plugin_user user = make_user("Alice", 1, auth_cred_user);
+	struct test_user user = make_user("Alice", 1, auth_cred_user);
 	char cfg[512];
 	printf("welcome.js:\n");
 	wire_hub_funcs(&h);
 	snprintf(cfg, sizeof(cfg), "script=%s/welcome.js motd=Hi_%%n", dir);
 	if (p_register(&h, cfg) != 0) { CHECK(0, "register welcome.js"); return; }
 	reset_recorders();
-	h.funcs.on_user_login(&h, &user);
+	h.funcs.on_user_login(&h, as_pu(&user));
 	CHECK(strcmp(g_last_message, "Hi_Alice") == 0, "onUserLogin substitutes %n from config motd");
 	p_unregister(&h);
 }
@@ -156,8 +205,8 @@ static void test_welcome(const char* dir)
 static void test_chat_only(const char* dir)
 {
 	struct plugin_handle h;
-	struct plugin_user user = make_user("Bob", 2, auth_cred_user);
-	struct plugin_user op = make_user("Op", 3, auth_cred_operator);
+	struct test_user user = make_user("Bob", 2, auth_cred_user);
+	struct test_user op = make_user("Op", 3, auth_cred_operator);
 	char cfg[512];
 	printf("chat_only.js:\n");
 	wire_hub_funcs(&h);
@@ -165,18 +214,18 @@ static void test_chat_only(const char* dir)
 	if (p_register(&h, cfg) != 0) { CHECK(0, "register chat_only.js"); return; }
 
 	reset_recorders();
-	CHECK(h.funcs.on_search(&h, &user, "TOfoo") == st_deny, "onSearch denies a normal user");
+	CHECK(h.funcs.on_search(&h, as_pu(&user), "TOfoo") == st_deny, "onSearch denies a normal user");
 	CHECK(g_status_count == 1, "first denied search warns once");
-	h.funcs.on_search(&h, &user, "TObar");
+	h.funcs.on_search(&h, as_pu(&user), "TObar");
 	CHECK(g_status_count == 1, "second denied search does NOT warn again");
-	CHECK(h.funcs.on_p2p_connect(&h, &op, &op) == st_allow, "operator is exempt (st_allow)");
+	CHECK(h.funcs.on_p2p_connect(&h, as_pu(&op), as_pu(&op)) == st_allow, "operator is exempt (st_allow)");
 	p_unregister(&h);
 }
 
 static void test_flood(const char* dir)
 {
 	struct plugin_handle h;
-	struct plugin_user user = make_user("Carol", 4, auth_cred_user);
+	struct test_user user = make_user("Carol", 4, auth_cred_user);
 	char cfg[512];
 	printf("flood.js:\n");
 	wire_hub_funcs(&h);
@@ -184,9 +233,9 @@ static void test_flood(const char* dir)
 	if (p_register(&h, cfg) != 0) { CHECK(0, "register flood.js"); return; }
 
 	reset_recorders();
-	CHECK(h.funcs.on_flood_detected(&h, &user, flood_type_chat) == st_default, "1st strike -> st_default (hub warns)");
+	CHECK(h.funcs.on_flood_detected(&h, as_pu(&user), flood_type_chat) == st_default, "1st strike -> st_default (hub warns)");
 	CHECK(g_disconnect_count == 0, "no disconnect on 1st strike");
-	CHECK(h.funcs.on_flood_detected(&h, &user, flood_type_chat) == st_deny, "2nd strike (grace) -> st_deny");
+	CHECK(h.funcs.on_flood_detected(&h, as_pu(&user), flood_type_chat) == st_deny, "2nd strike (grace) -> st_deny");
 	CHECK(g_disconnect_count == 1, "user disconnected at grace limit");
 	p_unregister(&h);
 }
@@ -194,7 +243,7 @@ static void test_flood(const char* dir)
 static void test_watchdog(const char* dir)
 {
 	struct plugin_handle h;
-	struct plugin_user user = make_user("Spin", 5, auth_cred_user);
+	struct test_user user = make_user("Spin", 5, auth_cred_user);
 	char* script;
 	char cfg[512];
 	int64_t t0, dt;
@@ -206,7 +255,7 @@ static void test_watchdog(const char* dir)
 	snprintf(cfg, sizeof(cfg), "script=%s time_limit=150", script);
 	if (p_register(&h, cfg) != 0) { CHECK(0, "register watchdog fixture"); remove(script); free(script); return; }
 	t0 = now_ms();
-	h.funcs.on_search(&h, &user, "spin");
+	h.funcs.on_search(&h, as_pu(&user), "spin");
 	dt = now_ms() - t0;
 	printf("  (interrupted after %lldms)\n", (long long) dt);
 	CHECK(dt < 2000, "runaway callback interrupted by watchdog (<2s)");
@@ -218,7 +267,7 @@ static void test_watchdog(const char* dir)
 static void test_lifetime(const char* dir)
 {
 	struct plugin_handle h;
-	struct plugin_user user = make_user("Dave", 6, auth_cred_user);
+	struct test_user user = make_user("Dave", 6, auth_cred_user);
 	char* script;
 	char cfg[512];
 	const char* src =
@@ -237,7 +286,7 @@ static void test_lifetime(const char* dir)
 	if (p_register(&h, cfg) != 0) { CHECK(0, "register lifetime fixture"); remove(script); free(script); return; }
 
 	reset_recorders();
-	h.funcs.on_user_login(&h, &user);          /* stashes the user, sends "live" */
+	h.funcs.on_user_login(&h, as_pu(&user));          /* stashes the user, sends "live" */
 	CHECK(strcmp(g_last_message, "live") == 0, "live user reference works during its callback");
 
 	reset_recorders();
@@ -245,7 +294,7 @@ static void test_lifetime(const char* dir)
 	   so the stale sendMessage never reaches the stub and the handler returns
 	   ALLOW from the catch block (not DENY from the try). */
 	{
-		plugin_st st = h.funcs.on_chat_msg(&h, &user, "hi");
+		plugin_st st = h.funcs.on_chat_msg(&h, as_pu(&user), "hi");
 		CHECK(g_last_message[0] == '\0', "stale user reference does NOT reach the hub");
 		CHECK(st == st_allow, "using a stale user throws (caught) instead of denying");
 	}
@@ -259,16 +308,16 @@ static void test_lifetime(const char* dir)
 static void test_dir_load(const char* dir)
 {
 	struct plugin_handle h;
-	struct plugin_user user = make_user("Erin", 7, auth_cred_user);
+	struct test_user user = make_user("Erin", 7, auth_cred_user);
 	char cfg[512];
 	printf("dir= load:\n");
 	wire_hub_funcs(&h);
 	snprintf(cfg, sizeof(cfg), "dir=%s motd=Hi_%%n", dir);
 	if (p_register(&h, cfg) != 0) { CHECK(0, "register dir="); return; }
 	reset_recorders();
-	h.funcs.on_user_login(&h, &user);
+	h.funcs.on_user_login(&h, as_pu(&user));
 	CHECK(strcmp(g_last_message, "Hi_Erin") == 0, "welcome.js loaded from dir= (login message)");
-	CHECK(h.funcs.on_search(&h, &user, "TOx") == st_deny, "chat_only.js loaded from dir= (search denied)");
+	CHECK(h.funcs.on_search(&h, as_pu(&user), "TOx") == st_deny, "chat_only.js loaded from dir= (search denied)");
 	p_unregister(&h);
 }
 
@@ -276,7 +325,7 @@ static void test_dir_load(const char* dir)
 static void test_config_list(const char* dir)
 {
 	struct plugin_handle h;
-	struct plugin_user user = make_user("Frank", 8, auth_cred_user);
+	struct test_user user = make_user("Frank", 8, auth_cred_user);
 	char* listfile;
 	char listbody[600];
 	char cfg[512];
@@ -289,7 +338,7 @@ static void test_config_list(const char* dir)
 	snprintf(cfg, sizeof(cfg), "config=%s motd=Global_%%n", listfile);
 	if (p_register(&h, cfg) != 0) { CHECK(0, "register config="); remove(listfile); free(listfile); return; }
 	reset_recorders();
-	h.funcs.on_user_login(&h, &user);
+	h.funcs.on_user_login(&h, as_pu(&user));
 	CHECK(strcmp(g_last_message, "FromList_Frank") == 0, "per-script config overrides global (config= list)");
 	p_unregister(&h);
 	remove(listfile);

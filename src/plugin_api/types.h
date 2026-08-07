@@ -26,29 +26,34 @@
 #include "util/credentials.h"
 #include "network/ipcalc.h"
 
-#define PLUGIN_API_VERSION 7
+#define PLUGIN_API_VERSION 8
 
-/* Oldest plugin ABI the current hub still accepts. struct plugin_funcs (the
-   table a plugin implements) is unchanged across 5->7 -- only plugin_hub_funcs
-   (hub-provided) grew -- so v5 plugins remain binary-compatible. */
-#define PLUGIN_API_VERSION_MIN 5
+/* Oldest plugin ABI the current hub still accepts. Version 8 made struct
+   plugin_user opaque, which retired the guarantee that its layout mirrors the
+   head of the hub's internal user struct. A v5-v7 plugin dereferences that
+   layout directly, so once the hub reorders its internals such a plugin would
+   read garbage rather than fail -- hence the floor moves with the version.
+   Plugins must switch to the hub.get_user_* accessors and rebuild. */
+#define PLUGIN_API_VERSION_MIN 8
 
 struct plugin_handle;
+
+/**
+ * An opaque handle to a user on the hub. Plugins receive one in callbacks and
+ * pass it back to the hub.* functions; its contents are private to the hub.
+ * Read its properties through the hub.get_user_* accessors in
+ * struct plugin_hub_funcs.
+ *
+ * The handle is valid only for the duration of the callback that received it.
+ * Do not store it -- use hub.get_user_connection_id() for a key that stays
+ * valid, or hub.set_user_data() to attach per-user state.
+ */
+struct plugin_user;
 
 /* Cleanup callback for per-user plugin data. Invoked with the owning plugin
    handle when the user is destroyed, when the value is replaced, or when the
    plugin is unloaded while users are still connected. */
 typedef void (*plugin_user_data_free)(struct plugin_handle*, void* data);
-
-struct plugin_user
-{
-	sid_t sid;
-	char nick[MAX_NICK_LEN+1];
-	char cid[MAX_CID_LEN+1];
-	char user_agent[MAX_UA_LEN+1];
-	struct ip_addr_encap addr;
-	enum auth_credentials credentials;
-};
 
 struct plugin_hub_info
 {

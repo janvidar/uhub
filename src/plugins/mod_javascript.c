@@ -303,14 +303,17 @@ static JSValue js_make_user(struct js_script* s, struct plugin_user* user)
 	JS_SetOpaque(obj, u);
 
 	/* Snapshot the scalar identity fields as plain (read-only-ish) properties;
-	   they remain readable even after the reference is invalidated. */
-	JS_SetPropertyStr(ctx, obj, "nick", JS_NewString(ctx, user->nick));
-	JS_SetPropertyStr(ctx, obj, "cid", JS_NewString(ctx, user->cid));
-	JS_SetPropertyStr(ctx, obj, "userAgent", JS_NewString(ctx, user->user_agent));
-	JS_SetPropertyStr(ctx, obj, "credentials", JS_NewString(ctx, auth_cred_to_string(user->credentials)));
-	JS_SetPropertyStr(ctx, obj, "sid", JS_NewInt32(ctx, (int32_t) user->sid));
+	   they remain readable even after the reference is invalidated. Reading them
+	   through the accessors copies into the JS string, so nothing here keeps a
+	   pointer into the hub's user record. */
+	struct plugin_handle* ph = s->owner->handle;
+	JS_SetPropertyStr(ctx, obj, "nick", JS_NewString(ctx, ph->hub.get_user_nick(ph, user)));
+	JS_SetPropertyStr(ctx, obj, "cid", JS_NewString(ctx, ph->hub.get_user_cid(ph, user)));
+	JS_SetPropertyStr(ctx, obj, "userAgent", JS_NewString(ctx, ph->hub.get_user_user_agent(ph, user)));
+	JS_SetPropertyStr(ctx, obj, "credentials", JS_NewString(ctx, auth_cred_to_string(ph->hub.get_user_credentials(ph, user))));
+	JS_SetPropertyStr(ctx, obj, "sid", JS_NewInt32(ctx, (int32_t) ph->hub.get_user_sid(ph, user)));
 	JS_SetPropertyStr(ctx, obj, "id",
-		JS_NewInt64(ctx, (int64_t) s->owner->handle->hub.get_user_connection_id(s->owner->handle, user)));
+		JS_NewInt64(ctx, (int64_t) ph->hub.get_user_connection_id(ph, user)));
 	return obj;
 }
 

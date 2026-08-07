@@ -22,25 +22,25 @@
 
 static plugin_st on_search_result(struct plugin_handle* plugin, struct plugin_user* from, struct plugin_user* to, const char* search_data)
 {
-	(void) plugin; (void) from; (void) search_data;
-	if (to->credentials >= auth_cred_user)
+	(void) from; (void) search_data;
+	if (plugin->hub.get_user_credentials(plugin, to) >= auth_cred_user)
 		return st_default;
 	return st_deny;
 }
 
 static plugin_st on_search(struct plugin_handle* plugin, struct plugin_user* user, const char* search_data)
 {
-	(void) plugin; (void) search_data;
+	(void) search_data;
 	// Registered users are allowed to search.
-	if (user->credentials >= auth_cred_user)
+	if (plugin->hub.get_user_credentials(plugin, user) >= auth_cred_user)
 		return st_default;
 	return st_deny;
 }
 
 static plugin_st on_p2p_connect(struct plugin_handle* plugin, struct plugin_user* from, struct plugin_user* to)
 {
-	(void) plugin; (void) to;
-	if (from->credentials >= auth_cred_user)
+	(void) to;
+	if (plugin->hub.get_user_credentials(plugin, from) >= auth_cred_user)
 		return st_default;
 	return st_deny;
 }

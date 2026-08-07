@@ -97,7 +97,7 @@ static void history_add(struct plugin_handle* plugin, struct plugin_user* from, 
 	rc = sqlite3_prepare_v2(data->db, "INSERT INTO chat_history (from_nick, message) VALUES(?, ?);", -1, &stmt, NULL);
 	if (rc == SQLITE_OK)
 	{
-		sqlite3_bind_text(stmt, 1, from->nick, -1, SQLITE_STATIC);
+		sqlite3_bind_text(stmt, 1, plugin->hub.get_user_nick(plugin, from), -1, SQLITE_STATIC);
 		sqlite3_bind_text(stmt, 2, message, -1, SQLITE_STATIC);
 		sqlite3_step(stmt);
 		sqlite3_finalize(stmt);

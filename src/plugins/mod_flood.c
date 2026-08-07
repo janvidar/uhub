@@ -95,7 +95,7 @@ static plugin_st on_flood_detected(struct plugin_handle* plugin, struct plugin_u
 	struct user_strikes* info;
 
 	// Leave operators alone if configured to do so.
-	if (data->operator_override && user->credentials >= auth_cred_operator)
+	if (data->operator_override && plugin->hub.get_user_credentials(plugin, user) >= auth_cred_operator)
 		return st_allow;
 
 	info = get_user_strikes(plugin, user);

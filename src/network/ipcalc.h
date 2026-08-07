@@ -43,7 +43,7 @@ struct ip_range
 
 extern int ip_convert_to_binary(const char* text_addr, struct ip_addr_encap* raw);
 
-extern const char* ip_convert_to_string(struct ip_addr_encap* raw);
+extern const char* ip_convert_to_string(const struct ip_addr_encap* raw);
 
 /**
  * Convert a string on the form:
