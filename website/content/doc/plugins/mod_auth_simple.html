@@ -13,29 +13,46 @@ sidebar: plugins
 			</p>
 
 			<h2>Loading</h2>
-			<pre><code>plugin /var/lib/uhub/mod_auth_simple.so "file=/etc/uhub/users.conf"</code></pre>
+			<pre><code>plugin /var/lib/uhub/mod_auth_simple.so <span class="s">"file=/etc/uhub/users.conf"</span></code></pre>
 
 			<h2>Configuration</h2>
-			<table>
+			<table class="table">
 				<tr><th>Option</th><th>Default</th><th>Description</th></tr>
 				<tr><td><code>file</code></td><td>—</td><td>Path to the accounts file (required).</td></tr>
 				<tr><td><code>readonly</code></td><td><code>yes</code></td><td>The hub never writes back to the file; registration/update/delete are refused.</td></tr>
-				<tr><td><code>exclusive</code></td><td><code>no</code></td><td>When enabled, only accounts listed in this file may log in — any other nick is denied instead of being passed on to the hub's own ACL.</td></tr>
+				<tr><td><code>exclusive</code></td><td><code>no</code></td><td>When enabled, only accounts listed in this file may log in — any other nick is denied instead of being passed on to another auth plug-in.</td></tr>
 			</table>
 
 			<h2>File format</h2>
 			<p>One account per line, whitespace-separated:</p>
 			<pre><code>credential username password</code></pre>
 			<p>
-				<code>credential</code> is one of <code>admin</code>, <code>super</code>, <code>op</code>,
-				<code>reg</code>/<code>user</code> or a bot class — the same credential keywords used in the
-				hub's <a href="../config.html">ACL file</a>. For example:
+				<code>credential</code> is one of <code>admin</code>, <code>super</code>,
+				<code>op</code>/<code>operator</code>, <code>reg</code>/<code>user</code> or a bot class
+				(<code>bot</code>, <code>ubot</code>, <code>opbot</code>, <code>opubot</code>). For example:
 			</p>
 			<pre><code>admin alice s3cr3t
 op    bob   hunter2
 reg   carol passw0rd</code></pre>
 
+			<div class="callout">
+				<p>
+					<strong>Changed in 0.8.0:</strong> registered accounts are no longer defined in the hub's
+					<code>file_acl</code> ACL file — an authentication plug-in such as this one is now the only
+					place they live. If you are upgrading, move any <code>user_admin</code> /
+					<code>user_op</code> / <code>user_reg</code> lines out of the ACL file and into this
+					format.
+				</p>
+			</div>
+			<div class="callout warn">
+				<p>
+					<strong>Fixed in 0.8.0:</strong> if the accounts file cannot be read, the plug-in now fails
+					to load instead of starting with an empty account list. Previously an unreadable file
+					combined with <code>exclusive=1</code> would lock every user out of the hub.
+				</p>
+			</div>
+
 			<p>
-				For a database-backed store with self-service registration instead, see
+				For a database-backed store, ban persistence and self-service registration, see
 				<a href="mod_auth_sqlite.html">mod_auth_sqlite</a>.
 			</p>

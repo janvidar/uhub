@@ -15,30 +15,72 @@ sidebar: plugins
 			<p>On Windows, point at the <code>.dll</code> instead:</p>
 			<pre><code>plugin c:\path\to\mod_logging.dll "file=c:\uhub\uhub.log"</code></pre>
 
+			<p>
+				Plug-ins are loaded in the order they are listed, which matters when one builds on another —
+				<code>mod_selfregister</code> needs a storage plug-in above it, and for intercepted events the
+				first plug-in to give a verdict wins. An optional <code>plugin_dir</code> line sets a base
+				directory for any plug-in named without an absolute path:
+			</p>
+			<pre><code>plugin_dir /usr/lib/uhub
+plugin mod_logging.so <span class="s">"file=/var/log/uhub/uhub.log"</span></code></pre>
+
 			<h2>Bundled plug-ins</h2>
 			<p>Click a module for its configuration options and commands.</p>
+
+			<h3>Authentication and accounts</h3>
 			<table class="table">
 				<tr><th>Module</th><th>Description</th></tr>
-				<tr><td><a href="mod_auth_simple.html"><code>mod_auth_simple</code></a></td><td>Authenticate users based on a read-only text file.</td></tr>
-				<tr><td><a href="mod_auth_sqlite.html"><code>mod_auth_sqlite</code></a></td><td>Authenticate users based on a SQLite database, with optional self-registration.</td></tr>
-				<tr><td><a href="mod_logging.html"><code>mod_logging</code></a></td><td>Logs users entering and leaving the hub.</td></tr>
+				<tr><td><a href="mod_auth_sqlite.html"><code>mod_auth_sqlite</code></a></td><td>Registered accounts and persisted bans in a SQLite database.</td></tr>
+				<tr><td><a href="mod_auth_simple.html"><code>mod_auth_simple</code></a></td><td>Registered accounts from a read-only text file.</td></tr>
+				<tr><td><a href="mod_selfregister.html"><code>mod_selfregister</code></a></td><td>Self-service <code>!regme</code> / <code>!passwd</code> commands. <span class="tag">0.8.0</span></td></tr>
+			</table>
+
+			<h3>Chat and moderation</h3>
+			<table class="table">
+				<tr><th>Module</th><th>Description</th></tr>
 				<tr><td><a href="mod_welcome.html"><code>mod_welcome</code></a></td><td>Sends a welcome message (and rules / MOTD) to users when they log in.</td></tr>
 				<tr><td><a href="mod_chat_history.html"><code>mod_chat_history</code></a></td><td>Provides a global chat history log.</td></tr>
 				<tr><td><a href="mod_chat_history_sqlite.html"><code>mod_chat_history_sqlite</code></a></td><td>Provides a global chat history log backed by SQLite.</td></tr>
 				<tr><td><a href="mod_chat_only.html"><code>mod_chat_only</code></a></td><td>Chat-only hub: disables connection setup, search and results.</td></tr>
-				<tr><td><a href="mod_topic.html"><code>mod_topic</code></a></td><td>Adds commands for changing the hub topic (description).</td></tr>
+				<tr><td><a href="mod_chat_is_privileged.html"><code>mod_chat_is_privileged</code></a></td><td>Restricts main chat and private messages by credential.</td></tr>
 				<tr><td><a href="mod_no_guest_downloads.html"><code>mod_no_guest_downloads</code></a></td><td>Only registered users can search and initiate transfers.</td></tr>
 				<tr><td><a href="mod_flood.html"><code>mod_flood</code></a></td><td>Disconnects users after repeated hub-detected floods.</td></tr>
+				<tr><td><a href="mod_topic.html"><code>mod_topic</code></a></td><td>Adds commands for changing the hub topic (description).</td></tr>
+			</table>
+
+			<h3>Interface and extensibility</h3>
+			<table class="table">
+				<tr><th>Module</th><th>Description</th></tr>
+				<tr><td><a href="mod_ucmd.html"><code>mod_ucmd</code></a></td><td>Publishes hub commands as client right-click context menus.</td></tr>
+				<tr><td><a href="mod_javascript.html"><code>mod_javascript</code></a></td><td>Runs JavaScript scripts as plug-ins, via an embedded QuickJS engine. <span class="tag">0.8.0</span></td></tr>
+				<tr><td><a href="mod_logging.html"><code>mod_logging</code></a></td><td>Logs users entering and leaving the hub.</td></tr>
 				<tr><td><a href="mod_example.html"><code>mod_example</code></a></td><td>A simple example plug-in to base your own on.</td></tr>
 			</table>
+			<p>
+				<code>mod_javascript</code> is optional and only built when the hub is configured with
+				<code>-DJAVASCRIPT_SUPPORT=ON</code>; every other module above is built by default.
+			</p>
 
 			<h2>Example configuration</h2>
 			<p>A typical <code>plugins.conf</code> combining several modules:</p>
-			<pre><code>plugin /var/lib/uhub/mod_auth_sqlite.so "file=/etc/uhub/users.db"
-plugin /var/lib/uhub/mod_logging.so "file=/var/log/uhub/uhub.log"
-plugin /var/lib/uhub/mod_welcome.so "motd=/etc/uhub/motd.txt rules=/etc/uhub/rules.txt"
-plugin /var/lib/uhub/mod_chat_history.so "history_max=200 history_default=10 history_connect=5"</code></pre>
+			<pre><code>plugin /var/lib/uhub/mod_auth_sqlite.so <span class="s">"file=/etc/uhub/users.db"</span>
+plugin /var/lib/uhub/mod_selfregister.so
+plugin /var/lib/uhub/mod_logging.so <span class="s">"file=/var/log/uhub/uhub.log"</span>
+plugin /var/lib/uhub/mod_welcome.so <span class="s">"motd=/etc/uhub/motd.txt rules=/etc/uhub/rules.txt rtf0=true"</span>
+plugin /var/lib/uhub/mod_chat_history.so <span class="s">"history_max=200 history_default=10 history_connect=5"</span>
+plugin /var/lib/uhub/mod_ucmd.so</code></pre>
+
+			<div class="callout warn">
+				<p>
+					<strong>Upgrading to 0.8.0?</strong> Plug-ins must be rebuilt against plug-in API 8 — the
+					hub refuses to load older ones. The <code>self_register</code> parameter of
+					<code>mod_auth_sqlite</code> was removed in favour of
+					<a href="mod_selfregister.html">mod_selfregister</a>, and registered accounts no longer
+					live in the <a href="../config.html">ACL file</a>.
+				</p>
+			</div>
 
 			<p>
-				Want to write your own? See the <a href="../plugin-api.html">plug-in API</a> documentation.
+				Want to write your own? See the <a href="../plugin-api.html">plug-in API</a> for C, or the
+				<a href="../javascript.html">JavaScript plug-in API</a> for scripts.
 			</p>

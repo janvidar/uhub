@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>uhub — mod_selfregister</title>
+	<meta name="description" content="mod_selfregister adds the self-service !regme and !passwd commands to uhub, backed by any auth storage plug-in." />
+	<link rel="icon" href="../../assets/img/favicon.ico" />
+	<link rel="stylesheet" href="../../assets/css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+	<div class="container nav">
+		<a class="brand" href="../../index.html">
+			<img src="../../assets/img/logo.svg" alt="uhub logo" />
+			<span>uhub</span>
+			<span class="slogan">High performance ADC hub</span>
+		</a>
+		<button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+		<ul class="nav-links">
+			<li><a href="../../index.html">About</a></li>
+			<li><a href="../../news.html">News</a></li>
+			<li><a href="../../download.html">Download</a></li>
+			<li><a href="../index.html" class="active">Documentation</a></li>
+			<li class="nav-github">
+				<a href="https://github.com/janvidar/uhub/" aria-label="uhub on GitHub" title="uhub on GitHub">
+					<svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+					<span class="nav-github-label">GitHub</span>
+				</a>
+			</li>
+		</ul>
+	</div>
+</header>
+
+<div class="container doc-layout">
+	<aside class="doc-sidebar">
+		<h4>Users</h4>
+		<ul>
+			<li><a href="../getstarted.html">Getting started</a></li>
+			<li><a href="../config-example.html">Example configuration</a></li>
+			<li><a href="../config.html">Configuration reference</a></li>
+			<li><a href="index.html" class="active">Plug-ins</a></li>
+			<li><a href="../config-ssl.html">SSL / TLS</a></li>
+			<li><a href="../metrics.html">Monitoring</a></li>
+			<li><a href="../linking.html">Hub linking</a></li>
+		</ul>
+		<h4>Developers</h4>
+		<ul>
+			<li><a href="../developers.html">Contributors</a></li>
+			<li><a href="../compile.html">Compiling</a></li>
+			<li><a href="../architecture.html">Architecture</a></li>
+			<li><a href="../plugin-api.html">Plug-in API (C)</a></li>
+			<li><a href="../javascript.html">Plug-in API (JavaScript)</a></li>
+		</ul>
+		<h4>Resources</h4>
+		<ul>
+			<li><a href="../adc.html">What is ADC?</a></li>
+			<li><a href="../coredumps.html">Core dumps</a></li>
+		</ul>
+	</aside>
+
+	<main class="doc-content">
+		<div class="prose">
+			<h1>mod_selfregister</h1>
+			<p class="lead-sub">Self-service registration commands. Part of the bundled <a href="index.html">plug-ins</a>.</p>
+
+			<p>
+				<code>mod_selfregister</code> lets users register their own nick and change their own password
+				from inside the hub, with <code>!regme</code> and <code>!passwd</code>.
+			</p>
+			<p>
+				It stores nothing itself. It is pure policy, and reaches user records through the hub's
+				storage accessors, which route to whichever authentication storage plug-in is loaded — today
+				<a href="mod_auth_sqlite.html">mod_auth_sqlite</a>, tomorrow any other backend. Load it
+				<em>alongside</em> a storage plug-in; on its own it has nowhere to write.
+			</p>
+
+			<div class="callout">
+				<p>
+					New in <strong>uhub 0.8.0</strong>. These commands used to live behind the
+					<code>self_register</code> parameter of <a href="mod_auth_sqlite.html">mod_auth_sqlite</a>,
+					which has been removed — see <a href="#migrating">Migrating</a>.
+				</p>
+			</div>
+
+			<h2>Loading</h2>
+			<p>Order matters: load the storage plug-in first.</p>
+			<pre><code>plugin /var/lib/uhub/mod_auth_sqlite.so <span class="s">"file=/etc/uhub/users.db"</span>
+plugin /var/lib/uhub/mod_selfregister.so</code></pre>
+
+			<h2>Configuration</h2>
+			<p>This plug-in takes no parameters.</p>
+
+			<h2>Commands</h2>
+			<table class="table">
+				<tr><th>Command</th><th>Access</th><th>Description</th></tr>
+				<tr><td><code>!regme &lt;password&gt;</code></td><td>guest</td><td>Register the nick you are currently using, with the given password.</td></tr>
+				<tr><td><code>!passwd &lt;password&gt;</code></td><td>registered</td><td>Change the password of your registered nick.</td></tr>
+			</table>
+			<p>
+				Passwords must be 1–64 characters and may not contain spaces. After <code>!regme</code>,
+				set the password in your client and reconnect to log in as a registered user — registering
+				does not upgrade the session you are already in.
+			</p>
+
+			<div class="callout warn">
+				<p>
+					<strong>Any guest can permanently claim any unregistered nick.</strong> That is the point of
+					self-registration, but it means the plug-in is only appropriate on hubs where that is
+					acceptable. On a moderated or private hub, register accounts with
+					<a href="../getstarted.html">uhub-passwd</a> instead and leave this plug-in unloaded.
+				</p>
+			</div>
+
+			<h2 id="migrating">Migrating from mod_auth_sqlite self_register</h2>
+			<p>
+				The <code>self_register</code> parameter was removed in 0.8.0 and the hub <strong>refuses to
+				start</strong> if it is still present, rather than quietly dropping a security-relevant
+				setting. Drop the parameter and load this plug-in:
+			</p>
+			<pre><code><span class="c"># before (0.7.x)</span>
+plugin /var/lib/uhub/mod_auth_sqlite.so <span class="s">"file=/etc/uhub/users.db self_register=true"</span>
+
+<span class="c"># after (0.8.0)</span>
+plugin /var/lib/uhub/mod_auth_sqlite.so <span class="s">"file=/etc/uhub/users.db"</span>
+plugin /var/lib/uhub/mod_selfregister.so</code></pre>
+			<p>
+				If you did <em>not</em> use <code>self_register</code>, simply do not load this plug-in — the
+				commands disappear along with it. The user database format is unchanged either way.
+			</p>
+		</div>
+	</main>
+</div>
+
+<footer class="site-footer">
+	<div class="container footer-inner">
+		<div>uhub &copy; 2007–2026 Jan Vidar Krey</div>
+		<ul class="footer-links">
+			<li><a href="https://github.com/janvidar/uhub/">GitHub</a></li>
+			<li><a href="https://github.com/janvidar/uhub/issues">Issues</a></li>
+			<li><a href="../index.html">Documentation</a></li>
+			<li><a href="https://www.gnu.org/licenses/gpl-3.0.html">License</a></li>
+		</ul>
+	</div>
+</footer>
+
+<script src="../../assets/js/main.js"></script>
+</body>
+</html>

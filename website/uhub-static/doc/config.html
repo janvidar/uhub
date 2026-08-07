@@ -23,6 +23,12 @@
 			<li><a href="../news.html">News</a></li>
 			<li><a href="../download.html">Download</a></li>
 			<li><a href="index.html" class="active">Documentation</a></li>
+			<li class="nav-github">
+				<a href="https://github.com/janvidar/uhub/" aria-label="uhub on GitHub" title="uhub on GitHub">
+					<svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+					<span class="nav-github-label">GitHub</span>
+				</a>
+			</li>
 		</ul>
 	</div>
 </header>
@@ -44,7 +50,8 @@
 			<li><a href="developers.html">Contributors</a></li>
 			<li><a href="compile.html">Compiling</a></li>
 			<li><a href="architecture.html">Architecture</a></li>
-			<li><a href="plugin-api.html">Plug-in API</a></li>
+			<li><a href="plugin-api.html">Plug-in API (C)</a></li>
+			<li><a href="javascript.html">Plug-in API (JavaScript)</a></li>
 		</ul>
 		<h4>Resources</h4>
 		<ul>
@@ -141,6 +148,37 @@
 						<tr><th>Since</th><td>uhub 0.7.0</td></tr>
 					</table></div>
 				</details>
+				<details class="directive" data-name="keepalive_interval" data-desc="Seconds of write silence before the hub pokes an idle client">
+					<summary>keepalive_interval<span class="badge">default: 120</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>How long a logged-in connection may go without the hub writing anything to it before the hub sends an empty line (<code>\n</code>) as a keepalive. Clients ignore empty lines, so this is only there to make the hub write: a write to a connection the peer has already forgotten (a NAT or firewall dropped the state, or the client went away without a FIN) fails or is reset, and the hub reaps the stale user.<br />
+			This matters because clients do the same thing in the other direction. A client whose keepalive is reset reconnects immediately, and if the hub is still holding the dead connection the new login is rejected as "CID taken". Poking idle connections closes that window.<br />
+			The same value doubles as how long a session must have been silent before a login presenting the same CID may take its place: a live client is expected to be heard from at least that often, so a session that is still talking is never displaced, while one that has gone quiet gives way to its owner reconnecting. A different CID never displaces anything that is still alive.<br />
+			If this is 0 the keepalive is disabled and stale connections are only detected by TCP keepalive, which takes several minutes. Connections that already have data queued are skipped: they have a pending write of their own, and adding to the backlog would not tell the hub anything new.</td></tr>
+						<tr><th>Type</th><td>number (0–3600)</td></tr>
+						<tr><th>Default</th><td><code>120</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.8.0</td></tr>
+						<tr><th>Syntax</th><td>0 = off</td></tr>
+						<tr><th>Example</th><td>To poke idle connections every minute:<br />
+				keepalive_interval = 60</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="nat_override" data-desc="Comma separated list of IP ranges allowed to advertise their own address">
+					<summary>nat_override<span class="badge">default: &quot;&quot;</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td>Clients connecting from one of these IP ranges (typically the hub's own
+			LAN, or a NAT gateway) are permitted to advertise the IPv4 address they
+			claim in their INF instead of the (often private) address the hub
+			observes. This lets a client behind NAT be reachable by remote peers for
+			connection setup and transfers. Only list networks you trust. Ranges may
+			be given as CIDR, as a lo-hi range, or as a single address. This replaces
+			the former nat_ip entries in the acl file (file_acl).</td></tr>
+						<tr><th>Type</th><td>String</td></tr>
+						<tr><th>Default</th><td><code>&quot;&quot;</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.8.0</td></tr>
+						<tr><th>Example</th><td><code>nat_override = 10.0.0.0/8,192.168.0.0/16</code></td></tr>
+					</table></div>
+				</details>
 			</div>
 			<div class="config-group">
 				<h2>Hub options</h2>
@@ -187,7 +225,7 @@
 				<details class="directive" data-name="registered_users_only" data-desc="Allow registered users only">
 					<summary>registered_users_only<span class="badge">default: no</span></summary>
 					<div class="directive-body"><table>
-						<tr><th>Description</th><td>If this is enabled only registered users will be able to use the hub. A user must be registered in the acl file (file_acl).</td></tr>
+						<tr><th>Description</th><td>If this is enabled only registered users will be able to use the hub. Users are registered through an authentication plugin (for example mod_auth_sqlite or mod_auth_simple), configured via file_plugins.</td></tr>
 						<tr><th>Type</th><td>boolean</td></tr>
 						<tr><th>Default</th><td><code>no</code></td></tr>
 						<tr><th>Since</th><td>uhub 0.1.1</td></tr>
@@ -220,6 +258,30 @@
 						<tr><th>Type</th><td>boolean</td></tr>
 						<tr><th>Default</th><td><code>no</code></td></tr>
 						<tr><th>Since</th><td>uhub 0.2.4</td></tr>
+					</table></div>
+				</details>
+				<details class="directive" data-name="chat_rich_text" data-desc="Allow rich text formatted chat messages">
+					<summary>chat_rich_text<span class="badge">default: yes</span></summary>
+					<div class="directive-body"><table>
+						<tr><th>Description</th><td><p>
+			When enabled the hub advertises the <code>RTF0</code> extension, which lets
+			clients mark a chat message as rich text formatted with the <code>RT1</code>
+			flag. Rich text messages may embed images by URL, using the form
+			<code>![description](url)</code>, so clients that support the extension will
+			fetch and display remote images posted in chat.
+			</p>
+			<p>
+			Disable this on hubs where that is unwanted: the hub then stops advertising
+			<code>RTF0</code> and removes the <code>RT</code> flag from every relayed
+			message, so no client renders posted images.
+			</p>
+			<p>
+			Clients that do not support <code>RTF0</code> never receive the
+			<code>RT</code> flag and see the plain message text either way.
+			</p></td></tr>
+						<tr><th>Type</th><td>boolean</td></tr>
+						<tr><th>Default</th><td><code>yes</code></td></tr>
+						<tr><th>Since</th><td>uhub 0.8.0</td></tr>
 					</table></div>
 				</details>
 				<details class="directive" data-name="hub_name" data-desc="Name of hub">
@@ -919,12 +981,20 @@
 						<tr><th>Since</th><td>uhub 0.3.0</td></tr>
 					</table></div>
 				</details>
-				<details class="directive" data-name="file_acl" data-desc="File containing access control lists">
+				<details class="directive" data-name="file_acl" data-desc="File containing access control lists (bans and denied nicks)">
 					<summary>file_acl<span class="badge">default: &quot;&quot;</span></summary>
 					<div class="directive-body"><table>
-						<tr><th>Description</th><td>This is an access control list (acl) file.
-			In this file all registered users, bans, etc should be stored.
-			If the file is missing, or empty no registered users, or ban records are used.</td></tr>
+						<tr><th>Description</th><td>An access control list (acl) file holding ban and deny rules only:
+			ban_nick, ban_cid, deny_nick and deny_ip. If missing or empty, no such
+			rules are loaded.
+
+			IMPORTANT (changed in 0.8.0): registered users are NO LONGER defined
+			here. Account credentials are served by an authentication plugin
+			(mod_auth_simple / mod_auth_sqlite, configured via file_plugins). The
+			old user_admin / user_super / user_op / user_reg / link / bot / ubot /
+			opbot / opubot keywords, and nat_ip (now the nat_override option), are
+			obsolete: they are ignored with a warning so existing files keep
+			loading, but you must migrate them.</td></tr>
 						<tr><th>Type</th><td>file</td></tr>
 						<tr><th>Default</th><td><code>&quot;&quot;</code></td></tr>
 						<tr><th>Since</th><td>uhub 0.1.3</td></tr>
@@ -954,38 +1024,21 @@
 			<div class="config-group">
 				<h2>Access control (users.conf)</h2>
 				<p class="lead-sub">These directives live in the ACL file (the <code>file_acl</code> path), not in <code>uhub.conf</code>.</p>
-				<details class="directive" data-name="user_admin" data-desc="An administrator user with full access to configure the hub, plus operator privileges.">
-					<summary>user_admin<span class="badge">username:password</span></summary>
-					<div class="directive-body"><table>
-						<tr><th>Description</th><td>An administrator user with full access to configure the hub, plus operator privileges.</td></tr>
-						<tr><th>Syntax</th><td><code>user_admin username:password</code></td></tr>
-						<tr><th>Since</th><td>uhub 0.1.2</td></tr>
-					</table></div>
-				</details>
-				<details class="directive" data-name="user_super" data-desc="A super user with more privileges than an operator but fewer than an administrator.">
-					<summary>user_super<span class="badge">username:password</span></summary>
-					<div class="directive-body"><table>
-						<tr><th>Description</th><td>A super user with more privileges than an operator but fewer than an administrator.</td></tr>
-						<tr><th>Syntax</th><td><code>user_super username:password</code></td></tr>
-						<tr><th>Since</th><td>uhub 0.2.1</td></tr>
-					</table></div>
-				</details>
-				<details class="directive" data-name="user_op" data-desc="An operator who can kick and ban users from the hub.">
-					<summary>user_op<span class="badge">username:password</span></summary>
-					<div class="directive-body"><table>
-						<tr><th>Description</th><td>An operator who can kick and ban users from the hub.</td></tr>
-						<tr><th>Syntax</th><td><code>user_op username:password</code></td></tr>
-						<tr><th>Since</th><td>uhub 0.1.2</td></tr>
-					</table></div>
-				</details>
-				<details class="directive" data-name="user_reg" data-desc="A registered user with no special privileges, but a password-protected username that can enter registered-only hubs.">
-					<summary>user_reg<span class="badge">username:password</span></summary>
-					<div class="directive-body"><table>
-						<tr><th>Description</th><td>A registered user with no special privileges, but a password-protected username that can enter registered-only hubs.</td></tr>
-						<tr><th>Syntax</th><td><code>user_reg username:password</code></td></tr>
-						<tr><th>Since</th><td>uhub 0.1.2</td></tr>
-					</table></div>
-				</details>
+				<div class="callout warn">
+					<p>
+						<strong>Changed in 0.8.0:</strong> the ACL file holds <em>ban and deny rules only</em>.
+						Registered accounts are no longer defined here — the
+						<code>user_admin</code>, <code>user_super</code>, <code>user_op</code>,
+						<code>user_reg</code>, <code>link</code>, <code>bot</code>, <code>ubot</code>,
+						<code>opbot</code> and <code>opubot</code> keywords are obsolete, and so is
+						<code>nat_ip</code> (replaced by the <code>nat_override</code> option in
+						<code>uhub.conf</code>). Obsolete lines are ignored with a warning so an old file
+						still loads, but they no longer do anything. Move accounts to an authentication
+						plug-in — <a href="plugins/mod_auth_sqlite.html">mod_auth_sqlite</a> or
+						<a href="plugins/mod_auth_simple.html">mod_auth_simple</a> — configured through
+						<code>file_plugins</code>.
+					</p>
+				</div>
 				<details class="directive" data-name="deny_nick" data-desc="A denied username. Any user identifying with this nickname is denied access.">
 					<summary>deny_nick<span class="badge">username</span></summary>
 					<div class="directive-body"><table>
@@ -1020,15 +1073,12 @@
 						<tr><th>Example</th><td><code>deny_ip 192.168.0.0/24<br />deny_ip ::1/128</code></td></tr>
 					</table></div>
 				</details>
-				<details class="directive" data-name="nat_ip" data-desc="Allow users behind the same NAT router as the hub to advertise a public IP. The hub rewrites IPs for other users on the same NATed network. IPv4 only.">
-					<summary>nat_ip<span class="badge">ip range/mask</span></summary>
-					<div class="directive-body"><table>
-						<tr><th>Description</th><td>Allow users behind the same NAT router as the hub to advertise a public IP. The hub rewrites IPs for other users on the same NATed network. IPv4 only.</td></tr>
-						<tr><th>Syntax</th><td><code>nat_ip ip range/mask</code></td></tr>
-						<tr><th>Since</th><td>uhub 0.2.1</td></tr>
-						<tr><th>Example</th><td><code>nat_ip 192.168.1.0/24</code></td></tr>
-					</table></div>
-				</details>
+				<p>
+					Bans created at runtime with <code>!ban</code> (and lifted with <code>!unban</code>) are
+					<em>not</em> written back to this file. To survive a restart they need a storage
+					plug-in that implements ban persistence — see
+					<a href="plugins/mod_auth_sqlite.html">mod_auth_sqlite</a>.
+				</p>
 			</div>
 			<div class="config-group">
 				<h2>Message strings</h2>

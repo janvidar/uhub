@@ -9,6 +9,55 @@ nav: news
 		<p class="section-sub">Release announcements and project updates.</p>
 
 		<article class="news-entry">
+			<h2>uhub 0.8.0 released <span class="tag">release</span></h2>
+			<div class="news-meta">2026-08-07 by Jan Vidar Krey</div>
+			<p>uhub 0.8.0 is now available 🎉</p>
+			<p>
+				The headline addition is <a href="doc/plugins/mod_javascript.html">mod_javascript</a>, an
+				optional plug-in that embeds QuickJS so hub logic can be extended with JavaScript in addition
+				to C. The <a href="doc/javascript.html">JavaScript plug-in API</a> documents the events,
+				verdicts and objects, with worked examples, and JavaScript ports of the welcome, chat-only and
+				flood plug-ins ship as examples in
+				<a href="https://github.com/janvidar/uhub/tree/master/doc/js"><code>doc/js/</code></a>.
+			</p>
+			<p>
+				Chat now supports the new <strong>RTF0</strong> rich text extension — clients that negotiate it
+				render CommonMark, and the MOTD, rules and command output are formatted to match.
+			</p>
+			<p>
+				Moderation gains a new <code>!unban</code> command, durations and reasons on
+				<code>!ban</code>, and ban persistence through a storage plug-in, all propagated across
+				<a href="doc/linking.html">linked hubs</a>.
+			</p>
+			<p>
+				Idle connections are now keepalived, so a connection that died in the middle is reaped in
+				seconds instead of minutes — and a client reconnecting after such a drop takes its own dead
+				session's place rather than being turned away as “CID taken”.
+			</p>
+			<p>
+				This release also fixes a number of bugs and restores native and cross-compiled Windows builds.
+			</p>
+			<p>
+				Two new plug-ins round it out:
+				<a href="doc/plugins/mod_selfregister.html">mod_selfregister</a> for self-service
+				<code>!regme</code> / <code>!passwd</code>, and
+				<a href="doc/plugins/mod_chat_is_privileged.html">mod_chat_is_privileged</a> for gating chat
+				and private messages by credential.
+			</p>
+			<div class="callout warn">
+				<p>
+					<strong>Upgrading needs two changes.</strong> Registered accounts move out of the ACL file
+					into an <a href="doc/plugins/index.html">authentication plug-in</a> — the old
+					<code>user_admin</code> / <code>user_op</code> / <code>user_reg</code> keywords are ignored
+					with a warning. And plug-ins must be rebuilt against plug-in API 8, in which
+					<code>struct plugin_user</code> became opaque; older plug-ins are refused at load. See the
+					<a href="https://github.com/janvidar/uhub/blob/master/ChangeLog">ChangeLog</a> for the full
+					list, and the <a href="download.html">download page</a> for the sources.
+				</p>
+			</div>
+		</article>
+
+		<article class="news-entry">
 			<h2>uhub 0.7.1 released <span class="tag">release</span></h2>
 			<div class="news-meta">2026-07-08 by Jan Vidar Krey</div>
 			<p>

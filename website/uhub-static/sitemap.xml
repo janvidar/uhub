@@ -11,8 +11,26 @@
   <url><loc>https://www.uhub.org/doc/coredumps.html</loc></url>
   <url><loc>https://www.uhub.org/doc/developers.html</loc></url>
   <url><loc>https://www.uhub.org/doc/getstarted.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/javascript.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/linking.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/metrics.html</loc></url>
   <url><loc>https://www.uhub.org/doc/plugin-api.html</loc></url>
   <url><loc>https://www.uhub.org/doc/plugins/</loc></url>
+  <url><loc>https://www.uhub.org/doc/plugins/mod_auth_simple.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/plugins/mod_auth_sqlite.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/plugins/mod_chat_history.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/plugins/mod_chat_history_sqlite.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/plugins/mod_chat_is_privileged.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/plugins/mod_chat_only.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/plugins/mod_example.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/plugins/mod_flood.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/plugins/mod_javascript.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/plugins/mod_logging.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/plugins/mod_no_guest_downloads.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/plugins/mod_selfregister.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/plugins/mod_topic.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/plugins/mod_ucmd.html</loc></url>
+  <url><loc>https://www.uhub.org/doc/plugins/mod_welcome.html</loc></url>
   <url><loc>https://www.uhub.org/download.html</loc></url>
   <url><loc>https://www.uhub.org/news.html</loc></url>
 </urlset>

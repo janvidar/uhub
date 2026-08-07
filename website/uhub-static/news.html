@@ -23,6 +23,12 @@
 			<li><a href="news.html" class="active">News</a></li>
 			<li><a href="download.html">Download</a></li>
 			<li><a href="doc/index.html">Documentation</a></li>
+			<li class="nav-github">
+				<a href="https://github.com/janvidar/uhub/" aria-label="uhub on GitHub" title="uhub on GitHub">
+					<svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+					<span class="nav-github-label">GitHub</span>
+				</a>
+			</li>
 		</ul>
 	</div>
 </header>
@@ -31,6 +37,55 @@
 	<div class="container" style="max-width:760px;">
 		<h2 class="section-title">News</h2>
 		<p class="section-sub">Release announcements and project updates.</p>
+
+		<article class="news-entry">
+			<h2>uhub 0.8.0 released <span class="tag">release</span></h2>
+			<div class="news-meta">2026-08-07 by Jan Vidar Krey</div>
+			<p>uhub 0.8.0 is now available 🎉</p>
+			<p>
+				The headline addition is <a href="doc/plugins/mod_javascript.html">mod_javascript</a>, an
+				optional plug-in that embeds QuickJS so hub logic can be extended with JavaScript in addition
+				to C. The <a href="doc/javascript.html">JavaScript plug-in API</a> documents the events,
+				verdicts and objects, with worked examples, and JavaScript ports of the welcome, chat-only and
+				flood plug-ins ship as examples in
+				<a href="https://github.com/janvidar/uhub/tree/master/doc/js"><code>doc/js/</code></a>.
+			</p>
+			<p>
+				Chat now supports the new <strong>RTF0</strong> rich text extension — clients that negotiate it
+				render CommonMark, and the MOTD, rules and command output are formatted to match.
+			</p>
+			<p>
+				Moderation gains a new <code>!unban</code> command, durations and reasons on
+				<code>!ban</code>, and ban persistence through a storage plug-in, all propagated across
+				<a href="doc/linking.html">linked hubs</a>.
+			</p>
+			<p>
+				Idle connections are now keepalived, so a connection that died in the middle is reaped in
+				seconds instead of minutes — and a client reconnecting after such a drop takes its own dead
+				session's place rather than being turned away as “CID taken”.
+			</p>
+			<p>
+				This release also fixes a number of bugs and restores native and cross-compiled Windows builds.
+			</p>
+			<p>
+				Two new plug-ins round it out:
+				<a href="doc/plugins/mod_selfregister.html">mod_selfregister</a> for self-service
+				<code>!regme</code> / <code>!passwd</code>, and
+				<a href="doc/plugins/mod_chat_is_privileged.html">mod_chat_is_privileged</a> for gating chat
+				and private messages by credential.
+			</p>
+			<div class="callout warn">
+				<p>
+					<strong>Upgrading needs two changes.</strong> Registered accounts move out of the ACL file
+					into an <a href="doc/plugins/index.html">authentication plug-in</a> — the old
+					<code>user_admin</code> / <code>user_op</code> / <code>user_reg</code> keywords are ignored
+					with a warning. And plug-ins must be rebuilt against plug-in API 8, in which
+					<code>struct plugin_user</code> became opaque; older plug-ins are refused at load. See the
+					<a href="https://github.com/janvidar/uhub/blob/master/ChangeLog">ChangeLog</a> for the full
+					list, and the <a href="download.html">download page</a> for the sources.
+				</p>
+			</div>
+		</article>
 
 		<article class="news-entry">
 			<h2>uhub 0.7.1 released <span class="tag">release</span></h2>

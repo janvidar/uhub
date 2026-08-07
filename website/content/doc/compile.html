@@ -15,12 +15,32 @@ sidebar: compile
 				<li>SQLite3</li>
 			</ul>
 
+			<h2>Getting the source</h2>
+			<p>
+				Building from git needs submodules — the test framework is one, and QuickJS is another if you
+				enable <a href="javascript.html">JavaScript plug-ins</a>:
+			</p>
+			<pre><code>git clone --recurse-submodules https://github.com/janvidar/uhub.git
+
+<span class="c"># or, in an existing clone:</span>
+git submodule update --init</code></pre>
+
 			<h2>Linux, macOS, BSD, Solaris</h2>
 			<p>An out-of-tree build is recommended:</p>
 			<pre><code>mkdir -p build &amp;&amp; cd build
 cmake ..
 make -j
 make install</code></pre>
+
+			<h3>Build options</h3>
+			<table class="table">
+				<tr><th>Option</th><th>Default</th><th>Description</th></tr>
+				<tr><td><code>-DRELEASE</code></td><td><code>ON</code></td><td>Turn off for a debug build.</td></tr>
+				<tr><td><code>-DJAVASCRIPT_SUPPORT</code></td><td><code>OFF</code></td><td>Build <a href="plugins/mod_javascript.html">mod_javascript</a>, embedding QuickJS. Needs the <code>third_party/quickjs</code> submodule.</td></tr>
+				<tr><td><code>-DSYSTEMD_SUPPORT</code></td><td><code>OFF</code></td><td>systemd socket activation and notification.</td></tr>
+				<tr><td><code>-DADC_STRESS</code></td><td><code>OFF</code></td><td>Build the stress-tester client.</td></tr>
+			</table>
+			<p>Run the test suite from the build directory with <code>ctest</code>, or by running <code>./autotest-bin</code> directly.</p>
 
 			<p>Default install directories:</p>
 			<table class="table">

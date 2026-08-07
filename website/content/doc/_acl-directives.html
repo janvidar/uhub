@@ -1,38 +1,21 @@
 			<div class="config-group">
 				<h2>Access control (users.conf)</h2>
 				<p class="lead-sub">These directives live in the ACL file (the <code>file_acl</code> path), not in <code>uhub.conf</code>.</p>
-				<details class="directive" data-name="user_admin" data-desc="An administrator user with full access to configure the hub, plus operator privileges.">
-					<summary>user_admin<span class="badge">username:password</span></summary>
-					<div class="directive-body"><table>
-						<tr><th>Description</th><td>An administrator user with full access to configure the hub, plus operator privileges.</td></tr>
-						<tr><th>Syntax</th><td><code>user_admin username:password</code></td></tr>
-						<tr><th>Since</th><td>uhub 0.1.2</td></tr>
-					</table></div>
-				</details>
-				<details class="directive" data-name="user_super" data-desc="A super user with more privileges than an operator but fewer than an administrator.">
-					<summary>user_super<span class="badge">username:password</span></summary>
-					<div class="directive-body"><table>
-						<tr><th>Description</th><td>A super user with more privileges than an operator but fewer than an administrator.</td></tr>
-						<tr><th>Syntax</th><td><code>user_super username:password</code></td></tr>
-						<tr><th>Since</th><td>uhub 0.2.1</td></tr>
-					</table></div>
-				</details>
-				<details class="directive" data-name="user_op" data-desc="An operator who can kick and ban users from the hub.">
-					<summary>user_op<span class="badge">username:password</span></summary>
-					<div class="directive-body"><table>
-						<tr><th>Description</th><td>An operator who can kick and ban users from the hub.</td></tr>
-						<tr><th>Syntax</th><td><code>user_op username:password</code></td></tr>
-						<tr><th>Since</th><td>uhub 0.1.2</td></tr>
-					</table></div>
-				</details>
-				<details class="directive" data-name="user_reg" data-desc="A registered user with no special privileges, but a password-protected username that can enter registered-only hubs.">
-					<summary>user_reg<span class="badge">username:password</span></summary>
-					<div class="directive-body"><table>
-						<tr><th>Description</th><td>A registered user with no special privileges, but a password-protected username that can enter registered-only hubs.</td></tr>
-						<tr><th>Syntax</th><td><code>user_reg username:password</code></td></tr>
-						<tr><th>Since</th><td>uhub 0.1.2</td></tr>
-					</table></div>
-				</details>
+				<div class="callout warn">
+					<p>
+						<strong>Changed in 0.8.0:</strong> the ACL file holds <em>ban and deny rules only</em>.
+						Registered accounts are no longer defined here — the
+						<code>user_admin</code>, <code>user_super</code>, <code>user_op</code>,
+						<code>user_reg</code>, <code>link</code>, <code>bot</code>, <code>ubot</code>,
+						<code>opbot</code> and <code>opubot</code> keywords are obsolete, and so is
+						<code>nat_ip</code> (replaced by the <code>nat_override</code> option in
+						<code>uhub.conf</code>). Obsolete lines are ignored with a warning so an old file
+						still loads, but they no longer do anything. Move accounts to an authentication
+						plug-in — <a href="plugins/mod_auth_sqlite.html">mod_auth_sqlite</a> or
+						<a href="plugins/mod_auth_simple.html">mod_auth_simple</a> — configured through
+						<code>file_plugins</code>.
+					</p>
+				</div>
 				<details class="directive" data-name="deny_nick" data-desc="A denied username. Any user identifying with this nickname is denied access.">
 					<summary>deny_nick<span class="badge">username</span></summary>
 					<div class="directive-body"><table>
@@ -67,13 +50,10 @@
 						<tr><th>Example</th><td><code>deny_ip 192.168.0.0/24<br />deny_ip ::1/128</code></td></tr>
 					</table></div>
 				</details>
-				<details class="directive" data-name="nat_ip" data-desc="Allow users behind the same NAT router as the hub to advertise a public IP. The hub rewrites IPs for other users on the same NATed network. IPv4 only.">
-					<summary>nat_ip<span class="badge">ip range/mask</span></summary>
-					<div class="directive-body"><table>
-						<tr><th>Description</th><td>Allow users behind the same NAT router as the hub to advertise a public IP. The hub rewrites IPs for other users on the same NATed network. IPv4 only.</td></tr>
-						<tr><th>Syntax</th><td><code>nat_ip ip range/mask</code></td></tr>
-						<tr><th>Since</th><td>uhub 0.2.1</td></tr>
-						<tr><th>Example</th><td><code>nat_ip 192.168.1.0/24</code></td></tr>
-					</table></div>
-				</details>
+				<p>
+					Bans created at runtime with <code>!ban</code> (and lifted with <code>!unban</code>) are
+					<em>not</em> written back to this file. To survive a restart they need a storage
+					plug-in that implements ban persistence — see
+					<a href="plugins/mod_auth_sqlite.html">mod_auth_sqlite</a>.
+				</p>
 			</div>

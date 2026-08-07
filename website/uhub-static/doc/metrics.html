@@ -23,6 +23,12 @@
 			<li><a href="../news.html">News</a></li>
 			<li><a href="../download.html">Download</a></li>
 			<li><a href="index.html" class="active">Documentation</a></li>
+			<li class="nav-github">
+				<a href="https://github.com/janvidar/uhub/" aria-label="uhub on GitHub" title="uhub on GitHub">
+					<svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+					<span class="nav-github-label">GitHub</span>
+				</a>
+			</li>
 		</ul>
 	</div>
 </header>
@@ -44,7 +50,8 @@
 			<li><a href="developers.html">Contributors</a></li>
 			<li><a href="compile.html">Compiling</a></li>
 			<li><a href="architecture.html">Architecture</a></li>
-			<li><a href="plugin-api.html">Plug-in API</a></li>
+			<li><a href="plugin-api.html">Plug-in API (C)</a></li>
+			<li><a href="javascript.html">Plug-in API (JavaScript)</a></li>
 		</ul>
 		<h4>Resources</h4>
 		<ul>
@@ -170,6 +177,7 @@ uhub_uptime_seconds 4210
 				<tr><td><code>uhub_chat_messages_total</code></td><td>counter</td><td>Public chat messages accepted for routing.</td></tr>
 				<tr><td><code>uhub_private_messages_total</code></td><td>counter</td><td>Private messages accepted for routing.</td></tr>
 				<tr><td><code>uhub_searches_total</code> / <code>uhub_search_results_total</code></td><td>counter</td><td>Search requests accepted / results relayed.</td></tr>
+				<tr><td><code>uhub_partial_results_total</code></td><td>counter</td><td>Partial file sharing responses (PSR) relayed.</td></tr>
 				<tr><td><code>uhub_connect_requests_total</code> / <code>uhub_rev_connect_requests_total</code></td><td>counter</td><td>Active (CTM) / passive (RCM) connect requests.</td></tr>
 				<tr><td><code>uhub_broadcasts_total</code> / <code>uhub_feature_casts_total</code></td><td>counter</td><td>Messages broadcast to all / feature-cast to subscribers.</td></tr>
 			</table>
@@ -182,6 +190,7 @@ uhub_uptime_seconds 4210
 				<tr><td><code>uhub_net_tx_rate_bytes</code> / <code>uhub_net_rx_rate_bytes</code></td><td>gauge</td><td>Current send / receive rate (bytes/sec); <code>_peak</code> variants hold the maxima.</td></tr>
 				<tr><td><code>uhub_send_queue_bytes</code></td><td>gauge</td><td>Total bytes queued for sending across all users.</td></tr>
 				<tr><td><code>uhub_connections_accepted_total</code> / <code>_closed_total</code> / <code>_errors_total</code></td><td>counter</td><td>Connection lifecycle counts.</td></tr>
+				<tr><td><code>uhub_keepalives_total</code></td><td>counter</td><td>Keepalives written to idle connections (see <code>keepalive_interval</code>). A rising rate against a flat user count means many idle sessions; a spike in <code>_closed_total</code> alongside it is the hub reaping connections that died silently.</td></tr>
 				<tr><td><code>uhub_tls_accept_total</code> / <code>_connect_total</code> / <code>_close_total</code> / <code>_error_total</code></td><td>counter</td><td>TLS handshake and error counts.</td></tr>
 				<tr><td><code>uhub_event_loop_seconds</code></td><td>histogram</td><td>Event-loop processing time per iteration (excludes the idle poll wait) — a direct measure of main-thread saturation.</td></tr>
 			</table>

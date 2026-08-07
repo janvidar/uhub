@@ -83,6 +83,11 @@ a:hover { color: var(--primary-dark); text-decoration: underline; }
 .nav-links a:hover { background: var(--surface-alt); color: var(--primary); text-decoration: none; }
 .nav-links a.active { color: var(--primary); background: var(--surface-alt); }
 
+/* GitHub link: icon only on desktop, icon + label in the mobile drop-down. */
+.nav-github a { display: flex; align-items: center; gap: 8px; }
+.nav-github svg { display: block; }
+.nav-github-label { display: none; }
+
 .nav-toggle {
 	display: none;
 	background: none;
@@ -143,6 +148,12 @@ a:hover { color: var(--primary-dark); text-decoration: underline; }
 
 /* ---------- Sections / cards ---------- */
 .section { padding: 56px 0; }
+/* Full-bleed tinted band, to separate adjacent sections on the front page. */
+.section-alt {
+	background: var(--surface-alt);
+	border-top: 1px solid var(--border);
+	border-bottom: 1px solid var(--border);
+}
 .section h2.section-title {
 	font-size: 1.7rem;
 	letter-spacing: -.01em;
@@ -371,5 +382,6 @@ pre .n { color: #d2a8ff; }   /* number  */
 		box-shadow: var(--shadow);
 	}
 	.nav-links.open { display: flex; }
+	.nav-github-label { display: inline; }
 	.prose { padding: 24px 22px; }
 }

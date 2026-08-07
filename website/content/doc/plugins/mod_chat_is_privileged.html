@@ -1,0 +1,70 @@
+title: uhub — mod_chat_is_privileged
+description: mod_chat_is_privileged restricts who may write in main chat and who may send private messages on a uhub hub, by credential.
+layout: doc
+nav: documentation
+sidebar: plugins
+---
+			<h1>mod_chat_is_privileged</h1>
+			<p class="lead-sub">Gate chat by credential. Part of the bundled <a href="index.html">plug-ins</a>.</p>
+
+			<p>
+				<code>mod_chat_is_privileged</code> restricts who may write in main chat and who may send
+				private messages, using a minimum credential per message type. It is the plug-in counterpart
+				to the built-in <a href="../config.html">chat_is_privileged</a> option, adding
+				private-message control — the usual defence against private-message spam from guests, which
+				the core option does not cover.
+			</p>
+
+			<h2>Loading</h2>
+			<pre><code>plugin /var/lib/uhub/mod_chat_is_privileged.so <span class="s">"allow_privchat=reg allow_op_contact=guest"</span></code></pre>
+
+			<h2>Configuration</h2>
+			<p>
+				Each option is a <em>minimum</em> credential: a user at or above that level is allowed,
+				everyone below is denied and told so once.
+			</p>
+			<table class="table">
+				<tr><th>Option</th><th>Default</th><th>Description</th></tr>
+				<tr><td><code>allow_mainchat</code></td><td><code>guest</code></td><td>Minimum credential to write in main chat.</td></tr>
+				<tr><td><code>allow_privchat</code></td><td><code>guest</code></td><td>Minimum credential to send a private message.</td></tr>
+				<tr><td><code>allow_op_contact</code></td><td><code>guest</code></td><td>Minimum credential to private-message an operator or above. Applies when the <em>recipient</em> is staff.</td></tr>
+			</table>
+			<p>Accepted credential names, from least to most privileged:</p>
+			<p>
+				<code>none</code>, <code>guest</code>, <code>user</code> (also <code>reg</code>),
+				<code>operator</code> (also <code>op</code>), <code>super</code>, <code>admin</code> — plus the
+				bot classes <code>bot</code>, <code>ubot</code>, <code>opbot</code> and <code>opubot</code>.
+			</p>
+
+			<h2>Behaviour</h2>
+			<p>
+				A denied user is sent a one-time notice per category — one for main chat, one for private
+				messages — so a client that keeps retrying does not spam them with warnings. The message
+				itself is dropped.
+			</p>
+			<p>
+				<code>allow_op_contact</code> is checked when the recipient is an operator, super or admin, and
+				is normally left at or below <code>allow_privchat</code>. That way ordinary users can always
+				reach staff even while peer-to-peer private messaging is locked down:
+			</p>
+			<pre><code><span class="c"># Everyone may read and write main chat.</span>
+<span class="c"># Only registered users may PM each other…</span>
+<span class="c"># …but anyone may PM an operator to ask for help.</span>
+plugin /var/lib/uhub/mod_chat_is_privileged.so <span class="s">"allow_privchat=reg allow_op_contact=guest"</span></code></pre>
+			<p>
+				Setting <code>allow_op_contact</code> <em>above</em> <code>allow_privchat</code> is allowed but
+				rarely what you want — it makes staff harder to reach than other users.
+			</p>
+
+			<div class="callout">
+				<p>
+					<strong>Fixed in 0.8.0:</strong> earlier versions parsed <code>allow_privchat</code> but
+					never enforced it, so private messages were not actually gated. Hubs that relied on the
+					setting should recheck their configuration now that it takes effect.
+				</p>
+			</div>
+
+			<p>
+				To disable file transfers entirely rather than restrict chat, see
+				<a href="mod_chat_only.html">mod_chat_only</a>.
+			</p>

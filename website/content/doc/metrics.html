@@ -119,6 +119,7 @@ uhub_uptime_seconds 4210
 				<tr><td><code>uhub_chat_messages_total</code></td><td>counter</td><td>Public chat messages accepted for routing.</td></tr>
 				<tr><td><code>uhub_private_messages_total</code></td><td>counter</td><td>Private messages accepted for routing.</td></tr>
 				<tr><td><code>uhub_searches_total</code> / <code>uhub_search_results_total</code></td><td>counter</td><td>Search requests accepted / results relayed.</td></tr>
+				<tr><td><code>uhub_partial_results_total</code></td><td>counter</td><td>Partial file sharing responses (PSR) relayed.</td></tr>
 				<tr><td><code>uhub_connect_requests_total</code> / <code>uhub_rev_connect_requests_total</code></td><td>counter</td><td>Active (CTM) / passive (RCM) connect requests.</td></tr>
 				<tr><td><code>uhub_broadcasts_total</code> / <code>uhub_feature_casts_total</code></td><td>counter</td><td>Messages broadcast to all / feature-cast to subscribers.</td></tr>
 			</table>
@@ -131,6 +132,7 @@ uhub_uptime_seconds 4210
 				<tr><td><code>uhub_net_tx_rate_bytes</code> / <code>uhub_net_rx_rate_bytes</code></td><td>gauge</td><td>Current send / receive rate (bytes/sec); <code>_peak</code> variants hold the maxima.</td></tr>
 				<tr><td><code>uhub_send_queue_bytes</code></td><td>gauge</td><td>Total bytes queued for sending across all users.</td></tr>
 				<tr><td><code>uhub_connections_accepted_total</code> / <code>_closed_total</code> / <code>_errors_total</code></td><td>counter</td><td>Connection lifecycle counts.</td></tr>
+				<tr><td><code>uhub_keepalives_total</code></td><td>counter</td><td>Keepalives written to idle connections (see <code>keepalive_interval</code>). A rising rate against a flat user count means many idle sessions; a spike in <code>_closed_total</code> alongside it is the hub reaping connections that died silently.</td></tr>
 				<tr><td><code>uhub_tls_accept_total</code> / <code>_connect_total</code> / <code>_close_total</code> / <code>_error_total</code></td><td>counter</td><td>TLS handshake and error counts.</td></tr>
 				<tr><td><code>uhub_event_loop_seconds</code></td><td>histogram</td><td>Event-loop processing time per iteration (excludes the idle poll wait) — a direct measure of main-thread saturation.</td></tr>
 			</table>

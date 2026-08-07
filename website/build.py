@@ -78,11 +78,13 @@ def either(*fns):
 ACL_MARKER = "__ACL__"
 GROUPS = [
     ("Server & network", names("server_port", "server_bind_addr",
-        "server_listen_backlog", "server_alt_ports", "server_reuseport")),
+        "server_listen_backlog", "server_alt_ports", "server_reuseport",
+        "nat_override", "keepalive_interval")),
     ("Hub options", names("hub_enabled", "hub_name", "hub_description",
         "max_users", "registered_users_only", "register_self",
-        "chat_is_privileged", "obsolete_clients", "low_bandwidth_mode",
-        "show_banner", "show_banner_sys_info", "redirect_addr")),
+        "chat_is_privileged", "chat_rich_text", "obsolete_clients",
+        "low_bandwidth_mode", "show_banner", "show_banner_sys_info",
+        "redirect_addr")),
     ("Hub information", names("hub_address", "hub_website", "hub_network",
         "hub_owner", "reg_server_url")),
     ("Limits", either(prefixes("limit_"), names("max_connections_per_ip"))),
@@ -287,11 +289,35 @@ def render_page(relpath, text, config_reference):
     return resolve_tokens(page, page_dir, active_keys)
 
 
+SITE_URL = "https://www.uhub.org"
+
+
+def write_sitemap(relpaths):
+    """Generate sitemap.xml from the pages actually built, so a new page is
+    never left out of it. index.html maps to its directory URL."""
+    urls = []
+    for rel in relpaths:
+        path = rel.replace(os.sep, "/")
+        if path == "index.html":
+            path = ""
+        elif path.endswith("/index.html"):
+            path = path[:-len("index.html")]
+        urls.append("%s/%s" % (SITE_URL, path))
+
+    body = "\n".join("  <url><loc>%s</loc></url>" % u for u in sorted(urls))
+    dest = os.path.join(OUT, "sitemap.xml")
+    with open(dest, "w", encoding="utf-8") as f:
+        f.write('<?xml version="1.0" encoding="UTF-8"?>\n'
+                '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+                '%s\n</urlset>\n' % body)
+    print("  sitemap: %d urls" % len(urls))
+
+
 def main():
     print("Building uhub website...")
     config_reference = build_config_reference()
 
-    count = 0
+    built = []
     for root, _, files in os.walk(CONTENT):
         for fn in sorted(files):
             if not fn.endswith(".html") or fn.startswith("_"):
@@ -303,8 +329,9 @@ def main():
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             with open(dest, "w", encoding="utf-8") as f:
                 f.write(out)
-            count += 1
-    print("  wrote %d pages to %s" % (count, os.path.relpath(OUT, os.getcwd())))
+            built.append(rel)
+    print("  wrote %d pages to %s" % (len(built), os.path.relpath(OUT, os.getcwd())))
+    write_sitemap(built)
 
 
 if __name__ == "__main__":

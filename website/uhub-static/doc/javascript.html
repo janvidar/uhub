@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>uhub — JavaScript plug-in API</title>
+	<meta name="description" content="Write uhub hub logic in JavaScript with mod_javascript, the embedded QuickJS plug-in host — events, verdicts, the user object, and worked examples." />
+	<link rel="icon" href="../assets/img/favicon.ico" />
+	<link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+	<div class="container nav">
+		<a class="brand" href="../index.html">
+			<img src="../assets/img/logo.svg" alt="uhub logo" />
+			<span>uhub</span>
+			<span class="slogan">High performance ADC hub</span>
+		</a>
+		<button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+		<ul class="nav-links">
+			<li><a href="../index.html">About</a></li>
+			<li><a href="../news.html">News</a></li>
+			<li><a href="../download.html">Download</a></li>
+			<li><a href="index.html" class="active">Documentation</a></li>
+			<li class="nav-github">
+				<a href="https://github.com/janvidar/uhub/" aria-label="uhub on GitHub" title="uhub on GitHub">
+					<svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+					<span class="nav-github-label">GitHub</span>
+				</a>
+			</li>
+		</ul>
+	</div>
+</header>
+
+<div class="container doc-layout">
+	<aside class="doc-sidebar">
+		<h4>Users</h4>
+		<ul>
+			<li><a href="getstarted.html">Getting started</a></li>
+			<li><a href="config-example.html">Example configuration</a></li>
+			<li><a href="config.html">Configuration reference</a></li>
+			<li><a href="plugins/index.html">Plug-ins</a></li>
+			<li><a href="config-ssl.html">SSL / TLS</a></li>
+			<li><a href="metrics.html">Monitoring</a></li>
+			<li><a href="linking.html">Hub linking</a></li>
+		</ul>
+		<h4>Developers</h4>
+		<ul>
+			<li><a href="developers.html">Contributors</a></li>
+			<li><a href="compile.html">Compiling</a></li>
+			<li><a href="architecture.html">Architecture</a></li>
+			<li><a href="plugin-api.html">Plug-in API (C)</a></li>
+			<li><a href="javascript.html" class="active">Plug-in API (JavaScript)</a></li>
+		</ul>
+		<h4>Resources</h4>
+		<ul>
+			<li><a href="adc.html">What is ADC?</a></li>
+			<li><a href="coredumps.html">Core dumps</a></li>
+		</ul>
+	</aside>
+
+	<main class="doc-content">
+		<div class="prose">
+			<h1>JavaScript plug-in API</h1>
+			<p class="lead-sub">
+				Write hub logic in JavaScript instead of C. <code>mod_javascript</code> embeds the
+				<a href="https://github.com/quickjs-ng/quickjs">QuickJS</a> engine and runs your scripts
+				as ordinary uhub plug-ins — no compiler, no rebuild, no ABI to match.
+			</p>
+
+			<div class="callout">
+				<p>
+					New in <strong>uhub 0.8.0</strong>. <code>mod_javascript</code> is optional and is not
+					built unless you ask for it — see <a href="#building">Building the plug-in</a>.
+				</p>
+			</div>
+
+			<h2>Why JavaScript?</h2>
+			<p>
+				The <a href="plugin-api.html">C plug-in API</a> is the fast path and gives you the whole hub.
+				It also means a compiler, a shared library that must match the plug-in ABI of the running hub,
+				and a rebuild for every policy tweak. Most hub customisation is not performance-critical — a
+				welcome message, a word filter, a rule about who may search — and for that a script you can
+				edit and reload is a far better fit.
+			</p>
+			<table class="table">
+				<tr><th></th><th>C plug-in</th><th>JavaScript</th></tr>
+				<tr><td>Build step</td><td>Compiler, headers, matching plug-in API version</td><td>None — drop a <code>.js</code> file in place</td></tr>
+				<tr><td>Hub surface</td><td>Everything in <code>plugin_funcs</code></td><td>The curated <code>uhub</code> object</td></tr>
+				<tr><td>Failure mode</td><td>A bug can crash or wedge the hub</td><td>Exception is logged; watchdog stops runaway loops</td></tr>
+				<tr><td>Sandbox</td><td>Full process privileges</td><td>No filesystem, network or process access</td></tr>
+				<tr><td>Best for</td><td>Storage backends, protocol work, hot paths</td><td>Hub policy, chat rules, greetings, moderation</td></tr>
+			</table>
+			<p>
+				The two coexist. A hub can load <code>mod_auth_sqlite</code> in C for storage and a handful of
+				scripts for policy on top.
+			</p>
+
+			<h2 id="building">Building the plug-in</h2>
+			<p>
+				The engine (quickjs-ng) is a git submodule pinned to a specific release. Fetch it, then
+				configure with JavaScript support:
+			</p>
+			<pre><code>git submodule update --init third_party/quickjs
+
+<span class="c"># CMake</span>
+cmake -DJAVASCRIPT_SUPPORT=ON ..
+
+<span class="c"># or zig</span>
+zig build -Djavascript=true</code></pre>
+			<p>
+				A fresh clone can use <code>git clone --recurse-submodules</code> instead. Only the engine core
+				is compiled — no CLI, and none of QuickJS's POSIX <code>std</code>/<code>os</code> bindings.
+			</p>
+
+			<h2 id="loading">Loading scripts</h2>
+			<p>
+				<code>mod_javascript</code> is loaded once, like any other plug-in, from
+				<a href="plugins/index.html">plugins.conf</a>. Rather than naming every script on that line,
+				you point it at a directory or a list file:
+			</p>
+			<pre><code><span class="c"># Load every *.js in a directory (sorted by name, each validated):</span>
+plugin /usr/lib/uhub/mod_javascript.so <span class="s">"dir=/etc/uhub/js.d"</span>
+
+<span class="c"># Or list scripts, with per-script options, in a secondary config file:</span>
+plugin /usr/lib/uhub/mod_javascript.so <span class="s">"config=/etc/uhub/javascript.conf"</span>
+
+<span class="c"># A single script is also fine:</span>
+plugin /usr/lib/uhub/mod_javascript.so <span class="s">"script=/etc/uhub/welcome.js motd=Hi %n"</span></code></pre>
+			<p>
+				<code>dir=</code>, <code>config=</code> and <code>script=</code> may be combined and repeated.
+				Every <em>other</em> <code>key=value</code> on the plug-in line is handed to all scripts as
+				<code>uhub.config</code>.
+			</p>
+			<p>The list file used by <code>config=</code> holds one script per line:</p>
+			<pre><code><span class="c"># /etc/uhub/javascript.conf — '#' starts a comment, blank lines are ignored.</span>
+welcome.js     motd=Welcome %n!      <span class="c"># per-script options follow the path</span>
+chat_only.js
+flood.js       grace=5</code></pre>
+			<p>
+				Relative paths resolve against the list file's own directory, and the per-script
+				<code>key=value</code> options become that script's <code>uhub.config</code>, overriding
+				anything set on the plug-in line.
+			</p>
+			<div class="callout warn">
+				<p>
+					<code>dir=</code> uses <code>dirent</code> and is POSIX-only. On Windows use
+					<code>config=</code> or <code>script=</code>.
+				</p>
+			</div>
+
+			<h3>Tunables</h3>
+			<p>These keys are consumed by <code>mod_javascript</code> itself and are not passed to scripts:</p>
+			<table class="table">
+				<tr><th>Option</th><th>Default</th><th>Description</th></tr>
+				<tr><td><code>memory_limit</code></td><td><code>67108864</code></td><td>Engine heap cap, in bytes (64 MiB).</td></tr>
+				<tr><td><code>stack_limit</code></td><td><code>1048576</code></td><td>JavaScript stack cap, in bytes (1 MiB).</td></tr>
+				<tr><td><code>time_limit</code></td><td><code>1000</code></td><td>Per-callback wall-clock budget, in milliseconds.</td></tr>
+			</table>
+
+			<h2 id="first-script">Your first script</h2>
+			<p>
+				A script registers handlers on the global <code>uhub</code> object. The file is evaluated once
+				at hub startup; nothing else runs until an event fires.
+			</p>
+			<pre><code><span class="c">// greeter.js</span>
+<span class="k">var</span> hubName = uhub.config.name || <span class="s">"our hub"</span>;
+
+uhub.onUserLogin(<span class="k">function</span> (user) {
+    uhub.log(<span class="s">"login: "</span> + user.nick + <span class="s">" ("</span> + user.credentials + <span class="s">")"</span>);
+    user.sendMessage(<span class="s">"Welcome to "</span> + hubName + <span class="s">", "</span> + user.nick + <span class="s">"!"</span>);
+});
+
+uhub.onChatMsg(<span class="k">function</span> (from, message) {
+    <span class="k">if</span> (/\bbadword\b/i.test(message))
+        <span class="k">return</span> uhub.DENY;          <span class="c">// block this message</span>
+    <span class="c">// returning nothing == uhub.DEFAULT == let the hub decide</span>
+});</code></pre>
+			<p>Load it and restart the hub:</p>
+			<pre><code>plugin /usr/lib/uhub/mod_javascript.so <span class="s">"script=/etc/uhub/greeter.js name=Café ADC"</span></code></pre>
+			<p>
+				If a script fails to parse, or throws while being evaluated, <strong>the hub refuses to
+				start</strong> and logs the error. A script is a configuration file: a broken one is a
+				configuration error, not something to be silently skipped.
+			</p>
+
+			<h2 id="events">Events</h2>
+			<p>
+				Every registrar takes a single function; registering again replaces the previous handler.
+				<em>Interceptable</em> events use the handler's return value (see
+				<a href="#verdicts">Verdicts</a>); the rest ignore it.
+			</p>
+			<table class="table">
+				<tr><th>Registrar</th><th>Handler arguments</th><th>Intercept</th><th>Fires when</th></tr>
+				<tr><td><code>onUserLogin</code></td><td><code>(user)</code></td><td>—</td><td>A user has completed login and is on the hub.</td></tr>
+				<tr><td><code>onUserLogout</code></td><td><code>(user, reason)</code></td><td>—</td><td>A logged-in user disconnected. <code>reason</code> is a short string.</td></tr>
+				<tr><td><code>onChatMsg</code></td><td><code>(from, message)</code></td><td>yes</td><td>A main-chat message is about to be routed.</td></tr>
+				<tr><td><code>onPrivateMsg</code></td><td><code>(from, to, message)</code></td><td>yes</td><td>A private message is about to be delivered.</td></tr>
+				<tr><td><code>onSearch</code></td><td><code>(user, data)</code></td><td>yes</td><td>A search is about to be forwarded. <code>data</code> is the raw ADC search string.</td></tr>
+				<tr><td><code>onSearchResult</code></td><td><code>(user, data)</code></td><td>yes</td><td>A search result is about to be relayed back. <code>user</code> is the sender.</td></tr>
+				<tr><td><code>onP2PConnect</code></td><td><code>(from)</code></td><td>yes</td><td>A user asks to connect to a peer (active mode, CTM).</td></tr>
+				<tr><td><code>onP2PRevConnect</code></td><td><code>(from)</code></td><td>yes</td><td>A user asks a peer to connect back (passive mode, RCM).</td></tr>
+				<tr><td><code>onCheckIpLate</code></td><td><code>(user)</code></td><td>yes</td><td>Late in the login pipeline. <code>DENY</code> rejects the login.</td></tr>
+				<tr><td><code>onChangeNick</code></td><td><code>(user, newNick)</code></td><td>yes</td><td>A logged-in user wants to rename. <code>ALLOW</code> permits it, <code>DENY</code> refuses.</td></tr>
+				<tr><td><code>onFloodDetected</code></td><td><code>(user, type)</code></td><td>yes</td><td>The hub's <code>flood_ctl_*</code> thresholds tripped. See below.</td></tr>
+				<tr><td><code>onHubStarted</code></td><td><code>()</code></td><td>—</td><td>All plug-ins are loaded and the hub is running.</td></tr>
+				<tr><td><code>onHubShutdown</code></td><td><code>()</code></td><td>—</td><td>The hub is shutting down, before plug-ins are unloaded.</td></tr>
+			</table>
+			<p>
+				<code>onFloodDetected</code> receives a <code>type</code> of
+				<code>"chat"</code>, <code>"connect"</code>, <code>"search"</code>, <code>"update"</code> or
+				<code>"protocol"</code>. The hub only <em>detects</em> the flood — the script decides the
+				action. Returning <code>DEFAULT</code> keeps the hub's built-in drop-and-warn,
+				<code>DENY</code> drops the offending message quietly, and <code>ALLOW</code> lets it through.
+			</p>
+			<div class="callout warn">
+				<p>
+					<code>onUserLogout</code> fires only for users that <em>completed</em> login. Connections
+					rejected earlier — by <code>onCheckIpLate</code>, a ban, or a failed handshake — never
+					produce one, so do not use it as your only cleanup path for state you create before login.
+				</p>
+			</div>
+
+			<h2 id="verdicts">Verdicts</h2>
+			<p>An interceptable handler returns one of three values:</p>
+			<table class="table">
+				<tr><th>Value</th><th>Meaning</th></tr>
+				<tr><td><code>uhub.DEFAULT</code></td><td>Let the hub apply its normal behaviour. Also what <code>undefined</code> — i.e. no <code>return</code> at all — means.</td></tr>
+				<tr><td><code>uhub.ALLOW</code></td><td>Force-allow the action, overriding what the hub would otherwise have done.</td></tr>
+				<tr><td><code>uhub.DENY</code></td><td>Block the action.</td></tr>
+			</table>
+			<p>
+				A boolean works too: <code>true</code> is <code>ALLOW</code> and <code>false</code> is
+				<code>DENY</code>. Falling off the end of a function returns <code>undefined</code>, which is
+				<code>DEFAULT</code> — so the common “only act on the cases I care about” shape needs no
+				explicit else branch.
+			</p>
+			<pre><code>uhub.onPrivateMsg(<span class="k">function</span> (from, to, message) {
+    <span class="k">if</span> (from.credentials === <span class="s">"guest"</span> && to.credentials === <span class="s">"guest"</span>)
+        <span class="k">return</span> uhub.DENY;      <span class="c">// guests may not PM each other</span>
+    <span class="c">// everything else: no return -&gt; DEFAULT</span>
+});</code></pre>
+			<p>
+				When several scripts handle the same event they run in load order, and the
+				<strong>first non-<code>DEFAULT</code> verdict wins</strong> — later scripts are not consulted
+				for that event. A script that returns <code>ALLOW</code> early therefore shadows a stricter
+				script loaded after it, which is worth keeping in mind when ordering
+				<code>dir=</code> entries (they load sorted by filename).
+			</p>
+
+			<h2 id="uhub-object">The <code>uhub</code> object</h2>
+			<table class="table">
+				<tr><th>Member</th><th>Description</th></tr>
+				<tr><td><code>uhub.broadcast(text)</code></td><td>Send an informational message from the hub to every logged-in user.</td></tr>
+				<tr><td><code>uhub.getUserCount()</code></td><td>Number of users currently on the hub.</td></tr>
+				<tr><td><code>uhub.log(text)</code></td><td>Write a line to the hub log.</td></tr>
+				<tr><td><code>uhub.config</code></td><td>Object of this script's options, as strings — e.g. <code>uhub.config.motd</code>. Missing keys are <code>undefined</code>.</td></tr>
+				<tr><td><code>uhub.DEFAULT</code> / <code>ALLOW</code> / <code>DENY</code></td><td>Verdict constants (<code>0</code> / <code>1</code> / <code>-1</code>).</td></tr>
+			</table>
+			<p>
+				Everything in <code>uhub.config</code> is a string, including numbers and booleans. Parse and
+				validate at load time rather than on every event:
+			</p>
+			<pre><code><span class="k">var</span> grace = parseInt(uhub.config.grace || <span class="s">"3"</span>, <span class="n">10</span>);
+<span class="k">if</span> (!(grace &gt;= <span class="n">1</span>)) grace = <span class="n">1</span>;                          <span class="c">// also catches NaN</span>
+<span class="k">var</span> strict = uhub.config.strict === <span class="s">"1"</span> || uhub.config.strict === <span class="s">"true"</span>;</code></pre>
+
+			<h2 id="user-object">The <code>user</code> object</h2>
+			<p>Properties are read-only snapshots taken when the handler was called:</p>
+			<table class="table">
+				<tr><th>Property</th><th>Description</th></tr>
+				<tr><td><code>user.nick</code></td><td>Nickname.</td></tr>
+				<tr><td><code>user.cid</code></td><td>Client ID — the client's identity, stable across reconnects.</td></tr>
+				<tr><td><code>user.userAgent</code></td><td>The client's user-agent string, e.g. <code>"DC++ 0.880"</code>.</td></tr>
+				<tr><td><code>user.credentials</code></td><td><code>"guest"</code>, <code>"user"</code>, <code>"operator"</code>, <code>"super"</code>, <code>"admin"</code>, …</td></tr>
+				<tr><td><code>user.sid</code></td><td>Session ID. <strong>Reused</strong> as users come and go — do not use it as a key.</td></tr>
+				<tr><td><code>user.id</code></td><td>Stable, non-recycled connection id. This is the safe <code>Map</code> key.</td></tr>
+			</table>
+			<p>Methods:</p>
+			<table class="table">
+				<tr><th>Method</th><th>Description</th></tr>
+				<tr><td><code>user.sendMessage(text)</code></td><td>Send an informational message from the hub to this user.</td></tr>
+				<tr><td><code>user.sendRichMessage(text)</code></td><td>The same, marked as rich text (RTF0). <code>text</code> is CommonMark.</td></tr>
+				<tr><td><code>user.supportsRichText()</code></td><td><code>true</code> when this client negotiated RTF0 <em>and</em> the hub allows rich text.</td></tr>
+				<tr><td><code>user.sendStatus(code, text)</code></td><td>Send a status message with an ADC status code (<code>0</code> = informational).</td></tr>
+				<tr><td><code>user.disconnect()</code></td><td>Kick the user.</td></tr>
+				<tr><td><code>user.ban(seconds, reason)</code></td><td>Ban by CID and nick, disconnect, persist and propagate to linked hubs. <code>seconds &lt;= 0</code> is permanent; <code>reason</code> may be omitted.</td></tr>
+			</table>
+			<p>
+				<code>user.ban()</code> is a real ban, not a kick: it is written through to whichever storage
+				plug-in is loaded and forwarded across a <a href="linking.html">hub link</a>, so it survives a
+				restart and applies cluster-wide. Use <code>user.disconnect()</code> when you only want the
+				user gone for now.
+			</p>
+
+			<h3 id="lifetime">Object lifetime — read this one</h3>
+			<div class="callout warn">
+				<p>
+					A <code>user</code> handed to a handler is valid <strong>only for the duration of that
+					call</strong>. Stash it and touch it from a later callback and the access <em>throws</em>
+					— it does not silently return stale data or dangle.
+				</p>
+			</div>
+			<pre><code><span class="k">var</span> lastUser = <span class="k">null</span>;
+
+uhub.onUserLogin(<span class="k">function</span> (user) {
+    lastUser = user;                <span class="c">// storing the reference is fine…</span>
+});
+
+uhub.onChatMsg(<span class="k">function</span> () {
+    lastUser.sendMessage(<span class="s">"hi"</span>);    <span class="c">// …but this THROWS: the reference is dead</span>
+});</code></pre>
+			<p>
+				That is deliberate. The underlying hub user can disconnect between two events, and a script
+				holding a pointer to it would be a use-after-free. To carry state across events, key a
+				<code>Map</code> by <code>user.id</code> — the stable connection id — and drop the entry on
+				logout:
+			</p>
+			<pre><code><span class="k">var</span> strikes = <span class="k">new</span> Map();
+
+uhub.onFloodDetected(<span class="k">function</span> (user, type) {
+    <span class="k">var</span> n = (strikes.get(user.id) || <span class="n">0</span>) + <span class="n">1</span>;
+    strikes.set(user.id, n);
+    <span class="k">if</span> (n &gt;= <span class="n">3</span>) {
+        user.disconnect();
+        <span class="k">return</span> uhub.DENY;
+    }
+});
+
+uhub.onUserLogout(<span class="k">function</span> (user) {
+    strikes.delete(user.id);        <span class="c">// or the Map grows without bound</span>
+});</code></pre>
+			<p>
+				Copying the values you need — <code>user.nick</code>, <code>user.cid</code> — out of the object
+				is fine; they are plain strings and stay valid. It is only the object itself, and its methods,
+				that expire.
+			</p>
+
+			<h3 id="rich-text">Rich text</h3>
+			<p>
+				With the RTF0 extension a client can render CommonMark. <code>sendRichMessage()</code> falls
+				back to an ordinary message when the client cannot — but it sends <em>the same string</em>,
+				markup and all. Whenever the plain and rich forms would differ, branch and build both:
+			</p>
+			<pre><code>uhub.onUserLogin(<span class="k">function</span> (user) {
+    <span class="k">if</span> (user.supportsRichText())
+        user.sendRichMessage(<span class="s">"Welcome, **"</span> + user.nick + <span class="s">"**! See the [rules](https://example.org/rules)."</span>);
+    <span class="k">else</span>
+        user.sendMessage(<span class="s">"Welcome, "</span> + user.nick + <span class="s">"! See the rules: https://example.org/rules"</span>);
+});</code></pre>
+			<p>
+				<code>supportsRichText()</code> also accounts for the hub-wide
+				<a href="config.html">chat_rich_text</a> option, so a hub that has turned rich text off makes
+				every client report <code>false</code> and no branch needs changing.
+			</p>
+
+			<h2 id="examples">Worked examples</h2>
+			<p>
+				Ready-to-run ports of three bundled C plug-ins ship in <code>doc/js/</code> —
+				<code>welcome.js</code> (cf. <a href="plugins/mod_welcome.html">mod_welcome</a>),
+				<code>chat_only.js</code> (cf. <a href="plugins/mod_chat_only.html">mod_chat_only</a>) and
+				<code>flood.js</code> (cf. <a href="plugins/mod_flood.html">mod_flood</a>), alongside an
+				example <code>javascript.conf</code>. The recipes below build on them.
+			</p>
+
+			<h3>A configurable message of the day</h3>
+			<p>
+				Scripts have no filesystem access, so the text comes from the configuration rather than a file.
+				This is the shape <code>doc/js/welcome.js</code> uses:
+			</p>
+			<pre><code><span class="c">// welcome.js — plugin ... "script=/etc/uhub/welcome.js motd=Welcome %n!"</span>
+<span class="k">var</span> motd = uhub.config.motd || <span class="s">"Welcome to the hub, %n!"</span>;
+
+<span class="k">function</span> expand(template, user) {
+    <span class="k">return</span> template.replace(/%[nc%]/g, <span class="k">function</span> (m) {
+        <span class="k">if</span> (m === <span class="s">"%n"</span>) <span class="k">return</span> user.nick;
+        <span class="k">if</span> (m === <span class="s">"%c"</span>) <span class="k">return</span> user.credentials;
+        <span class="k">return</span> <span class="s">"%"</span>;
+    });
+}
+
+uhub.onUserLogin(<span class="k">function</span> (user) {
+    user.sendMessage(expand(motd, user));
+});</code></pre>
+
+			<h3>Chat-only hub, with a one-time warning per user</h3>
+			<p>
+				Deny searches and transfers, but only tell each user once per category so a client retrying in
+				a loop cannot spam them. Operators are exempt unless <code>operator_override=0</code>:
+			</p>
+			<pre><code><span class="k">var</span> operatorOverride = uhub.config.operator_override !== <span class="s">"0"</span>;
+<span class="k">var</span> warned = <span class="k">new</span> Map();     <span class="c">// user.id -&gt; { search: true, connect: true }</span>
+
+<span class="k">function</span> isOperator(user) {
+    <span class="k">var</span> c = user.credentials;
+    <span class="k">return</span> c === <span class="s">"operator"</span> || c === <span class="s">"super"</span> || c === <span class="s">"admin"</span>;
+}
+
+<span class="k">function</span> denyOnce(user, key, message) {
+    <span class="k">if</span> (operatorOverride && isOperator(user))
+        <span class="k">return</span> uhub.ALLOW;
+    <span class="k">var</span> seen = warned.get(user.id) || {};
+    <span class="k">if</span> (!seen[key]) {
+        user.sendStatus(<span class="n">0</span>, message);
+        seen[key] = <span class="k">true</span>;
+        warned.set(user.id, seen);
+    }
+    <span class="k">return</span> uhub.DENY;
+}
+
+uhub.onSearch(<span class="k">function</span> (user) {
+    <span class="k">return</span> denyOnce(user, <span class="s">"search"</span>, <span class="s">"Searching is disabled. This is a chat only hub."</span>);
+});
+uhub.onSearchResult(<span class="k">function</span> () { <span class="k">return</span> uhub.DENY; });
+uhub.onP2PConnect(<span class="k">function</span> (user) {
+    <span class="k">return</span> denyOnce(user, <span class="s">"connect"</span>, <span class="s">"Connection setup denied. This is a chat only hub."</span>);
+});
+uhub.onP2PRevConnect(<span class="k">function</span> (user) {
+    <span class="k">return</span> denyOnce(user, <span class="s">"connect"</span>, <span class="s">"Connection setup denied. This is a chat only hub."</span>);
+});
+
+uhub.onUserLogout(<span class="k">function</span> (user) { warned.delete(user.id); });</code></pre>
+			<p>
+				Note <code>onSearchResult</code> takes no per-user warning: results are relayed on behalf of
+				<em>other</em> users, and warning the sender about someone else's search is noise.
+			</p>
+
+			<h3>Strike-based flood action</h3>
+			<p>
+				The hub detects the flood against its <code>flood_ctl_*</code> thresholds; the script decides
+				what happens. Below the grace limit, hand back <code>DEFAULT</code> so the hub keeps its
+				built-in drop-and-warn:
+			</p>
+			<pre><code><span class="k">var</span> grace = parseInt(uhub.config.grace || <span class="s">"3"</span>, <span class="n">10</span>);
+<span class="k">if</span> (!(grace &gt;= <span class="n">1</span>)) grace = <span class="n">1</span>;
+<span class="k">var</span> strikes = <span class="k">new</span> Map();
+
+uhub.onFloodDetected(<span class="k">function</span> (user, type) {
+    <span class="k">if</span> (user.credentials !== <span class="s">"guest"</span> && user.credentials !== <span class="s">"user"</span>)
+        <span class="k">return</span> uhub.ALLOW;                    <span class="c">// staff are never acted on</span>
+
+    <span class="k">var</span> n = (strikes.get(user.id) || <span class="n">0</span>) + <span class="n">1</span>;
+    strikes.set(user.id, n);
+
+    <span class="k">if</span> (n &gt;= grace) {
+        user.sendStatus(<span class="n">0</span>, <span class="s">"Disconnected: repeated "</span> + type + <span class="s">" flooding."</span>);
+        user.disconnect();
+        <span class="k">return</span> uhub.DENY;                     <span class="c">// handled; drop the message quietly</span>
+    }
+    <span class="k">return</span> uhub.DEFAULT;                      <span class="c">// hub warns and drops</span>
+});
+
+uhub.onUserLogout(<span class="k">function</span> (user) { strikes.delete(user.id); });</code></pre>
+
+			<h3>A nick policy</h3>
+			<p>
+				<code>onChangeNick</code> intercepts renames of users already on the hub. Return
+				<code>ALLOW</code> to permit the rename and <code>DENY</code> to refuse it:
+			</p>
+			<pre><code><span class="k">var</span> reserved = /^(?:admin|operator|hub|owner|staff)/i;
+
+uhub.onChangeNick(<span class="k">function</span> (user, newNick) {
+    <span class="k">if</span> (reserved.test(newNick) && user.credentials === <span class="s">"guest"</span>) {
+        user.sendStatus(<span class="n">0</span>, <span class="s">"That nickname is reserved for staff."</span>);
+        <span class="k">return</span> uhub.DENY;
+    }
+    <span class="k">if</span> (newNick.length &lt; <span class="n">3</span>) {
+        user.sendStatus(<span class="n">0</span>, <span class="s">"Nicknames must be at least 3 characters."</span>);
+        <span class="k">return</span> uhub.DENY;
+    }
+});</code></pre>
+
+			<h3>Rate-limiting private messages from guests</h3>
+			<p>
+				A sliding window keyed by connection id. Note the time source: <code>Date.now()</code> is
+				available, and handlers run on the hub's single thread, so no locking is needed.
+			</p>
+			<pre><code><span class="k">var</span> WINDOW_MS = <span class="n">60000</span>, MAX_PMS = <span class="n">10</span>;
+<span class="k">var</span> sent = <span class="k">new</span> Map();      <span class="c">// user.id -&gt; array of timestamps</span>
+
+uhub.onPrivateMsg(<span class="k">function</span> (from, to, message) {
+    <span class="k">if</span> (from.credentials !== <span class="s">"guest"</span>)
+        <span class="k">return</span>;                              <span class="c">// DEFAULT: not our business</span>
+
+    <span class="k">var</span> now = Date.now();
+    <span class="k">var</span> stamps = (sent.get(from.id) || []).filter(<span class="k">function</span> (t) {
+        <span class="k">return</span> now - t &lt; WINDOW_MS;
+    });
+
+    <span class="k">if</span> (stamps.length &gt;= MAX_PMS) {
+        from.sendStatus(<span class="n">0</span>, <span class="s">"You are sending private messages too quickly."</span>);
+        sent.set(from.id, stamps);
+        <span class="k">return</span> uhub.DENY;
+    }
+
+    stamps.push(now);
+    sent.set(from.id, stamps);
+});
+
+uhub.onUserLogout(<span class="k">function</span> (user) { sent.delete(user.id); });</code></pre>
+
+			<h3>Announcing staff arrivals</h3>
+			<pre><code>uhub.onUserLogin(<span class="k">function</span> (user) {
+    <span class="k">var</span> c = user.credentials;
+    <span class="k">if</span> (c === <span class="s">"operator"</span> || c === <span class="s">"super"</span> || c === <span class="s">"admin"</span>)
+        uhub.broadcast(user.nick + <span class="s">" ("</span> + c + <span class="s">") has joined. "</span> +
+                       uhub.getUserCount() + <span class="s">" users online."</span>);
+});
+
+uhub.onHubStarted(<span class="k">function</span> () { uhub.log(<span class="s">"staff-announce.js ready"</span>); });</code></pre>
+
+			<h3>Banning on a hard rule</h3>
+			<p>
+				<code>user.ban()</code> persists and propagates, so use it for rules you mean. The reason is
+				shown to the user when they try to reconnect:
+			</p>
+			<pre><code><span class="k">var</span> spamLink = /(?:https?:\/\/)?(?:bit\.ly|tinyurl\.com)\/\S+/i;
+
+uhub.onChatMsg(<span class="k">function</span> (from, message) {
+    <span class="k">if</span> (from.credentials !== <span class="s">"guest"</span>)
+        <span class="k">return</span>;
+    <span class="k">if</span> (spamLink.test(message)) {
+        uhub.log(<span class="s">"banning "</span> + from.nick + <span class="s">" ("</span> + from.cid + <span class="s">") for link spam"</span>);
+        from.ban(<span class="n">86400</span>, <span class="s">"Link spam in main chat"</span>);   <span class="c">// 24 hours</span>
+        <span class="k">return</span> uhub.DENY;
+    }
+});</code></pre>
+			<p>
+				Pass <code>0</code> (or any value <code>&lt;= 0</code>) for a permanent ban. Bans only survive a
+				restart if a storage plug-in such as
+				<a href="plugins/mod_auth_sqlite.html">mod_auth_sqlite</a> is loaded to persist them.
+			</p>
+
+			<h2 id="multiple-scripts">Several scripts together</h2>
+			<p>
+				Each script gets its <strong>own JavaScript context</strong> — its own globals, its own
+				<code>uhub.config</code> — while sharing one engine instance. Two scripts cannot see or clobber
+				each other's variables, and each can be written as if it were the only one.
+			</p>
+			<p>
+				They are not isolated from each other in <em>effect</em>, though. For an interceptable event
+				every script runs in load order until one returns a non-<code>DEFAULT</code> verdict; for a
+				notification event they all run. A typical layout:
+			</p>
+			<pre><code>/etc/uhub/js.d/
+├── 10-welcome.js       <span class="c"># notify only, never intercepts</span>
+├── 20-nickpolicy.js    <span class="c"># denies bad renames</span>
+├── 30-antispam.js      <span class="c"># denies spammy chat</span>
+└── 90-flood.js         <span class="c"># last word on flood handling</span></code></pre>
+			<p>
+				<code>dir=</code> loads sorted by filename, so a numeric prefix makes the order explicit and
+				stable when you add a script later.
+			</p>
+
+			<h2 id="safety">Safety model</h2>
+			<p>Handlers run inline on the hub's single reactor thread. The host constrains what that can cost:</p>
+			<ul>
+				<li>
+					<strong>No ambient authority.</strong> A script gets the <code>uhub</code> object and
+					nothing else. QuickJS's <code>std</code> and <code>os</code> modules are not exposed, so
+					there is no filesystem, network or process access — not even to read its own config file.
+					Everything a script needs from outside comes through <code>uhub.config</code>.
+				</li>
+				<li>
+					<strong>A watchdog per callback.</strong> Each handler runs under a wall-clock budget
+					(<code>time_limit</code>, default one second). A script stuck in a loop is interrupted
+					instead of wedging the hub for every connected user.
+				</li>
+				<li>
+					<strong>Memory and stack caps.</strong> <code>memory_limit</code> and
+					<code>stack_limit</code> bound the engine; runaway allocation fails inside the script
+					rather than taking the process down.
+				</li>
+				<li>
+					<strong>File integrity checks.</strong> Script files get the same treatment as
+					<code>.so</code> plug-ins: the hub refuses to load one that is group- or world-writable, or
+					that is not a regular file.
+				</li>
+				<li>
+					<strong>Expiring user references.</strong> A <code>user</code> is invalidated when its
+					handler returns, so a stashed reference throws rather than dangling — see
+					<a href="#lifetime">Object lifetime</a>.
+				</li>
+			</ul>
+			<div class="callout warn">
+				<p>
+					There is no <code>async</code>/<code>await</code>, no timers and no I/O on the hot path.
+					A handler must return promptly; everything it does happens before the hub can serve
+					another user. The watchdog is a backstop against bugs, not a budget to spend.
+				</p>
+			</div>
+
+			<h2 id="errors">Errors and debugging</h2>
+			<p>
+				An exception thrown <em>during evaluation</em> — a syntax error, a bad top-level statement —
+				stops the hub from starting, with the error in the log. An exception thrown <em>inside a
+				handler</em> is caught, logged as
+				<code>mod_javascript: &lt;file&gt;: uncaught exception: …</code>, and treated as
+				<code>DEFAULT</code> for that event; the hub keeps running and the next event still reaches
+				the handler.
+			</p>
+			<p>
+				<code>uhub.log()</code> writes to the hub log and is the only output channel a script has —
+				there is no <code>console</code>. For anything non-trivial, log at the decision points:
+			</p>
+			<pre><code>uhub.onChatMsg(<span class="k">function</span> (from, message) {
+    <span class="k">if</span> (!rule.test(message))
+        <span class="k">return</span>;
+    uhub.log(<span class="s">"antispam: denied message from "</span> + from.nick + <span class="s">" ("</span> + from.cid + <span class="s">")"</span>);
+    <span class="k">return</span> uhub.DENY;
+});</code></pre>
+			<p>
+				Scripts are read once, at startup. Editing a file has no effect until the hub is restarted —
+				there is no reload of a running script.
+			</p>
+
+			<h2>See also</h2>
+			<ul>
+				<li><a href="plugins/mod_javascript.html">mod_javascript</a> — the plug-in's configuration reference.</li>
+				<li><a href="plugin-api.html">Plug-in API</a> — the C API, for what JavaScript does not reach.</li>
+				<li><a href="plugins/index.html">Plug-ins</a> — the bundled modules and how to load them.</li>
+				<li><code>doc/javascript.txt</code> and <code>doc/js/</code> in the source tree.</li>
+			</ul>
+		</div>
+	</main>
+</div>
+
+<footer class="site-footer">
+	<div class="container footer-inner">
+		<div>uhub &copy; 2007–2026 Jan Vidar Krey</div>
+		<ul class="footer-links">
+			<li><a href="https://github.com/janvidar/uhub/">GitHub</a></li>
+			<li><a href="https://github.com/janvidar/uhub/issues">Issues</a></li>
+			<li><a href="index.html">Documentation</a></li>
+			<li><a href="https://www.gnu.org/licenses/gpl-3.0.html">License</a></li>
+		</ul>
+	</div>
+</footer>
+
+<script src="../assets/js/main.js"></script>
+</body>
+</html>

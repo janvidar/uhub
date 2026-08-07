@@ -42,7 +42,27 @@ INFO: Starting server, listening on :::1511...</code></pre>
 				</p>
 			</div>
 
-			<h2>5. Use all CPU cores (optional)</h2>
+			<h2>5. Register users (optional)</h2>
+			<p>
+				Registered accounts are served by an authentication plug-in. The usual choice is
+				<a href="plugins/mod_auth_sqlite.html">mod_auth_sqlite</a>: create the database with
+				<code>uhub-passwd</code>, add an administrator, and point the plug-in at it.
+			</p>
+			<pre><code>uhub-passwd /etc/uhub/users.db create
+uhub-passwd /etc/uhub/users.db add alice s3cr3t admin</code></pre>
+			<p>Then in <code>plugins.conf</code>:</p>
+			<pre><code>plugin /var/lib/uhub/mod_auth_sqlite.so <span class="s">"file=/etc/uhub/users.db"</span></code></pre>
+			<div class="callout warn">
+				<p>
+					<strong>Changed in 0.8.0:</strong> accounts are no longer defined in the
+					<code>file_acl</code> ACL file. If you are upgrading, migrate any
+					<code>user_admin</code> / <code>user_op</code> / <code>user_reg</code> lines into an auth
+					plug-in — the ACL file now holds only bans and denied nicks. To let users register
+					themselves instead, add <a href="plugins/mod_selfregister.html">mod_selfregister</a>.
+				</p>
+			</div>
+
+			<h2>6. Use all CPU cores (optional)</h2>
 				<p>
 					uhub is single-threaded, so a single process uses one CPU core. On a multi-core
 					machine you can run the hub as several linked <strong>worker processes</strong> that

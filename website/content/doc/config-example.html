@@ -13,7 +13,9 @@ sidebar: config-example
 				<dt>uhub.conf</dt>
 				<dd>The main configuration file.</dd>
 				<dt>plugins.conf</dt>
-				<dd>The plug-in configuration file.</dd>
+				<dd>The plug-in configuration file, referenced from <code>file_plugins</code>.</dd>
+				<dt>users.conf</dt>
+				<dd>The ACL file (bans and denied nicks), referenced from <code>file_acl</code>.</dd>
 			</dl>
 
 			<h2>uhub.conf</h2>
@@ -22,13 +24,26 @@ hub_description = Yet another ADC hub
 
 server_port = 12345
 server_bind_addr = any
-max_users = 150</code></pre>
+max_users = 150
+
+file_plugins = /etc/uhub/plugins.conf
+file_acl = /etc/uhub/users.conf</code></pre>
 
 			<h2>plugins.conf</h2>
-			<pre><code>plugin /var/lib/uhub/mod_auth_sqlite.so "file=/etc/uhub/users.db"
-plugin /var/lib/uhub/mod_logging.so "file=/var/log/uhub/uhub.log"
-plugin /var/lib/uhub/mod_welcome.so "motd=/etc/uhub/motd.txt rules=/etc/uhub/rules.txt"
-plugin /var/lib/uhub/mod_chat_history.so "history_max=200 history_default=10 history_connect=5"</code></pre>
+			<pre><code>plugin /var/lib/uhub/mod_auth_sqlite.so <span class="s">"file=/etc/uhub/users.db"</span>
+plugin /var/lib/uhub/mod_logging.so <span class="s">"file=/var/log/uhub/uhub.log"</span>
+plugin /var/lib/uhub/mod_welcome.so <span class="s">"motd=/etc/uhub/motd.txt rules=/etc/uhub/rules.txt"</span>
+plugin /var/lib/uhub/mod_chat_history.so <span class="s">"history_max=200 history_default=10 history_connect=5"</span></code></pre>
+
+			<h2>users.conf</h2>
+			<p>
+				The ACL file holds ban and deny rules. Since 0.8.0 it no longer holds accounts — those live in
+				an authentication plug-in such as <a href="plugins/mod_auth_sqlite.html">mod_auth_sqlite</a>.
+			</p>
+			<pre><code>deny_nick Hub-Security
+ban_nick spammer
+ban_cid FOIL5EK2UDZYAXT7UIUFEKL4SEBEAJE3INJDKAY
+deny_ip 192.168.0.0/24</code></pre>
 
 			<p>
 				See the <a href="config.html">configuration reference</a> for every available directive,

@@ -1,0 +1,59 @@
+title: uhub — mod_ucmd
+description: mod_ucmd publishes uhub's registered hub commands as ADC user-command (UCMD) context-menu entries in supporting clients.
+layout: doc
+nav: documentation
+sidebar: plugins
+---
+			<h1>mod_ucmd</h1>
+			<p class="lead-sub">Hub commands as client context menus. Part of the bundled <a href="index.html">plug-ins</a>.</p>
+
+			<p>
+				<code>mod_ucmd</code> publishes the hub's registered commands as ADC <em>user command</em>
+				(UCMD) entries, so they appear in the right-click menus of clients that support the extension
+				— DC++, AirDC++ and others. Selecting an entry makes the client send the corresponding
+				<code>+command</code> on the user's behalf, so operators get a menu instead of having to
+				remember command syntax.
+			</p>
+
+			<div class="callout">
+				<p>
+					Added in <strong>0.7.1</strong>. In <strong>0.8.0</strong> the extension is advertised
+					correctly as <code>UCMD</code> (0.7.1 announced it as <code>UCM0</code>), only advertised
+					when this plug-in is actually loaded, and command entries are only sent to clients that
+					negotiated the extension.
+				</p>
+			</div>
+
+			<h2>Loading</h2>
+			<pre><code>plugin /var/lib/uhub/mod_ucmd.so</code></pre>
+
+			<h2>Configuration</h2>
+			<p>This plug-in takes no parameters.</p>
+
+			<h2>Behaviour</h2>
+			<p>
+				When a user logs in, the plug-in enumerates every hub command available at that user's
+				credential level and publishes one menu entry per command. A guest sees only guest-level
+				commands; an operator sees the operator set. Commands registered by <em>other</em> plug-ins are
+				included automatically — nothing needs to know about <code>mod_ucmd</code>.
+			</p>
+			<p>
+				Entries are grouped under a top-level <code>uhub</code> submenu and named after the command's
+				description, falling back to the command word itself. Where an entry appears depends on what
+				the command takes:
+			</p>
+			<table class="table">
+				<tr><th>Command takes</th><th>Menu</th><th>Client fills in</th></tr>
+				<tr><td>A nick or CID argument</td><td>User list / chat</td><td>The nick or CID of the user you clicked.</td></tr>
+				<tr><td>Anything else</td><td>Hub / main chat</td><td>Prompts for each argument — a message, number, address, password, …</td></tr>
+			</table>
+			<p>
+				So <code>!kick</code>, <code>!ban</code> and <code>!getip</code> land in the user-list menu
+				already targeting the right user, while hub-wide commands such as <code>!motd</code> or
+				<code>!uptime</code> land in the hub menu. Optional arguments are left out of the generated
+				entry, so the menu prompts only for what the command requires.
+			</p>
+			<p>
+				Clients that did not negotiate UCMD are unaffected: nothing is sent to them, and the commands
+				remain available by typing them in chat as usual.
+			</p>

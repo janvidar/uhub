@@ -1,0 +1,109 @@
+title: uhub — mod_javascript
+description: mod_javascript runs JavaScript scripts as uhub plug-ins using an embedded QuickJS engine.
+layout: doc
+nav: documentation
+sidebar: plugins
+---
+			<h1>mod_javascript</h1>
+			<p class="lead-sub">Run JavaScript as hub plug-ins. Part of the bundled <a href="index.html">plug-ins</a>.</p>
+
+			<p>
+				<code>mod_javascript</code> embeds the QuickJS engine and runs <code>.js</code> files as uhub
+				plug-ins. Scripts register handlers on a global <code>uhub</code> object and act on users
+				through the objects they are handed — no compiler, and no plug-in ABI to match.
+			</p>
+			<p>
+				This page covers loading and configuring the plug-in. The scripting API itself — events,
+				verdicts, the <code>user</code> object and worked examples — is documented on the
+				<a href="../javascript.html">JavaScript plug-in API</a> page.
+			</p>
+
+			<div class="callout">
+				<p>
+					New in <strong>uhub 0.8.0</strong>, and <strong>optional</strong>: it is not built unless
+					the hub is configured with JavaScript support.
+				</p>
+			</div>
+
+			<h2>Building</h2>
+			<p>The engine (quickjs-ng) is a git submodule pinned to a release. Fetch it, then enable the option:</p>
+			<pre><code>git submodule update --init third_party/quickjs
+cmake -DJAVASCRIPT_SUPPORT=ON ..     <span class="c"># or: zig build -Djavascript=true</span></code></pre>
+
+			<h2>Loading</h2>
+			<pre><code><span class="c"># every *.js in a directory, loaded in filename order</span>
+plugin /var/lib/uhub/mod_javascript.so <span class="s">"dir=/etc/uhub/js.d"</span>
+
+<span class="c"># a list file naming scripts and their individual options</span>
+plugin /var/lib/uhub/mod_javascript.so <span class="s">"config=/etc/uhub/javascript.conf"</span>
+
+<span class="c"># a single script</span>
+plugin /var/lib/uhub/mod_javascript.so <span class="s">"script=/etc/uhub/welcome.js motd=Hi %n"</span></code></pre>
+
+			<h2>Configuration</h2>
+			<table class="table">
+				<tr><th>Option</th><th>Default</th><th>Description</th></tr>
+				<tr><td><code>dir</code></td><td>—</td><td>Load every <code>*.js</code> in this directory, sorted by filename. POSIX only.</td></tr>
+				<tr><td><code>config</code></td><td>—</td><td>Path to a list file naming the scripts to load (see below).</td></tr>
+				<tr><td><code>script</code></td><td>—</td><td>Load a single script file.</td></tr>
+				<tr><td><code>memory_limit</code></td><td><code>67108864</code></td><td>Engine heap cap in bytes (64 MiB).</td></tr>
+				<tr><td><code>stack_limit</code></td><td><code>1048576</code></td><td>JavaScript stack cap in bytes (1 MiB).</td></tr>
+				<tr><td><code>time_limit</code></td><td><code>1000</code></td><td>Per-callback wall-clock budget in milliseconds. A handler that exceeds it is interrupted.</td></tr>
+			</table>
+			<p>
+				<code>dir</code>, <code>config</code> and <code>script</code> may be combined and repeated. Any
+				<em>other</em> <code>key=value</code> on the plug-in line is passed to every script as
+				<code>uhub.config</code> — that is how <code>motd=Hi %n</code> above reaches
+				<code>uhub.config.motd</code>.
+			</p>
+
+			<h3>The script list file</h3>
+			<p>
+				<code>config=</code> reads one script per line: a path, then optional per-script options.
+				<code>#</code> starts a comment and blank lines are ignored.
+			</p>
+			<pre><code><span class="c"># /etc/uhub/javascript.conf</span>
+welcome.js     motd=Welcome to the hub, %n!
+chat_only.js
+flood.js       grace=3</code></pre>
+			<p>
+				Relative paths resolve against the list file's own directory. The per-script options become
+				that script's <code>uhub.config</code> and override anything set on the plug-in line, so the
+				same script can be loaded twice with different settings.
+			</p>
+
+			<h2>Behaviour</h2>
+			<p>
+				Each script runs in its own JavaScript context — its own globals and its own
+				<code>uhub.config</code> — sharing a single engine instance. For an interceptable event the
+				scripts run in load order until one returns a verdict other than <code>uhub.DEFAULT</code>;
+				notification events reach all of them.
+			</p>
+			<p>
+				A script that fails to parse, or throws while being evaluated, <strong>prevents the hub from
+				starting</strong> and the error is logged. An exception thrown later, inside a handler, is
+				logged and treated as <code>DEFAULT</code> — the hub keeps running.
+			</p>
+			<p>
+				Scripts are read once at startup; editing a file takes effect on the next restart.
+			</p>
+
+			<h2>Sandbox</h2>
+			<p>
+				Scripts get the <code>uhub</code> API and nothing else. QuickJS's <code>std</code> and
+				<code>os</code> modules are not exposed, so a script has no filesystem, network or process
+				access. Every callback runs under the <code>time_limit</code> watchdog so a runaway loop cannot
+				wedge the single-threaded hub, the engine is bounded by <code>memory_limit</code> and
+				<code>stack_limit</code>, and script files get the same integrity check as <code>.so</code>
+				plug-ins — a group- or world-writable file is refused.
+			</p>
+
+			<h2>Examples</h2>
+			<p>
+				JavaScript ports of three bundled plug-ins ship in <code>doc/js/</code> of the source tree:
+				<code>welcome.js</code> (<a href="mod_welcome.html">mod_welcome</a>),
+				<code>chat_only.js</code> (<a href="mod_chat_only.html">mod_chat_only</a>) and
+				<code>flood.js</code> (<a href="mod_flood.html">mod_flood</a>), plus an example
+				<code>javascript.conf</code>. More recipes are on the
+				<a href="../javascript.html">JavaScript plug-in API</a> page.
+			</p>

@@ -23,6 +23,12 @@
 			<li><a href="../news.html">News</a></li>
 			<li><a href="../download.html">Download</a></li>
 			<li><a href="index.html" class="active">Documentation</a></li>
+			<li class="nav-github">
+				<a href="https://github.com/janvidar/uhub/" aria-label="uhub on GitHub" title="uhub on GitHub">
+					<svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+					<span class="nav-github-label">GitHub</span>
+				</a>
+			</li>
 		</ul>
 	</div>
 </header>
@@ -44,7 +50,8 @@
 			<li><a href="developers.html">Contributors</a></li>
 			<li><a href="compile.html">Compiling</a></li>
 			<li><a href="architecture.html">Architecture</a></li>
-			<li><a href="plugin-api.html" class="active">Plug-in API</a></li>
+			<li><a href="plugin-api.html" class="active">Plug-in API (C)</a></li>
+			<li><a href="javascript.html">Plug-in API (JavaScript)</a></li>
 		</ul>
 		<h4>Resources</h4>
 		<ul>
@@ -66,6 +73,15 @@
 				for how. The full API is defined
 				<a href="https://github.com/janvidar/uhub/tree/master/src/plugin_api">in the source code</a>.
 			</p>
+			<div class="callout warn">
+				<p>
+					<strong>uhub 0.8.0 uses plug-in API version 8, with a minimum of 8.</strong> The hub refuses
+					to load a plug-in built against an older version. The breaking change is that
+					<code>struct plugin_user</code> is now opaque — see
+					<a href="#opaque-user">Reading user properties</a>. If you would rather write hub logic in
+					a scripting language, see the <a href="javascript.html">JavaScript plug-in API</a>.
+				</p>
+			</div>
 
 			<h2>Creating a plug-in</h2>
 			<p>A plug-in must implement at least two functions, called when loading and unloading it:</p>
@@ -119,19 +135,111 @@
 			</p>
 			<pre><code><span class="k">static void</span> event_user_login(<span class="k">struct</span> plugin_handle* plugin, <span class="k">struct</span> plugin_user* user)
 {
-    printf(<span class="s">"User \"%s\" logged in.\n"</span>, user->nick);
+    printf(<span class="s">"User \"%s\" logged in.\n"</span>, plugin->hub.get_user_nick(plugin, user));
 }
 
 <span class="k">int</span> plugin_register(<span class="k">struct</span> plugin_handle* handle, <span class="k">const char</span>* config)
 {
     PLUGIN_INITIALIZE(handle, <span class="s">"test"</span>, <span class="s">"1.0"</span>, <span class="s">"A simple test plug-in"</span>);
-    plugin->funcs.on_user_login = event_user_login;
+    handle->funcs.on_user_login = event_user_login;
     <span class="k">return</span> <span class="n">0</span>;
 }</code></pre>
 
 			<p>
 				See the full list of available callbacks in
 				<a href="https://github.com/janvidar/uhub/blob/master/src/plugin_api/handle.h"><code>struct plugin_funcs</code></a>.
+				Four hooks that were declared but never fired before 0.8.0 —
+				<code>on_hub_started</code>, <code>on_hub_shutdown</code>, <code>on_check_ip_late</code> and
+				<code>on_change_nick</code> — now do, and <code>on_validate_nick</code> /
+				<code>on_validate_cid</code> are wired into the login pipeline.
+			</p>
+
+			<h2 id="opaque-user">Reading user properties</h2>
+			<p>
+				<strong>Changed in API 8.</strong> <code>struct plugin_user</code> is opaque: a plug-in can no
+				longer reach into its fields, and reads go through accessors on <code>plugin->hub</code>.
+				This is what lets the hub change its internal user representation without breaking every
+				plug-in in existence.
+			</p>
+			<pre><code><span class="c">/* Before (API 7 and earlier) */</span>
+<span class="k">const char</span>* nick = user->nick;
+
+<span class="c">/* Now (API 8) */</span>
+<span class="k">const char</span>* nick = plugin->hub.get_user_nick(plugin, user);</code></pre>
+			<table class="table">
+				<tr><th>Accessor</th><th>Returns</th></tr>
+				<tr><td><code>get_user_sid</code></td><td>Session ID. Recycled as users come and go.</td></tr>
+				<tr><td><code>get_user_nick</code></td><td>Nickname.</td></tr>
+				<tr><td><code>get_user_cid</code></td><td>Client ID.</td></tr>
+				<tr><td><code>get_user_user_agent</code></td><td>Client user-agent string.</td></tr>
+				<tr><td><code>get_user_address</code></td><td><code>const struct ip_addr_encap*</code> for the connection.</td></tr>
+				<tr><td><code>get_user_credentials</code></td><td><code>enum auth_credentials</code>.</td></tr>
+				<tr><td><code>get_user_connection_id</code></td><td>A stable, non-recycled <code>uint64_t</code> — the safe key for correlating a user across callbacks.</td></tr>
+				<tr><td><code>get_tls_version</code></td><td>Negotiated TLS version, e.g. <code>"TLSv1.3"</code>, or <code>NULL</code> if not over TLS.</td></tr>
+			</table>
+			<div class="callout warn">
+				<p>
+					Strings and addresses returned by these accessors point into the hub's own storage and are
+					valid <strong>for the duration of the callback only</strong>. Copy anything that must
+					outlive the call. All of them tolerate a <code>NULL</code> user, returning
+					<code>""</code>/<code>NULL</code>/<code>0</code>, so they can be chained without a guard.
+				</p>
+			</div>
+
+			<h2>Per-user storage</h2>
+			<p>
+				<strong>New in API 6.</strong> Each plug-in gets one opaque pointer per user, keyed by its own
+				handle, with a cleanup function. The cleanup is guaranteed to run exactly once — when the value
+				is replaced or cleared, when the user is destroyed, or when the plug-in is unloaded while the
+				user is still connected — so a plug-in no longer has to track logouts to free per-user state.
+			</p>
+			<pre><code><span class="k">struct</span> user_info { <span class="k">int</span> warnings; };
+
+<span class="k">static void</span> free_user_info(<span class="k">struct</span> plugin_handle* plugin, <span class="k">void</span>* data)
+{
+    hub_free(data);
+}
+
+<span class="k">static</span> <span class="k">struct</span> user_info* get_info(<span class="k">struct</span> plugin_handle* plugin, <span class="k">struct</span> plugin_user* user)
+{
+    <span class="k">struct</span> user_info* info = plugin->hub.get_user_data(plugin, user);
+    <span class="k">if</span> (!info)
+    {
+        info = hub_malloc_zero(<span class="k">sizeof</span>(*info));
+        plugin->hub.set_user_data(plugin, user, info, free_user_info);
+    }
+    <span class="k">return</span> info;
+}</code></pre>
+			<p>
+				Pass <code>set_user_data(plugin, user, NULL, NULL)</code> to clear the slot; setting over an
+				existing value runs the previous value's cleanup first.
+			</p>
+
+			<h2>Hub functions</h2>
+			<p>
+				The <code>hub</code> member of <code>plugin_handle</code> is the plug-in's way to act on the
+				hub. Alongside the accessors above and the existing messaging, command and hub-name functions,
+				API 8 adds:
+			</p>
+			<table class="table">
+				<tr><th>Function</th><th>Description</th></tr>
+				<tr><td><code>ban_user(plugin, user, seconds, reason)</code></td><td>Ban by CID and nick, disconnect, persist through a storage plug-in and propagate to linked hubs. <code>seconds &lt;= 0</code> is permanent; <code>reason</code> may be <code>NULL</code>.</td></tr>
+				<tr><td><code>unban(plugin, target)</code></td><td>Lift a ban by nick, CID or IP/range, cluster-wide.</td></tr>
+				<tr><td><code>auth_get_user</code> / <code>auth_register_user</code> / <code>auth_update_user</code></td><td>Read and write stored accounts through whichever auth storage plug-in is loaded. This is how <a href="plugins/mod_selfregister.html">mod_selfregister</a> works without owning any storage.</td></tr>
+				<tr><td><code>send_rich_message(plugin, user, message)</code></td><td>Send a message marked as rich text (RTF0), the body being CommonMark.</td></tr>
+				<tr><td><code>user_supports_rich_text(plugin, user)</code></td><td>Whether this client negotiated RTF0 <em>and</em> the hub allows rich text. Branch on it whenever the plain and rich forms would differ.</td></tr>
+			</table>
+
+			<h2>Storage plug-ins</h2>
+			<p>
+				A plug-in becomes an <em>authentication storage</em> backend by implementing the
+				<code>auth_*</code> callbacks in <code>plugin_funcs</code>, and a <em>ban storage</em> backend
+				by implementing <code>auth_ban_add</code>, <code>auth_ban_del</code> and
+				<code>auth_is_banned</code>. The hub is the only caller: it writes bans through as they are
+				created and queries at login. With no plug-in implementing them, bans live only in the hub's
+				in-memory ACL and are lost on restart —
+				<a href="plugins/mod_auth_sqlite.html">mod_auth_sqlite</a> is the reference implementation,
+				with per-ban expiry and reason.
 			</p>
 		</div>
 	</main>

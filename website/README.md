@@ -25,6 +25,8 @@ copying). Re-running is idempotent.
 - `content/doc/_acl-directives.html` — the hand-written `users.conf` ACL block
   (leading `_` = not a page; included by the config-reference generator).
 - `uhub-static/assets/` — CSS/JS/images, static (not touched by the build).
+- `uhub-static/sitemap.xml` — generated from the pages actually built, so a new
+  page is never missing from it. `index.html` maps to its directory URL.
 
 ## Config reference generation
 

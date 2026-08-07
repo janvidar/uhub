@@ -14,17 +14,18 @@ sidebar: plugins
 			</p>
 
 			<h2>Loading</h2>
-			<pre><code>plugin /var/lib/uhub/mod_welcome.so "motd=/etc/uhub/motd.txt rules=/etc/uhub/rules.txt"</code></pre>
+			<pre><code>plugin /var/lib/uhub/mod_welcome.so <span class="s">"motd=/etc/uhub/motd.txt rules=/etc/uhub/rules.txt rtf0=true"</span></code></pre>
 
 			<h2>Configuration</h2>
-			<table>
+			<table class="table">
 				<tr><th>Option</th><th>Default</th><th>Description</th></tr>
 				<tr><td><code>motd</code></td><td>—</td><td>File whose contents are sent to each user on login. Enables the <code>!motd</code> command.</td></tr>
 				<tr><td><code>rules</code></td><td>—</td><td>File with the hub rules. Enables the <code>!rules</code> command (not sent automatically).</td></tr>
+				<tr><td><code>rtf0</code></td><td><code>false</code></td><td>Send the MOTD and rules as rich text, so clients supporting the RTF0 extension render them. <span class="tag">0.8.0</span></td></tr>
 			</table>
 
 			<h2>Commands</h2>
-			<table>
+			<table class="table">
 				<tr><th>Command</th><th>Access</th><th>Description</th></tr>
 				<tr><td><code>!motd</code></td><td>guest</td><td>Show the message of the day (when <code>motd</code> is configured).</td></tr>
 				<tr><td><code>!rules</code></td><td>guest</td><td>Show the hub rules (when <code>rules</code> is configured).</td></tr>
@@ -32,11 +33,36 @@ sidebar: plugins
 
 			<h2>Substitutions</h2>
 			<p>The following placeholders are expanded in the MOTD and rules text:</p>
-			<table>
+			<table class="table">
 				<tr><th>Token</th><th>Expands to</th></tr>
 				<tr><td><code>%n</code></td><td>the user's nick</td></tr>
 				<tr><td><code>%a</code></td><td>the user's IP address</td></tr>
 				<tr><td><code>%c</code></td><td>the user's credentials (guest, user, operator, …)</td></tr>
+				<tr><td><code>%t</code></td><td>the TLS version protecting the user's connection <span class="tag">0.8.0</span></td></tr>
 				<tr><td><code>%%</code></td><td>a literal percent sign</td></tr>
 				<tr><td><code>%H %I %M %S %p %P</code></td><td>current time fields (hour 24h / hour 12h / minute / second / am-pm)</td></tr>
 			</table>
+
+			<h2>Rich text</h2>
+			<p>
+				With <code>rtf0=true</code>, the MOTD and rules are sent as rich text and clients that
+				negotiated the RTF0 extension render them as CommonMark — headings, emphasis, links, and
+				images embedded by URL with <code>![description](url)</code>:
+			</p>
+			<pre><code>## Welcome to **My Hub**, %n!
+
+You are connected over %t as *%c*.
+See the [rules](https://example.org/rules) before sharing.
+
+![hub banner](https://example.org/banner.png)</code></pre>
+			<p>
+				Clients without RTF0 support receive the plain text either way, so the file should still read
+				sensibly unrendered. Nothing is sent as rich text when the hub is configured with
+				<a href="../config.html">chat_rich_text</a> set to <code>no</code>, regardless of this option.
+			</p>
+			<div class="callout warn">
+				<p>
+					Embedded images are fetched by the client from the URL you write, which exposes each
+					connecting user's IP address to that host. Only reference images you control.
+				</p>
+			</div>

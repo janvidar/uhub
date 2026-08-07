@@ -23,6 +23,12 @@
 			<li><a href="news.html">News</a></li>
 			<li><a href="download.html">Download</a></li>
 			<li><a href="doc/index.html">Documentation</a></li>
+			<li class="nav-github">
+				<a href="https://github.com/janvidar/uhub/" aria-label="uhub on GitHub" title="uhub on GitHub">
+					<svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+					<span class="nav-github-label">GitHub</span>
+				</a>
+			</li>
 		</ul>
 	</div>
 </header>
@@ -43,13 +49,19 @@
 
 <main class="section">
 	<div class="container">
-		<h2 class="section-title">Key features</h2>
-		<p class="section-sub">Everything you need to run a fast, modern ADC hub.</p>
+		<h2 class="section-title">What is uhub?</h2>
+		<p class="section-sub">
+			A hub server for the <a href="https://adc.sourceforge.net/ADC.html">ADC</a> peer-to-peer network.
+			It proxies chat and file-search traffic between connected clients, and is compatible with
+			<a href="https://dcplusplus.sourceforge.io/">DC++</a>,
+			<a href="https://airdcpp.net/">AirDC++</a>, QuickDC and other ADC clients.
+			New to the protocol? Start with <a href="doc/adc.html">what ADC is</a>.
+		</p>
 		<div class="grid grid-3">
 			<div class="card">
 				<div class="icon">⚡</div>
-				<h3>High performance</h3>
-				<p>Single-threaded, event-driven core with very low memory usage — scales from embedded devices to large servers.</p>
+				<h3>Small and fast</h3>
+				<p>A single-threaded, event-driven core with very low memory usage — thousands of users on one server, or a private hub on embedded hardware.</p>
 			</div>
 			<div class="card">
 				<div class="icon">🌐</div>
@@ -57,48 +69,68 @@
 				<p>Full dual-stack networking. The hub auto-detects and prefers IPv6 where it is available.</p>
 			</div>
 			<div class="card">
-				<div class="icon">🔒</div>
-				<h3>TLS / SSL</h3>
-				<p>Secure your hub with TLS using the <code>adcs://</code> protocol and your own certificates.</p>
-			</div>
-			<div class="card">
-				<div class="icon">🛡️</div>
-				<h3>Access control</h3>
-				<p>Advanced ACLs for registered users, operators, nick &amp; CID bans, and IP/CIDR deny rules.</p>
-			</div>
-			<div class="card">
-				<div class="icon">🧩</div>
-				<h3>Plug-ins</h3>
-				<p>Loadable C plug-ins for authentication, logging, chat history, topic and more.</p>
-			</div>
-			<div class="card">
-				<div class="icon">⚙️</div>
-				<h3>Easy configuration</h3>
-				<p>A simple, well-documented configuration file gets a hub up and running in minutes.</p>
+				<div class="icon">📖</div>
+				<h3>Free &amp; open source</h3>
+				<p>Licensed under the <a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL v3</a> and developed in the open on <a href="https://github.com/janvidar/uhub/">GitHub</a> — contributions are welcome.</p>
 			</div>
 		</div>
 	</div>
 </main>
 
-<section class="section" style="padding-top:0;">
+<section class="section section-alt">
 	<div class="container">
+		<h2 class="section-title">Running a hub</h2>
+		<p class="section-sub">
+			A single, well-documented <a href="doc/config.html">configuration file</a> gets a hub up in
+			minutes — and there is room to grow when it fills up.
+		</p>
 		<div class="grid grid-2">
 			<div class="card">
-				<h3>What is uhub?</h3>
-				<p style="margin-bottom:12px;">
-					uhub speaks the <a href="https://adc.sourceforge.net/ADC.html">ADC</a> protocol and is
-					compatible with <a href="https://dcplusplus.sourceforge.io/">DC++</a>,
-					<a href="https://airdcpp.net/">AirDC++</a> and other ADC clients.
-				</p>
-				<p>It proxies chat and file-search traffic between connected clients with minimal overhead.</p>
+				<div class="icon">🔒</div>
+				<h3>Encrypted connections</h3>
+				<p>Serve <code>adcs://</code> with your own certificates. TLS 1.2 and 1.3, on OpenSSL or LibreSSL — see the <a href="doc/config-ssl.html">TLS guide</a>.</p>
 			</div>
 			<div class="card">
-				<h3>Free &amp; open source</h3>
-				<p style="margin-bottom:12px;">
-					uhub is free software, licensed under the
-					<a href="https://www.gnu.org/licenses/gpl-3.0.html">GNU General Public License v3</a>.
-				</p>
-				<p>Source code is hosted on <a href="https://github.com/janvidar/uhub/">GitHub</a> — contributions are welcome.</p>
+				<div class="icon">🛡️</div>
+				<h3>Access control &amp; moderation</h3>
+				<p>Registered accounts and operators, nick and CID bans carrying a reason and an expiry, IP/CIDR deny rules, and configurable flood thresholds.</p>
+			</div>
+			<div class="card">
+				<div class="icon">📊</div>
+				<h3>Monitoring</h3>
+				<p>A built-in <a href="doc/metrics.html">Prometheus endpoint</a> on the hub's own port, covering users, traffic, connections and event-loop latency.</p>
+			</div>
+			<div class="card">
+				<div class="icon">🔗</div>
+				<h3>Linking &amp; scaling</h3>
+				<p><a href="doc/linking.html">Federate hubs</a> across machines into one logical hub, or run a single hub across every CPU core as linked worker processes.</p>
+			</div>
+		</div>
+	</div>
+</section>
+
+<section class="section">
+	<div class="container">
+		<h2 class="section-title">Extending uhub</h2>
+		<p class="section-sub">
+			Hub behaviour is driven by plug-ins that hook into events — logins, chat, searches, transfers —
+			and can allow, deny or act on each one.
+		</p>
+		<div class="grid grid-3">
+			<div class="card">
+				<div class="icon">🧩</div>
+				<h3>Bundled plug-ins</h3>
+				<p>Authentication, logging, chat history, welcome messages, topic commands, flood action and more — <a href="doc/plugins/index.html">load what you need</a>.</p>
+			</div>
+			<div class="card">
+				<div class="icon">📜</div>
+				<h3>Scripting in JavaScript</h3>
+				<p>Write hub logic as sandboxed <a href="doc/javascript.html">JavaScript</a> — no compiler, no ABI to match, and no filesystem or network access from a script.</p>
+			</div>
+			<div class="card">
+				<div class="icon">🔌</div>
+				<h3>C plug-in API</h3>
+				<p>For storage backends and hot paths, the <a href="doc/plugin-api.html">C API</a> gives a plug-in the full hub surface, including its own user commands.</p>
 			</div>
 		</div>
 	</div>
