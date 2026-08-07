@@ -2,54 +2,91 @@
 Incompatible changes (action required beyond replacing the binaries):
 - The acl file (file_acl) no longer defines registered users. The user_admin,
   user_super, user_op, user_reg, link, bot, ubot, opbot and opubot keywords are
-  obsolete (they had already stopped granting access in prior releases). Remove
-  them and configure accounts through an auth plugin (mod_auth_sqlite /
-  mod_auth_simple). The acl file now holds only ban_nick / ban_cid / deny_nick /
+  obsolete; configure accounts through an auth plugin (mod_auth_sqlite /
+  mod_auth_simple). file_acl now holds only ban_nick / ban_cid / deny_nick /
   deny_ip. Obsolete keywords are ignored with a warning so old files still load.
 - nat_ip is no longer an acl-file keyword; use the nat_override option in
   uhub.conf instead. A leftover nat_ip line is ignored with a warning.
 - The mod_auth_sqlite "self_register" parameter was removed; the hub refuses to
-  start if it is still present. The !regme / !passwd self-service commands moved
-  to the new mod_selfregister plugin. To keep self-registration, drop the
-  parameter and load the new plugin:
+  start if it is still present. To keep self-registration, drop the parameter
+  and load mod_selfregister:
     old:  plugin .../mod_auth_sqlite.so "file=/etc/uhub/users.db self_register=true"
     new:  plugin .../mod_auth_sqlite.so "file=/etc/uhub/users.db"
           plugin .../mod_selfregister.so
+- Plugins must be rebuilt against plugin API 8 (minimum 8): struct plugin_user
+  is opaque, so e.g. user->nick becomes plugin->hub.get_user_nick(plugin, user).
+  Older plugins are refused at load.
 
 New features:
+- New plugin mod_javascript: hub logic in JavaScript, embedding QuickJS. Scripts
+  load with script=<file>, dir=<directory> or config=<list>; JavaScript versions
+  of the welcome, chat-only and flood plugins ship as examples.
+- RTF0 rich text chat: clients can mark a message as rich text (and embed images
+  by URL), and the hub formats the motd, rules and command output the same way.
+  Clients that did not negotiate the extension get plain text. Enabled by
+  default; turn it off with the new chat_rich_text option.
+- Chat messages carry a hub-stamped TS timestamp. A client-supplied TS is
+  replaced, so the timestamp cannot be forged; chat forwarded over a link keeps
+  the origin hub's stamp.
 - New operator command !unban to lift a ban by nick, CID or IP/range. Runtime
   bans could previously only be cleared by restarting the hub.
-- !ban now accepts an optional duration (e.g. "!ban nick 30m", 12h, 7d) for a
-  timed ban that expires on its own; clients are told the remaining time.
-- Bans can carry a reason: "!ban nick 30m <reason>" (or a plugin banning with
-  one). The reason is shown to the banned user on a refused reconnect, persisted
-  by a storage plugin, and propagated to linked hubs.
+- !ban takes an optional duration ("!ban nick 30m", 12h, 7d) and a reason
+  ("!ban nick 30m <reason>"). The reason is shown to the banned user on a
+  refused reconnect, persisted by a storage plugin, and propagated to linked
+  hubs; clients are told the remaining time.
 - New plugin mod_selfregister: the self-service !regme / !passwd commands,
   split out of mod_auth_sqlite so any auth storage backend can offer them.
-- The hub now sends a keepalive to connections it has not written to for
-  keepalive_interval seconds (default 120), so a connection dropped in the
-  middle is reaped in seconds instead of minutes. A login colliding with a dead
-  or long-silent session of the same identity takes its place rather than being
-  refused as "CID taken"; a session that is still talking is never displaced.
-  New metric: uhub_keepalives_total.
+- The hub keepalives connections it has not written to for keepalive_interval
+  seconds (default 120), so a connection dropped in the middle is reaped in
+  seconds instead of minutes. A login colliding with a dead or long-silent
+  session of the same identity takes its place rather than being refused as
+  "CID taken"; a session that is still talking is never displaced. New metric:
+  uhub_keepalives_total.
+- PFSR partial file sharing responses are routed.
+
+Fixes:
+- HBRI: the secondary IPv4/IPv6 UDP port now survives validation, post-login
+  port updates are gated on a proven address, and a changed advertised address
+  is re-challenged. The hub uses the address it observes and discards a
+  client-advertised I4/I6, so peers see the real one.
+- UCMD: 0.7.1 advertised the extension as "UCM0" (ADC-EXT 3.7 calls it "UCMD")
+  and sent ICMD to every client regardless of support. Both corrected; UCM0 is
+  still accepted from clients that mirrored the old advertisement, and the
+  extension is only advertised when mod_ucmd is loaded.
+- mod_chat_is_privileged now gates private messages by credential, mod_chat_only
+  no longer ignores operator_override, and mod_auth_simple fails closed when its
+  ACL file cannot be read (it used to load an empty ACL, locking everyone out
+  under exclusive=1).
+- Fixed crashes and memory errors: use-after-free during shutdown and in DNS
+  result delivery, out-of-bounds indexing in the kqueue and backend connection
+  tables, and undersized password-challenge buffers. Shutdown no longer waits
+  for the next event.
+- Removed the AUT0 extension, which was documented but never implemented.
 
 Configuration:
-- NAT override moved out of the acl file into the nat_override option in
-  uhub.conf (the old nat_ip acl keyword is obsolete and ignored with a warning).
-- Retired the dead file_acl registered-user list (user_admin/user_op/... and
-  friends); accounts are handled by an auth plugin. The obsolete keywords are
-  ignored with a warning so existing acl files keep loading. file_acl now holds
-  only bans and denied nicks.
+- New options: nat_override (replaces the nat_ip acl keyword),
+  keepalive_interval, chat_rich_text.
+- %t in the motd and rules expands to the user's TLS version.
 
-Plugin API (version 4):
+Building:
+- Windows builds again, natively and cross-compiled with zig. Windows remains a
+  secondary platform.
+- Building from git needs submodules: git submodule update --init (the test
+  framework, plus QuickJS if mod_javascript is enabled).
+
+Plugin API (version 8, minimum 8):
+- struct plugin_user is opaque; read it through get_user_sid / get_user_nick /
+  get_user_cid / get_user_user_agent / get_user_address / get_user_credentials.
+  Returned strings and addresses are valid for the duration of the callback.
+- Per-user plugin storage with a destroy hook (set_user_data / get_user_data),
+  so a plugin no longer has to track logouts to free per-user state.
 - Ban storage callbacks (auth_ban_add / auth_ban_del / auth_is_banned) let a
   storage plugin persist bans; the hub queries them at login. mod_auth_sqlite
-  implements them (bans survive a restart, with per-ban expiry).
-- New hub functions plugins can call: ban_user / unban, and auth_get_user /
-  auth_register_user / auth_update_user (routed to the storage plugin).
-  ban_user takes a reason argument; auth_ban_add / auth_is_banned carry a
-  ban reason (struct ban_info gained a reason field), persisted and reported.
-- Wired the on_validate_nick / on_validate_cid login hooks into the pipeline.
+  implements them, with per-ban expiry and reason.
+- New hub functions: ban_user / unban, auth_get_user / auth_register_user /
+  auth_update_user, and get_tls_version.
+- on_hub_started, on_hub_shutdown, on_check_ip_late and on_change_nick now fire;
+  on_validate_nick / on_validate_cid are wired into the login pipeline.
 - libadcclient: ADC_client_set_pid() pins a client's PID (stable CID); added
   ADC_client_get_cid().
 
@@ -60,11 +97,6 @@ Federation:
 Authentication:
 - mod_auth_sqlite is now storage-only (users + bans); self-registration moved to
   mod_selfregister.
-
-Testing:
-- Added a scripted end-to-end test harness (test/e2e/) that drives a live hub
-  with real ADC clients: ban/unban/timed-ban/persistence, linked-hub LBAN/LUBN
-  propagation, and the plugin ban/validate hooks.
 
 0.7.1:
 New features:
