@@ -1,12 +1,20 @@
 name: Release
 
-# Publishes the source archive for a tag.
+# Publishes the source archive and the per-platform binary packages for a tag.
 #
 # GitHub's own "Source code (zip/tar.gz)" assets are a plain `git archive` of the
 # superproject and therefore never contain third_party/exotic or
 # third_party/quickjs -- submodules are gitlinks, not files, so no setting can
 # make them complete. Those assets cannot be suppressed either, so this workflow
 # attaches a real one next to them and says so in the release notes.
+#
+# The release is built as a draft and only published once every asset is in
+# place, so nobody downloads a half-populated release. Job order:
+#
+#   source   -> archives + cold-build gate, creates the draft release
+#   binaries -> five cross-compiled platform packages (zig)
+#   smoke    -> runs the packages that have a native runner
+#   finalize -> regenerates SHA256SUMS over everything, undrafts the release
 
 on:
   push:
@@ -21,9 +29,12 @@ permissions:
   contents: write   # needed to create the release and upload assets
 
 jobs:
-  release:
+  source:
     name: source archive
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      created: ${{ steps.publish.outputs.created }}
     steps:
       - name: Resolve the tag being released
         id: tag
@@ -81,28 +92,173 @@ jobs:
           "$work/build/uhub" -V
           unzip -qt dist/uhub-*-src.zip
 
-      - name: Publish the release assets
+      # Created as a draft: the binary packages are still building, and a release
+      # that is briefly visible with only some of its assets is worse than one
+      # that appears a few minutes later complete. finalize undrafts it.
+      - name: Publish the source assets
+        id: publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
           tag='${{ steps.tag.outputs.tag }}'
           if gh release view "$tag" >/dev/null 2>&1; then
+            echo "created=false" >> "$GITHUB_OUTPUT"
             gh release upload "$tag" dist/* --clobber
           else
+            echo "created=true" >> "$GITHUB_OUTPUT"
             notes=$(mktemp)
             {
-              echo "### Source"
+              echo "### Downloads"
               echo
-              echo 'Download `uhub-'"$tag"'-src.tar.gz` (or `.zip`) below.'
+              echo 'Binary packages are self-contained -- TLS (LibreSSL) and SQLite are'
+              echo 'linked in, so there is nothing else to install. Unpack, then run'
+              echo '`bin/uhub -c etc/uhub.conf` from the unpacked directory. See'
+              echo 'RUNNING.txt inside the package.'
               echo
-              echo 'Note that the **"Source code (zip)" and "Source code (tar.gz)" links'
-              echo 'GitHub adds automatically are incomplete** and will not build: they'
-              echo 'cannot contain the bundled `third_party/exotic` and'
-              echo '`third_party/quickjs` submodules. Use the archive attached here, or'
-              echo 'clone with `git clone --recursive`.'
+              echo 'They are **not code-signed**: macOS quarantines them until you run'
+              echo '`xattr -dr com.apple.quarantine .` on the unpacked directory, and'
+              echo 'Windows SmartScreen may warn about an unknown publisher.'
+              echo
+              echo 'To build from source, download `uhub-'"$tag"'-src.tar.gz` (or `.zip`).'
+              echo 'The **"Source code (zip)" and "Source code (tar.gz)" links GitHub adds'
+              echo 'automatically are incomplete** and will not build: they cannot contain'
+              echo 'the bundled `third_party/exotic` and `third_party/quickjs` submodules.'
+              echo 'Use the archive attached here, or clone with `git clone --recursive`.'
               echo
               echo 'Checksums are in `SHA256SUMS`. See the ChangeLog for what changed.'
             } >"$notes"
-            gh release create "$tag" dist/* --title "uhub $tag" --notes-file "$notes"
+            gh release create "$tag" dist/* --draft --title "uhub $tag" --notes-file "$notes"
           fi
+
+  # ---------------------------------------------------------------------------
+  # One self-contained package per platform. All five are cross-compiled with zig
+  # on the same Linux runner: the toolchain makes the host irrelevant, and using
+  # one runner keeps the matrix from depending on runner-image labels that come
+  # and go. The packages that have a native runner are executed by the smoke job
+  # below; linux-aarch64 and macos-x86_64 ship cross-built and unexecuted.
+  # ---------------------------------------------------------------------------
+  binaries:
+    name: ${{ matrix.platform }}
+    needs: source
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - linux-x86_64
+          - linux-aarch64
+          - macos-x86_64
+          - macos-aarch64
+          - windows-x86_64
+    env:
+      ZIG_VERSION: "0.16.0"
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ needs.source.outputs.tag }}
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install zig ${{ env.ZIG_VERSION }}
+        run: |
+          url="https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
+          curl -fsSL "$url" | tar -xJ
+          echo "$PWD/zig-x86_64-linux-${ZIG_VERSION}" >> "$GITHUB_PATH"
+
+      - name: Build the package
+        run: scripts/make-binary-dist.sh '${{ matrix.platform }}' '${{ needs.source.outputs.tag }}'
+
+      # Kept as a workflow artifact as well as a release asset, so the smoke job
+      # tests the exact bytes that were built rather than re-downloading.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pkg-${{ matrix.platform }}
+          path: dist/uhub-*-${{ matrix.platform }}.*
+          if-no-files-found: error
+
+      - name: Attach it to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload '${{ needs.source.outputs.tag }}' dist/uhub-*-'${{ matrix.platform }}'.* --clobber
+
+  # ---------------------------------------------------------------------------
+  # Unpack each package on a runner of its own platform and actually run it, so
+  # no release ships a binary that has never started. Only the three platforms
+  # with a native GitHub runner are covered.
+  # ---------------------------------------------------------------------------
+  smoke:
+    name: smoke ${{ matrix.platform }}
+    needs: [source, binaries]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: linux-x86_64,   os: ubuntu-latest }
+          - { platform: macos-aarch64,  os: macos-latest }
+          - { platform: windows-x86_64, os: windows-latest }
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      # Pulled from the release rather than from the workflow artifact, so what
+      # gets executed is the exact asset a user would download.
+      - name: Download the package from the release
+        run: gh release download '${{ needs.source.outputs.tag }}' --pattern "uhub-*-${{ matrix.platform }}.*" --clobber
+
+      - name: Unpack it and run the binaries
+        run: |
+          set -eu
+          case '${{ matrix.platform }}' in
+          windows-*)
+            # unzip is not guaranteed on the Windows image; 7z is.
+            if command -v unzip >/dev/null 2>&1; then
+              unzip -q uhub-*-'${{ matrix.platform }}'.zip
+            else
+              7z x -y uhub-*-'${{ matrix.platform }}'.zip >/dev/null
+            fi
+            EXE=.exe
+            ;;
+          *)
+            tar xzf uhub-*-'${{ matrix.platform }}'.tar.gz
+            EXE=
+            ;;
+          esac
+          cd uhub-*-'${{ matrix.platform }}'
+          "./bin/uhub$EXE" -V
+          # Exercises SQLite and the CRT startup path, not merely that a file exists.
+          "./bin/uhub-passwd$EXE" etc/users.db create
+          "./bin/uhub-passwd$EXE" etc/users.db add tester secret admin
+
+  finalize:
+    name: finalize
+    needs: [source, binaries, smoke]
+    runs-on: ubuntu-latest
+    steps:
+      # SHA256SUMS has to cover every asset, and the binaries are uploaded by a
+      # matrix that cannot safely append to a shared file, so it is regenerated
+      # once here from what the release actually ended up holding.
+      - name: Regenerate SHA256SUMS over every asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          tag='${{ needs.source.outputs.tag }}'
+          mkdir assets && cd assets
+          gh release download "$tag" --clobber
+          rm -f SHA256SUMS
+          sha256sum uhub-* | LC_ALL=C sort -k2 > SHA256SUMS
+          cat SHA256SUMS
+          gh release upload "$tag" SHA256SUMS --clobber
+
+      - name: Publish the release
+        if: needs.source.outputs.created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release edit '${{ needs.source.outputs.tag }}' --draft=false

@@ -266,6 +266,44 @@ static int plugin_path_is_absolute(const char* path)
 #endif
 }
 
+/*
+ * The module extension differs per platform, so the binary distributions name
+ * plugins without one ("mod_topic") and let the loader supply it. That way a
+ * single plugins.conf works everywhere. A name that already carries an
+ * extension is used exactly as written, so configs naming mod_topic.so keep
+ * loading unchanged.
+ */
+#ifdef HAVE_DLOPEN
+#define PLUGIN_EXTENSION ".so"
+#else
+#define PLUGIN_EXTENSION ".dll"
+#endif
+
+/* Returns a newly allocated copy of name, extension appended if it had none. */
+static char* plugin_add_extension(const char* name)
+{
+	const char* base = name;
+	const char* p;
+	const char* ext = "";
+	char* full;
+	size_t len;
+
+	for (p = name; *p; p++)
+		if (*p == '/' || *p == '\\')
+			base = p + 1;
+
+	/* Only the last path component decides: a directory may contain dots. */
+	if (!strchr(base, '.'))
+		ext = PLUGIN_EXTENSION;
+
+	len = strlen(name) + strlen(ext) + 1;
+	full = hub_malloc(len);
+	if (!full)
+		return NULL;
+	snprintf(full, len, "%s%s", name, ext);
+	return full;
+}
+
 /* Join a directory and a plugin name, inserting a separator if needed. */
 static char* plugin_join_path(const char* dir, const char* name)
 {
@@ -319,14 +357,23 @@ static int plugin_parse_line(char* line, int line_count, void* ptr_data)
 
 	if (strcmp(directive, "plugin") == 0 && soname && *soname)
 	{
+		char* named = plugin_add_extension(soname);
 		char* resolved = NULL;
-		const char* path = soname;
+		const char* path;
 
-		if (handle->plugin_dir && !plugin_path_is_absolute(soname))
+		if (!named)
 		{
-			resolved = plugin_join_path(handle->plugin_dir, soname);
+			cfg_tokens_free(tokens);
+			return -1;
+		}
+		path = named;
+
+		if (handle->plugin_dir && !plugin_path_is_absolute(named))
+		{
+			resolved = plugin_join_path(handle->plugin_dir, named);
 			if (!resolved)
 			{
+				hub_free(named);
 				cfg_tokens_free(tokens);
 				return -1;
 			}
@@ -339,6 +386,7 @@ static int plugin_parse_line(char* line, int line_count, void* ptr_data)
 		LOG_PLUGIN("Load plugin: \"%s\", params=\"%s\"", path, params);
 		plugin = plugin_load(path, params, hub);
 		hub_free(resolved);
+		hub_free(named);
 		if (plugin)
 		{
 			list_append(handle->loaded, plugin);

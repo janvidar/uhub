@@ -49,7 +49,14 @@ For a list of compatible clients, see the
 
 ## Building
 
-uhub is distributed as source — there are no prebuilt binaries.
+Prebuilt, self-contained packages for Linux, macOS and Windows (x86_64 and
+arm64) are attached to each [release](https://github.com/janvidar/uhub/releases).
+TLS and SQLite are linked in, so there is nothing else to install: unpack, then
+run `bin/uhub -c etc/uhub.conf` from the unpacked directory. They are not
+code-signed — see `RUNNING.txt` inside the package for the one-line macOS
+Gatekeeper workaround.
+
+To build it yourself, read on.
 
 Get the source either by cloning **with `--recursive`**, or by downloading the
 `uhub-<version>-src.tar.gz` attached to a

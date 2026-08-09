@@ -53,9 +53,13 @@ start_hub() {
 FIXED_PID="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 DENY_CID=$("$ADC" --pid "$FIXED_PID" --show-cid)
 
+# Written the way the binary distributions do it -- plugin_dir plus names with
+# no extension, which the loader completes per platform -- so that resolution
+# path is exercised here rather than only when someone unpacks a release.
 cat > "$DIR/plugins.conf" <<EOF
-plugin $BUILD/mod_auth_sqlite.so "file=$DIR/users.db"
-plugin $BUILD/mod_e2e_test.so "deny_cid=$DENY_CID"
+plugin_dir $BUILD
+plugin mod_auth_sqlite "file=$DIR/users.db"
+plugin mod_e2e_test "deny_cid=$DENY_CID"
 EOF
 cat > "$DIR/uhub.conf" <<EOF
 server_port = $PORT

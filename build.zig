@@ -139,6 +139,7 @@ const Ctx = struct {
     optimize: std.builtin.OptimizeMode,
     cflags: []const []const u8,
     systemd: bool,
+    strip: ?bool,
     common: *std.Build.Step.Compile,
     version_h: *std.Build.Step.ConfigHeader,
     system_h: *std.Build.Step.ConfigHeader,
@@ -155,6 +156,7 @@ const Ctx = struct {
             .target = ctx.target,
             .optimize = ctx.optimize,
             .link_libc = true,
+            .strip = ctx.strip,
             // Match CMake: it never enables the C UB sanitizer, and the code
             // relies on a handful of signed-shift / overflow behaviours.
             .sanitize_c = .off,
@@ -273,6 +275,10 @@ pub fn build(b: *std.Build) void {
         b.build_root.handle.access(b.graph.io, "third_party/exotic/src/autotest.c", .{}) catch break :blk false;
         break :blk true;
     };
+    // Left null by default so zig applies its per-optimize-mode default. The
+    // binary distributions pass -Dstrip=true: DWARF is most of an unstripped
+    // ELF's size and nobody debugging a release build has the sources anyway.
+    const strip = b.option(bool, "strip", "Strip debug info from the produced binaries");
     const tests = b.option(bool, "tests", "Build autotest-bin (needs the third_party/exotic submodule)") orelse exotic_present;
     if (tests and !exotic_present) {
         std.debug.panic(
@@ -415,6 +421,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .cflags = cflags,
         .systemd = systemd,
+        .strip = strip,
         .common = common,
         .version_h = version_h,
         .system_h = system_h,
