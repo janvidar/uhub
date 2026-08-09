@@ -264,6 +264,26 @@ pub fn build(b: *std.Build) void {
     // avoids needing the system OpenSSL headers on the include path (keg-only
     // on Homebrew macOS). -Dsystem-ssl links the host's ssl/crypto instead.
     const system_ssl = b.option(bool, "system-ssl", "Link the host OpenSSL/LibreSSL instead of the bundled LibreSSL") orelse false;
+    // Only autotest-bin needs the exotic submodule, so default -Dtests to
+    // whether it is actually present. This mirrors UHUB_TESTS in CMakeLists.txt
+    // and keeps `zig build` working in a source tree that arrived without
+    // submodules -- an unpacked GitHub "Source code" archive, say, which cannot
+    // contain them. Asking for tests explicitly still fails loudly.
+    const exotic_present = blk: {
+        b.build_root.handle.access(b.graph.io, "third_party/exotic/src/autotest.c", .{}) catch break :blk false;
+        break :blk true;
+    };
+    const tests = b.option(bool, "tests", "Build autotest-bin (needs the third_party/exotic submodule)") orelse exotic_present;
+    if (tests and !exotic_present) {
+        std.debug.panic(
+            "the exotic test framework is missing from third_party/exotic.\n" ++
+                "Run: git submodule update --init third_party/exotic\n" ++
+                "If this tree was unpacked from GitHub's auto-generated source archive, it\n" ++
+                "cannot contain uhub's submodules; use the uhub-<version>-src.tar.gz attached\n" ++
+                "to the release, or clone with --recursive. Otherwise build with -Dtests=false.",
+            .{},
+        );
+    }
 
     // Assemble the common C flags applied to every translation unit.
     var flags = std.array_list.Managed([]const u8).init(b.allocator);
@@ -416,7 +436,7 @@ pub fn build(b: *std.Build) void {
     // autotest-bin. The suite drives POSIX socket-fd semantics (socketpair, and
     // write()/close() on socket descriptors) that do not map onto WinSock, and
     // there is no Windows test runner, so it is not built for Windows.
-    const autotest: ?*std.Build.Step.Compile = if (is_windows) null else blk: {
+    const autotest: ?*std.Build.Step.Compile = if (is_windows or !tests) null else blk: {
         const autotest_mod = ctx.module();
         ctx.addSources(autotest_mod, &core_sources);
         // mod_auth_sqlite.c is compiled in (not just built as a loadable

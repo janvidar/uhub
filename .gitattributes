@@ -1,0 +1,7 @@
+# Substituted by `git archive` (including GitHub's auto-generated "Source code"
+# release assets). In a git checkout the file keeps its literal $Format:...$
+# placeholder, so CMakeLists.txt can tell a checkout from an extracted archive
+# and give the right advice when a submodule is missing -- "run git submodule
+# update --init" is useless to someone who has no .git directory. The same
+# value supplies UHUB_REVISION when no git is available.
+.uhub-archive-version export-subst

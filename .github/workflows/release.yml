@@ -1,0 +1,108 @@
+name: Release
+
+# Publishes the source archive for a tag.
+#
+# GitHub's own "Source code (zip/tar.gz)" assets are a plain `git archive` of the
+# superproject and therefore never contain third_party/exotic or
+# third_party/quickjs -- submodules are gitlinks, not files, so no setting can
+# make them complete. Those assets cannot be suppressed either, so this workflow
+# attaches a real one next to them and says so in the release notes.
+
+on:
+  push:
+    tags: ['[0-9]+.[0-9]+.[0-9]+*']   # existing tags carry no "v" prefix
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build and attach assets to'
+        required: true
+
+permissions:
+  contents: write   # needed to create the release and upload assets
+
+jobs:
+  release:
+    name: source archive
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve the tag being released
+        id: tag
+        run: echo "tag=${{ inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      # fetch-depth: 0 because make-dist.sh and the export-subst version stamp
+      # both need the tag history, not just the tip commit.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          submodules: recursive
+          fetch-depth: 0
+
+      # A tag whose tree still carries the previous version number produces
+      # binaries that misreport themselves, and that is only discoverable after
+      # release. Catch it before anything is published.
+      - name: Check the tag matches the declared version
+        run: |
+          tag='${{ steps.tag.outputs.tag }}'
+          base=${tag%%-*}          # 0.8.1-rc1 -> 0.8.1
+          cml=$(sed -nE 's/^[[:space:]]*VERSION[[:space:]]+([0-9][0-9.]*).*/\1/p' CMakeLists.txt | head -1)
+          zon=$(sed -nE 's/^[[:space:]]*\.version[[:space:]]*=[[:space:]]*"([^"]*)".*/\1/p' build.zig.zon | head -1)
+          chg=$(sed -nE '1s/^([0-9][0-9.]*):.*/\1/p' ChangeLog)
+          echo "tag=$base  CMakeLists=$cml  build.zig.zon=$zon  ChangeLog=$chg"
+          rc=0
+          [ "$cml" = "$base" ] || { echo "::error::CMakeLists.txt says $cml, tag says $base"; rc=1; }
+          [ "$zon" = "$base" ] || { echo "::error::build.zig.zon says $zon, tag says $base"; rc=1; }
+          [ "$chg" = "$base" ] || { echo "::error::ChangeLog's top section is $chg, tag says $base"; rc=1; }
+          exit $rc
+
+      - name: Build the source archives
+        env:
+          DIST_VERSION: ${{ steps.tag.outputs.tag }}
+        run: scripts/make-dist.sh '${{ steps.tag.outputs.tag }}'
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake libsqlite3-dev libssl-dev
+
+      # The gate that would have caught the incomplete 0.8.0 assets: unpack the
+      # tarball somewhere with no .git anywhere above it and build it cold, with
+      # both submodule-dependent features switched on explicitly. UHUB_TESTS=ON
+      # matters -- it defaults to off when exotic is absent, so without it a
+      # tarball missing exotic would quietly build and pass.
+      - name: Verify the tarball builds and tests clean
+        run: |
+          set -eu
+          work=$(mktemp -d)
+          tar xzf dist/uhub-*-src.tar.gz -C "$work"
+          src=$(echo "$work"/uhub-*-src)
+          cmake -S "$src" -B "$work/build" -DRELEASE=ON -DUHUB_TESTS=ON -DJAVASCRIPT_SUPPORT=ON
+          cmake --build "$work/build" -j
+          "$work/build/autotest-bin"
+          "$work/build/uhub" -V
+          unzip -qt dist/uhub-*-src.zip
+
+      - name: Publish the release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          tag='${{ steps.tag.outputs.tag }}'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/* --clobber
+          else
+            notes=$(mktemp)
+            {
+              echo "### Source"
+              echo
+              echo 'Download `uhub-'"$tag"'-src.tar.gz` (or `.zip`) below.'
+              echo
+              echo 'Note that the **"Source code (zip)" and "Source code (tar.gz)" links'
+              echo 'GitHub adds automatically are incomplete** and will not build: they'
+              echo 'cannot contain the bundled `third_party/exotic` and'
+              echo '`third_party/quickjs` submodules. Use the archive attached here, or'
+              echo 'clone with `git clone --recursive`.'
+              echo
+              echo 'Checksums are in `SHA256SUMS`. See the ChangeLog for what changed.'
+            } >"$notes"
+            gh release create "$tag" dist/* --title "uhub $tag" --notes-file "$notes"
+          fi

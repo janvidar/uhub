@@ -51,6 +51,13 @@ For a list of compatible clients, see the
 
 uhub is distributed as source — there are no prebuilt binaries.
 
+Get the source either by cloning **with `--recursive`**, or by downloading the
+`uhub-<version>-src.tar.gz` attached to a
+[release](https://github.com/janvidar/uhub/releases). Do not use the
+"Source code (zip/tar.gz)" links GitHub generates for a tag: those are produced
+by `git archive`, which cannot include uhub's bundled `third_party/` submodules,
+so they are incomplete.
+
 ### Prerequisites
 
 - A C compiler (C23) and [CMake](https://cmake.org/) ≥ 3.21
@@ -67,7 +74,7 @@ sudo apt-get install build-essential cmake perl libsqlite3-dev libssl-dev
 ### Build with CMake
 
 ```sh
-git clone https://github.com/janvidar/uhub.git
+git clone --recursive https://github.com/janvidar/uhub.git
 cd uhub
 mkdir -p build && cd build
 cmake ..
@@ -77,7 +84,9 @@ sudo make install    # optional
 
 This produces the `uhub` binary, the `mod_*.so` plugins, and the `uhub-passwd`
 helper. Useful CMake options: `-DRELEASE=OFF` (debug build),
-`-DSYSTEMD_SUPPORT=ON`, and `-DADC_STRESS=ON` (build the stress tester). To
+`-DSYSTEMD_SUPPORT=ON`, `-DADC_STRESS=ON` (build the stress tester), and
+`-DUHUB_TESTS=OFF` (skip `autotest-bin`; it defaults to off when the
+`third_party/exotic` submodule is absent, so the hub still builds there). To
 build against LibreSSL when both are installed, point CMake at its prefix with
 `-DOPENSSL_ROOT_DIR=/path/to/libressl`.
 

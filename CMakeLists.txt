@@ -31,6 +31,67 @@ option(ADC_STRESS "Enable the stress tester client" OFF)
 option(FUZZING "Build libFuzzer fuzz targets (requires clang)" OFF)
 option(JAVASCRIPT_SUPPORT "Build the mod_javascript plugin (embeds QuickJS, a git submodule)" OFF)
 
+# Only autotest-bin needs the exotic submodule, so default the test suite to
+# whether it is actually there. That keeps `cmake .. && make uhub` working in a
+# source tree that arrived without submodules, while an explicit -DUHUB_TESTS=ON
+# still fails loudly rather than silently skipping the tests.
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/exotic/CMakeLists.txt")
+	set (UHUB_TESTS_DEFAULT ON)
+else()
+	set (UHUB_TESTS_DEFAULT OFF)
+endif()
+option(UHUB_TESTS "Build the autotest suite (needs the exotic submodule)" ${UHUB_TESTS_DEFAULT})
+
+# Tell a git checkout apart from an unpacked source archive. .uhub-archive-version
+# is marked export-subst in .gitattributes, so any `git archive` output -- which
+# includes the "Source code (zip/tar.gz)" assets GitHub generates for a tag --
+# has its contents replaced by the describe output, while a checkout keeps the
+# literal $Format:...$ placeholder. The distinction matters because the two cases
+# need opposite advice about a missing submodule: an unpacked archive has no .git,
+# so "run git submodule update" is not something its reader can do.
+set (UHUB_ARCHIVE_VERSION "")
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
+	set (UHUB_FROM_GIT TRUE)
+else()
+	set (UHUB_FROM_GIT FALSE)
+	if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.uhub-archive-version")
+		file (READ "${CMAKE_CURRENT_SOURCE_DIR}/.uhub-archive-version" UHUB_MARKER)
+		string (STRIP "${UHUB_MARKER}" UHUB_MARKER)
+		if (UHUB_MARKER AND NOT UHUB_MARKER MATCHES "^\\$Format:")
+			set (UHUB_ARCHIVE_VERSION "${UHUB_MARKER}")
+		endif()
+	endif()
+endif()
+
+# Report a missing submodule with advice its reader can actually act on.
+function (uhub_submodule_missing what path)
+	if (UHUB_FROM_GIT)
+		message (FATAL_ERROR
+			"${what} is missing from ${path}.\n"
+			"Run: git submodule update --init ${path}")
+	elseif (UHUB_ARCHIVE_VERSION)
+		message (FATAL_ERROR
+			"${what} is missing from ${path}.\n"
+			"This tree was unpacked from an auto-generated GitHub source archive "
+			"(${UHUB_ARCHIVE_VERSION}). Those never contain uhub's submodules: git "
+			"cannot place submodule contents into a `git archive`, so the archive "
+			"is incomplete by construction and there is no .git here to fetch them "
+			"into.\n"
+			"Use the complete source tarball attached to the release instead:\n"
+			"  https://github.com/janvidar/uhub/releases  ->  uhub-<version>-src.tar.gz\n"
+			"or build from a clone:\n"
+			"  git clone --recursive https://github.com/janvidar/uhub.git")
+	else()
+		message (FATAL_ERROR
+			"${what} is missing from ${path}.\n"
+			"This source tree is incomplete and is not a git checkout, so the "
+			"submodule cannot be fetched here.\n"
+			"Use the source tarball attached to a release "
+			"(https://github.com/janvidar/uhub/releases), or build from a clone:\n"
+			"  git clone --recursive https://github.com/janvidar/uhub.git")
+	endif()
+endfunction()
+
 find_package(Git)
 find_package(SQLite3 REQUIRED)
 
@@ -228,15 +289,24 @@ set_target_properties(utils network PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_dependencies(adc utils)
 add_dependencies(network utils)
 
+add_executable(uhub ${UHUB_SOURCE_DIR}/core/main.c ${uhub_SOURCES})
+
 # exotic, the test framework, pulled in as a git submodule at third_party/exotic
-# (pinned by .gitmodules + the recorded commit). Unlike the optional QuickJS
-# submodule this one is required, since autotest-bin cannot be built without it.
+# (pinned by .gitmodules + the recorded commit). Nothing but autotest-bin uses
+# it, so a tree without it still builds the hub; see the UHUB_TESTS option.
 set (EXOTIC_DIR ${CMAKE_SOURCE_DIR}/third_party/exotic)
-if (NOT EXISTS ${EXOTIC_DIR}/CMakeLists.txt)
-	message(FATAL_ERROR
-		"The exotic submodule is missing. "
-		"Run: git submodule update --init third_party/exotic")
+if (UHUB_TESTS AND NOT EXISTS ${EXOTIC_DIR}/CMakeLists.txt)
+	uhub_submodule_missing("The exotic test framework" "third_party/exotic")
 endif()
+if (NOT UHUB_TESTS)
+	message (STATUS "Tests disabled (UHUB_TESTS=OFF): building the hub without autotest-bin")
+endif()
+
+# Everything down to the matching `endif() # UHUB_TESTS` builds autotest-bin and
+# is left unindented so the block reads as a diff against the unconditional
+# version it replaced.
+if (UHUB_TESTS)
+
 # exotic declares add_library() without an explicit type, so it would follow a
 # consumer's BUILD_SHARED_LIBS. Force static for its subdirectory only, so
 # autotest-bin needs no RPATH, then restore whatever the user asked for.
@@ -271,8 +341,6 @@ set (AUTOTEST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/autotest")
 file (GLOB autotest_TCC CONFIGURE_DEPENDS ${AUTOTEST_DIR}/test_*.tcc)
 list (SORT autotest_TCC)
 
-add_executable(uhub ${UHUB_SOURCE_DIR}/core/main.c ${uhub_SOURCES})
-
 exotic_add_tests(autotest-bin
 	SOURCES ${autotest_TCC}
 	WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
@@ -287,6 +355,9 @@ target_include_directories(autotest-bin PRIVATE ${AUTOTEST_DIR})
 # Absolute path to the autotest/ dir so tests can locate checked-in fixtures
 # (e.g. the TLS test certificate) regardless of the working directory.
 target_compile_definitions(autotest-bin PRIVATE UHUB_TEST_DIR="${AUTOTEST_DIR}")
+
+endif() # UHUB_TESTS
+
 add_executable(uhub-passwd ${UHUB_SOURCE_DIR}/tools/uhub-passwd.c)
 
 add_library(mod_example MODULE ${UHUB_SOURCE_DIR}/plugins/mod_example.c)
@@ -311,9 +382,9 @@ if(JAVASCRIPT_SUPPORT)
 	# third-party and is compiled with warnings disabled.
 	set(QUICKJS_DIR ${CMAKE_SOURCE_DIR}/third_party/quickjs)
 	if(NOT EXISTS ${QUICKJS_DIR}/quickjs.c)
-		message(FATAL_ERROR
-			"JAVASCRIPT_SUPPORT is ON but the QuickJS submodule is missing. "
-			"Run: git submodule update --init third_party/quickjs")
+		uhub_submodule_missing(
+			"JAVASCRIPT_SUPPORT is ON but the QuickJS engine"
+			"third_party/quickjs")
 	endif()
 	add_library(quickjs STATIC
 		${QUICKJS_DIR}/quickjs.c
@@ -370,7 +441,9 @@ set_target_properties(
 
 target_link_libraries(uhub ${CMAKE_DL_LIBS} adc network utils)
 target_link_libraries(uhub-passwd SQLite::SQLite3 utils)
-target_link_libraries(autotest-bin PRIVATE ${CMAKE_DL_LIBS} adc network utils SQLite::SQLite3)
+if (UHUB_TESTS)
+	target_link_libraries(autotest-bin PRIVATE ${CMAKE_DL_LIBS} adc network utils SQLite::SQLite3)
+endif()
 target_link_libraries(mod_example utils)
 target_link_libraries(mod_welcome network utils)
 target_link_libraries(mod_auth_simple utils)
@@ -388,7 +461,9 @@ target_link_libraries(mod_ucmd utils)
 
 if(WIN32)
 	target_link_libraries(uhub ws2_32)
-	target_link_libraries(autotest-bin PRIVATE ws2_32)
+	if (UHUB_TESTS)
+		target_link_libraries(autotest-bin PRIVATE ws2_32)
+	endif()
 	target_link_libraries(mod_logging ws2_32)
 	target_link_libraries(mod_welcome ws2_32)
 endif()
@@ -406,7 +481,9 @@ if(UNIX)
 	set_target_properties(mod_e2e_test PROPERTIES PREFIX "")
 	target_link_libraries(mod_e2e_test utils)
 	target_link_libraries(uhub pthread)
-	target_link_libraries(autotest-bin PRIVATE pthread)
+	if (UHUB_TESTS)
+		target_link_libraries(autotest-bin PRIVATE pthread)
+	endif()
 
 	if (ADC_STRESS)
 		add_executable(adcrush ${UHUB_SOURCE_DIR}/tools/adcrush.c ${adcclient_SOURCES})
@@ -417,13 +494,29 @@ if(UNIX)
 	endif()
 endif()
 
-if (NOT UHUB_REVISION AND GIT_FOUND)
+# UHUB_FROM_GIT guards this: without it, unpacking a tarball inside some other
+# git working tree would stamp that repository's hash onto the build.
+if (NOT UHUB_REVISION AND GIT_FOUND AND UHUB_FROM_GIT)
 	execute_process(COMMAND ${GIT_EXECUTABLE} show -s --pretty=format:%h
 					WORKING_DIRECTORY ${UHUB_SOURCE_DIR}
 					OUTPUT_VARIABLE UHUB_REVISION_TEMP
 					OUTPUT_STRIP_TRAILING_WHITESPACE)
 	if (UHUB_REVISION_TEMP)
 		set (UHUB_REVISION "git-${UHUB_REVISION_TEMP}")
+	endif()
+endif()
+
+# No git, but built from an archive that git stamped on its way out (see
+# .gitattributes), so the exact provenance is still known.
+if (NOT UHUB_REVISION AND UHUB_ARCHIVE_VERSION)
+	if (UHUB_ARCHIVE_VERSION STREQUAL PROJECT_VERSION)
+		# An archive of the release tag itself; the version says it all.
+		set (UHUB_REVISION "release")
+	else()
+		# A describe string such as "0.8.0-3-g113a125": keep only the suffix,
+		# since UHUB_GIT_VERSION prepends the version anyway.
+		string (REGEX REPLACE "^${PROJECT_VERSION}-" ""
+			UHUB_REVISION "${UHUB_ARCHIVE_VERSION}")
 	endif()
 endif()
 
@@ -437,7 +530,9 @@ message (STATUS "Configuring uhub version: ${UHUB_GIT_VERSION}")
 set(SSL_LIBS OpenSSL::SSL OpenSSL::Crypto)
 
 target_link_libraries(uhub ${SSL_LIBS})
-target_link_libraries(autotest-bin PRIVATE ${SSL_LIBS})
+if (UHUB_TESTS)
+	target_link_libraries(autotest-bin PRIVATE ${SSL_LIBS})
+endif()
 if(UNIX)
 	target_link_libraries(uhub-admin ${SSL_LIBS})
 	target_link_libraries(adc_cmd ${SSL_LIBS})
@@ -451,7 +546,9 @@ endif()
 
 if (SYSTEMD_SUPPORT)
 	target_link_libraries(uhub PkgConfig::SD)
-	target_link_libraries(autotest-bin PRIVATE PkgConfig::SD)
+	if (UHUB_TESTS)
+		target_link_libraries(autotest-bin PRIVATE PkgConfig::SD)
+	endif()
 	target_link_libraries(uhub-passwd PkgConfig::SD)
 	target_link_libraries(uhub-admin PkgConfig::SD)
 	if(UNIX)

@@ -1,0 +1,95 @@
+Making a uhub release
+=====================
+
+Why there is a procedure at all
+-------------------------------
+
+GitHub attaches "Source code (zip)" and "Source code (tar.gz)" to every tag
+automatically. Those are a plain `git archive` of the superproject. Submodules
+are gitlinks rather than files, so such an archive can never contain
+third_party/exotic or third_party/quickjs -- there is no repository setting that
+changes this, and the assets cannot be removed from the release page either.
+
+An incomplete archive is not merely missing an optional feature: without exotic
+a -DUHUB_TESTS=ON build fails outright, and without quickjs so does
+-DJAVASCRIPT_SUPPORT=ON. The 0.8.0 release shipped with only those assets.
+
+So every release also carries uhub-<version>-src.tar.gz, built by
+scripts/make-dist.sh, which contains the submodule contents. The release notes
+say plainly that the auto-generated links are incomplete.
+
+
+Before tagging
+--------------
+
+The version is declared in three places and .github/workflows/release.yml
+refuses to publish unless all three agree with the tag:
+
+  - CMakeLists.txt          project (uhub VERSION x.y.z)
+  - build.zig.zon           .version = "x.y.z"
+  - ChangeLog               the top section heading, "x.y.z:"
+
+Also decide deliberately whether to move the submodule pins
+(git submodule update --remote, then commit the changed gitlinks); they are
+part of what the release ships.
+
+
+Tagging
+-------
+
+Tags carry no "v" prefix -- 0.8.0, not v0.8.0. The release workflow triggers on
+[0-9]+.[0-9]+.[0-9]+*, so -rc suffixes are released the same way.
+
+    git tag -a 0.8.1 -m "uhub 0.8.1"
+    git push origin 0.8.1
+
+That is all that is required. The workflow then checks the versions agree,
+builds the archives, unpacks the tarball somewhere outside any git working tree
+and builds it cold with -DUHUB_TESTS=ON -DJAVASCRIPT_SUPPORT=ON (so a missing
+submodule fails the job rather than the user), runs the test suite, and creates
+the release with the archives and SHA256SUMS attached.
+
+
+Fixing up a release that was already published
+----------------------------------------------
+
+Run the workflow by hand from the Actions tab ("Release" -> Run workflow) with
+the tag name as input. When the release already exists the workflow uploads the
+assets to it (--clobber) and leaves the existing notes alone, so the notes need
+editing by hand to point at the tarball.
+
+Equivalently, from a checkout:
+
+    git checkout 0.8.0
+    git submodule update --init --recursive
+    scripts/make-dist.sh 0.8.0
+    gh release upload 0.8.0 dist/* --clobber
+
+
+Building an archive locally
+---------------------------
+
+    scripts/make-dist.sh [ref]        # ref defaults to HEAD
+
+Writes dist/uhub-<version>-src.{tar.gz,zip} and dist/SHA256SUMS. The script
+reads the submodule commits out of the tree of <ref> rather than out of the
+working copy, so it produces the right archive even when the checkout is on
+another branch; it refuses to run if a submodule it needs is not checked out.
+Submodules marked "update = none" in .gitmodules are skipped deliberately --
+that is how quickjs pulls in the ~50k-file test262 suite, which is not needed to
+build.
+
+Output is reproducible for repeated runs on the same host. The published
+artifacts are the ones built by CI on Linux.
+
+
+How a bad archive reports itself
+--------------------------------
+
+.gitattributes marks .uhub-archive-version as export-subst, so any git archive
+(including GitHub's) has the placeholder in that file replaced by the describe
+output, while a checkout keeps it literal. CMakeLists.txt uses that to tell the
+two apart and to print advice the reader can act on: a checkout is told to run
+git submodule update --init, while an unpacked archive -- which has no .git --
+is pointed at the release tarball instead. The same value supplies the revision
+in `uhub -V` when no git is available.
