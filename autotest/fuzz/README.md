@@ -14,6 +14,7 @@ configured with `-DFUZZING=ON` and run for a short time on every CI run.
 | `fuzz_config_token`   | `src/tools/fuzz_config_token.c`   | `cfg_tokenize()` / `cfg_settings_split()` | `uhub.conf` / `users.conf` file content |
 | `fuzz_metrics`        | `src/tools/fuzz_metrics.c`        | `metrics_classify_request()` (HTTP method/path/bearer-token validation) | raw network bytes on the metrics endpoint |
 | `fuzz_login`          | `src/tools/fuzz_login.c`          | `hub_handle_info_login()` -- the connect-time INF checks (CID/nick/network/user-agent/ACL) | INF from a not-yet-trusted client, **pre-auth** |
+| `fuzz_bbs`            | `src/tools/fuzz_bbs.c`            | `bbs_handle_subscribe()` / `bbs_handle_post()` -- the BBS0 board name, hash, size and subject handling | HBBL/HBBP from a logged-in but untrusted session |
 
 `fuzz_adc_escape` also checks a property: `escape()` followed by `unescape()`
 must reproduce the original string exactly (a violation aborts the run).
@@ -23,7 +24,9 @@ against attacker bytes before authentication. `fuzz_message` covers the ADC
 parse; `fuzz_login` continues past it into the connect-time INF checks
 (CID/nick/network/user-agent/ACL), the code with the OOB history.
 `fuzz_command_parser` also exercises the ipcalc and `is_number` parsers via
-the address/number argument codes.
+the address/number argument codes. `fuzz_bbs` runs post-login, but everything
+it reads is remote input that ends up in a persistent index and back on the
+wire to other users, so it lasts rather than passing through.
 
 ## Build
 

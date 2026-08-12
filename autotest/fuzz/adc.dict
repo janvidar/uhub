@@ -51,6 +51,26 @@
 " TO"
 " AN"
 
+# BBS0 bulletin boards
+"HBBL "
+"HBBP "
+"IBBL "
+"IBBD "
+" BD"
+" PE"
+" MS"
+" OT"
+" NP"
+" SJ"
+" TH"
+" PA"
+" DA"
+" RM"
+" TR"
+" SI"
+"general"
+"KX3TQ7ZVN5PLQGKD3NDBK6ZTZG5PYQXSNMFYVJH"
+
 # Escape sequences
 "\\s"
 "\\n"
