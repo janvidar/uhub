@@ -439,7 +439,9 @@ set_target_properties(
 	mod_ucmd
 	PROPERTIES PREFIX "")
 
-target_link_libraries(uhub ${CMAKE_DL_LIBS} adc network utils)
+# SQLite is linked into the hub itself (not only into the plugins) because the
+# BBS0 bulletin board index in src/core/bbs_index.c lives there.
+target_link_libraries(uhub ${CMAKE_DL_LIBS} adc network utils SQLite::SQLite3)
 target_link_libraries(uhub-passwd SQLite::SQLite3 utils)
 if (UHUB_TESTS)
 	target_link_libraries(autotest-bin PRIVATE ${CMAKE_DL_LIBS} adc network utils SQLite::SQLite3)
