@@ -62,6 +62,11 @@ enum ADC_client_callback_type
 	ADC_CLIENT_USER_UPDATE      = 4003,
 
 	ADC_CLIENT_HUB_INFO         = 5001,
+
+	/* Every line received from the hub, raw, before it is dispatched. Set only
+	   by tests that need to observe commands this client does not model -- the
+	   BBS0 descriptors and index entries, for instance. */
+	ADC_CLIENT_RAW_LINE         = 6001,
 };
 
 struct ADC_hub_info
@@ -127,6 +132,7 @@ struct ADC_client_callback_data
 		struct ADC_client_quit_reason* quit;
 		struct ADC_client_tls_info* tls_info;
 		struct ADC_client_status* status;
+		const char* line;              /* ADC_CLIENT_RAW_LINE */
 	};
 };
 
@@ -142,6 +148,14 @@ struct ADC_client* ADC_client_create(const char* nickname, const char* descripti
 void ADC_client_set_callback(struct ADC_client* client, adc_client_cb);
 void ADC_client_set_password(struct ADC_client* client, const char* password);
 void ADC_client_set_pid(struct ADC_client* client, const char* pid);
+
+/**
+ * Offer an additional feature in the HSUP sent at connect, e.g. "ADBBS0".
+ *
+ * Must be called before ADC_client_connect(). May be called more than once;
+ * each feature is appended to the handshake in the order given.
+ */
+void ADC_client_add_support(struct ADC_client* client, const char* feature);
 void ADC_client_destroy(struct ADC_client* client);
 int ADC_client_connect(struct ADC_client* client, const char* address);
 void ADC_client_disconnect(struct ADC_client* client);

@@ -19,7 +19,7 @@
 
 #include "tools/adcclient.h"
 
-#define ADC_HANDSHAKE "HSUP ADBASE ADTIGR ADPING\n"
+#define ADC_HANDSHAKE "HSUP ADBASE ADTIGR ADPING"
 #define ADC_CID_SIZE 39
 #define BIG_BUFSIZE 32768
 #define TIGERSIZE 24
@@ -81,6 +81,7 @@ struct ADC_client
 	char* desc;
 	char* password;
 	char* fixed_pid;             /* caller-supplied PID (base32); NULL = generate a random one */
+	char* extra_support;         /* extra HSUP features, e.g. " ADBBS0"; NULL for none */
 	char cid[MAX_CID_LEN + 1];   /* CID for the current identity (set by adc_cid_pid / set_pid) */
 	int flags;
 	void* ptr;
@@ -281,6 +282,14 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 #ifdef ADC_CLIENT_DEBUG_PROTO
 	ADC_client_debug(client, "- LINE: '%s'", line);
 #endif
+
+	/* Hand the raw line over before anything is parsed, so a caller can see
+	   commands the switch below does not model. */
+	{
+		struct ADC_client_callback_data raw;
+		raw.line = line;
+		client->callback(client, ADC_CLIENT_RAW_LINE, &raw);
+	}
 
 	if (length < 4)
 	{
@@ -686,6 +695,7 @@ void ADC_client_destroy(struct ADC_client* client)
 	hub_free(client->desc);
 	hub_free(client->password);
 	hub_free(client->fixed_pid);
+	hub_free(client->extra_support);
 	hub_free(client->address.hostname);
 	hub_free(client);
 
@@ -752,7 +762,12 @@ int ADC_client_connect(struct ADC_client* client, const char* address)
 static void ADC_client_send_handshake(struct ADC_client* client)
 {
 	ADC_TRACE;
-	struct adc_message* handshake = adc_msg_create(ADC_HANDSHAKE);
+	struct adc_message* handshake;
+	char buf[256];
+
+	snprintf(buf, sizeof(buf), "%s%s\n", ADC_HANDSHAKE,
+	         client->extra_support ? client->extra_support : "");
+	handshake = adc_msg_create(buf);
 
 	client->callback(client, ADC_CLIENT_CONNECTED, 0);
 	net_con_update(client->con, NET_EVENT_READ);
@@ -892,6 +907,26 @@ void ADC_client_set_password(struct ADC_client* client, const char* password)
    random one, giving the client a stable identity. The CID is derived from it
    (CID = base32(tiger(PID))) and cached so ADC_client_get_cid() is valid before
    connecting. Passing NULL restores random per-connection identities. */
+void ADC_client_add_support(struct ADC_client* client, const char* feature)
+{
+	size_t length;
+	char* buf;
+
+	ADC_TRACE;
+	if (!feature || !*feature)
+		return;
+
+	/* " " + feature, appended to whatever is already there. */
+	length = (client->extra_support ? strlen(client->extra_support) : 0) + strlen(feature) + 2;
+	buf = hub_malloc_zero(length);
+	if (!buf)
+		return;
+
+	snprintf(buf, length, "%s %s", client->extra_support ? client->extra_support : "", feature);
+	hub_free(client->extra_support);
+	client->extra_support = buf;
+}
+
 void ADC_client_set_pid(struct ADC_client* client, const char* pid)
 {
 	ADC_TRACE;

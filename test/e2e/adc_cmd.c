@@ -28,17 +28,27 @@
  *
  * Usage:
  *   adc_cmd <adc://host:port> --nick N [--password P]
- *           [--send "text"]... [--linger SECONDS] [--timeout SECONDS]
- *           [--expect ok|fail]
+ *           [--send "text"]... [--raw "LINE"]... [--sup ADXXXX]...
+ *           [--expect-line GLOB]... [--dump]
+ *           [--linger SECONDS] [--timeout SECONDS] [--expect ok|fail]
+ *
+ * --raw sends a line verbatim after login, for driving extensions this client
+ * does not model (BBS0's HBBL and HBBP, say). --expect-line matches received
+ * lines against a glob and fails the run if any pattern goes unmatched, which
+ * is how a test asserts on what the hub sent back.
  *
  * Exit codes: 0 = expectation met, 1 = expectation not met, 2 = usage/timeout.
  */
 
 #include "adcclient.h"
+#include <fnmatch.h>
 #include <signal.h>
 #include <unistd.h>
 
 #define MAX_SEND 8
+#define MAX_RAW 16
+#define MAX_SUP 8
+#define MAX_EXPECT 16
 
 static int running = 1;
 static int logged_in = 0;
@@ -47,7 +57,48 @@ static int timed_out = 0;
 
 static const char* opt_send[MAX_SEND];
 static int opt_send_n = 0;
+static const char* opt_raw[MAX_RAW];
+static int opt_raw_n = 0;
+static const char* opt_sup[MAX_SUP];
+static int opt_sup_n = 0;
+static const char* opt_expect_line[MAX_EXPECT];
+static int opt_expect_line_seen[MAX_EXPECT];
+static int opt_expect_line_n = 0;
+static int opt_dump = 0;
 static int opt_linger = 1;   /* seconds to stay connected after login */
+
+/* Send a line to the hub verbatim. adc_msg_create() takes the line as-is, so
+   whatever the caller wrote is what goes on the wire -- the point of --raw. */
+static void send_raw(struct ADC_client* client, const char* line)
+{
+	char buf[MAX_ADC_CMD_LEN];
+	struct adc_message* cmd;
+
+	snprintf(buf, sizeof(buf), "%s\n", line);
+	cmd = adc_msg_create(buf);
+	if (!cmd)
+	{
+		printf("RAW-INVALID: %s\n", line);
+		return;
+	}
+	ADC_client_send(client, cmd);
+	adc_msg_free(cmd);
+	printf("RAW: %s\n", line);
+}
+
+/* Match a received line against the --expect-line globs. */
+static void check_expected(const char* line)
+{
+	int i;
+	for (i = 0; i < opt_expect_line_n; i++)
+	{
+		if (!opt_expect_line_seen[i] && fnmatch(opt_expect_line[i], line, 0) == 0)
+		{
+			opt_expect_line_seen[i] = 1;
+			printf("MATCHED: %s\n", opt_expect_line[i]);
+		}
+	}
+}
 
 static void on_alarm(int sig) { (void) sig; timed_out = 1; running = 0; }
 
@@ -72,6 +123,8 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 			printf("LOGGED_IN\n");
 			for (i = 0; i < opt_send_n; i++)
 				send_line(client, opt_send[i]);
+			for (i = 0; i < opt_raw_n; i++)
+				send_raw(client, opt_raw[i]);
 			/* Give the hub time to process the command(s) / to kick us, then stop. */
 			alarm(opt_linger > 0 ? (unsigned) opt_linger : 1);
 			break;
@@ -101,6 +154,14 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 			if (data && data->user)
 				printf("JOIN: %s\n", data->user->name);
 			break;
+		case ADC_CLIENT_RAW_LINE:
+			if (data && data->line)
+			{
+				if (opt_dump)
+					printf("LINE: %s\n", data->line);
+				check_expected(data->line);
+			}
+			break;
 		default:
 			break;
 	}
@@ -115,6 +176,7 @@ int main(int argc, char** argv)
 	const char* pid = NULL;
 	const char* expect = NULL;
 	int show_cid = 0;
+	int expect_failed = 0;
 	int timeout = 8;
 	struct ADC_client* client;
 	int i;
@@ -127,6 +189,10 @@ int main(int argc, char** argv)
 		else if (!strcmp(argv[i], "--pid") && i + 1 < argc) pid = argv[++i];
 		else if (!strcmp(argv[i], "--show-cid")) show_cid = 1;
 		else if (!strcmp(argv[i], "--send") && i + 1 < argc && opt_send_n < MAX_SEND) opt_send[opt_send_n++] = argv[++i];
+		else if (!strcmp(argv[i], "--raw") && i + 1 < argc && opt_raw_n < MAX_RAW) opt_raw[opt_raw_n++] = argv[++i];
+		else if (!strcmp(argv[i], "--sup") && i + 1 < argc && opt_sup_n < MAX_SUP) opt_sup[opt_sup_n++] = argv[++i];
+		else if (!strcmp(argv[i], "--expect-line") && i + 1 < argc && opt_expect_line_n < MAX_EXPECT) opt_expect_line[opt_expect_line_n++] = argv[++i];
+		else if (!strcmp(argv[i], "--dump")) opt_dump = 1;
 		else if (!strcmp(argv[i], "--linger") && i + 1 < argc) opt_linger = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--timeout") && i + 1 < argc) timeout = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--expect") && i + 1 < argc) expect = argv[++i];
@@ -149,7 +215,9 @@ int main(int argc, char** argv)
 	if (!address || !nick)
 	{
 		fprintf(stderr, "Usage: %s <adc://host:port> --nick N [--password P] [--pid PID] "
-		                "[--send TEXT]... [--linger S] [--timeout S] [--expect ok|fail]\n"
+		                "[--send TEXT]... [--raw LINE]... [--sup ADXXXX]... "
+		                "[--expect-line GLOB]... [--dump] "
+		                "[--linger S] [--timeout S] [--expect ok|fail]\n"
 		                "       %s --pid PID --show-cid\n", argv[0], argv[0]);
 		return 2;
 	}
@@ -169,6 +237,8 @@ int main(int argc, char** argv)
 		ADC_client_set_password(client, password);
 	if (pid)
 		ADC_client_set_pid(client, pid);
+	for (i = 0; i < opt_sup_n; i++)
+		ADC_client_add_support(client, opt_sup[i]);
 	ADC_client_connect(client, address);
 
 	while (running && net_backend_process()) { }
@@ -176,7 +246,21 @@ int main(int argc, char** argv)
 	ADC_client_destroy(client);
 	net_destroy();
 
-	printf("RESULT: logged_in=%d login_error=%d timed_out=%d\n", logged_in, login_error, timed_out);
+	/* Report every pattern, so a failing run says which one never arrived. */
+	for (i = 0; i < opt_expect_line_n; i++)
+	{
+		if (!opt_expect_line_seen[i])
+		{
+			printf("MISSING: %s\n", opt_expect_line[i]);
+			expect_failed = 1;
+		}
+	}
+
+	printf("RESULT: logged_in=%d login_error=%d timed_out=%d expect_failed=%d\n",
+	       logged_in, login_error, timed_out, expect_failed);
+
+	if (expect_failed)
+		return 1;
 
 	if (expect && !strcmp(expect, "ok"))
 		return (logged_in && !login_error) ? 0 : 1;
