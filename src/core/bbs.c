@@ -797,6 +797,247 @@ done:
 	return ret;
 }
 
+/**
+ * Deliver an accepted entry to everyone who should see it.
+ *
+ * There is no success status in BBS0: the entry *is* the acknowledgement. The
+ * submitting session therefore receives it even where it holds no subscription
+ * on the board, so that acceptance is signalled the same way in every case.
+ */
+static void bbs_broadcast_entry(struct hub_info* hub, struct hub_user* author,
+                                struct bbs_board* board, const struct bbs_entry* entry)
+{
+	struct hub_user* user;
+	int author_served = 0;
+
+	LIST_FOREACH(struct hub_user*, user, hub->users->list,
+	{
+		if (!bbs_user_subscription(user, board))
+			continue;
+		bbs_send_entry(hub, user, board->name, entry);
+		if (user == author)
+			author_served = 1;
+	});
+
+	if (author && !author_served)
+		bbs_send_entry(hub, author, board->name, entry);
+}
+
+/* Withdraw a post: HBBP with RM1. */
+static int bbs_handle_withdraw(struct hub_info* hub, struct hub_user* user,
+                               struct bbs_board* board, const char* tth, int permissions)
+{
+	struct bbs_entry entry;
+	struct bbs_entry tombstone;
+
+	if (bbs_index_lookup(hub->bbs->index, board->name, tth, &entry) != bbs_index_ok)
+	{
+		bbs_send_error(hub, user, ADC_STATUS_BBS_NO_ENTRY, "BBP",
+		               "No such post", ADC_SCH_FLAG_TTH, tth);
+		return -1;
+	}
+
+	/* Permission 16 withdraws anything; permission 8 withdraws one's own, which
+	   is decided on the CID the hub accepted the post from -- never on the nick,
+	   which is unique on no hub and at no time. */
+	if (!(permissions & ADC_BBS_PERM_WITHDRAW_ANY) &&
+	    !((permissions & ADC_BBS_PERM_WITHDRAW_OWN) && strcmp(entry.cid, user->id.cid) == 0))
+	{
+		bbs_send_error(hub, user, ADC_STATUS_ACCESS_DENIED, "BBP",
+		               "Not permitted to withdraw this post", ADC_SCH_FLAG_TTH, tth);
+		return -1;
+	}
+
+	if (bbs_index_withdraw(hub->bbs->index, board->name, tth, net_get_time(), &tombstone) != bbs_index_ok)
+	{
+		bbs_send_error(hub, user, ADC_STATUS_BBS_GENERIC, "BBP",
+		               "Unable to withdraw the post", ADC_SCH_FLAG_TTH, tth);
+		return -1;
+	}
+
+	LOG_DEBUG("bbs: '%s' withdrew %s from board '%s'", user->id.nick, tth, board->name);
+	bbs_broadcast_entry(hub, user, board, &tombstone);
+	return 0;
+}
+
+int bbs_handle_post(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
+{
+	struct bbs_board* board;
+	struct bbs_entry entry;
+	char* board_name;
+	char* arg_tr = NULL;
+	char* arg_si = NULL;
+	char* arg_pa = NULL;
+	char* arg_sj = NULL;
+	char* arg_rm = NULL;
+	char* subject = NULL;
+	int permissions;
+	int size = 0;
+	int needed;
+	int ret = -1;
+
+	if (!bbs_is_enabled(hub))
+		return -1;
+
+	board_name = adc_msg_get_named_argument(cmd, ADC_BBS_FLAG_BOARD);
+	arg_tr = adc_msg_get_named_argument(cmd, ADC_SCH_FLAG_TTH);
+	arg_si = adc_msg_get_named_argument(cmd, ADC_RES_FLAG_FILE_SIZE);
+	arg_pa = adc_msg_get_named_argument(cmd, ADC_BBS_FLAG_PARENT);
+	arg_sj = adc_msg_get_named_argument(cmd, ADC_BBS_FLAG_SUBJECT);
+	arg_rm = adc_msg_get_named_argument(cmd, ADC_BBS_FLAG_REMOVED);
+
+	/* ID, NI, TH and TS are the hub's to say. A client must not send them and
+	   the hub discards them if it does, rather than refusing the command --
+	   the same treatment PD gets in an INF. Simply never reading them is that. */
+
+	if (!board_name || !*board_name)
+	{
+		bbs_send_error(hub, user, ADC_STATUS_INF_FIELD_BAD, "BBP",
+		               "Missing board name", ADC_STA_FLAG_MISSING_FIELD, ADC_BBS_FLAG_BOARD);
+		goto done;
+	}
+
+	if (!arg_tr || !bbs_tth_is_valid(arg_tr))
+	{
+		bbs_send_error(hub, user, ADC_STATUS_INF_FIELD_BAD, "BBP",
+		               arg_tr ? "Invalid hash" : "Missing hash",
+		               arg_tr ? ADC_STA_FLAG_BAD_FIELD : ADC_STA_FLAG_MISSING_FIELD,
+		               ADC_SCH_FLAG_TTH);
+		goto done;
+	}
+
+	board = bbs_board_find(hub->bbs, board_name);
+	permissions = bbs_board_permissions(board, user->credentials);
+	if (!board || !permissions)
+	{
+		bbs_send_error(hub, user, ADC_STATUS_BBS_NO_BOARD, "BBP",
+		               "No such board", ADC_BBS_FLAG_BOARD, board_name);
+		goto done;
+	}
+
+	if (arg_rm && *arg_rm == '1')
+	{
+		ret = bbs_handle_withdraw(hub, user, board, arg_tr, permissions);
+		goto done;
+	}
+
+	if (!arg_si || !is_number(arg_si, &size) || size < 0)
+	{
+		bbs_send_error(hub, user, ADC_STATUS_INF_FIELD_BAD, "BBP",
+		               arg_si ? "Invalid size" : "Missing size",
+		               arg_si ? ADC_STA_FLAG_BAD_FIELD : ADC_STA_FLAG_MISSING_FIELD,
+		               ADC_RES_FLAG_FILE_SIZE);
+		goto done;
+	}
+
+	if (arg_pa && !bbs_tth_is_valid(arg_pa))
+	{
+		bbs_send_error(hub, user, ADC_STATUS_INF_FIELD_BAD, "BBP",
+		               "Invalid parent hash", ADC_STA_FLAG_BAD_FIELD, ADC_BBS_FLAG_PARENT);
+		goto done;
+	}
+
+	/* Separating the two is deliberate: a board where anyone may reply but only
+	   operators may start a thread is the natural form of an announcements
+	   board. */
+	needed = arg_pa ? ADC_BBS_PERM_REPLY : ADC_BBS_PERM_POST;
+	if (!(permissions & needed))
+	{
+		bbs_send_error(hub, user, ADC_STATUS_ACCESS_DENIED, "BBP",
+		               arg_pa ? "Not permitted to reply on this board"
+		                      : "Not permitted to start a thread on this board",
+		               ADC_SCH_FLAG_TTH, arg_tr);
+		goto done;
+	}
+
+	/* The declared size is the author's claim and nothing verifies it, but the
+	   hub must enforce MS against it at submission all the same. */
+	if ((size_t) size > board->max_size)
+	{
+		char limit[32];
+		snprintf(limit, sizeof(limit), "%zu", board->max_size);
+		bbs_send_error(hub, user, ADC_STATUS_BBS_TOO_LARGE, "BBP",
+		               "Post exceeds the size limit for this board", ADC_BBS_FLAG_MAX_SIZE, limit);
+		goto done;
+	}
+
+	/* The hub is the only place where posting can be refused. */
+	if (hub->config->bbs_post_interval > 0 && !auth_cred_is_unrestricted(user->credentials))
+	{
+		time_t wait = user->bbs_last_post + hub->config->bbs_post_interval - net_get_time();
+		if (user->bbs_last_post && wait > 0)
+		{
+			char seconds[32];
+			snprintf(seconds, sizeof(seconds), "%d", (int) wait);
+			bbs_send_error(hub, user, ADC_STATUS_BBS_RATE_LIMIT, "BBP",
+			               "Posting too fast", ADC_QUI_FLAG_TIME_LEFT, seconds);
+			goto done;
+		}
+	}
+
+	memset(&entry, 0, sizeof(entry));
+	memcpy(entry.tth, arg_tr, sizeof(entry.tth));
+	if (arg_pa)
+		memcpy(entry.parent, arg_pa, sizeof(entry.parent));
+	entry.size = (uint64_t) size;
+
+	/* The hub records the CID of the session it accepted the post from, and the
+	   nick that session held at the time. Both are the hub's own testimony and
+	   neither can be checked against anything. */
+	memcpy(entry.cid, user->id.cid, sizeof(entry.cid));
+	memcpy(entry.nick, user->id.nick, sizeof(entry.nick));
+
+	if (arg_sj)
+	{
+		subject = adc_msg_unescape(arg_sj);
+		if (!subject || strlen(subject) > BBS_MAX_SUBJECT || strchr(subject, '\n'))
+		{
+			bbs_send_error(hub, user, ADC_STATUS_INF_FIELD_BAD, "BBP",
+			               "Invalid subject", ADC_STA_FLAG_BAD_FIELD, ADC_BBS_FLAG_SUBJECT);
+			goto done;
+		}
+		memcpy(entry.subject, subject, strlen(subject));
+	}
+
+	switch (bbs_index_append(hub->bbs->index, board->name, &entry, net_get_time(),
+	                         (size_t) hub->config->bbs_max_posts_per_board))
+	{
+		case bbs_index_ok:
+			break;
+
+		case bbs_index_duplicate:
+			bbs_send_error(hub, user, ADC_STATUS_BBS_GENERIC, "BBP",
+			               "Already posted on this board", ADC_SCH_FLAG_TTH, arg_tr);
+			goto done;
+
+		case bbs_index_no_parent:
+			bbs_send_error(hub, user, ADC_STATUS_BBS_GENERIC, "BBP",
+			               "No such post to reply to", ADC_BBS_FLAG_PARENT, arg_pa);
+			goto done;
+
+		default:
+			bbs_send_error(hub, user, ADC_STATUS_BBS_GENERIC, "BBP",
+			               "Unable to index the post", ADC_SCH_FLAG_TTH, arg_tr);
+			goto done;
+	}
+
+	user->bbs_last_post = net_get_time();
+	LOG_DEBUG("bbs: '%s' posted %s to board '%s'", user->id.nick, entry.tth, board->name);
+
+	bbs_broadcast_entry(hub, user, board, &entry);
+	ret = 0;
+
+done:
+	hub_free(board_name);
+	hub_free(arg_tr);
+	hub_free(arg_si);
+	hub_free(arg_pa);
+	hub_free(arg_sj);
+	hub_free(arg_rm);
+	hub_free(subject);
+	return ret;
+}
+
 time_t bbs_board_oldest_replay(struct bbs_handle* handle, const struct bbs_board* board, time_t now)
 {
 	time_t oldest = 0;

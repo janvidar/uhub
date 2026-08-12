@@ -194,6 +194,16 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 				bbs_handle_subscribe(hub, u, cmd);
 				break;
 
+			case ADC_CMD_HBBP:
+				CHECK_FLOOD(extras, 1);
+				if (!user_is_logged_in(u))
+				{
+					ret = -1;
+					break;
+				}
+				bbs_handle_post(hub, u, cmd);
+				break;
+
 			case ADC_CMD_BSCH:
 			case ADC_CMD_DSCH:
 			case ADC_CMD_ESCH:

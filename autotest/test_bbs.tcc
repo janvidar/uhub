@@ -441,6 +441,278 @@ EXO_TEST(bbs_subscribe_unsubscribe_all, {
 		&& bbs_user_subscription(bu_op, bbs_board_find(bh->bbs, "many1")) == 0;
 });
 
+/* -- posting and withdrawal (HBBP) --------------------------------------- */
+
+static int bbs_hbbp(struct hub_user* user, const char* line)
+{
+	struct adc_message* cmd = adc_msg_parse(line, strlen(line));
+	int ret;
+	if (!cmd)
+		return -2;
+	ret = bbs_handle_post(bh, user, cmd);
+	adc_msg_free(cmd);
+	return ret;
+}
+
+#define BBS_TTH_P "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+#define BBS_TTH_Q "QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
+#define BBS_TTH_R "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+
+EXO_TEST(bbs_post_setup, {
+	/* A board everyone can use, and two subscribers -- the poster is not one of
+	   them, so that "the entry is the acknowledgement" is actually tested. */
+	if (!bbs_add_board("board talk post=guest withdraw_own=guest"))
+		return 0;
+	bh->config->bbs_post_interval = 0; /* rate limiting has its own tests */
+	uman_add(bh->users, bu_guest);
+	uman_add(bh->users, bu_reg);
+	tu_queue_clear(bu_guest);
+	tu_queue_clear(bu_reg);
+	return bbs_hbbl(bu_reg, "HBBL BDtalk TS0\n") == 0;
+});
+
+EXO_TEST(bbs_post_accepted, {
+	tu_queue_clear(bu_guest);
+	tu_queue_clear(bu_reg);
+	return bbs_hbbp(bu_guest, "HBBP TR" BBS_TTH_P " SI412 BDtalk SJHub\\supgrade\\son\\sSaturday\n") == 0;
+});
+
+/* The author sees exactly what every other subscriber sees, and that is the
+   acknowledgement -- there is no success status in BBS0. */
+EXO_TEST(bbs_post_author_receives_the_entry, {
+	char expect[512];
+	struct bbs_entry e;
+	if (bbs_index_lookup(bh->bbs->index, "talk", BBS_TTH_P, &e) != bbs_index_ok)
+		return 0;
+	/* The hub stamps the post with its own clock, so the expected line is built
+	   around the timestamp the index actually assigned. */
+	snprintf(expect, sizeof(expect),
+		"IBBL TR" BBS_TTH_P " SI412 BDtalk ID" BBS_CID_A " NIguest TH" BBS_TTH_P
+		" SJHub\\supgrade\\son\\sSaturday TS%lld\n", (long long) e.ts);
+	return tu_queue_count(bu_guest) == 1 && tu_queue_has(bu_guest, expect);
+});
+
+EXO_TEST(bbs_post_subscriber_receives_the_entry, {
+	return tu_queue_count(bu_reg) == 1
+		&& tu_queue_find(bu_reg, "IBBL TR" BBS_TTH_P " ") == 0;
+});
+
+/* TH equals TR because the post starts a thread, and the hub worked that out
+   from the absence of PA. */
+EXO_TEST(bbs_post_thread_root_is_own_hash, {
+	struct bbs_entry e;
+	return bbs_index_lookup(bh->bbs->index, "talk", BBS_TTH_P, &e) == bbs_index_ok
+		&& !strcmp(e.thread, BBS_TTH_P)
+		&& e.parent[0] == 0;
+});
+
+/* The hub records the CID of the session it accepted the post from and the
+   nick that session held -- both its own testimony. */
+EXO_TEST(bbs_post_records_submitting_session, {
+	struct bbs_entry e;
+	return bbs_index_lookup(bh->bbs->index, "talk", BBS_TTH_P, &e) == bbs_index_ok
+		&& !strcmp(e.cid, BBS_CID_A)
+		&& !strcmp(e.nick, "guest");
+});
+
+/* ID, NI, TH and TS are the hub's to say: a client sending them has them
+   discarded, not the command refused. */
+EXO_TEST(bbs_post_discards_client_supplied_hub_fields, {
+	struct bbs_entry e;
+	tu_queue_clear(bu_guest);
+	return bbs_hbbp(bu_reg,
+		"HBBP TR" BBS_TTH_Q " SI99 BDtalk SJMine IDLIEDABOUTTHISCIDAAAAAAAAAAAAAAAAAAAAAA"
+		" NIimposter TH" BBS_TTH_P " TS12345\n") == 0
+		&& bbs_index_lookup(bh->bbs->index, "talk", BBS_TTH_Q, &e) == bbs_index_ok
+		&& !strcmp(e.nick, "reg")
+		&& !strcmp(e.thread, BBS_TTH_Q)
+		&& strcmp(e.cid, "LIEDABOUTTHISCIDAAAAAAAAAAAAAAAAAAAAAA") != 0
+		&& e.ts != 12345;
+});
+
+EXO_TEST(bbs_post_reply_inherits_thread, {
+	struct bbs_entry e;
+	return bbs_hbbp(bu_guest, "HBBP TR" BBS_TTH_R " SI298 BDtalk PA" BBS_TTH_P
+	                          " SJRe:\\sHub\\supgrade\\son\\sSaturday\n") == 0
+		&& bbs_index_lookup(bh->bbs->index, "talk", BBS_TTH_R, &e) == bbs_index_ok
+		&& !strcmp(e.thread, BBS_TTH_P);
+});
+
+/* -- refusals ------------------------------------------------------------ */
+
+EXO_TEST(bbs_post_duplicate, {
+	tu_queue_clear(bu_guest);
+	return bbs_hbbp(bu_guest, "HBBP TR" BBS_TTH_P " SI412 BDtalk SJAgain\n") == -1
+		&& tu_queue_has(bu_guest,
+			"ISTA 170 Already\\sposted\\son\\sthis\\sboard FCBBP TR" BBS_TTH_P "\n");
+});
+
+EXO_TEST(bbs_post_unknown_parent, {
+	tu_queue_clear(bu_guest);
+	return bbs_hbbp(bu_guest, "HBBP TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA SI1 BDtalk"
+	                          " PABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\n") == -1
+		&& tu_queue_has(bu_guest,
+			"ISTA 170 No\\ssuch\\spost\\sto\\sreply\\sto FCBBP PABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\n");
+});
+
+EXO_TEST(bbs_post_missing_hash, {
+	tu_queue_clear(bu_guest);
+	return bbs_hbbp(bu_guest, "HBBP SI412 BDtalk\n") == -1
+		&& tu_queue_has(bu_guest, "ISTA 143 Missing\\shash FCBBP FMTR\n");
+});
+
+EXO_TEST(bbs_post_invalid_hash, {
+	tu_queue_clear(bu_guest);
+	return bbs_hbbp(bu_guest, "HBBP TRnothash SI412 BDtalk\n") == -1
+		&& tu_queue_has(bu_guest, "ISTA 143 Invalid\\shash FCBBP FBTR\n");
+});
+
+EXO_TEST(bbs_post_missing_size, {
+	tu_queue_clear(bu_guest);
+	return bbs_hbbp(bu_guest, "HBBP TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA BDtalk\n") == -1
+		&& tu_queue_has(bu_guest, "ISTA 143 Missing\\ssize FCBBP FMSI\n");
+});
+
+EXO_TEST(bbs_post_invalid_size, {
+	tu_queue_clear(bu_guest);
+	return bbs_hbbp(bu_guest, "HBBP TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA SIbig BDtalk\n") == -1
+		&& tu_queue_has(bu_guest, "ISTA 143 Invalid\\ssize FCBBP FBSI\n");
+});
+
+EXO_TEST(bbs_post_missing_board, {
+	tu_queue_clear(bu_guest);
+	return bbs_hbbp(bu_guest, "HBBP TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA SI1\n") == -1
+		&& tu_queue_has(bu_guest, "ISTA 143 Missing\\sboard\\sname FCBBP FMBD\n");
+});
+
+EXO_TEST(bbs_post_unknown_board, {
+	tu_queue_clear(bu_guest);
+	return bbs_hbbp(bu_guest, "HBBP TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA SI1 BDgenrel\n") == -1
+		&& tu_queue_has(bu_guest, "ISTA 171 No\\ssuch\\sboard FCBBP BDgenrel\n");
+});
+
+/* An operator may post to announcements, so this gets past the permission
+   check and is refused on the board's MS instead. */
+EXO_TEST(bbs_post_too_large, {
+	tu_queue_clear(bu_op);
+	return bbs_hbbp(bu_op, "HBBP TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA SI70000 BDannouncements\n") == -1
+		&& tu_queue_has(bu_op,
+			"ISTA 172 Post\\sexceeds\\sthe\\ssize\\slimit\\sfor\\sthis\\sboard FCBBP MS65536\n");
+});
+
+/* Only operators may start a thread on the announcements board; a guest may
+   still reply there. */
+EXO_TEST(bbs_post_thread_denied, {
+	tu_queue_clear(bu_guest);
+	return bbs_hbbp(bu_guest, "HBBP TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA SI1 BDannouncements\n") == -1
+		&& tu_queue_has(bu_guest,
+			"ISTA 125 Not\\spermitted\\sto\\sstart\\sa\\sthread\\son\\sthis\\sboard"
+			" FCBBP TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
+});
+
+EXO_TEST(bbs_post_reply_allowed_where_thread_is_not, {
+	return bbs_hbbp(bu_guest, "HBBP TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA SI1 BDannouncements"
+	                          " PA" BBS_TTH_B "\n") == 0;
+});
+
+EXO_TEST(bbs_post_subject_too_long, {
+	char line[BBS_MAX_SUBJECT + 128];
+	char subject[BBS_MAX_SUBJECT + 2];
+	memset(subject, 'x', sizeof(subject) - 1);
+	subject[sizeof(subject) - 1] = 0;
+	snprintf(line, sizeof(line), "HBBP TRCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC SI1 BDtalk SJ%s\n", subject);
+	tu_queue_clear(bu_guest);
+	return bbs_hbbp(bu_guest, line) == -1
+		&& tu_queue_has(bu_guest, "ISTA 143 Invalid\\ssubject FCBBP FBSJ\n");
+});
+
+/* A composing client emits no newline within a subject, so one arriving here
+   means the index copy would not match the document. */
+EXO_TEST(bbs_post_subject_with_newline, {
+	tu_queue_clear(bu_guest);
+	return bbs_hbbp(bu_guest, "HBBP TRCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC SI1 BDtalk SJone\\ntwo\n") == -1
+		&& tu_queue_has(bu_guest, "ISTA 143 Invalid\\ssubject FCBBP FBSJ\n");
+});
+
+/* -- rate limiting ------------------------------------------------------- */
+
+EXO_TEST(bbs_post_rate_limited, {
+	bh->config->bbs_post_interval = 60;
+	bu_guest->bbs_last_post = net_get_time();
+	tu_queue_clear(bu_guest);
+	return bbs_hbbp(bu_guest, "HBBP TRCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC SI1 BDtalk\n") == -1
+		&& tu_queue_has(bu_guest, "ISTA 175 Posting\\stoo\\sfast FCBBP TL60\n");
+});
+
+/* Bots and unrestricted operators are never rate-limited. */
+EXO_TEST(bbs_post_rate_limit_skips_unrestricted, {
+	bu_op->credentials = auth_cred_opubot;
+	bu_op->bbs_last_post = net_get_time();
+	return bbs_hbbp(bu_op, "HBBP TRCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC SI1 BDtalk\n") == 0;
+});
+
+EXO_TEST(bbs_post_rate_limit_disabled, {
+	bh->config->bbs_post_interval = 0;
+	bu_guest->bbs_last_post = net_get_time();
+	return bbs_hbbp(bu_guest, "HBBP TRFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF SI1 BDtalk\n") == 0;
+});
+
+/* -- withdrawal ---------------------------------------------------------- */
+
+EXO_TEST(bbs_withdraw_own_post, {
+	tu_queue_clear(bu_guest);
+	tu_queue_clear(bu_reg);
+	return bbs_hbbp(bu_guest, "HBBP TR" BBS_TTH_P " BDtalk RM1\n") == 0;
+});
+
+/* A tombstone carries the hash, the board, the new timestamp and RM1, and
+   nothing else. */
+EXO_TEST(bbs_withdraw_tombstone_wire_format, {
+	char expect[256];
+	struct bbs_entry e;
+	if (bbs_index_lookup(bh->bbs->index, "talk", BBS_TTH_P, &e) != bbs_index_ok)
+		return 0;
+	snprintf(expect, sizeof(expect), "IBBL TR" BBS_TTH_P " BDtalk TS%lld RM1\n", (long long) e.ts);
+	return e.removed
+		&& tu_queue_has(bu_reg, expect)
+		&& tu_queue_has(bu_guest, expect);
+});
+
+/* Withdrawal is not deletion: replies to a withdrawn post are separate posts
+   and stay where they are. */
+EXO_TEST(bbs_withdraw_keeps_replies, {
+	struct bbs_entry e;
+	return bbs_index_lookup(bh->bbs->index, "talk", BBS_TTH_R, &e) == bbs_index_ok
+		&& e.removed == 0;
+});
+
+/* withdraw_own goes by the CID the hub accepted the post from, never the nick. */
+EXO_TEST(bbs_withdraw_someone_elses_denied, {
+	tu_queue_clear(bu_guest);
+	return bbs_hbbp(bu_guest, "HBBP TR" BBS_TTH_Q " BDtalk RM1\n") == -1
+		&& tu_queue_has(bu_guest,
+			"ISTA 125 Not\\spermitted\\sto\\swithdraw\\sthis\\spost FCBBP TR" BBS_TTH_Q "\n");
+});
+
+/* Permission 16 withdraws anything. */
+EXO_TEST(bbs_withdraw_any_by_operator, {
+	bu_op->credentials = auth_cred_operator;
+	return bbs_hbbp(bu_op, "HBBP TR" BBS_TTH_Q " BDtalk RM1\n") == 0;
+});
+
+EXO_TEST(bbs_withdraw_missing_post, {
+	tu_queue_clear(bu_guest);
+	return bbs_hbbp(bu_guest, "HBBP TRZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ BDtalk RM1\n") == -1
+		&& tu_queue_has(bu_guest,
+			"ISTA 176 No\\ssuch\\spost FCBBP TRZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ\n");
+});
+
+EXO_TEST(bbs_post_cleanup_usermanager, {
+	uman_remove(bh->users, bu_guest);
+	uman_remove(bh->users, bu_reg);
+	return 1;
+});
+
 EXO_TEST(bbs_teardown, {
 	tu_user_destroy(bu_guest);
 	tu_user_destroy(bu_reg);
