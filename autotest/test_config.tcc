@@ -71,6 +71,23 @@ EXO_TEST(cfg_boolean_off, {
 	return ok;
 });
 
+/* Chat timestamps (the TS flag) are on unless the hub turns them off. */
+EXO_TEST(cfg_chat_timestamps_default, {
+	struct hub_config config;
+	int ok = cfg_read("hub_name = Timestamped\n", &config) == 0
+	         && config.chat_timestamps == 1;
+	free_config(&config);
+	return ok;
+});
+
+EXO_TEST(cfg_chat_timestamps_off, {
+	struct hub_config config;
+	int ok = cfg_read("chat_timestamps = no\n", &config) == 0
+	         && config.chat_timestamps == 0;
+	free_config(&config);
+	return ok;
+});
+
 /* Surrounding whitespace around key and value is stripped. */
 EXO_TEST(cfg_whitespace, {
 	struct hub_config config;

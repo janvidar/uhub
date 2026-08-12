@@ -175,6 +175,14 @@ extern int adc_msg_replace_named_argument(struct adc_message* cmd, const char pr
 extern int adc_msg_add_timestamp(struct adc_message* cmd, time_t timestamp);
 
 /**
+ * Remove every "TS" named argument from the command, so a message is relayed
+ * without a timestamp (see the chat_timestamps hub option).
+ *
+ * @return the number of named arguments removed.
+ */
+extern int adc_msg_remove_timestamp(struct adc_message* cmd);
+
+/**
  * Append an argument
  *
  * @arg string must be escaped (see adc_msg_escape).

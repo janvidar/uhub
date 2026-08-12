@@ -779,6 +779,37 @@ EXO_TEST(adc_message_timestamp_readback, {
 	return ok;
 });
 
+/* chat_timestamps=no: the flag is stripped, including one sent by a client. */
+EXO_TEST(adc_message_timestamp_remove, {
+	const char* line = "BMSG AAAB Hi TS1\n";
+	struct adc_message* msg = adc_msg_parse_verify(g_user, line, strlen(line));
+	int ok = msg && adc_msg_remove_timestamp(msg) == 1;
+	if (ok)
+		ok = strcmp(msg->cache, "BMSG AAAB Hi\n") == 0;
+	adc_msg_free(msg);
+	return ok;
+});
+
+EXO_TEST(adc_message_timestamp_remove_multiple, {
+	const char* line = "BMSG AAAB Hi TS1 TS2\n";
+	struct adc_message* msg = adc_msg_parse_verify(g_user, line, strlen(line));
+	int ok = msg && adc_msg_remove_timestamp(msg) == 2;
+	if (ok)
+		ok = strcmp(msg->cache, "BMSG AAAB Hi\n") == 0;
+	adc_msg_free(msg);
+	return ok;
+});
+
+/* Removing from a message that has no timestamp leaves it untouched. */
+EXO_TEST(adc_message_timestamp_remove_none, {
+	struct adc_message* msg = adc_msg_parse_verify(g_user, test_string2, strlen(test_string2));
+	int ok = msg && adc_msg_remove_timestamp(msg) == 0;
+	if (ok)
+		ok = strcmp(msg->cache, test_string2) == 0;
+	adc_msg_free(msg);
+	return ok;
+});
+
 EXO_TEST(adc_message_last, {
 	hub_free(g_user);
 	g_user = 0;

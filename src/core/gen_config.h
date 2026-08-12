@@ -39,6 +39,7 @@ struct hub_config
 	int   obsolete_clients;                /*<<< Support obsolete clients using a ADC protocol prior to 1.0 (default: 0) */
 	int   chat_is_privileged;              /*<<< Allow chat for operators and above only (default: 0) */
 	int   chat_rich_text;                  /*<<< Allow rich text formatted chat messages (default: 1) */
+	int   chat_timestamps;                 /*<<< Timestamp relayed chat messages (default: 1) */
 	char* hub_name;                        /*<<< Name of hub (default: "uhub") */
 	char* hub_description;                 /*<<< Short hub description, topic or subject. (default: "no description") */
 	char* hub_address;                     /*<<< Hub host address advertised to hub lists (HH). (default: "") */
