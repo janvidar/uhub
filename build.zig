@@ -47,6 +47,7 @@ const adc_sources = [_][]const u8{
 // point, added explicitly to uhub only). Shared between uhub and autotest-bin.
 const core_sources = [_][]const u8{
     "src/core/auth.c",
+    "src/core/bbs.c",
     "src/core/command_parser.c",
     "src/core/commands.c",
     "src/core/config.c",
@@ -75,6 +76,7 @@ const core_sources = [_][]const u8{
 // source sets above) rather than globbed at build time; add a new .tcc here.
 const tcc_sources = [_][]const u8{
     "test_auth.tcc",
+    "test_bbs_board.tcc",
     "test_cbuffer.tcc",
     "test_commands.tcc",
     "test_condead.tcc",
