@@ -109,6 +109,7 @@ const tcc_sources = [_][]const u8{
     "test_tiger.tcc",
     "test_timer.tcc",
     "test_tls.tcc",
+    "test_testutil_user.tcc",
     "test_tokenizer.tcc",
     "test_usermanager.tcc",
 };
