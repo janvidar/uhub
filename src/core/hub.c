@@ -181,6 +181,19 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 				ret = hub_handle_chat_message(hub, u, cmd);
 				break;
 
+			case ADC_CMD_HBBL:
+				/* BBS0. A subscription is a standing instruction to send data,
+				   obtained with one short command, so the rate at which a
+				   session may issue these is bounded like the other extras. */
+				CHECK_FLOOD(extras, 1);
+				if (!user_is_logged_in(u))
+				{
+					ret = -1;
+					break;
+				}
+				bbs_handle_subscribe(hub, u, cmd);
+				break;
+
 			case ADC_CMD_BSCH:
 			case ADC_CMD_DSCH:
 			case ADC_CMD_ESCH:

@@ -41,6 +41,7 @@
 #include <string.h>
 
 #include "adc/message.h"
+#include "core/bbs.h"
 #include "core/hub.h"
 #include "core/ioqueue.h"
 #include "core/user.h"
@@ -183,6 +184,9 @@ static inline void tu_user_destroy(struct hub_user* user)
 	   hub's write queue before the memory goes away. */
 	if (user->hub && user->hub->write_queue && user_flag_get(user, flag_dirty))
 		list_remove(user->hub->write_queue, user);
+
+	/* Mirror the parts of user_destroy() that own memory a test can reach. */
+	bbs_user_unsubscribe_all(user);
 
 	ioq_send_destroy(user->send_queue);
 	hub_free(user->connection);

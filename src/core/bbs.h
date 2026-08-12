@@ -25,6 +25,8 @@
 
 #include "util/credentials.h"
 
+struct adc_message;
+struct bbs_entry;
 struct bbs_index;
 struct hub_config;
 struct hub_info;
@@ -175,5 +177,52 @@ extern void bbs_send_board_descriptor(struct hub_info* hub, struct hub_user* use
  * BBS0 in its SUP receives nothing.
  */
 extern void bbs_send_board_list(struct hub_info* hub, struct hub_user* user);
+
+/**
+ * A session's standing request to receive a board's index entries.
+ *
+ * The cursor is the point the session has been sent up to. It exists so that a
+ * re-subscription can be told from a fresh one; the stream itself needs no
+ * state, because an accepted post goes out to every subscriber as it arrives.
+ */
+struct bbs_subscription
+{
+	struct bbs_board* board;
+	time_t cursor;
+};
+
+/**
+ * Handle an "HBBL": subscribe to a board, resume from a timestamp, cancel a
+ * subscription, or ask for one index entry.
+ *
+ * @return 0 on success, -1 if the command was refused (a status message has
+ *         then been sent to the user).
+ */
+extern int bbs_handle_subscribe(struct hub_info* hub, struct hub_user* user,
+                                struct adc_message* cmd);
+
+/**
+ * Drop every subscription a session holds. Called when the user goes away.
+ */
+extern void bbs_user_unsubscribe_all(struct hub_user* user);
+
+/**
+ * @return the session's subscription to @p board, or NULL.
+ */
+extern struct bbs_subscription* bbs_user_subscription(struct hub_user* user,
+                                                      const struct bbs_board* board);
+
+/**
+ * Send one index entry ("BBL") to a session, or a tombstone where the entry is
+ * withdrawn.
+ */
+extern void bbs_send_entry(struct hub_info* hub, struct hub_user* user,
+                           const char* board, const struct bbs_entry* entry);
+
+/**
+ * Drop every session's subscription to a board, for when the board goes away
+ * or a session loses the permission to read it.
+ */
+extern void bbs_cancel_subscriptions(struct hub_info* hub, const struct bbs_board* board);
 
 #endif /* HAVE_UHUB_BBS_H */

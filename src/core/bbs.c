@@ -26,8 +26,11 @@
 #include "core/bbs_index.h"
 #include "core/config.h"
 #include "core/hub.h"
+#include "core/ioqueue.h"
+#include "core/netevent.h"
 #include "core/route.h"
 #include "core/user.h"
+#include "core/usermanager.h"
 #include "network/backend.h"
 #include "util/config_token.h"
 #include "util/credentials.h"
@@ -481,6 +484,317 @@ void bbs_send_board_list(struct hub_info* hub, struct hub_user* user)
 	{
 		bbs_send_board_descriptor(hub, user, board);
 	});
+}
+
+/**
+ * Refuse a command.
+ *
+ * BBS0 defines no success status, so a status message always means something
+ * went wrong -- and always at severity 1, since none of these is a reason to
+ * disconnect a client. hub_send_status() is no use here: it is welded to the
+ * configurable message strings and builds an IQUI alongside.
+ *
+ * Every refusal names the command it refuses in "FC", and one further flag
+ * where the code defines one, so that a client can match a refusal to what it
+ * refused without a token: the hash or the board is the identifier.
+ */
+static void bbs_send_error(struct hub_info* hub, struct hub_user* user, int code,
+                           const char* fourcc, const char* text,
+                           const char* key, const char* value)
+{
+	struct adc_message* cmd;
+	char status[4];
+	char* escaped;
+
+	if (!user)
+		return;
+
+	cmd = adc_msg_construct(ADC_CMD_ISTA, 128);
+	if (!cmd)
+		return;
+
+	/* status_level_error is severity 1: recoverable, never a disconnect. */
+	snprintf(status, sizeof(status), "%d%02d", (int) status_level_error, code);
+	adc_msg_add_argument(cmd, status);
+	escaped = adc_msg_escape(text);
+	adc_msg_add_argument(cmd, escaped ? escaped : "");
+	hub_free(escaped);
+	adc_msg_add_named_argument(cmd, ADC_STA_FLAG_FOURCC, fourcc);
+	if (key && value)
+		adc_msg_add_named_argument_string(cmd, key, value);
+
+	route_to_user(hub, user, cmd);
+	adc_msg_free(cmd);
+}
+
+/* Send one index entry, or a tombstone. A withdrawn post carries only its hash,
+   its board, the new timestamp and RM1: the subject and author of a withdrawn
+   post are usually the reason it was withdrawn. */
+void bbs_send_entry(struct hub_info* hub, struct hub_user* user,
+                    const char* board, const struct bbs_entry* entry)
+{
+	struct adc_message* cmd;
+
+	if (!user || !entry)
+		return;
+
+	cmd = adc_msg_construct(ADC_CMD_IBBL, 256);
+	if (!cmd)
+		return;
+
+	adc_msg_add_named_argument(cmd, ADC_SCH_FLAG_TTH, entry->tth);
+
+	if (entry->removed)
+	{
+		adc_msg_add_named_argument(cmd, ADC_BBS_FLAG_BOARD, board);
+		adc_msg_add_named_argument_uint64(cmd, ADC_MSG_FLAG_TIMESTAMP, (uint64_t) entry->ts);
+		adc_msg_add_named_argument(cmd, ADC_BBS_FLAG_REMOVED, "1");
+	}
+	else
+	{
+		adc_msg_add_named_argument_uint64(cmd, ADC_RES_FLAG_FILE_SIZE, entry->size);
+		adc_msg_add_named_argument(cmd, ADC_BBS_FLAG_BOARD, board);
+		adc_msg_add_named_argument(cmd, ADC_INF_FLAG_CLIENT_ID, entry->cid);
+		if (*entry->nick)
+			adc_msg_add_named_argument_string(cmd, ADC_INF_FLAG_NICK, entry->nick);
+		if (*entry->parent)
+			adc_msg_add_named_argument(cmd, ADC_BBS_FLAG_PARENT, entry->parent);
+		adc_msg_add_named_argument(cmd, ADC_BBS_FLAG_THREAD, entry->thread);
+		if (*entry->subject)
+			adc_msg_add_named_argument_string(cmd, ADC_BBS_FLAG_SUBJECT, entry->subject);
+		adc_msg_add_named_argument_uint64(cmd, ADC_MSG_FLAG_TIMESTAMP, (uint64_t) entry->ts);
+	}
+
+	route_to_user(hub, user, cmd);
+	adc_msg_free(cmd);
+}
+
+struct bbs_subscription* bbs_user_subscription(struct hub_user* user, const struct bbs_board* board)
+{
+	struct bbs_subscription* sub;
+
+	if (!user || !user->bbs_subs || !board)
+		return NULL;
+
+	LIST_FOREACH(struct bbs_subscription*, sub, user->bbs_subs,
+	{
+		if (sub->board == board)
+			return sub;
+	});
+	return NULL;
+}
+
+void bbs_user_unsubscribe_all(struct hub_user* user)
+{
+	if (!user || !user->bbs_subs)
+		return;
+
+	list_clear(user->bbs_subs, &hub_free_handle);
+	list_destroy(user->bbs_subs);
+	user->bbs_subs = NULL;
+}
+
+static void bbs_user_unsubscribe(struct hub_user* user, const struct bbs_board* board)
+{
+	struct bbs_subscription* sub = bbs_user_subscription(user, board);
+	if (!sub)
+		return;
+
+	list_remove(user->bbs_subs, sub);
+	hub_free(sub);
+}
+
+void bbs_cancel_subscriptions(struct hub_info* hub, const struct bbs_board* board)
+{
+	struct hub_user* user;
+
+	if (!hub || !hub->users || !board)
+		return;
+
+	LIST_FOREACH(struct hub_user*, user, hub->users->list,
+	{
+		bbs_user_unsubscribe(user, board);
+	});
+}
+
+/* The replay burst reuses the send-queue bypass that the user list at login
+   uses: a subscription from the start of a board is one large, bounded batch,
+   and bbs_max_posts_per_board is what bounds it. */
+struct bbs_replay_state
+{
+	struct hub_info* hub;
+	struct hub_user* user;
+	const char* board;
+	time_t highest;
+};
+
+static void bbs_replay_entry(const struct bbs_entry* entry, void* ptr)
+{
+	struct bbs_replay_state* state = (struct bbs_replay_state*) ptr;
+
+	/* A disconnect mid-replay (a send queue that overflowed) clears the
+	   connection; stop writing to a user that is on its way out. */
+	if (!state->user->connection)
+		return;
+
+	bbs_send_entry(state->hub, state->user, state->board, entry);
+	if (entry->ts > state->highest)
+		state->highest = entry->ts;
+}
+
+static void bbs_replay(struct hub_info* hub, struct hub_user* user,
+                       struct bbs_board* board, struct bbs_subscription* sub, time_t from)
+{
+	struct bbs_replay_state state;
+	int was_bypassing = user_flag_get(user, flag_user_list);
+
+	state.hub = hub;
+	state.user = user;
+	state.board = board->name;
+	state.highest = from;
+
+	user_flag_set(user, flag_user_list);
+	bbs_index_replay(hub->bbs->index, board->name, from, &bbs_replay_entry, &state);
+	if (!was_bypassing)
+		user_flag_unset(user, flag_user_list);
+
+	sub->cursor = state.highest;
+
+	/* A small replay rides the ordinary deferred write, which coalesces it with
+	   whatever else the iteration queues. A large one is drained here instead:
+	   left sitting in the queue it would exceed max_send_buffer, and the next
+	   message routed to this user would trip the hard limit and disconnect them
+	   mid-catch-up. This is what on_login_success() does with the user list, and
+	   for the same reason. */
+	if (user->connection && ioq_send_get_bytes(user->send_queue) > get_max_send_queue_soft(hub))
+	{
+		if (handle_net_write(user))
+			hub_disconnect_user(hub, user, quit_send_queue);
+	}
+}
+
+int bbs_handle_subscribe(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
+{
+	struct bbs_board* board;
+	struct bbs_subscription* sub;
+	char* board_name;
+	char* arg_ts;
+	char* arg_tr;
+	char* arg_rm;
+	time_t from = 0;
+	time_t oldest;
+	int ret = -1;
+
+	if (!bbs_is_enabled(hub))
+		return -1;
+
+	board_name = adc_msg_get_named_argument(cmd, ADC_BBS_FLAG_BOARD);
+	arg_ts = adc_msg_get_named_argument(cmd, ADC_MSG_FLAG_TIMESTAMP);
+	arg_tr = adc_msg_get_named_argument(cmd, ADC_SCH_FLAG_TTH);
+	arg_rm = adc_msg_get_named_argument(cmd, ADC_BBS_FLAG_REMOVED);
+
+	if (!board_name || !*board_name)
+	{
+		bbs_send_error(hub, user, ADC_STATUS_INF_FIELD_BAD, "BBL",
+		               "Missing board name", ADC_STA_FLAG_MISSING_FIELD, ADC_BBS_FLAG_BOARD);
+		goto done;
+	}
+
+	board = bbs_board_find(hub->bbs, board_name);
+
+	/* A board the session may not subscribe to is answered exactly as one that
+	   does not exist, so that refusing does not disclose it. */
+	if (!board || !(bbs_board_permissions(board, user->credentials) & ADC_BBS_PERM_SUBSCRIBE))
+	{
+		bbs_send_error(hub, user, ADC_STATUS_BBS_NO_BOARD, "BBL",
+		               "No such board", ADC_BBS_FLAG_BOARD, board_name);
+		goto done;
+	}
+
+	/* Cancelling: the client is done with the board. */
+	if (arg_rm && *arg_rm == '1')
+	{
+		bbs_user_unsubscribe(user, board);
+		ret = 0;
+		goto done;
+	}
+
+	if (arg_tr && arg_ts)
+	{
+		bbs_send_error(hub, user, ADC_STATUS_PROTOCOL_GENERIC, "BBL",
+		               "TR and TS must not both be given", NULL, NULL);
+		goto done;
+	}
+
+	/* A request carrying TR is a question, not a subscription: answer with the
+	   one entry and leave the session's subscriptions alone. */
+	if (arg_tr)
+	{
+		struct bbs_entry entry;
+
+		if (!bbs_tth_is_valid(arg_tr))
+		{
+			bbs_send_error(hub, user, ADC_STATUS_INF_FIELD_BAD, "BBL",
+			               "Invalid hash", ADC_STA_FLAG_BAD_FIELD, ADC_SCH_FLAG_TTH);
+			goto done;
+		}
+
+		if (bbs_index_lookup(hub->bbs->index, board->name, arg_tr, &entry) != bbs_index_ok)
+		{
+			bbs_send_error(hub, user, ADC_STATUS_BBS_NO_ENTRY, "BBL",
+			               "No such post", ADC_SCH_FLAG_TTH, arg_tr);
+			goto done;
+		}
+
+		bbs_send_entry(hub, user, board->name, &entry);
+		ret = 0;
+		goto done;
+	}
+
+	if (arg_ts)
+		from = (time_t) strtoll(arg_ts, NULL, 10);
+	if (from < 0)
+		from = 0;
+
+	/* A hub may refuse to replay from before its OT, and must treat a request
+	   for anything earlier as a request from OT. */
+	oldest = bbs_board_oldest_replay(hub->bbs, board, net_get_time());
+	if (from < oldest)
+		from = oldest;
+
+	sub = bbs_user_subscription(user, board);
+	if (!sub)
+	{
+		if (!user->bbs_subs)
+			user->bbs_subs = list_create();
+		if (!user->bbs_subs)
+			goto done;
+
+		if (list_size(user->bbs_subs) >= (size_t) hub->config->bbs_max_subscriptions)
+		{
+			bbs_send_error(hub, user, ADC_STATUS_BBS_GENERIC, "BBL",
+			               "Too many subscriptions", ADC_BBS_FLAG_BOARD, board_name);
+			goto done;
+		}
+
+		sub = (struct bbs_subscription*) hub_malloc_zero(sizeof(struct bbs_subscription));
+		if (!sub)
+			goto done;
+		sub->board = board;
+		list_append(user->bbs_subs, sub);
+	}
+
+	/* A second HBBL for a board already subscribed replaces the first rather
+	   than adding to it, and replays from the newly requested timestamp. */
+	bbs_replay(hub, user, board, sub, from);
+	ret = 0;
+
+done:
+	hub_free(board_name);
+	hub_free(arg_ts);
+	hub_free(arg_tr);
+	hub_free(arg_rm);
+	return ret;
 }
 
 time_t bbs_board_oldest_replay(struct bbs_handle* handle, const struct bbs_board* board, time_t now)

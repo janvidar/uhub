@@ -22,6 +22,7 @@
 #include "adc/message.h"
 #include "adc/adcconst.h"
 #include "network/connection.h"
+#include "core/bbs.h"
 #include "core/hub.h"
 #include "core/ioqueue.h"
 #include "core/ipcount.h"
@@ -109,6 +110,7 @@ void user_destroy(struct hub_user* user)
 	adc_msg_free(user->info);
 	adc_msg_free(user->auth_pending_inf);
 	user_clear_feature_cast_support(user);
+	bbs_user_unsubscribe_all(user);
 	hub_free(user);
 }
 
