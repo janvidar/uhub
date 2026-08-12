@@ -1455,9 +1455,16 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 		hub_free(tmp);
 	}
 
-	/* Reserve room for the base features plus the three runtime-appended,
-	 * optional ones (" ADHBRI", " ADUCMD" and " ADRTF0", 7 bytes each). */
-	hub->command_support = adc_msg_construct(ADC_CMD_ISUP, 6 + strlen(ADC_PROTO_SUPPORT) + 21);
+	if (bbs_initialize(hub->config, &hub->bbs) < 0)
+	{
+		LOG_FATAL("Unable to load the bulletin board configuration.");
+		hub->status = hub_status_shutdown;
+	}
+
+	/* Reserve room for the base features plus the four runtime-appended,
+	 * optional ones (" ADHBRI", " ADUCMD", " ADRTF0" and " ADBBS0", 7 bytes
+	 * each). */
+	hub->command_support = adc_msg_construct(ADC_CMD_ISUP, 6 + strlen(ADC_PROTO_SUPPORT) + 28);
 	if (hub->command_support)
 	{
 		adc_msg_add_argument(hub->command_support, ADC_PROTO_SUPPORT);
@@ -1467,6 +1474,12 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 		 * when rich text is allowed. */
 		if (hub->config->chat_rich_text)
 			adc_msg_add_argument(hub->command_support, ADC_SUP_FLAG_ADD ADC_EXT_RTF0);
+		/* BBS0 is announced only with boards to serve. A hub that does not want
+		 * a bulletin board declines by saying nothing. TIGR is unconditional in
+		 * ADC_PROTO_SUPPORT, which BBS0 requires: every identifier in it is a
+		 * Tiger tree hash. */
+		if (bbs_is_enabled(hub))
+			adc_msg_add_argument(hub->command_support, ADC_SUP_FLAG_ADD ADC_EXT_BBS0);
 	}
 
 	hub->command_banner = adc_msg_construct(ADC_CMD_ISTA, 100 + (server ? strlen(server) : 0));
@@ -1483,12 +1496,7 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 		hub_free(tmp);
 	}
 
-	if (bbs_initialize(hub->config, &hub->bbs) < 0)
-	{
-		LOG_FATAL("Unable to load the bulletin board configuration.");
-		hub->status = hub_status_shutdown;
-	}
-	else if (hub_plugins_load(hub) < 0)
+	if (hub_plugins_load(hub) < 0)
 	{
 		LOG_FATAL("Unable to load plugins.");
 		hub->status = hub_status_shutdown;

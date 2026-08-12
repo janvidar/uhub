@@ -77,6 +77,7 @@ const core_sources = [_][]const u8{
 // source sets above) rather than globbed at build time; add a new .tcc here.
 const tcc_sources = [_][]const u8{
     "test_auth.tcc",
+    "test_bbs.tcc",
     "test_bbs_board.tcc",
     "test_bbs_index.tcc",
     "test_cbuffer.tcc",
