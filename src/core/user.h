@@ -130,6 +130,8 @@ struct hub_user
 	uint32_t flags;					   /** see enum user_flags */
 	time_t tm_connected;			   /** Wall-clock time (unix epoch) the connection was accepted */
 	struct linked_list *feature_cast;  /** Features supported by feature cast */
+	struct linked_list *bbs_subs;      /** BBS0: struct bbs_subscription*, one per subscribed board. NULL until the first HBBL. */
+	time_t bbs_last_post;              /** BBS0: when this session last had a post accepted, for the posting rate limit. */
 	struct adc_message *info;		   /** ADC 'INF' message (broadcasted to everyone joining the hub) */
 	struct hub_info *hub;			   /** The hub instance this user belong to */
 	struct hub_link *origin_link;	   /** NULL for a local user; the owning link for a remote user learned over federation. */

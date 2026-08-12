@@ -206,6 +206,241 @@ EXO_TEST(bbs_descriptor_no_replay_limit_reports_oldest_entry, {
 	return board && bbs_board_oldest_replay(bh->bbs, board, 1786500000) == 1786443100;
 });
 
+/* -- subscriptions (HBBL) ----------------------------------------------- */
+
+/* Drive the handler the way the dispatch switch does: parse a real line, then
+   call it. Everything the hub sends back lands in the user's send queue. */
+static int bbs_hbbl(struct hub_user* user, const char* line)
+{
+	struct adc_message* cmd = adc_msg_parse(line, strlen(line));
+	int ret;
+	if (!cmd)
+		return -2;
+	tu_queue_clear(user);
+	ret = bbs_handle_subscribe(bh, user, cmd);
+	adc_msg_free(cmd);
+	return ret;
+}
+
+/* Post to a board directly through the index, standing in for another user's
+   HBBP until posting exists. */
+static int bbs_seed(const char* board, const char* tth, const char* parent,
+                    const char* subject, time_t ts)
+{
+	struct bbs_entry e;
+	memset(&e, 0, sizeof(e));
+	strcpy(e.tth, tth);
+	if (parent)
+		strcpy(e.parent, parent);
+	if (subject)
+		strcpy(e.subject, subject);
+	strcpy(e.cid, BBS_CID_A);
+	strcpy(e.nick, "janvidar");
+	e.size = 412;
+	return bbs_index_append(bh->bbs->index, board, &e, ts, 0) == bbs_index_ok;
+}
+
+#define BBS_TTH_B "7ZQGKD3NDBK6ZTZG5PYQXSNMFYVJH4TXAVN6PLQ"
+#define BBS_TTH_C "VN6PLQ7ZQGKD3NDBK6ZTZG5PYQXSNMFYVJH4TXA"
+
+EXO_TEST(bbs_subscribe_seed_board, {
+	return bbs_seed("announcements", BBS_TTH_B, 0, "Hub upgrade on Saturday", 1786436000)
+		&& bbs_seed("announcements", BBS_TTH_C, BBS_TTH_B, "Re: Hub upgrade on Saturday", 1786438120);
+});
+
+EXO_TEST(bbs_subscribe_replays_backlog, {
+	return bbs_hbbl(bu_guest, "HBBL BDannouncements TS0\n") == 0
+		&& tu_queue_count(bu_guest) == 2;
+});
+
+/* The entry, in full. TH names the thread root the hub derived; the reply's is
+   its parent's hash, and nothing in a document names a thread. */
+EXO_TEST(bbs_subscribe_entry_wire_format, {
+	return tu_queue_has(bu_guest,
+		"IBBL TR" BBS_TTH_B " SI412 BDannouncements ID" BBS_CID_A
+		" NIjanvidar TH" BBS_TTH_B " SJHub\\supgrade\\son\\sSaturday TS1786436000\n");
+});
+
+EXO_TEST(bbs_subscribe_reply_carries_parent_and_thread, {
+	return tu_queue_has(bu_guest,
+		"IBBL TR" BBS_TTH_C " SI412 BDannouncements ID" BBS_CID_A
+		" NIjanvidar PA" BBS_TTH_B " TH" BBS_TTH_B
+		" SJRe:\\sHub\\supgrade\\son\\sSaturday TS1786438120\n");
+});
+
+EXO_TEST(bbs_subscribe_records_subscription, {
+	struct bbs_board* board = bbs_board_find(bh->bbs, "announcements");
+	struct bbs_subscription* sub = bbs_user_subscription(bu_guest, board);
+	return sub && sub->cursor == 1786438120;
+});
+
+/* Resuming from the highest timestamp seen re-delivers that second. */
+EXO_TEST(bbs_subscribe_resume_from_cursor, {
+	return bbs_hbbl(bu_guest, "HBBL BDannouncements TS1786438120\n") == 0
+		&& tu_queue_count(bu_guest) == 1;
+});
+
+/* A second HBBL replaces the first rather than adding to it. */
+EXO_TEST(bbs_subscribe_replaces_not_adds, {
+	struct bbs_board* board = bbs_board_find(bh->bbs, "announcements");
+	return list_size(bu_guest->bbs_subs) == 1
+		&& bbs_user_subscription(bu_guest, board) != 0;
+});
+
+EXO_TEST(bbs_subscribe_absent_ts_means_everything, {
+	return bbs_hbbl(bu_guest, "HBBL BDannouncements\n") == 0
+		&& tu_queue_count(bu_guest) == 2;
+});
+
+EXO_TEST(bbs_subscribe_cancel, {
+	struct bbs_board* board = bbs_board_find(bh->bbs, "announcements");
+	return bbs_hbbl(bu_guest, "HBBL BDannouncements RM1\n") == 0
+		&& tu_queue_count(bu_guest) == 0
+		&& bbs_user_subscription(bu_guest, board) == 0;
+});
+
+/* Cancelling something never subscribed to is not an error. */
+EXO_TEST(bbs_subscribe_cancel_when_not_subscribed, {
+	return bbs_hbbl(bu_guest, "HBBL BDannouncements RM1\n") == 0
+		&& tu_queue_count(bu_guest) == 0;
+});
+
+/* -- single entry requests ---------------------------------------------- */
+
+EXO_TEST(bbs_subscribe_single_entry, {
+	return bbs_hbbl(bu_guest, "HBBL BDannouncements TR" BBS_TTH_B "\n") == 0
+		&& tu_queue_count(bu_guest) == 1
+		&& tu_queue_find(bu_guest, "IBBL TR" BBS_TTH_B " ") == 0;
+});
+
+/* A request carrying TR is a question, not a subscription. */
+EXO_TEST(bbs_subscribe_single_entry_does_not_subscribe, {
+	struct bbs_board* board = bbs_board_find(bh->bbs, "announcements");
+	return bbs_user_subscription(bu_guest, board) == 0;
+});
+
+EXO_TEST(bbs_subscribe_single_entry_missing, {
+	return bbs_hbbl(bu_guest, "HBBL BDannouncements TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n") == -1
+		&& tu_queue_has(bu_guest,
+			"ISTA 176 No\\ssuch\\spost FCBBL TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
+});
+
+EXO_TEST(bbs_subscribe_single_entry_bad_hash, {
+	return bbs_hbbl(bu_guest, "HBBL BDannouncements TRnothash\n") == -1
+		&& tu_queue_has(bu_guest, "ISTA 143 Invalid\\shash FCBBL FBTR\n");
+});
+
+/* -- refusals ----------------------------------------------------------- */
+
+EXO_TEST(bbs_subscribe_missing_board, {
+	return bbs_hbbl(bu_guest, "HBBL TS0\n") == -1
+		&& tu_queue_has(bu_guest, "ISTA 143 Missing\\sboard\\sname FCBBL FMBD\n");
+});
+
+EXO_TEST(bbs_subscribe_unknown_board, {
+	return bbs_hbbl(bu_guest, "HBBL BDgenrel TS0\n") == -1
+		&& tu_queue_has(bu_guest, "ISTA 171 No\\ssuch\\sboard FCBBL BDgenrel\n");
+});
+
+/* A board the session cannot subscribe to is refused exactly as one that does
+   not exist, so the refusal does not disclose it. */
+EXO_TEST(bbs_subscribe_invisible_board_looks_missing, {
+	return bbs_hbbl(bu_guest, "HBBL BDmembers TS0\n") == -1
+		&& tu_queue_has(bu_guest, "ISTA 171 No\\ssuch\\sboard FCBBL BDmembers\n");
+});
+
+EXO_TEST(bbs_subscribe_visible_to_registered, {
+	return bbs_hbbl(bu_reg, "HBBL BDmembers TS0\n") == 0
+		&& tu_queue_count(bu_reg) == 0; /* the board is empty, but it exists */
+});
+
+EXO_TEST(bbs_subscribe_tr_and_ts_together, {
+	return bbs_hbbl(bu_guest, "HBBL BDannouncements TS0 TR" BBS_TTH_B "\n") == -1
+		&& tu_queue_has(bu_guest, "ISTA 140 TR\\sand\\sTS\\smust\\snot\\sboth\\sbe\\sgiven FCBBL\n");
+});
+
+EXO_TEST(bbs_subscribe_limit, {
+	int i;
+	char line[64];
+	char name[32];
+	/* One more board than the session is allowed to hold at once. */
+	for (i = 0; i < bh->config->bbs_max_subscriptions + 1; i++)
+	{
+		snprintf(name, sizeof(name), "many%d", i);
+		snprintf(line, sizeof(line), "board %s", name);
+		if (!bbs_add_board(line))
+			return 0;
+	}
+	for (i = 0; i < bh->config->bbs_max_subscriptions; i++)
+	{
+		snprintf(line, sizeof(line), "HBBL BDmany%d TS0\n", i);
+		if (bbs_hbbl(bu_op, line) != 0)
+			return 0;
+	}
+	snprintf(line, sizeof(line), "HBBL BDmany%d TS0\n", bh->config->bbs_max_subscriptions);
+	return bbs_hbbl(bu_op, line) == -1
+		&& tu_queue_find(bu_op, "ISTA 170 Too\\smany\\ssubscriptions FCBBL BDmany") == 0;
+});
+
+/* Re-subscribing to a board already held is not a new subscription and does not
+   count against the limit. */
+EXO_TEST(bbs_subscribe_resubscribe_within_limit, {
+	return bbs_hbbl(bu_op, "HBBL BDmany0 TS0\n") == 0
+		&& list_size(bu_op->bbs_subs) == (size_t) bh->config->bbs_max_subscriptions;
+});
+
+/* -- OT clamping -------------------------------------------------------- */
+
+/* A cursor older than what the hub will replay is not refused: the request is
+   treated as one from OT, so a client that has been away too long still gets
+   everything the hub still holds. */
+EXO_TEST(bbs_subscribe_setup_bounded_board, {
+	return bbs_add_board("board bounded") != 0
+		&& bbs_seed("bounded", "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD", 0, "First", 5000)
+		&& bbs_seed("bounded", "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE", 0, "Second", 6000);
+});
+
+EXO_TEST(bbs_subscribe_ancient_cursor_is_served_not_refused, {
+	return bbs_hbbl(bu_guest, "HBBL BDbounded TS1\n") == 0
+		&& tu_queue_count(bu_guest) == 2;
+});
+
+/* The cursor ends up at the newest entry actually sent, so the next resume
+   starts from there rather than from the value the client asked for. */
+EXO_TEST(bbs_subscribe_cursor_follows_what_was_sent, {
+	struct bbs_board* board = bbs_board_find(bh->bbs, "bounded");
+	struct bbs_subscription* sub = bbs_user_subscription(bu_guest, board);
+	return sub && sub->cursor == 6000;
+});
+
+/* A negative timestamp is not a way to ask for something before the beginning. */
+EXO_TEST(bbs_subscribe_negative_ts, {
+	return bbs_hbbl(bu_guest, "HBBL BDbounded TS-9999\n") == 0
+		&& tu_queue_count(bu_guest) == 2;
+});
+
+/* -- lifecycle ---------------------------------------------------------- */
+
+/* Cancelling a board's subscriptions walks the user manager, so a user has to
+   be in it to be reached. */
+EXO_TEST(bbs_subscribe_cancelled_when_board_goes, {
+	struct bbs_board* board = bbs_board_find(bh->bbs, "many0");
+	if (bbs_user_subscription(bu_op, board) == 0)
+		return 0;
+	uman_add(bh->users, bu_op);
+	bbs_cancel_subscriptions(bh, board);
+	uman_remove(bh->users, bu_op);
+	return bbs_user_subscription(bu_op, board) == 0
+		/* and only that board's */
+		&& bbs_user_subscription(bu_op, bbs_board_find(bh->bbs, "many1")) != 0;
+});
+
+EXO_TEST(bbs_subscribe_unsubscribe_all, {
+	bbs_user_unsubscribe_all(bu_op);
+	return bu_op->bbs_subs == 0
+		&& bbs_user_subscription(bu_op, bbs_board_find(bh->bbs, "many1")) == 0;
+});
+
 EXO_TEST(bbs_teardown, {
 	tu_user_destroy(bu_guest);
 	tu_user_destroy(bu_reg);
