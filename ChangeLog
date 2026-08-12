@@ -28,6 +28,12 @@ New features:
 - Chat messages carry a hub-stamped TS timestamp. A client-supplied TS is
   replaced, so the timestamp cannot be forged; chat forwarded over a link keeps
   the origin hub's stamp.
+- BBS0 bulletin boards: durable, threaded lists of posts that a client
+  subscribes to, catches up on and keeps. Boards are defined in a boards file
+  (file_bbs_boards) with per-credential permissions, and the index is kept in
+  SQLite (file_bbs_index). The hub holds the index only -- post content travels
+  between clients over the ordinary search and transfer machinery and is never
+  stored on or served by the hub. Off by default; see doc/bbs.txt.
 - New operator command !unban to lift a ban by nick, CID or IP/range. Runtime
   bans could previously only be cleared by restarting the hub.
 - !ban takes an optional duration ("!ban nick 30m", 12h, 7d) and a reason
