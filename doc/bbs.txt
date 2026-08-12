@@ -1,0 +1,173 @@
+Bulletin boards (BBS0)
+======================
+
+Chat is ephemeral. A user who joins an hour late has missed everything said
+before they arrived, and an operator who wants to leave a notice where users
+will find it has nowhere to put it. BBS0 gives the hub bulletin boards in the
+sense Usenet used the term: lists of posts, each of which may be a reply to
+another, that a client downloads once and keeps.
+
+uhub implements the hub side of the BBS0 draft. What that means in practice is
+worth stating plainly, because it decides how you run one.
+
+
+What the hub holds, and what it does not
+----------------------------------------
+
+The hub holds an index and nothing else. For each board it keeps an ordered
+list of entries; an entry records the Tiger tree hash naming a post document,
+its declared size, the board, the CID of the session the hub accepted it from,
+the nick that session held, the parent post if it is a reply, the thread root,
+the subject and the time the hub accepted it.
+
+The bytes of a post never touch the hub. A post is a file, named by its hash,
+and a client fetches it from whichever clients hold it, over the same search
+and transfer machinery it uses for any other file. Nothing new is added to that
+exchange; the hub is not in it at all.
+
+Three consequences follow, and none of them is a defect:
+
+- A board is only as durable as its readers. When the author disconnects and no
+  one else has fetched a post, its entry remains and its content cannot be
+  retrieved. Clients are required to show that state rather than hide the post.
+- An operator who wants a board to last should run a client that subscribes to
+  it and fetches and serves every post. Nothing distinguishes such a client
+  from any other, which makes durability a deployment decision rather than a
+  protocol feature.
+- The hub cannot check that a post exists, that it hashes to the name given,
+  that it is the size declared, or that its author is the session that
+  submitted it. Every one of those checks belongs to the reading client, which
+  has the document and can do them; the hub has neither.
+
+What the hub *can* refuse is who may post where, how large a post may be, how
+often one session may post, and how far back it will replay. That is what the
+configuration below is about.
+
+
+Configuration
+-------------
+
+In uhub.conf:
+
+	bbs_enable = yes
+	file_bbs_boards = /etc/uhub/boards.conf
+	file_bbs_index = /var/lib/uhub/bbs.db
+
+The index database is created if it does not exist. It holds index entries
+only, never the content of a post, and it is an ordinary SQLite file: you can
+open it with the sqlite3 shell to see what a board holds.
+
+Boards are defined one per line in the boards file. See doc/boards.conf for a
+worked example; the short version is:
+
+	board general title="General discussion" post=guest replay_days=90
+
+The permissions -- subscribe, post, reply, withdraw_own and withdraw_any --
+each name the lowest credential that holds them, or "none" for nobody.
+Separating post from reply is deliberate and is the most useful thing here: a
+board where anyone may reply but only operators may start a thread is the
+natural form of an announcements board.
+
+A board a session may not subscribe to is not merely read-protected. The hub
+never tells that session the board exists, and refuses a subscription to it in
+the same words it uses for a board that is not there. Withholding the
+descriptor is the whole of the mechanism for hiding a board.
+
+
+Timestamps, catching up, and why nothing is inserted in the past
+---------------------------------------------------------------
+
+Every entry carries the time the hub accepted it, and that timestamp is both
+the post's place in the board's order and the cursor a client resumes from. A
+client that has been away reconnects, says where it got to, and receives
+everything since -- and then keeps receiving entries as they arrive, because
+the backlog and the live feed are one stream.
+
+Three rules make that work, and uhub keeps all three:
+
+- A new entry never takes a timestamp lower than the highest already on the
+  board. If the clock moves backwards the highest value is reused rather than a
+  lower one, because a client that has caught up to a given second will never
+  ask for anything earlier.
+- Timestamps are never perturbed to make them unique. Two posts in the same
+  second is ordinary on a busy board; a client identifies an entry by its hash,
+  not its time.
+- Nothing enters the index in the past. A post takes the time of its arrival,
+  never the time its author claims. That is what lets a cursor work without a
+  generation counter to guard it.
+
+A withdrawal gives the entry a *new* timestamp -- the time of the withdrawal --
+while keeping its hash. That is what places the tombstone at the head of the
+stream, where it reaches a subscriber at once and an absent client as soon as
+it resumes. The original timestamp would leave it behind every cursor that had
+already gone past.
+
+Withdrawal is not deletion. It removes an index entry; the document may by then
+be held by every client that read it, and will go on being served by them. A
+tombstone is a request, honoured by clients that receive it and meaningless to
+those that do not, which is why "withdraw" is the word used throughout and why
+an interface offering to "delete" a post would be making a promise nothing here
+can keep. Replies to a withdrawn post are separate posts and are not removed
+with it.
+
+
+Sizing a board
+--------------
+
+Two settings decide how much a board can cost you.
+
+bbs_max_posts_per_board (default 5000) is the number of entries retained. Past
+it the oldest are dropped, and the board's declared replay horizon moves
+forward with them, so the hub never promises a replay it cannot deliver. This
+is also what bounds the burst a client can ask for: a client subscribing from
+the beginning of a board receives every retained entry at once. At roughly 250
+bytes an entry, the default is a little over a megabyte -- the same order as
+the user list a busy hub already sends at login.
+
+replay_days, per board, is the other bound: how far back the hub will replay at
+all. A client asking for something older is served from the horizon rather than
+refused, and it is told the horizon in advance so it knows its view of the
+board has a gap it cannot close. On a large board, set this to what you can
+afford to replay rather than to the age of the oldest entry you happen to hold.
+
+bbs_post_interval (default 60 seconds) rate-limits submission per session.
+Unrestricted users -- bots and unrestricted operators -- are not limited.
+bbs_max_subscriptions (default 8) bounds how many boards one session may hold
+at once.
+
+
+What a client is required to do
+-------------------------------
+
+Worth knowing when evaluating one, because the hub cannot enforce any of it.
+
+Before displaying a post, a client must verify that what it fetched hashes to
+the name it asked for, and discard it entirely if not. Until that has passed,
+an index entry is a stranger's description of a file that may not exist. The
+author, the parent, the subject and the content are inside that hash, so a hub
+cannot alter any of them for a client that checks -- which is the whole point
+of the split between the document and the index.
+
+What the hub says and no hash covers: which posts appear on the board at all,
+when they arrived, and how threads are grouped. A client can reconstruct true
+threading from the parent links in the documents it has verified, and should
+where the two disagree.
+
+The nick in an index entry is informative and nothing more. It is not in the
+document, is unique on no hub and at no time, and must not be used to attribute
+a post or to match against an ignore list -- those decisions belong to the CID.
+The CID in the entry means only: this hub says it accepted this post from a
+session that had authenticated as this CID. uhub decides "your own post", for
+withdrawal, on exactly that and never on the nick.
+
+Note also that reading a post is visible: the author is at first the only party
+who can serve it, so fetching one discloses the reader to them. A well-behaved
+client does not fetch automatically when an entry arrives.
+
+
+See also
+--------
+
+- doc/boards.conf -- a worked boards file.
+- doc/uhub.conf -- the options above, in context.
+- The BBS0 specification, in the ADC extensions repository.
