@@ -76,3 +76,34 @@ BUILD=/path/to/build test/e2e/run_plugin_e2e.sh [port]
 The CID test relies on `ADC_client_set_pid()` (added to `libadcclient`): a fixed
 PID yields a fixed CID (`CID = base32(tiger(PID))`), so `adc_cmd --pid P --show-cid`
 prints the CID to configure the plugin's `deny_cid`.
+
+## run_bbs_e2e.sh
+
+Drives BBS0 bulletin boards over a socket with real clients — the hub side of
+the extension end to end:
+
+1. `BBS0` is announced in `ISUP`, and one `IBBD` per board follows login;
+2. a board a session may not subscribe to is never mentioned to it, and a
+   client that never offered `BBS0` receives no descriptors at all;
+3. a post is accepted and the resulting `IBBL` is the acknowledgement — there
+   is no success status in `BBS0`;
+4. a reply's thread root is derived by the hub from its parent;
+5. subscribing from `TS0` replays the whole board;
+6. refusals carry the right code and name what they refused (`171` no such
+   board, `176` no such post, `125` no permission, `172` too large);
+7. an operator starts a thread on an announcements board and a guest replies to
+   it, which is what separating the post and reply permissions is for;
+8. an author withdraws a post, the tombstone reaches subscribers, replies to it
+   survive, another user cannot withdraw it and an operator can;
+9. the index survives a restart of the hub.
+
+```sh
+BUILD=/path/to/build test/e2e/run_bbs_e2e.sh [port]
+```
+
+Two things this leans on. `adc_cmd --raw` sends a line verbatim and
+`--expect-line` matches received lines against a glob, which is how a client
+that models none of these commands can still drive and assert on them. And the
+author pins a PID (`--pid`), because withdrawing one's own post is decided on
+the CID the hub accepted it from and never on the nick — reconnecting under the
+same nick is a different author, and should be.

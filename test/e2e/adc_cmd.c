@@ -92,7 +92,10 @@ static void check_expected(const char* line)
 	int i;
 	for (i = 0; i < opt_expect_line_n; i++)
 	{
-		if (!opt_expect_line_seen[i] && fnmatch(opt_expect_line[i], line, 0) == 0)
+		/* FNM_NOESCAPE: ADC escapes everything with backslashes ("\s" for a
+		   space), and fnmatch would otherwise read those as glob escapes and
+		   quietly match the wrong thing. */
+		if (!opt_expect_line_seen[i] && fnmatch(opt_expect_line[i], line, FNM_NOESCAPE) == 0)
 		{
 			opt_expect_line_seen[i] = 1;
 			printf("MATCHED: %s\n", opt_expect_line[i]);
