@@ -21,9 +21,11 @@
 #define HAVE_UHUB_BBS_H
 
 #include <stddef.h>
+#include <time.h>
 
 #include "util/credentials.h"
 
+struct bbs_index;
 struct hub_config;
 struct linked_list;
 
@@ -76,7 +78,19 @@ struct bbs_board
 struct bbs_handle
 {
 	struct linked_list* boards; /**<< struct bbs_board*, in the order they were configured. */
+	struct bbs_index* index;    /**<< The post index (see bbs_index.h). */
 };
+
+/**
+ * The oldest timestamp the hub will replay on a board -- the "OT" of the board
+ * descriptor.
+ *
+ * This is the later of the board's replay_days cutoff and the oldest entry it
+ * still holds, so that OT never promises more than the index can deliver.
+ *
+ * @param now the current time.
+ */
+extern time_t bbs_board_oldest_replay(struct bbs_handle* handle, const struct bbs_board* board, time_t now);
 
 /**
  * Load the bulletin board configuration.

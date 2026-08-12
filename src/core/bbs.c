@@ -22,6 +22,7 @@
 
 #include "adc/adcconst.h"
 #include "core/bbs.h"
+#include "core/bbs_index.h"
 #include "core/config.h"
 #include "util/config_token.h"
 #include "util/credentials.h"
@@ -350,6 +351,12 @@ int bbs_initialize(struct hub_config* config, struct bbs_handle** out)
 		return -1;
 	}
 
+	if (!*config->file_bbs_index)
+	{
+		LOG_ERROR("bbs_enable is set but file_bbs_index is empty: there is nowhere to keep the index.");
+		return -1;
+	}
+
 	handle = (struct bbs_handle*) hub_malloc_zero(sizeof(struct bbs_handle));
 	if (!handle)
 	{
@@ -380,8 +387,15 @@ int bbs_initialize(struct hub_config* config, struct bbs_handle** out)
 		return -1;
 	}
 
-	LOG_INFO("Bulletin boards enabled: %zu board(s) from %s.",
-	         list_size(handle->boards), config->file_bbs_boards);
+	handle->index = bbs_index_open(config->file_bbs_index);
+	if (!handle->index)
+	{
+		bbs_shutdown(handle);
+		return -1;
+	}
+
+	LOG_INFO("Bulletin boards enabled: %zu board(s) from %s, index in %s.",
+	         list_size(handle->boards), config->file_bbs_boards, config->file_bbs_index);
 
 	*out = handle;
 	return 0;
@@ -392,7 +406,32 @@ void bbs_shutdown(struct bbs_handle* handle)
 	if (!handle)
 		return;
 
+	bbs_index_close(handle->index);
 	list_clear(handle->boards, &bbs_board_free_handle);
 	list_destroy(handle->boards);
 	hub_free(handle);
+}
+
+time_t bbs_board_oldest_replay(struct bbs_handle* handle, const struct bbs_board* board, time_t now)
+{
+	time_t oldest = 0;
+	time_t cutoff = 0;
+
+	if (!handle || !board)
+		return 0;
+
+	if (bbs_index_stats(handle->index, board->name, NULL, &oldest, NULL) < 0)
+		return 0;
+
+	if (board->replay_days > 0)
+	{
+		cutoff = now - ((time_t) board->replay_days * 86400);
+		if (cutoff < 0)
+			cutoff = 0;
+	}
+
+	/* Whichever is the later bound wins: a hub that expires old entries says so
+	   through OT, and a hub that has simply not been running long enough should
+	   not claim a backlog it never had. */
+	return (cutoff > oldest) ? cutoff : oldest;
 }

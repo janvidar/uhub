@@ -48,6 +48,7 @@ const adc_sources = [_][]const u8{
 const core_sources = [_][]const u8{
     "src/core/auth.c",
     "src/core/bbs.c",
+    "src/core/bbs_index.c",
     "src/core/command_parser.c",
     "src/core/commands.c",
     "src/core/config.c",
@@ -77,6 +78,7 @@ const core_sources = [_][]const u8{
 const tcc_sources = [_][]const u8{
     "test_auth.tcc",
     "test_bbs_board.tcc",
+    "test_bbs_index.tcc",
     "test_cbuffer.tcc",
     "test_commands.tcc",
     "test_condead.tcc",
@@ -435,6 +437,9 @@ pub fn build(b: *std.Build) void {
     const uhub_mod = ctx.module();
     ctx.addSources(uhub_mod, &core_sources);
     ctx.addSources(uhub_mod, &.{"src/core/main.c"});
+    // src/core/bbs_index.c keeps the BBS0 bulletin board index in SQLite, so
+    // the hub itself links it -- not only the sqlite-backed plugins.
+    ctx.addSqlite(uhub_mod);
     uhub_mod.linkLibrary(common);
     ctx.linkExternal(uhub_mod);
     const uhub = b.addExecutable(.{ .name = "uhub", .root_module = uhub_mod });
