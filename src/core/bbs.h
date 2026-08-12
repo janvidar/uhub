@@ -202,6 +202,15 @@ extern int bbs_handle_subscribe(struct hub_info* hub, struct hub_user* user,
                                 struct adc_message* cmd);
 
 /**
+ * Handle an "HBBP": submit a post, or withdraw one.
+ *
+ * @return 0 on success, -1 if the command was refused (a status message has
+ *         then been sent to the user).
+ */
+extern int bbs_handle_post(struct hub_info* hub, struct hub_user* user,
+                           struct adc_message* cmd);
+
+/**
  * Drop every subscription a session holds. Called when the user goes away.
  */
 extern void bbs_user_unsubscribe_all(struct hub_user* user);
