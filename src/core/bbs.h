@@ -27,6 +27,8 @@
 
 struct bbs_index;
 struct hub_config;
+struct hub_info;
+struct hub_user;
 struct linked_list;
 
 /**
@@ -148,5 +150,30 @@ extern struct bbs_board* bbs_board_parse(const char* line, int* error);
  * Free a board returned by bbs_board_parse(). Tolerates NULL.
  */
 extern void bbs_board_free(struct bbs_board* board);
+
+/**
+ * @return 1 if this hub serves bulletin boards.
+ */
+extern int bbs_is_enabled(struct hub_info* hub);
+
+/**
+ * Send the board descriptor ("BBD") for one board to one session.
+ *
+ * The descriptor states what the *receiving session* may do, so it is built per
+ * user rather than cached. Sending is silently skipped where the session holds
+ * no permission on the board: withholding the descriptor is the whole of the
+ * mechanism for hiding a board.
+ */
+extern void bbs_send_board_descriptor(struct hub_info* hub, struct hub_user* user,
+                                      const struct bbs_board* board);
+
+/**
+ * Send a descriptor for every board this session may subscribe to.
+ *
+ * Called as the session enters the NORMAL state, following the pattern by which
+ * a hub sends the INF of every user at login. A session that did not offer
+ * BBS0 in its SUP receives nothing.
+ */
+extern void bbs_send_board_list(struct hub_info* hub, struct hub_user* user);
 
 #endif /* HAVE_UHUB_BBS_H */

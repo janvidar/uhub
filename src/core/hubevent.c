@@ -19,6 +19,7 @@
 
 #include "adc/message.h"
 #include "network/connection.h"
+#include "core/bbs.h"
 #include "core/hbri.h"
 #include "core/hub.h"
 #include "core/hubevent.h"
@@ -72,6 +73,11 @@ void on_login_success(struct hub_info* hub, struct hub_user* u)
 		route_info_message(hub, u);
 		/* Propagate the new local user to linked hubs (live join). */
 		link_broadcast_local_inf(hub, u);
+
+		/* Tell a BBS0 client what boards there are to subscribe to, following
+		   the pattern by which the INF of every user is sent at login. This
+		   subscribes the session to nothing; it says what there is. */
+		bbs_send_board_list(hub, u);
 	}
 
 	plugin_log_user_login_success(hub, u);

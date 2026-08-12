@@ -21,9 +21,14 @@
 #include <string.h>
 
 #include "adc/adcconst.h"
+#include "adc/message.h"
 #include "core/bbs.h"
 #include "core/bbs_index.h"
 #include "core/config.h"
+#include "core/hub.h"
+#include "core/route.h"
+#include "core/user.h"
+#include "network/backend.h"
 #include "util/config_token.h"
 #include "util/credentials.h"
 #include "util/list.h"
@@ -410,6 +415,72 @@ void bbs_shutdown(struct bbs_handle* handle)
 	list_clear(handle->boards, &bbs_board_free_handle);
 	list_destroy(handle->boards);
 	hub_free(handle);
+}
+
+int bbs_is_enabled(struct hub_info* hub)
+{
+	return hub && hub->bbs && hub->bbs->index;
+}
+
+void bbs_send_board_descriptor(struct hub_info* hub, struct hub_user* user,
+                               const struct bbs_board* board)
+{
+	struct adc_message* cmd;
+	time_t now;
+	time_t newest = 0;
+	size_t count = 0;
+	int permissions;
+
+	if (!bbs_is_enabled(hub) || !user || !board)
+		return;
+
+	permissions = bbs_board_permissions(board, user->credentials);
+	if (!permissions)
+		return;
+
+	if (bbs_index_stats(hub->bbs->index, board->name, &newest, NULL, &count) < 0)
+		return;
+
+	cmd = adc_msg_construct(ADC_CMD_IBBD, 128);
+	if (!cmd)
+		return;
+
+	now = net_get_time();
+
+	/* Field order follows the BBS0 draft. BD is protocol text and needs no
+	   escaping; the title and description are user text and do. */
+	adc_msg_add_named_argument(cmd, ADC_BBS_FLAG_BOARD, board->name);
+	if (board->title)
+		adc_msg_add_named_argument_string(cmd, ADC_INF_FLAG_NICK, board->title);
+	if (board->description)
+		adc_msg_add_named_argument_string(cmd, ADC_INF_FLAG_DESCRIPTION, board->description);
+	adc_msg_add_named_argument_int(cmd, ADC_BBS_FLAG_PERMISSIONS, permissions);
+	adc_msg_add_named_argument_uint64(cmd, ADC_BBS_FLAG_MAX_SIZE, (uint64_t) board->max_size);
+	adc_msg_add_named_argument_uint64(cmd, ADC_MSG_FLAG_TIMESTAMP, (uint64_t) newest);
+	adc_msg_add_named_argument_uint64(cmd, ADC_BBS_FLAG_OLDEST,
+	                                  (uint64_t) bbs_board_oldest_replay(hub->bbs, board, now));
+	adc_msg_add_named_argument_uint64(cmd, ADC_BBS_FLAG_NUM_POSTS, (uint64_t) count);
+
+	route_to_user(hub, user, cmd);
+	adc_msg_free(cmd);
+}
+
+void bbs_send_board_list(struct hub_info* hub, struct hub_user* user)
+{
+	struct bbs_board* board;
+
+	if (!bbs_is_enabled(hub) || !user)
+		return;
+
+	/* The hub's announcement in SUP is authoritative for the connection, and a
+	   client that never offered BBS0 has no use for a board descriptor. */
+	if (!user_flag_get(user, feature_bbs))
+		return;
+
+	LIST_FOREACH(struct bbs_board*, board, hub->bbs->boards,
+	{
+		bbs_send_board_descriptor(hub, user, board);
+	});
 }
 
 time_t bbs_board_oldest_replay(struct bbs_handle* handle, const struct bbs_board* board, time_t now)
