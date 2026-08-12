@@ -29,6 +29,7 @@
 #include "network/dnsresolver.h"
 #include "network/network.h"
 #include "core/auth.h"
+#include "core/bbs.h"
 #include "core/commands.h"
 #include "core/config.h"
 #include "core/eventid.h"
@@ -1482,7 +1483,12 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 		hub_free(tmp);
 	}
 
-	if (hub_plugins_load(hub) < 0)
+	if (bbs_initialize(hub->config, &hub->bbs) < 0)
+	{
+		LOG_FATAL("Unable to load the bulletin board configuration.");
+		hub->status = hub_status_shutdown;
+	}
+	else if (hub_plugins_load(hub) < 0)
 	{
 		LOG_FATAL("Unable to load plugins.");
 		hub->status = hub_status_shutdown;
@@ -1504,6 +1510,9 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 void hub_free_variables(struct hub_info* hub)
 {
 	hub_plugins_unload(hub);
+
+	bbs_shutdown(hub->bbs);
+	hub->bbs = NULL;
 
 	adc_msg_free(hub->command_info);
 	adc_msg_free(hub->command_banner);

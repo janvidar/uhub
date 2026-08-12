@@ -34,6 +34,7 @@ struct event_queue;
 struct hub_config;
 struct hub_user_manager;
 struct acl_handle;
+struct bbs_handle;
 struct adc_message;
 struct command_base;
 struct uhub_plugins;
@@ -165,6 +166,8 @@ struct hub_info
 
 	struct ssl_context_handle* ctx;
 	char* tls_keyprint;                 /* ADC KEYP keyprint of the TLS certificate ("SHA256/..."), NULL when TLS is disabled. */
+
+	struct bbs_handle* bbs;             /* BBS0 bulletin boards, or NULL when disabled. */
 
 	struct regserver* regserver;        /* Pending/in-flight registration-server announce (NULL if none). */
 

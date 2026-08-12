@@ -906,6 +906,106 @@
 		]]></example>
 	</option>
 
+	<option name="bbs_enable" type="boolean" default="0">
+		<short>Enable bulletin boards (the BBS0 extension)</short>
+		<description><![CDATA[
+			<p>
+			When enabled the hub announces the <code>BBS0</code> feature and serves
+			the bulletin boards defined in <code>file_bbs_boards</code>. A board is a
+			durable, threaded list of posts that a client subscribes to, catches up
+			on and keeps.
+			</p>
+			<p>
+			The hub holds only an index: for each post it records who submitted it,
+			when, on which board, and the Tiger tree hash naming the document. The
+			bytes of a post are never stored on or served by the hub -- they travel
+			between clients over the ordinary search and transfer machinery, exactly
+			as any other file. A board therefore stays readable only for as long as
+			some client still holds and serves its posts.
+			</p>
+			<p>
+			Both <code>file_bbs_boards</code> and <code>file_bbs_index</code> must be
+			set when this is enabled, or the hub refuses to start.
+			</p>
+		]]></description>
+		<since>0.8.0</since>
+	</option>
+
+	<option name="file_bbs_boards" type="file" default="">
+		<short>File defining the bulletin boards this hub serves</short>
+		<description><![CDATA[
+			One board per line, each naming the board and who may do what on it:
+
+			board general title="General discussion" post=reg reply=guest
+
+			The recognised settings are title, description, max_size (the largest
+			post document accepted, in bytes), replay_days (how far back the hub
+			will replay, 0 for no limit), and the permissions subscribe, post,
+			reply, withdraw_own and withdraw_any, each taking a credential name
+			(guest, reg, operator, admin, ...) or "none" for nobody.
+
+			A board a session cannot subscribe to is not merely read-protected: the
+			hub never mentions that it exists.
+		]]></description>
+		<since>0.8.0</since>
+		<example><![CDATA[
+			file_bbs_boards = "/etc/uhub/boards.conf"
+		]]></example>
+	</option>
+
+	<option name="file_bbs_index" type="file" default="">
+		<short>SQLite database holding the bulletin board index</short>
+		<description><![CDATA[
+			The database file in which the hub records the posts indexed on each
+			board. It is created if it does not exist. This holds index entries
+			only -- never the content of a post.
+		]]></description>
+		<since>0.8.0</since>
+		<example><![CDATA[
+			file_bbs_index = "/var/lib/uhub/bbs.db"
+		]]></example>
+	</option>
+
+	<option name="bbs_max_subscriptions" type="int" default="8">
+		<check min="1" max="64" />
+		<short>Maximum number of boards one session may subscribe to at once</short>
+		<description><![CDATA[
+			A subscription is a standing instruction to send data, obtained with one
+			short command. This bounds how many a single session may hold.
+		]]></description>
+		<since>0.8.0</since>
+	</option>
+
+	<option name="bbs_post_interval" type="int" default="60">
+		<check min="0" max="86400" />
+		<short>Minimum number of seconds between two posts from one session</short>
+		<description><![CDATA[
+			The hub is the only place where posting can be refused, so it rate-limits
+			submissions. A post arriving sooner than this after the session's last
+			one is refused, and the client is told how long to wait. Set to 0 to
+			disable the limit. Unrestricted users (bots and unrestricted operators)
+			are never rate-limited.
+		]]></description>
+		<since>0.8.0</since>
+	</option>
+
+	<option name="bbs_max_posts_per_board" type="int" default="5000">
+		<check min="0" max="1000000" />
+		<short>Maximum number of index entries retained per board</short>
+		<description><![CDATA[
+			<p>
+			When a board exceeds this many entries the oldest are dropped, and the
+			hub tells subscribing clients how far back it can still replay. Set to 0
+			to retain everything.
+			</p>
+			<p>
+			This bounds the burst a client can ask for: a client subscribing from the
+			beginning of a board receives every retained entry at once.
+			</p>
+		]]></description>
+		<since>0.8.0</since>
+	</option>
+
 	<option name="nat_override" type="string" default="">
 		<short>Comma separated list of IP ranges allowed to advertise their own address</short>
 		<description><![CDATA[
