@@ -590,6 +590,9 @@ if (FUZZING)
 	add_fuzzer(fuzz_metrics        ${UHUB_SOURCE_DIR}/tools/fuzz_metrics.c ${uhub_SOURCES})
 	# hub_handle_info_login() (the connect-time INF checks) is in the hub core too.
 	add_fuzzer(fuzz_login          ${UHUB_SOURCE_DIR}/tools/fuzz_login.c ${uhub_SOURCES})
+	# The BBS0 commands live in the hub core and pull in the SQLite index.
+	add_fuzzer(fuzz_bbs            ${UHUB_SOURCE_DIR}/tools/fuzz_bbs.c ${uhub_SOURCES})
+	target_link_libraries(fuzz_bbs SQLite::SQLite3)
 endif()
 
 configure_file ("${UHUB_SOURCE_DIR}/version.h.in" "${PROJECT_BINARY_DIR}/version.h")
