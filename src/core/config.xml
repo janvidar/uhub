@@ -421,6 +421,30 @@
 		<since>0.8.0</since>
 	</option>
 
+	<option name="chat_timestamps" type="boolean" default="1">
+		<short>Timestamp relayed chat messages</short>
+		<description><![CDATA[
+			<p>
+			When enabled the hub adds a <code>TS</code> flag to every chat message it
+			relays, holding the time the message was relayed as the number of seconds
+			since the Unix epoch (January 1 1970 00:00:00 GMT). Clients that understand
+			the flag can then display the hub's time for a message rather than the time
+			they happened to receive it.
+			</p>
+			<p>
+			The hub always uses its own clock: a <code>TS</code> sent by a client is
+			replaced, so a sender cannot forge the time other users see. Chat arriving
+			from a linked hub keeps the originating hub's timestamp.
+			</p>
+			<p>
+			Disable this to relay messages without a timestamp; the <code>TS</code> flag
+			is then also stripped from every relayed message. Clients that do not
+			understand the flag ignore it either way.
+			</p>
+		]]></description>
+		<since>0.8.0</since>
+	</option>
+
 	<option name="hub_name" type="string" default="uhub">
 		<short>Name of hub</short>
 		<description><![CDATA[

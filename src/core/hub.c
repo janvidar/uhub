@@ -590,9 +590,12 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 
 		/* Stamp the message with the hub's clock before it is relayed, so every
 		   recipient -- and every linked hub -- sees the same time. A TS sent by
-		   the client is discarded: the timestamp is the hub's view of when the
-		   message was relayed, not a value the sender gets to choose. */
-		adc_msg_add_timestamp(cmd, net_get_time());
+		   the client is discarded either way: the timestamp is the hub's view of
+		   when the message was relayed, not a value the sender gets to choose. */
+		if (hub->config->chat_timestamps)
+			adc_msg_add_timestamp(cmd, net_get_time());
+		else
+			adc_msg_remove_timestamp(cmd);
 
 		if (broadcast)
 		{

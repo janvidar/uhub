@@ -781,6 +781,19 @@ int adc_msg_add_timestamp(struct adc_message* cmd, time_t timestamp)
 }
 
 
+int adc_msg_remove_timestamp(struct adc_message* cmd)
+{
+	int count = 0;
+
+	ADC_MSG_ASSERT(cmd);
+
+	while (adc_msg_has_named_argument(cmd, ADC_MSG_FLAG_TIMESTAMP))
+		count += adc_msg_remove_named_argument(cmd, ADC_MSG_FLAG_TIMESTAMP);
+
+	return count;
+}
+
+
 void adc_msg_terminate(struct adc_message* cmd)
 {
 	if (cmd->length == 0 || cmd->cache[cmd->length - 1] != '\n')

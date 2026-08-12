@@ -39,6 +39,7 @@ void config_defaults(struct hub_config* config)
 	config->obsolete_clients = 0;
 	config->chat_is_privileged = 0;
 	config->chat_rich_text = 1;
+	config->chat_timestamps = 1;
 	config->hub_name = hub_strdup("uhub");
 	config->hub_description = hub_strdup("no description");
 	config->hub_address = hub_strdup("");
@@ -453,6 +454,16 @@ static int apply_config(struct hub_config* config, char* key, char* data, int li
 	if (!strcmp(key, "chat_rich_text"))
 	{
 		if (!apply_boolean(key, data, &config->chat_rich_text))
+		{
+			LOG_ERROR("Configuration parse error on line %d", line_count);
+			return -1;
+		}
+		return 0;
+	}
+
+	if (!strcmp(key, "chat_timestamps"))
+	{
+		if (!apply_boolean(key, data, &config->chat_timestamps))
 		{
 			LOG_ERROR("Configuration parse error on line %d", line_count);
 			return -1;
@@ -1596,6 +1607,9 @@ void dump_config(struct hub_config* config, int ignore_defaults)
 
 	if (!ignore_defaults || config->chat_rich_text != 1)
 		fprintf(stdout, "chat_rich_text = %s\n", config->chat_rich_text ? "yes" : "no");
+
+	if (!ignore_defaults || config->chat_timestamps != 1)
+		fprintf(stdout, "chat_timestamps = %s\n", config->chat_timestamps ? "yes" : "no");
 
 	if (!ignore_defaults || strcmp(config->hub_name, "uhub") != 0)
 		fprintf(stdout, "hub_name = \"%s\"\n", config->hub_name);

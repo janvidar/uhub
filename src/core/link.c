@@ -1363,8 +1363,10 @@ void link_relay_broadcast(struct hub_info* hub, struct adc_message* msg)
 /* Chat forwarded by a peer keeps the origin hub's timestamp -- that is the time
    the message was actually said. Only a peer that does not stamp its messages
    (an older hub) gets a local timestamp, so clients on this side always see a
-   TS. Non-chat traffic (searches, connect requests) is left alone. */
-static void link_stamp_message(struct adc_message* msg)
+   TS. With chat_timestamps off the flag is stripped instead, so a peer cannot
+   put timestamps on a hub that does not want them. Non-chat traffic (searches,
+   connect requests) is left alone. */
+static void link_stamp_message(struct hub_info* hub, struct adc_message* msg)
 {
 	switch (msg->cmd)
 	{
@@ -1372,7 +1374,9 @@ static void link_stamp_message(struct adc_message* msg)
 		case ADC_CMD_DMSG:
 		case ADC_CMD_EMSG:
 		case ADC_CMD_FMSG:
-			if (!adc_msg_has_named_argument(msg, ADC_MSG_FLAG_TIMESTAMP))
+			if (!hub->config->chat_timestamps)
+				adc_msg_remove_timestamp(msg);
+			else if (!adc_msg_has_named_argument(msg, ADC_MSG_FLAG_TIMESTAMP))
 				adc_msg_add_timestamp(msg, net_get_time());
 			break;
 
@@ -1399,7 +1403,7 @@ static void link_handle_route(struct hub_link* link, const char* adcstr)
 	sender = uman_get_user_by_sid(link->hub->users, msg->source);
 	if (sender)
 	{
-		link_stamp_message(msg);
+		link_stamp_message(link->hub, msg);
 		LOG_DEBUG("link: delivering routed message from sid %s (via %s)",
 			sid_to_string(msg->source), link->peer_desc);
 		route_message(link->hub, sender, msg);
