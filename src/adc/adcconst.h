@@ -50,6 +50,9 @@ typedef uint32_t fourcc_t;
 #define ADC_EXT_TIGR "TIGR"
 #define ADC_EXT_UCMD "UCMD" /* ADC-EXT 3.7 */
 #define ADC_EXT_RTF0 "RTF0"
+#define ADC_EXT_BBS0 "BBS0" /* BBS0: bulletin boards. Hub feature only -- it is
+                               never a flag in the INF "SU" field, since no
+                               client ever sends a bulletin to another. */
 
 /* Server sent commands */
 #define ADC_CMD_ISID FOURCC('I', 'S', 'I', 'D')
@@ -130,6 +133,22 @@ typedef uint32_t fourcc_t;
 #define ADC_CMD_HTCP                                                           \
   FOURCC('H', 'T', 'C', 'P') /* client -> hub: reply protocol */
 
+/* BBS0 Extension (bulletin boards) */
+#define ADC_CMD_IBBD                                                           \
+  FOURCC('I', 'B', 'B', 'D') /* hub -> client: board descriptor */
+#define ADC_CMD_HBBL                                                           \
+  FOURCC('H', 'B', 'B', 'L') /* client -> hub: subscribe / resume / cancel, or \
+                                request a single index entry */
+#define ADC_CMD_IBBL                                                           \
+  FOURCC('I', 'B', 'B', 'L') /* hub -> client: index entry (or tombstone) */
+#define ADC_CMD_HBBP                                                           \
+  FOURCC('H', 'B', 'B', 'P') /* client -> hub: submit or withdraw a post */
+
+/* Reserved by BBS0: never sent on any connection. It is the FOURCC that opens
+   a post document, whose header is a whole ADC message so that a client can
+   read it with the parser it already has. The hub never sees a document. */
+#define ADC_CMD_IBB0 FOURCC('I', 'B', 'B', '0')
+
 #define ADC_INF_FLAG_IPV4_ADDR "I4"     /* ipv4 address */
 #define ADC_INF_FLAG_IPV6_ADDR "I6"     /* ipv6 address */
 #define ADC_INF_FLAG_IPV4_UDP_PORT "U4" /* port number */
@@ -179,6 +198,37 @@ typedef uint32_t fourcc_t;
   "RT" /* RTF0: "1" = message is rich text formatted */
 #define ADC_MSG_FLAG_TIMESTAMP                                                 \
   "TS" /* time the hub relayed the message, in seconds since the Unix epoch */
+
+/* BBS0 named parameters.
+ *
+ * Only the names this extension introduces are listed here; BBS0 also reuses
+ * TR, SI, ID, NI, DE, TS, RT, RM, FC and TL with the meanings they carry
+ * elsewhere, so those macros are shared with the INF/SCH/RES/QUI/STA sets. */
+#define ADC_BBS_FLAG_BOARD "BD"      /* board name (protocol text, not user text) */
+#define ADC_BBS_FLAG_PERMISSIONS "PE" /* bitmask of what this session may do */
+#define ADC_BBS_FLAG_MAX_SIZE "MS"   /* largest post document the board accepts */
+#define ADC_BBS_FLAG_OLDEST "OT"     /* oldest timestamp the hub will replay */
+#define ADC_BBS_FLAG_NUM_POSTS "NP"  /* posts indexed, excluding tombstones */
+#define ADC_BBS_FLAG_SUBJECT "SJ"    /* post subject (SU is not reused: it is
+                                        bound too tightly to feature lists) */
+#define ADC_BBS_FLAG_THREAD "TH"     /* TTH of the thread root, derived by the hub */
+#define ADC_BBS_FLAG_PARENT "PA"     /* TTH of the post being replied to */
+#define ADC_BBS_FLAG_COMPOSED "DA"   /* author's claimed time of composition */
+#define ADC_BBS_FLAG_REMOVED "RM"    /* "1" = board gone / post withdrawn */
+
+/* Permission bits carried in the BBS0 "PE" field, added together in the manner
+ * of the INF "CT" field. PE tells a client what to offer the user; it is not a
+ * security boundary, and every operation is re-checked when it arrives. */
+#define ADC_BBS_PERM_SUBSCRIBE 1     /* receive the board's index entries */
+#define ADC_BBS_PERM_POST 2          /* start a new thread */
+#define ADC_BBS_PERM_REPLY 4         /* reply to an existing post */
+#define ADC_BBS_PERM_WITHDRAW_OWN 8  /* withdraw a post of one's own */
+#define ADC_BBS_PERM_WITHDRAW_ANY 16 /* withdraw any post on the board */
+
+/* Status message flags (ADC "General defined fields"), used on ISTA. */
+#define ADC_STA_FLAG_FOURCC "FC"        /* the command the status refers to */
+#define ADC_STA_FLAG_MISSING_FIELD "FM" /* name of a missing required field */
+#define ADC_STA_FLAG_BAD_FIELD "FB"     /* name of an invalid field */
 
 #define ADC_SCH_FLAG_INCLUDE "AN" /* include given search term */
 #define ADC_SCH_FLAG_EXCLUDE "NO" /* exclude given search term */
@@ -239,6 +289,8 @@ typedef uint32_t fourcc_t;
 #define ADC_STATUS_NICK_TAKEN 22         /* 22: nick already taken */
 #define ADC_STATUS_INVALID_PASSWORD 23   /* 23: invalid password */
 #define ADC_STATUS_CID_TAKEN 24          /* 24: CID already taken */
+#define ADC_STATUS_ACCESS_DENIED                                               \
+  25 /* 25: session lacks the permission the operation needs (FC field) */
 #define ADC_STATUS_REGISTERED_ONLY 26    /* 26: registered users only */
 #define ADC_STATUS_INVALID_PID 27        /* 27: invalid PID */
 #define ADC_STATUS_DISCONNECT_GENERIC 30 /* 30: generic kick/ban/disconnect */
@@ -249,5 +301,18 @@ typedef uint32_t fourcc_t;
 #define ADC_STATUS_INF_FIELD_BAD                                               \
   43 /* 43: required INF field missing or bad (FC field) */
 #define ADC_STATUS_NO_COMMON_HASH 47 /* 47: no common hash algorithm */
+
+/* BBS0 status codes. The extension defines no success message, so a status
+ * from the hub always means something went wrong, and all of these are sent at
+ * severity 1: none is a reason to disconnect a client. Where an existing ADC
+ * code above describes the condition it is used instead of one of these. */
+#define ADC_STATUS_BBS_GENERIC                                                 \
+  70 /* 70: generic bulletin board error -- unknown parent, duplicate post,    \
+        too many subscriptions */
+#define ADC_STATUS_BBS_NO_BOARD 71   /* 71: no such board (BD field) */
+#define ADC_STATUS_BBS_TOO_LARGE 72  /* 72: post document too large (MS field) */
+#define ADC_STATUS_BBS_RATE_LIMIT 75 /* 75: posting rate exceeded (TL field) */
+#define ADC_STATUS_BBS_NO_ENTRY                                                \
+  76 /* 76: no index entry for the requested post */
 
 #endif /* HAVE_UHUB_ADC_CONSTANTS_H */
