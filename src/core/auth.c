@@ -741,8 +741,10 @@ const char* acl_password_generate_challenge(struct hub_info* hub, struct hub_use
 	memcpy(buf + offset, &sid, sizeof(sid));
 	offset += sizeof(sid);
 
-	/* Add socket ID (4 bytes) */
-	uint32_t sfd = (uint32_t) net_con_get_sd(user->connection);
+	/* Add socket ID (4 bytes). Only a connecting local user is ever challenged,
+	   but users without a connection exist (federated users), so do not assume
+	   one is there. */
+	uint32_t sfd = user->connection ? (uint32_t) net_con_get_sd(user->connection) : 0;
 	memcpy(buf + offset, &sfd, sizeof(sfd));
 	offset += sizeof(sfd);
 

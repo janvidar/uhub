@@ -189,10 +189,14 @@ EXO_TEST(inf_limit_hubs_7, { CHECK_INF("BINF AAAB NIFriend IDGNSSMURMD7K466NGZIH
 
 
 /*
- * ADC0 support-cast stripping. inf_user has no connection, which counts as
- * "not confirmed TLS", so hub_handle_info_common() must drop the ADC0 feature
- * token from the SU field. EXPECT is the resulting SU value, or NULL when the
- * SU argument is expected to be removed entirely.
+ * ADCS support-cast stripping. ADCS says "I accept encrypted client-to-client
+ * connections"; ADC0 is the same claim in the spelling that predates ADCS 1.0.
+ * Both are understood, so both must be gated the same way -- gating one and not
+ * the other would leave the claim reachable under its other name.
+ *
+ * inf_user has no connection, which counts as "not confirmed TLS", so
+ * hub_handle_info_common() must drop both. EXPECT is the resulting SU value, or
+ * NULL when the SU argument is expected to be removed entirely.
  */
 static int check_su_strip(const char* line, const char* expect_su)
 {
@@ -225,8 +229,15 @@ EXO_TEST(inf_su_adc0_first, { return check_su_strip("BINF AAAB SUADC0,TCP4,UDP4\
 EXO_TEST(inf_su_adc0_mid,   { return check_su_strip("BINF AAAB SUTCP4,ADC0,UDP4\n", "TCP4,UDP4"); });
 EXO_TEST(inf_su_adc0_last,  { return check_su_strip("BINF AAAB SUTCP4,UDP4,ADC0\n", "TCP4,UDP4"); });
 EXO_TEST(inf_su_no_adc0,    { return check_su_strip("BINF AAAB SUTCP4,UDP4\n", "TCP4,UDP4"); });
-EXO_TEST(inf_su_adcs_kept,  { return check_su_strip("BINF AAAB SUADCS,TCP4\n", "ADCS,TCP4"); }); /* ADCS must not be confused with ADC0 */
-EXO_TEST(inf_su_adcs_adc0,  { return check_su_strip("BINF AAAB SUADCS,ADC0,TCP4\n", "ADCS,TCP4"); });
+/* The modern spelling is gated exactly as the old one is. Both of these
+   previously asserted that ADCS survived, which was the bug: an unencrypted
+   client could advertise encrypted transfers just by spelling it ADCS. */
+EXO_TEST(inf_su_adcs_only,   { return check_su_strip("BINF AAAB SUADCS\n", NULL); });
+EXO_TEST(inf_su_adcs_first,  { return check_su_strip("BINF AAAB SUADCS,TCP4\n", "TCP4"); });
+EXO_TEST(inf_su_adcs_mid,    { return check_su_strip("BINF AAAB SUTCP4,ADCS,UDP4\n", "TCP4,UDP4"); });
+EXO_TEST(inf_su_adcs_last,   { return check_su_strip("BINF AAAB SUTCP4,ADCS\n", "TCP4"); });
+EXO_TEST(inf_su_both_spellings, { return check_su_strip("BINF AAAB SUADCS,ADC0,TCP4\n", "TCP4"); });
+EXO_TEST(inf_su_no_adcs,     { return check_su_strip("BINF AAAB SUTCP4,UDP4\n", "TCP4,UDP4"); });
 EXO_TEST(inf_su_none,       { return check_su_strip("BINF AAAB NIFriend\n", NULL); }); /* no SU field at all */
 
 /*

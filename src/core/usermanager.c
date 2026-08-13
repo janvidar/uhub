@@ -51,6 +51,24 @@ static int uman_map_compare(const void* a, const void* b)
 	return strcmp((const char*) a, (const char*) b);
 }
 
+/**
+ * Empty and release one of the lookup maps.
+ *
+ * rb_tree_destroy() frees the tree but not its nodes, so anyone still
+ * registered at shutdown would leak one node per map. Only the nodes are
+ * dropped here: the users themselves belong to users->list and are freed from
+ * there, and their nicks and CIDs are the node keys, so they must outlive this.
+ */
+static void uman_clear_map(struct rb_tree* tree)
+{
+	struct rb_node* node;
+
+	while ((node = rb_tree_first(tree)) != NULL)
+		rb_tree_remove(tree, node->key);
+
+	rb_tree_destroy(tree);
+}
+
 
 struct hub_user_manager* uman_init(int node_id, int node_count)
 {
@@ -119,10 +137,10 @@ int uman_shutdown(struct hub_user_manager* users)
 		return -1;
 
 	if (users->nickmap)
-		rb_tree_destroy(users->nickmap);
+		uman_clear_map(users->nickmap);
 
 	if (users->cidmap)
-		rb_tree_destroy(users->cidmap);
+		uman_clear_map(users->cidmap);
 
 	if (users->list)
 	{
