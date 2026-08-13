@@ -1,0 +1,105 @@
+#!/bin/sh
+#
+# chkconfig: - 92 34
+# description: Starts and stops the uhub-seeder ( https://www.uhub.org ) seed \
+#	       cache daemon on RHEL\CentOS. It is a separate process from the \
+#	       hub: it logs into a hub as a registered bot account and serves \
+#	       files that were posted in chat. Start order is after uhub and \
+#	       stop order before it, but it does not require a local hub.
+#
+# pidfile: /var/run/uhub/uhub-seeder.pid
+# config:  /etc/uhub/uhub-seeder.conf
+
+
+
+# Source function library.
+if [ -f /etc/init.d/functions ] ; then
+  . /etc/init.d/functions
+elif [ -f /etc/rc.d/init.d/functions ] ; then
+  . /etc/rc.d/init.d/functions
+else
+  exit 1
+fi
+
+# Avoid using root's TMPDIR
+unset TMPDIR
+
+# Source networking configuration.
+. /etc/sysconfig/network
+
+if [ -f /etc/sysconfig/uhub-seeder ]; then
+   . /etc/sysconfig/uhub-seeder
+fi
+
+# Check that networking is up.
+[ ${NETWORKING} = "no" ] && exit 1
+
+# Check that bin and uhub-seeder.conf exists.
+[ -f $UHUBSEEDERBINFILE ] || exit 6
+[ -f /etc/uhub/uhub-seeder.conf ] || exit 6
+
+RETVAL=0
+
+
+start() {
+        KIND="Uhub seed cache"
+	echo -n $"Starting $KIND services: "
+	# Unlike uhub, uhub-seeder has no -u/-g option: it never needs a
+	# privileged port, so it is started as an unprivileged user instead of
+	# dropping privileges itself. That means the runtime and log
+	# directories have to be writable by that user before it starts.
+	if [ -n "$UHUBSEEDERUSER" ] ; then
+		[ -d /var/run/uhub ] || mkdir -p -m 0755 /var/run/uhub
+		[ -d /var/log/uhub ] || mkdir -p -m 0755 /var/log/uhub
+		chown $UHUBSEEDERUSER /var/run/uhub /var/log/uhub
+		daemon --user $UHUBSEEDERUSER $UHUBSEEDERBINFILE $UHUBSEEDEROPTIONS
+	else
+		daemon $UHUBSEEDERBINFILE $UHUBSEEDEROPTIONS
+	fi
+	RETVAL=$?
+        echo ""
+	return $RETVAL
+}
+
+stop() {
+        KIND="Uhub seed cache"
+	echo -n $"Shutting down $KIND services: "
+	killproc  $UHUBSEEDERBINFILE
+	RETVAL=$?
+	echo ""
+	return $RETVAL
+}
+
+restart() {
+	stop
+	start
+}
+
+rhstatus() {
+	status  $UHUBSEEDERBINFILE
+        RETVAL=$?
+        if [ $RETVAL -ne 0 ] ; then
+                return $RETVAL
+        fi
+}
+
+
+case "$1" in
+  start)
+  	start
+	;;
+  stop)
+  	stop
+	;;
+  restart)
+  	restart
+	;;
+  status)
+  	rhstatus
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|restart|status}"
+	exit 2
+esac
+
+exit $?

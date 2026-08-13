@@ -121,6 +121,19 @@ sed -E -e 's|^([[:space:]]*#?[[:space:]]*plugin[[:space:]]+)/usr/lib/uhub/|\1|' 
 rm -f "$pkg/etc/plugins.conf.body"
 
 sed -e 's|/etc/uhub/|etc/|g' doc/uhub.conf >"$pkg/etc/uhub.conf"
+
+# The seed cache daemon has its own configuration file, but only ship it where
+# the daemon itself was built. Its cache directory defaults to
+# /var/lib/uhub/seed, which is not writable from a relocatable package, so
+# point it inside the package and uncomment the key.
+if [ -f "$pkg/bin/uhub-seeder" ] || [ -f "$pkg/bin/uhub-seeder.exe" ]; then
+	sed -e 's|/etc/uhub/|etc/|g' \
+		-e 's|/var/lib/uhub/seed|seed|g' \
+		-e 's|^# seed_cache_dir = |seed_cache_dir = |' \
+		doc/uhub-seeder.conf >"$pkg/etc/uhub-seeder.conf"
+	cp doc/seedcache.txt doc/uhub-seeder.1 "$pkg/doc/"
+fi
+
 cp doc/users.conf "$pkg/etc/users.conf"
 cp doc/rules.txt  "$pkg/etc/rules.txt"
 if [ -f doc/motd.txt ]; then
@@ -159,6 +172,16 @@ Register an operator account first (mod_auth_sqlite is enabled by default):
 
     bin/uhub-passwd etc/users.db create
     bin/uhub-passwd etc/users.db add <nick> <password> admin
+
+If bin/uhub-seeder is present, it is the seed cache: a separate daemon that logs
+into a hub as a registered bot account and keeps files posted in chat available
+after the poster has left. It is not started by bin/uhub and does not read
+etc/uhub.conf. Give it a bot account, a password and a port of its own in
+etc/uhub-seeder.conf, then:
+
+    bin/uhub-seeder -c etc/uhub-seeder.conf
+
+See doc/seedcache.txt.
 
 These binaries are not code-signed.
 

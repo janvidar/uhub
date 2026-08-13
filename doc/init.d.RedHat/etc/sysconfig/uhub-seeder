@@ -1,0 +1,21 @@
+# locate bin file
+UHUBSEEDERBINFILE=/usr/bin/uhub-seeder
+
+# Run the seed cache as this user. uhub-seeder has no -u/-g option of its own,
+# so the init script drops privileges with `daemon --user` before starting it.
+# Leave empty to run it as root (not recommended).
+UHUBSEEDERUSER=uhub
+
+# Options to UHUB-SEEDER
+#  -v          Verbose mode. Add more -v's for higher verbosity.
+#  -q          Quiet mode - no output
+#  -f          Fork to background
+#  -l <file>   Log messages to given file (default: stderr)
+#  -c <file>   Specify configuration file (default: /etc/uhub/uhub-seeder.conf)
+#  -C          Check the configuration file and exit
+#  -p <file>   Store pid in file (process id)
+UHUBSEEDEROPTIONS=" -f -p /var/run/uhub/uhub-seeder.pid -l /var/log/uhub/seeder.log"
+
+# NOTE: the seeder does not read uhub.conf. It needs a registered bot account
+# on the hub and a reachable listening port of its own; both are configured in
+# /etc/uhub/uhub-seeder.conf. See uhub-seeder(1).

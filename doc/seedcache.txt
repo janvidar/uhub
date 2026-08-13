@@ -1,0 +1,609 @@
+The uhub seed cache
+-------------------
+
+uhub-seeder is a separate daemon that keeps content posted in hub chat
+available after the user who posted it has gone. This document explains what it
+does, how to set it up, what goes over the wire, what ends up on disk, and what
+an operator takes on by running it.
+
+It assumes you have a working hub. See uhub-seeder(1) for the command line, and
+getstarted.txt for the hub itself.
+
+
+1. What it is
+-------------
+
+uhub-seeder is not part of the hub and needs no support from it. It logs in as
+a registered bot account, over the same port and the same protocol as everybody
+else, and behaves as an ordinary ADC client.
+
+It watches chat for content-addressed embeds -- a magnet link naming a tiger
+tree hash (TTH) that some user has posted. When it sees one it asks that user
+for the file, downloads it over an ordinary client-to-client connection,
+verifies that what arrived hashes to the TTH that was advertised, and stores it
+in a local cache. From then on it answers TR searches for that TTH and serves
+the file to whoever asks.
+
+Two things follow from that, and they are the whole point:
+
+  * The content survives the poster leaving. The seeder is a second source, and
+    on a small hub it is usually the only one still online an hour later.
+
+  * The content is reachable on a hub where every user is passive. Two passive
+    clients cannot connect to each other at all; a passive client and the
+    active seeder can. Everything the seeder does is ordinary client behaviour,
+    so no client needs to know it exists.
+
+Nothing here changes how the hub routes chat, searches or transfers. If the
+seeder is not running, a magnet embed is still a magnet link that any DC client
+can copy, search for and download from whoever still has the file. The seeder
+only adds a source that stays.
+
+
+2. Why it is a separate process
+-------------------------------
+
+This feature used to live inside the hub, and that was the wrong place for it.
+
+The seeder parses bytes it did not ask for and cannot trust. A client-to-client
+connection is reachable by anyone who can open a socket, and its first bytes
+arrive before anything has authenticated. It does file I/O on a shared
+directory, hashes megabytes, and -- if the operator turns it on -- fetches URLs
+that users typed into chat.
+
+Inside the hub, all of that ran in the same address space and on the same
+single reactor thread as chat routing for every logged-in user. A fault
+anywhere in it took the hub down with it, and a slow or full disk stalled
+everyone, not just the transfer.
+
+As its own process it can fail on its own. Kill uhub-seeder with SIGKILL in the
+middle of a transfer and the hub does not notice: it loses a client, which hubs
+are built to survive. The cost is one more process to run, one more port to
+open, and one more address to get right.
+
+
+3. Setting it up
+----------------
+
+3.1 Register the bot account
+
+The seeder authenticates with a nick and a password, like any registered user.
+Credentials come from an auth plugin, not from the ACL file: bot, ubot, opbot
+and opubot are not accepted in users.conf, and a line using one is logged as
+obsolete and ignored. Load an auth plugin in plugins.conf, for example
+
+  plugin /usr/lib/uhub/mod_auth_sqlite.so "file=/etc/uhub/users.db"
+
+and register the account with uhub-passwd(1):
+
+  % uhub-passwd /etc/uhub/users.db add "[hub]files" "a-long-password" ubot
+
+Use ubot rather than bot. The u stands for unrestricted, and the difference
+matters here: auth_cred_is_unrestricted exempts a user from flood control and
+from the minimum search length. A seeder on a busy hub answers a lot of
+searches and issues a connect request for every transfer it takes part in, so a
+plain bot account will sooner or later trip flood_ctl_connect and start having
+its messages dropped -- which looks exactly like the seeder being broken.
+
+The nick is what users see in the user list. Pick something that reads as
+infrastructure rather than as a person.
+
+3.2 Configure the seeder
+
+The seeder has its own configuration file, /etc/uhub/uhub-seeder.conf by
+default. It does not read uhub.conf. A minimal one looks like this:
+
+  # Where to log in, and as whom.
+  seed_hub_url      = "adcs://hub.example.org:1511/"
+  seed_nick         = "[hub]files"
+  seed_password     = "a-long-random-password"
+  seed_description  = "seed cache"
+
+  # The port other clients connect to for transfers.
+  seed_client_port      = 1512
+  seed_client_bind_addr = "any"
+
+  # The certificate that port answers a TLS handshake with. Without it the
+  # seeder can only offer plain ADC/1.0, which clients refuse (section 3.3).
+  seed_tls_certificate  = "/etc/uhub/seeder.crt"
+  seed_tls_private_key  = "/etc/uhub/seeder.key"
+
+  # Where the cache lives.
+  seed_cache_dir    = "/var/lib/uhub/seed"
+  seed_cache_size   = 256      # MiB
+  seed_max_file_size = 2       # MiB
+  seed_max_entries  = 4096
+  seed_entry_ttl    = 2592000  # seconds; 30 days, 0 = never expire
+
+The remaining settings -- concurrency limits, the per-user ingest quota, the
+media type allowlist, the HTTP endpoint and URL mirroring -- are described in
+sections 6 and 8. They carry the names the hub used for the same thing, with
+the blob_ prefix replaced by seed_.
+
+Check the file without starting the daemon:
+
+  % uhub-seeder -C -c /etc/uhub/uhub-seeder.conf
+  OK
+
+3.3 The port
+
+The seeder needs a listening port of its own and it must be reachable from the
+outside. This is the one real cost of moving it out of the hub: when it lived
+inside, its client connections rode the hub's own port, so a reachable hub
+meant a reachable seeder for free.
+
+There is no way around it. A passive seeder cannot serve a passive client --
+neither side can accept a connection -- and serving passive clients is the
+reason to run one. Open the port, and forward it if the machine is behind NAT.
+
+The port serves ADCS and plain ADC at the same time, told apart from the first
+bytes of each connection exactly as the hub's own port does -- a TLS
+ClientHello is unwrapped and the ordinary CSUP exchange then runs over the
+decrypted stream. That needs a certificate: seed_tls_certificate and
+seed_tls_private_key, given together, and both PEM. Nothing verifies it, so a
+self-signed pair is fine and the hub's own pair may be reused; the peer is
+identified by the CID in its CINF, and the TLS is there for confidentiality.
+This is the second thing the split cost: inside the hub these connections rode
+the hub port, where probe.c had already unwrapped TLS, so ADCS worked for free.
+
+Configure it. Real clients require ADCS for transfers and will refuse a plain
+one, so a seeder without a certificate is a seeder nobody downloads from -- and
+its grant tokens and file contents cross the wire in cleartext. A certificate
+that is configured but cannot be loaded stops the daemon; it does not fall back
+to serving in the clear.
+
+There is deliberately no option for the address to advertise. The seeder is an
+ordinary client, so the address other users see for it is the one the hub
+observed the connection arriving from; anything the seeder put in its own INF
+is overwritten by check_network() in the hub. A seeder behind NAT is therefore
+fixed exactly like any other NATed client: the hub operator lists its address
+in the hub's existing nat_override setting. A seed_advertise_addr key would be
+a knob the hub is guaranteed to ignore.
+
+3.4 Check that it works
+
+Start it in the foreground, connect with a normal ADC client, and confirm the
+bot appears in the user list with the nick you registered. Then post a magnet
+embed (section 4) and watch the log: an ingest that works ends with a line
+naming the TTH, the size and the detected media type. From a second client,
+search for that TTH; the result should be attributed to the bot, and the
+download should complete.
+
+
+4. Posting content: the magnet embed
+------------------------------------
+
+Content is referred to by a magnet link inside a rich text (RTF0) chat message,
+in CommonMark link syntax:
+
+  ![shot.png](magnet:?xt=urn:tree:tiger:<39 char TTH>&xl=48213&dn=shot.png)
+
+A leading '!' means "render this inline as an image". Without it,
+
+  [report.pdf](magnet:?xt=urn:tree:tiger:<39 char TTH>&xl=104857&dn=report.pdf)
+
+it is a plain attachment. The seeder treats both identically; the difference is
+only a hint to the client that renders the message.
+
+The magnet is not decoration, and the format was not invented for this. It is
+exactly what DC clients already produce for "copy magnet link" and already
+understand when one is pasted into a search box. That is the entire argument
+for it: a client that has never heard of the seed cache, and never will, can
+still copy the link out of chat and search for the TTH by hand, and the seeder
+answers that search like any other. Nothing about this format asks clients to
+implement anything new. Clients that do support RTF0 rich text get an inline
+image; everybody else sees a magnet link.
+
+What is read from the link:
+
+  xt   Required, and must be exactly "urn:tree:tiger:" followed by 39
+       characters from the base32 alphabet [A-Z2-7]. A missing or malformed xt
+       discards the whole embed rather than producing a partial one.
+  xl   Optional file size in bytes. Advisory: it decides how much space is
+       reserved up front, and it is checked against what actually arrives.
+  dn   Optional display name, taken verbatim -- it is never percent-decoded,
+       never used to build a path, and never echoed into an HTTP header.
+  mt   Optional media type. Parsed and then ignored; the type is determined by
+       inspecting the file (section 8).
+
+Anything else in the magnet is ignored. The label must begin on the same line
+as the link. At most four embeds per chat message are acted on; the rest are
+skipped. A plain http:// or https:// URL in a message is not a seed embed, and
+is only fetched at all if URL mirroring is enabled (section 8).
+
+Whether a message is scanned at all depends on the poster: seed_min_credentials
+sets the lowest credential class whose posts are ingested, judged by the CT
+flag the hub publishes in the poster's INF (no CT for a guest, CT2 for a
+registered user, CT4 and up for operators). Per-user quotas limit how much any
+one account can push into the cache within a window -- seed_ingest_per_user
+files and seed_ingest_quota_kb kilobytes per seed_ingest_interval seconds.
+
+
+5. The exchange on the wire
+---------------------------
+
+All of this is ordinary ADC. The seeder speaks it as a client; nothing below
+requires hub cooperation beyond routing the messages.
+
+The client-to-client protocol strings are "ADC/1.0" for a plain connection and
+"ADCS/0.10" for a TLS one, and nothing else is accepted. ("ADCS" on its own is
+a feature token in the INF, advertising that the seeder can do TLS transfers; it
+is not a protocol string and is never sent as one. Older clients spell that
+token "ADC0", from before ADCS 1.0 -- the same vintage as the "0.10" above. The
+seeder understands both and sends "ADCS".)
+
+5.1 Who speaks first
+
+Get this wrong and both ends sit waiting for each other until the idle timeout
+kills the connection. That happened during development, so it is worth stating
+plainly, before the traces:
+
+  * The side that dialled sends CSUP first. The side that accepted answers with
+    its own CSUP.
+
+  * The side that was CONNECTED TO sends its CINF first. It does not wait for
+    the other end's CINF, and it sends this before anything has been
+    authorised -- which is safe, because a CINF discloses only a CID that is
+    already public in the user list, and nothing is served until the token is
+    checked.
+
+  * The token travels with whichever side received the connect request -- that
+    is, the side that dialled. It appears as TO<token> in that side's CINF. The
+    side that issued the token never repeats it back.
+
+Those three rules hold in every direction below. Read the traces against them.
+
+5.2 Ingest: the seeder fetches from the poster
+
+The seeder is active, so it always asks the poster to dial in. This works
+whether the poster is active or passive: a passive client cannot accept a
+connection, but it can certainly make one. There is no reverse-connect case in
+this direction.
+
+  seeder -> hub -> poster
+      DCTM <seederSID> <posterSID> ADCS/0.10 1512 <token>
+
+The token is 15 random bytes in base32, 24 characters, valid for 60 seconds,
+and good for exactly one connection -- it is consumed the moment the CINF
+quoting it is accepted, so neither a replay nor a second parallel connection
+can ride it.
+
+The poster connects to the address and port in the CTM. From there:
+
+  poster -> seeder   CSUP ADBASE ADTIGR          (the dialler speaks first)
+  seeder -> poster   CSUP ADBASE ADTIGR
+  seeder -> poster   CINF ID<seeder CID>         (connected-to side, no token)
+  poster -> seeder   CINF ID<poster CID> TO<token>
+  seeder -> poster   CGET file TTH/<tth> 0 -1
+  poster -> seeder   CSND file TTH/<tth> 0 <n>
+  poster -> seeder   <n bytes of file>
+
+The seeder checks the CSND line strictly: the TTH must be the one it asked for,
+the offset must be 0, and the length must be a real length rather than "to
+EOF", because an unknown length gives it nothing to check the body against. It
+hashes every byte as it arrives, and enforces the size limit against what has
+actually been received, not against what was announced.
+
+5.3 Serving an active client
+
+An active client sends a connect request naming its own address and a token it
+generated:
+
+  client -> hub -> seeder
+      DCTM <clientSID> <seederSID> ADC/1.0 <client port> <token>
+
+The seeder dials the client -- at the address the hub observed for that user,
+never at anything named in the CTM -- and this time it is the one that dialled:
+
+  seeder -> client   CSUP ADBASE ADTIGR          (the dialler speaks first)
+  client -> seeder   CSUP ADBASE ADTIGR
+  client -> seeder   CINF ID<client CID>         (connected-to side, no token)
+  seeder -> client   CINF ID<seeder CID> TO<token>
+  client -> seeder   CGET file TTH/<tth> 0 -1
+  seeder -> client   CSND file TTH/<tth> 0 <size>
+  seeder -> client   <size bytes of file>
+
+Note that the CINF ordering is the mirror image of 5.2 while the rule is the
+same one. The peer is identified by the CID in its CINF, and that CID must
+match the user who sent the CTM. On a TLS connection the certificate is not
+verified -- DC clients present self-signed certificates -- so the CID is the
+identity, and the TLS is there for confidentiality, not authentication.
+
+5.4 Serving a passive client
+
+A passive client has nothing to connect to, so it asks for the reverse:
+
+  client -> hub -> seeder
+      DRCM <clientSID> <seederSID> ADCS/0.10 <token>
+
+The seeder cannot dial a passive client, so it turns the request around and
+answers with a connect request of its own, naming its own address and port and
+echoing the client's token back:
+
+  seeder -> hub -> client
+      DCTM <seederSID> <clientSID> ADCS/0.10 1512 <token>
+
+The protocol in that answer is the one the client asked for, downgraded to
+ADC/1.0 only when the seeder has no certificate to answer a handshake with. A
+client that asks for ADCS and is told ADC/1.0 will usually give up, which is
+what makes seed_tls_certificate (section 3.3) worth setting.
+
+This is exactly what a passive client does when it meets an active peer, so
+nothing unusual reaches the client. It dials in, and the handshake is the one
+from 5.2 -- the seeder was connected to, so the seeder's CINF goes first
+without a token, and the client's CINF carries TO<token>:
+
+  client -> seeder   CSUP ADBASE ADTIGR
+  seeder -> client   CSUP ADBASE ADTIGR
+  seeder -> client   CINF ID<seeder CID>
+  client -> seeder   CINF ID<client CID> TO<token>
+  client -> seeder   CGET file TTH/<tth> 0 -1
+  seeder -> client   CSND file TTH/<tth> 0 <size>
+  seeder -> client   <size bytes of file>
+
+This is the case the whole feature exists for, and it is why the seeder must be
+active. If it were passive too, there would be nobody left to accept.
+
+5.5 Searches
+
+The seeder answers content searches only, and only by exact TTH. A search
+arrives as an ordinary broadcast or feature-cast:
+
+  BSCH <clientSID> TR<39 char base32 TTH> TO<search token>
+
+If the TTH is in the cache, is not blocked, and is not pending deletion, the
+seeder replies directly to the searcher:
+
+  DRES <seederSID> <clientSID> FN<name> SI<size> SL<slots> TR<tth> TO<token>
+
+FN is the stored name, or the TTH itself if there is none; SL is the number of
+upload slots; TO is echoed verbatim from the search, and omitted if the search
+carried none. A search without a TR term gets no answer at all -- there is no
+substring or filename search over the cache, by design. Results are sent over
+the hub connection; the seeder never answers over UDP.
+
+A client that asks for leaf hashes (CGET tthl) gets a recoverable error status
+rather than a dropped connection, so that it falls back to a plain file
+transfer. The cache stores files, not tiger tree leaf data.
+
+
+6. The cache
+------------
+
+The cache is content addressed. A file's name is its verified TTH:
+
+  <seed_cache_dir>/data/XX/YY/<39 char base32 TTH>.bin
+  <seed_cache_dir>/tmp/<pid>-<serial>.part
+  <seed_cache_dir>/seedcache.db
+
+XX and YY are the first two and next two characters of the TTH, to keep
+directory sizes down. Because the name is derived from a validated 39-character
+base32 string, no user-supplied byte ever reaches a path: a filename cannot be
+traversed, escaped or collided into. Directories are created with mode 0700 and
+files with 0600, after the daemon has dropped privileges, so the parent
+directory must be writable by the user it runs as.
+
+Verification is not optional and does not happen late. An ingest writes to a
+file under tmp/, hashing as it goes. Only when the last byte has arrived is the
+TTH finalised and compared. On a mismatch the temporary file is unlinked and
+nothing is published, indexed or logged as content -- only as a rejection. A
+file becomes visible to readers by being renamed into data/, which happens
+after the hash check, after the blocklist is re-checked (in case an operator
+blocked the TTH mid-transfer), and after the media type check. No unverified
+byte is ever reachable by a reader.
+
+Metadata lives in SQLite: one row per cached file with its size, detected media
+type, name, first-seen and last-access times, hit count, and the identity of
+whoever posted it; and a second table of blocked TTHs. The database is in WAL
+mode so a reader never blocks the writer, and runs with synchronous = NORMAL --
+content is re-fetchable, and metadata is not worth an fsync per row.
+
+The filesystem, not the database, is the authority for what exists. On startup
+the seeder clears tmp/, loads what the database knows, and then walks data/:
+files it does not recognise are removed, files it does recognise are adopted
+with their real on-disk size, and rows describing files that are no longer
+there are dropped. A database that has been *deleted* therefore costs
+provenance and hit counts, not content: the cached files are adopted back on
+the next start.
+
+A *corrupt* database is different. The seeder refuses to start on one rather
+than guessing at what it contains, since a half-readable index could hand out
+wrong sizes or lose the blocklist without saying so. Move the file aside and
+restart: the cache is rebuilt from the files on disk, and what is lost is the
+provenance and the blocklist, so re-apply any blocks that still matter.
+
+Limits, all enforced continuously:
+
+  seed_cache_size        Total bytes, in MiB. Over the limit, the least
+                         recently used entries are removed.
+  seed_max_entries       Total number of entries, evicted the same way.
+  seed_max_file_size     The largest single file, in MiB. Enforced against
+                         bytes actually received, so a sender that understates
+                         xl only lowers its own ceiling -- the transfer is cut
+                         off, and the truncated file would fail the hash check
+                         anyway.
+  seed_entry_ttl         How long an entry is kept, in seconds. 0 never
+                         expires. This is also how long the record of who
+                         posted what is kept, so it is the retention period for
+                         that information. Default 30 days.
+  seed_max_concurrent_ingest   Downloads into the cache at once.
+  seed_max_concurrent_upload   Transfers out of the cache at once. Beyond it,
+                         a request is refused with a "slots full" status rather
+                         than queued forever.
+
+An entry with a transfer in progress is pinned and is never evicted or expired.
+If a pinned entry is deleted, it disappears from the index immediately and the
+file is unlinked when the last reader is done; readers in flight keep the file
+they already opened. Pins are runtime state and never survive a restart.
+
+Space for an ingest is reserved up front at the announced size, so several
+concurrent ingests cannot collectively overshoot the cache size. If the disk
+returns an out-of-space or I/O error the cache marks itself degraded and
+refuses further ingests until it is restarted; it keeps serving what it already
+has.
+
+
+7. Operating it
+---------------
+
+7.1 Commands
+
+Operator commands are private messages to the bot. They are authorised by the
+CT flag in the sender's INF: CT4 (operator) and above. Anyone else gets no
+answer beyond a refusal.
+
+  stats            Cache size and entry count against their limits, how many
+                   entries are pinned, how many ingests are running, how many
+                   TTHs are blocked, and whether the cache has gone degraded.
+  list [N]         The N most recently used entries, 20 by default: TTH, size,
+                   media type and name.
+  info <tth>       Everything known about one entry, including who posted it --
+                   nick, CID and the address they connected from -- and when it
+                   was first seen.
+  del <tth>        Delete the cached copy. It can be cached again if somebody
+                   posts it once more.
+  block <tth>      Delete the copy and refuse to cache that TTH again. This is
+                   the one that makes a takedown stick.
+  unblock <tth>    Remove a TTH from the blocklist. Deliberately harder to get
+                   than block: blocking is an operator action, unblocking is an
+                   admin one.
+  purge <cid>      Delete every entry posted by one CID. What you want when a
+                   single account has been dumping things.
+  gc               Run the expiry and eviction sweep now, rather than waiting
+                   for the timer.
+
+Blocking is persistent -- it is a row in the database, and it survives a
+restart. It is also checked again just before a completed ingest is published,
+so blocking a TTH while it is being downloaded still works.
+
+7.2 What is logged, and why
+
+Every completed ingest is logged with the TTH, the size, the detected media
+type, the CID of the poster and the name that was advertised. Rejections are
+logged the same way with the reason: a hash mismatch logs both the announced
+and the computed TTH, a refused media type logs the type that was detected.
+Client-to-client protocol lines are logged as they go over the wire, because
+the ordering of those lines is the only practical way to tell which side was
+supposed to speak first when a transfer misbehaves.
+
+The durable record is the row in the database, which is the only place where
+the TTH, the nick, the CID, the address the poster connected from and the time
+it was first seen appear together. That row is what the info command prints,
+and it is what answers a complaint months later: somebody names a file, you
+look up its TTH, and you can say who posted it, from where and when. It is kept
+for seed_entry_ttl, and when the entry expires the provenance goes with it.
+
+If you expect to answer that kind of question, set seed_entry_ttl accordingly
+and back the database up. There is no other copy.
+
+7.3 What you are taking on
+
+Running a seeder means content that other people chose gets stored on your
+disk, on your machine, and is served to other people from your address. That is
+the feature, not a side effect.
+
+The seeder verifies hashes and media types; it has no idea what a file
+contains. The controls it gives you are the credential floor and the quotas
+before the fact, and delete, block and purge after it. Everything else is a
+matter for you and whoever hosts the machine. This is why the feature is off
+until an operator deliberately turns it on, and why the provenance record
+exists at all.
+
+
+8. Security notes
+-----------------
+
+The HTTP endpoint is off by default, and unauthenticated when on. With
+seed_http_enable set, it listens on seed_http_port and cached files can also be
+fetched with an ordinary HTTP GET of /seed/<tth>. There is no login: the TTH is
+the only thing standing
+between a cached file and anyone who can reach the port. It exists for the case
+where something other than a DC client has to fetch a file. Transfers work
+perfectly well without it, so leave it off unless you specifically need it.
+Unknown TTHs, blocked TTHs and malformed requests all return the same 404, so
+the endpoint cannot be used to probe what the cache holds.
+
+SVG is deliberately undetectable. The media type is decided by inspecting the
+first 64 bytes of the file; the type the poster claims in mt=, and any filename
+extension, are ignored entirely. PNG, JPEG, GIF, WebP, AVIF, HEIC, BMP and PDF
+are recognised; the default allowlist (seed_allowed_types) is PNG, JPEG, GIF
+and WebP. There is no code path that can return image/svg+xml, and this is on
+purpose rather than an omission: SVG carries script, and a client that renders
+chat in a web view would be executing it from the seeder's own origin. An SVG
+file falls through to text/plain or application/octet-stream, neither of which
+is in the default allowlist, so it is refused at ingest. Do not add SVG, HTML
+or text/plain to the allowlist.
+
+URL mirroring is off by default because it is an SSRF surface. With
+seed_url_mirror on, the seeder fetches URLs that users typed into chat, which
+means an attacker picks the destination and the seeder makes the request from
+inside your network. The defences, when it is on:
+
+  * Only http and https are parsed at all. file:, gopher:, data: and
+    scheme-relative forms are rejected, as are credentials embedded in the URL,
+    control characters, whitespace and non-ASCII bytes anywhere in it.
+  * Only the ports in seed_url_allow_ports (default 80,443), applied to the
+    effective port so an implicit 80 or 443 is checked too.
+  * The seeder resolves the host itself and checks every address it gets
+    against a deny table: loopback, RFC1918, carrier-grade NAT (100.64/10),
+    link-local -- which is where the cloud metadata address 169.254.169.254
+    lives -- IETF and documentation ranges, multicast, and on IPv6 the
+    unspecified and loopback addresses, unique-local, link-local, multicast,
+    NAT64, 6to4 and IPv4-mapped addresses. IPv4-mapped is on that list because
+    it is the classic way around a deny list that only looks at IPv4.
+  * The address check runs again on every redirect hop, on every address the
+    name resolves to. A hostname that looked fine says nothing about the
+    address, because DNS can be re-pointed between the check and the connect.
+  * Redirects are capped at seed_url_max_redirects, an https-to-http downgrade
+    is refused, and a redirect to the same URL is refused.
+  * The whole fetch is bounded by seed_url_timeout, and https certificates are
+    verified unless seed_url_verify_tls is turned off.
+  * seed_url_allow_hosts and seed_url_deny_hosts filter by hostname if you want
+    a narrower policy; the deny list wins.
+
+seed_url_allow_private switches the address checks off entirely. There is no
+safe use of it on a machine that can reach anything you care about; it exists
+for closed test setups.
+
+Connections are dialled at observed addresses only. When the seeder connects
+out to a client it uses the address the hub observed for that user, never an
+address supplied in the connect request, and it refuses ports below 1024 so it
+cannot be pointed at a privileged service. Tokens are single use and expire in
+60 seconds. Idle client-to-client connections are dropped after 30 seconds.
+
+
+9. Limitations
+--------------
+
+It must be active, and it must have its own port. Section 3.3. A passive seeder
+cannot serve a passive client, which is the case the seeder exists for.
+
+It searches by TTH only. Content is found by exact hash. There is no filename
+or substring search over the cache, and the seeder does not answer searches
+that carry no TR term.
+
+It stores files, not tiger tree leaf data, so a client asking for leaf hashes
+is told so and falls back to a plain transfer.
+
+The default file size limit is small -- 2 MiB. It is meant for the screenshots
+and small documents that get pasted into a conversation, not for distributing
+large files. Raise it deliberately, with the cache size raised to match.
+
+Successful HTTP fetches are not logged individually, so the HTTP endpoint tells
+you nothing about who downloaded what. If that matters, do not enable it.
+
+It sees everything. On a busy hub the seeder receives every broadcast search
+and every chat message, like any other client, and does the embed scan on each.
+That is ordinary client load, but it is not free.
+
+The hub is unaffected by any of this. That is the point of the split: if the
+seeder is misbehaving, stop it, and the only thing that stops with it is the
+cache.
+
+
+See also
+--------
+
+  uhub-seeder(1), uhub(1), uhub-passwd(1)
+  getstarted.txt   setting up the hub itself
+  architecture.txt the hub's login state machine and protocol overview
