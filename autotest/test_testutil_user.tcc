@@ -96,6 +96,7 @@ EXO_TEST(testutil_teardown, {
 	tu_a = 0;
 	uman_shutdown(tu_hub->users);
 	list_destroy(tu_hub->write_queue);
+	free_config(tu_hub->config);
 	hub_free(tu_hub->config);
 	hub_free(tu_hub);
 	tu_hub = 0;

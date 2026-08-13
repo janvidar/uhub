@@ -722,6 +722,7 @@ EXO_TEST(bbs_teardown, {
 	bh->bbs = 0;
 	uman_shutdown(bh->users);
 	list_destroy(bh->write_queue);
+	free_config(bh->config);
 	hub_free(bh->config);
 	hub_free(bh);
 	bh = 0;
