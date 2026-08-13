@@ -1001,14 +1001,28 @@ int hub_handle_info_common(struct hub_user* user, struct adc_message* cmd)
 	remove_server_restricted_flags(cmd);
 
 	/*
-	 * ADC0 in the support cast advertises that the client accepts
-	 * TLS client-to-client connections. Only let clients whose hub
-	 * connection is confirmed TLS advertise it; otherwise strip it so it is
-	 * not re-broadcast to other users. Fail closed: anything not provably TLS
-	 * (including a user with no connection) loses the flag.
+	 * ADCS in the support cast advertises that the client accepts TLS
+	 * client-to-client connections. ADC0 is the same claim in the spelling that
+	 * predates ADCS 1.0 -- which is why the protocol string is still
+	 * "ADCS/0.10" -- and much of the installed base still sends it, so both are
+	 * understood.
+	 *
+	 * Both are also gated: only a client whose own hub connection is confirmed
+	 * TLS may advertise either, otherwise it is stripped rather than
+	 * re-broadcast. Fail closed, and strip both spellings -- gating one and not
+	 * the other would leave the claim reachable under its other name.
 	 */
 	if (!(user->connection && net_con_is_ssl(user->connection)))
-		remove_support_feature(cmd, "ADC0");
+	{
+		int stripped = remove_support_feature(cmd, "ADCS");
+		stripped |= remove_support_feature(cmd, "ADC0");
+
+		/* Worth saying: from here on no other client can tell this one does
+		   encrypted transfers, and clients that insist on them will refuse it. */
+		if (stripped)
+			LOG_DEBUG("%s advertised encrypted client connections over a plaintext hub connection; stripped",
+				user->id.nick);
+	}
 
 	/* Update/set the feature cast flags. */
 	set_feature_cast_supports(user, cmd);

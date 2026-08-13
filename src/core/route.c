@@ -402,12 +402,37 @@ int route_to_all(struct hub_info* hub, struct adc_message* command) /* iterate u
 	return route_to_all_ex(hub, command, NULL);
 }
 
+/* Render a feature-cast list as "TCP4,NAT0" for a log line. Always terminated,
+   and truncated rather than grown: this is diagnostics, not protocol. */
+static void route_feature_list(struct linked_list* features, char* out, size_t out_size)
+{
+	char* feature;
+	size_t used = 0;
+
+	out[0] = '\0';
+	if (!features)
+		return;
+
+	LIST_FOREACH(char*, feature, features,
+	{
+		/* Feature tokens are exactly four characters, plus a separator. */
+		if (used + 6 >= out_size)
+			break;
+		if (used)
+			out[used++] = ',';
+		memcpy(out + used, feature, 4);
+		used += 4;
+	});
+	out[used] = '\0';
+}
+
 static int route_to_subscribers_ex(struct hub_info* hub, struct adc_message* command, struct adc_message* plain) /* iterate users */
 {
 	int do_send;
 	char* tmp;
 
 	struct hub_user* user;
+	size_t matched = 0;
 	hub->metrics.feature_casts++;
 	LIST_FOREACH(struct hub_user*, user, hub->users->list,
 	{
@@ -437,9 +462,29 @@ static int route_to_subscribers_ex(struct hub_info* hub, struct adc_message* com
 			});
 
 			if (do_send)
+			{
 				route_to_user(hub, user, route_rtf0_variant(user, command, plain));
+				matched++;
+			}
 		}
 	});
+
+	/*
+	 * A feature cast that reaches nobody is silent from every side: the sender
+	 * sees no answer, the would-be recipients never knew it existed, and the
+	 * hub did nothing wrong. Saying so is the only way to tell "nobody has the
+	 * file" apart from "the search was addressed to a feature nobody claims".
+	 */
+	if (!matched)
+	{
+		char inc[128];
+		char exc[128];
+
+		route_feature_list(command->feature_cast_include, inc, sizeof(inc));
+		route_feature_list(command->feature_cast_exclude, exc, sizeof(exc));
+		LOG_DEBUG("feature cast %.4s reached no users (requires \"%s\", excludes \"%s\")",
+			command->cache, inc, exc);
+	}
 
 	return 0;
 }
