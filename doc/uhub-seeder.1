@@ -1,0 +1,88 @@
+.TH UHUB-SEEDER 1 "August 2026"
+.\" Please adjust this date whenever revising the manpage.
+.SH NAME
+uhub\-seeder \- seed cache daemon for the uhub ADC hub
+.SH SYNOPSIS
+.B uhub\-seeder
+.RI [ options ]
+.SH DESCRIPTION
+uhub\-seeder keeps content posted in hub chat available after the user who
+posted it has left.
+.PP
+It is not part of the hub. It logs into a uhub as a registered bot account and
+behaves as an ordinary ADC client: it appears in the user list, watches chat
+for content\-addressed embeds, downloads the referenced file from the user who
+posted it, verifies the file against its TTH and stores it in a local cache.
+From then on it answers
+.B TR
+searches for that TTH and serves the file over ordinary client\-to\-client
+connections, so the content stays reachable on a hub where every other user is
+passive, and remains reachable after the poster disconnects.
+.PP
+Because it runs as a separate process it can fail without affecting the hub.
+Nothing it does needs hub internals, and a crash, a stalled disk or a hostile
+input costs the operator the seed cache and nothing else.
+.PP
+uhub\-seeder needs a listening port of its own and must be reachable from the
+outside; a passive seeder cannot serve passive clients, which is the entire
+point of running one. See
+.B doc/seedcache.txt
+for setup, the embed format, the wire exchange, operator commands and the
+security considerations.
+.SH "OPTIONS"
+.TP
+.BI \^\-v
+Verbose mode, add more \-v's for higher verbosity.
+.TP
+.BI \^\-q
+Quiet mode, if quiet mode is enabled no output or logs are made.
+.TP
+.BI \^\-f
+Fork uhub\-seeder to background in order to run it as a daemon.
+.TP
+.BI \^\-l " logfile"
+Log messages to the given logfile (default: stderr)
+.TP
+.BI \^\-c " config"
+Specify configuration file (default: /etc/uhub/uhub\-seeder.conf)
+.TP
+.BI \^\-C
+Check configuration file and return. Will print either "OK" or "ERROR".
+.TP
+.BI \^\-p " pidfile"
+Write the process id to the given file, and remove it on exit.
+.TP
+.BI \^\-h
+Show the help message.
+.TP
+.BI \^\-V
+Show the version number
+.SH EXAMPLES
+To run uhub\-seeder as a daemon, logging to a file and writing a pid file:
+.TP
+.B uhub\-seeder " -f -l /var/log/uhub/seeder.log -p /run/uhub/seeder.pid"
+.SH FILES
+.TP
+.I /etc/uhub/uhub\-seeder.conf
+Default configuration file. It is a separate file from
+.IR uhub.conf ;
+the seeder does not read the hub's configuration.
+.TP
+.I /var/lib/uhub/seed/
+Default seed cache directory. It holds the cached files, each named after its
+verified TTH, and the SQLite database of cache metadata. The directory is
+created with mode 0700.
+.SH "SEE ALSO"
+.BR uhub (1),
+.BR uhub\-passwd (1)
+.SH AUTHOR
+This program was written by Jan Vidar Krey <janvidar@extatic.org>
+.SH COPYRIGHT
+Copyright (C) 2007\-2026 Jan Vidar Krey.
+.PP
+This is free software, distributed under the terms of the GNU General Public
+License version 3 or later. There is NO warranty; not even for MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "BUG REPORTS"
+If you find a bug in uhub please report it to
+.B https://github.com/janvidar/uhub/issues

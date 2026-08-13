@@ -1,0 +1,19 @@
+# Log rotate for the uhub seed cache daemon
+# see man logrotate
+#
+# copytruncate rather than a postrotate signal: uhub-seeder installs handlers
+# only for SIGINT, SIGTERM and SIGPIPE, so a HUP would kill it rather than make
+# it reopen its log. It keeps the log file open across a rename, so truncating
+# the file it already has is the only thing that works.
+#
+/var/log/uhub/seeder.log {
+        compress
+        copytruncate
+        size 10M
+        rotate 10
+        missingok
+        notifempty
+
+
+}
+
