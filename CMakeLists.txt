@@ -579,20 +579,27 @@ if (FUZZING)
 			LINK_FLAGS "-fsanitize=address,undefined,fuzzer")
 	endmacro()
 
+	# A fuzz target that compiles the hub core in (same source set as
+	# autotest-bin, minus main.c / gen_config.c). The core carries the BBS0
+	# index, so every one of these needs SQLite whether or not the harness
+	# itself touches a board.
+	macro(add_core_fuzzer name source)
+		add_fuzzer(${name} ${source} ${uhub_SOURCES})
+		target_link_libraries(${name} SQLite::SQLite3)
+	endmacro()
+
 	add_fuzzer(fuzz_message      ${UHUB_SOURCE_DIR}/tools/fuzz_message.c)
 	add_fuzzer(fuzz_adc_escape   ${UHUB_SOURCE_DIR}/tools/fuzz_adc_escape.c)
 	add_fuzzer(fuzz_ipcalc       ${UHUB_SOURCE_DIR}/tools/fuzz_ipcalc.c)
 	add_fuzzer(fuzz_config_token ${UHUB_SOURCE_DIR}/tools/fuzz_config_token.c)
-	# command_parse() lives in the hub core, so compile the core objects in
-	# (same source set as autotest-bin, minus main.c / gen_config.c).
-	add_fuzzer(fuzz_command_parser ${UHUB_SOURCE_DIR}/tools/fuzz_command_parser.c ${uhub_SOURCES})
+	# command_parse() lives in the hub core.
+	add_core_fuzzer(fuzz_command_parser ${UHUB_SOURCE_DIR}/tools/fuzz_command_parser.c)
 	# metrics_classify_request() likewise lives in the hub core.
-	add_fuzzer(fuzz_metrics        ${UHUB_SOURCE_DIR}/tools/fuzz_metrics.c ${uhub_SOURCES})
+	add_core_fuzzer(fuzz_metrics        ${UHUB_SOURCE_DIR}/tools/fuzz_metrics.c)
 	# hub_handle_info_login() (the connect-time INF checks) is in the hub core too.
-	add_fuzzer(fuzz_login          ${UHUB_SOURCE_DIR}/tools/fuzz_login.c ${uhub_SOURCES})
+	add_core_fuzzer(fuzz_login          ${UHUB_SOURCE_DIR}/tools/fuzz_login.c)
 	# The BBS0 commands live in the hub core and pull in the SQLite index.
-	add_fuzzer(fuzz_bbs            ${UHUB_SOURCE_DIR}/tools/fuzz_bbs.c ${uhub_SOURCES})
-	target_link_libraries(fuzz_bbs SQLite::SQLite3)
+	add_core_fuzzer(fuzz_bbs            ${UHUB_SOURCE_DIR}/tools/fuzz_bbs.c)
 endif()
 
 configure_file ("${UHUB_SOURCE_DIR}/version.h.in" "${PROJECT_BINARY_DIR}/version.h")
