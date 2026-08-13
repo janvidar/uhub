@@ -86,6 +86,24 @@ extern struct adc_message* adc_msg_parse_verify(struct hub_user* u, const char* 
 extern struct adc_message* adc_msg_parse(const char* string, size_t length);
 
 /**
+ * Parse a client-to-client ('C' context) command.
+ *
+ * Accepts ONLY the 'C' prefix; every hub context (B/D/E/F/H/I/U) is rejected.
+ * Shares all the UTF-8, escape and length validation of adc_msg_parse().
+ * The returned message always has source and target set to 0, since a
+ * client connection has no SID space.
+ *
+ * NOTE: this is deliberately a separate entry point. adc_msg_parse() must
+ * keep rejecting 'C', because adc_msg_parse_verify() cannot check a
+ * client-to-client message against the sender's SID (there is none), so
+ * letting 'C' through the hub-side parser would bypass the anti-spoofing
+ * check rather than fail it.
+ *
+ * @return a new message, or NULL if the line is not a valid C context command.
+ */
+extern struct adc_message* adc_msg_parse_client(const char* line, size_t length);
+
+/**
  * This will construct a adc_message based on 'string'.
  * Only to be used for server generated commands.
  */
@@ -261,8 +279,10 @@ void adc_msg_unterminate(struct adc_message* cmd);
 /**
  * @return the offset for the first command argument in msg->cache.
  * or -1 if the command is not understood.
- * NOTE: for 'U' and 'C' commands (normally not seen by hubs),
- * this returns 4. Should be 4 + lengthOf(cid).
+ * NOTE: 'C' commands (only produced by adc_msg_parse_client()) return 4,
+ * as they carry neither a SID nor a CID. 'U' commands return -1: their
+ * real offset is 4 + lengthOf(cid), which is not a constant, and the hub
+ * never handles them.
  */
 int adc_msg_get_arg_offset(struct adc_message* msg);
 

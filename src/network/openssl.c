@@ -21,12 +21,14 @@
 #include "util/memory.h"
 #include "util/misc.h"
 #include "network/connection.h"
+#include "network/ipcalc.h"
 #include "network/network.h"
 #include "network/common.h"
 #include "network/tls.h"
 #include "network/backend.h"
 
 #include <openssl/x509.h>
+#include <openssl/x509v3.h>
 #include <openssl/sha.h>
 
 /*
@@ -68,6 +70,7 @@ struct net_ssl_openssl
 struct net_context_openssl
 {
 	SSL_CTX* ssl;
+	char* client_verify_host; /* Identity required of the peer, and the SNI sent, on client handshakes. NULL = no verification. */
 };
 
 static struct net_ssl_openssl* get_handle(struct net_connection* con)
@@ -280,10 +283,65 @@ struct ssl_context_handle* net_ssl_context_create(const char* tls_version, const
 	return (struct ssl_context_handle*) ctx;
 }
 
+int net_ssl_context_set_client_verify(struct ssl_context_handle* ctx_, const char* hostname)
+{
+	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
+	X509_VERIFY_PARAM* param;
+	char* copy;
+
+	if (!ctx || !ctx->ssl || !hostname || !*hostname)
+		return 0;
+
+	if (SSL_CTX_set_default_verify_paths(ctx->ssl) != 1)
+	{
+		LOG_ERROR("net_ssl_context_set_client_verify: no system certificate trust store: %s",
+			ERR_error_string(ERR_get_error(), NULL));
+		return 0;
+	}
+
+	param = SSL_CTX_get0_param(ctx->ssl);
+	if (!param)
+	{
+		LOG_ERROR("net_ssl_context_set_client_verify: no verification parameters on the context.");
+		return 0;
+	}
+
+	X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+
+	/*
+	 * An IP literal must be checked against the iPAddress SANs; passed to
+	 * set1_host() it would be compared as a DNS name and could never match.
+	 * set1_ip_asc() rejects anything that is not an address, which is exactly
+	 * the discrimination needed here -- but it leaves an entry on the error
+	 * queue when it does, so clear that before the handshake reads it.
+	 */
+	if (X509_VERIFY_PARAM_set1_ip_asc(param, hostname) != 1)
+	{
+		ERR_clear_error();
+		if (X509_VERIFY_PARAM_set1_host(param, hostname, 0) != 1)
+		{
+			LOG_ERROR("net_ssl_context_set_client_verify: unable to require the peer identity \"%s\".", hostname);
+			return 0;
+		}
+	}
+
+	copy = hub_strdup(hostname);
+	if (!copy)
+		return 0;
+
+	SSL_CTX_set_verify(ctx->ssl, SSL_VERIFY_PEER, NULL);
+	SSL_CTX_set_verify_depth(ctx->ssl, 9);
+
+	hub_free(ctx->client_verify_host);
+	ctx->client_verify_host = copy;
+	return 1;
+}
+
 void net_ssl_context_destroy(struct ssl_context_handle* ctx_)
 {
 	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
 	SSL_CTX_free(ctx->ssl);
+	hub_free(ctx->client_verify_host);
 	hub_free(ctx);
 }
 
@@ -321,15 +379,44 @@ int ssl_check_private_key(struct ssl_context_handle* ctx_)
 	return 1;
 }
 
-int net_ssl_get_keyprint(struct ssl_context_handle* ctx_, char* out, size_t out_size)
+/**
+ * The shared half of the keyprint accessors: hash @p cert and format the KEYP.
+ * Used for both the certificate installed in one of our own contexts and the
+ * one a peer presented, which must be fingerprinted identically or the two
+ * could never be compared.
+ */
+static int keyprint_from_x509(X509* cert, const char* who, char* out, size_t out_size)
 {
-	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
-	X509* cert;
 	unsigned char* der = NULL;
 	int der_len;
 	unsigned char digest[SHA256_DIGEST_LENGTH];
 	char b32[(SHA256_DIGEST_LENGTH * 8 + 4) / 5 + 1]; /* 52 base32 chars + NUL */
 	int n;
+
+	/* ADC KEYP hashes the DER (ASN.1) encoding of the certificate with SHA256. */
+	der_len = i2d_X509(cert, &der);
+	if (der_len <= 0 || !der)
+	{
+		LOG_ERROR("%s: i2d_X509 failed: %s", who, ERR_error_string(ERR_get_error(), NULL));
+		return 0;
+	}
+
+	SHA256(der, (size_t) der_len, digest);
+	OPENSSL_free(der);
+
+	base32_encode(digest, sizeof(digest), b32);
+
+	/* KEYP form: "<hash-name>/<base32>", e.g. "SHA256/G3PJC4F4MQ5KOX...". */
+	n = snprintf(out, out_size, "SHA256/%s", b32);
+	if (n < 0 || (size_t) n >= out_size)
+		return 0;
+	return 1;
+}
+
+int net_ssl_get_keyprint(struct ssl_context_handle* ctx_, char* out, size_t out_size)
+{
+	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
+	X509* cert;
 
 	if (!ctx || !ctx->ssl || !out || out_size == 0)
 		return 0;
@@ -344,24 +431,71 @@ int net_ssl_get_keyprint(struct ssl_context_handle* ctx_, char* out, size_t out_
 		return 0;
 	}
 
-	/* ADC KEYP hashes the DER (ASN.1) encoding of the certificate with SHA256. */
-	der_len = i2d_X509(cert, &der);
-	if (der_len <= 0 || !der)
-	{
-		LOG_ERROR("net_ssl_get_keyprint: i2d_X509 failed: %s", ERR_error_string(ERR_get_error(), NULL));
+	return keyprint_from_x509(cert, "net_ssl_get_keyprint", out, out_size);
+}
+
+int net_ssl_get_peer_keyprint(struct net_connection* con, char* out, size_t out_size)
+{
+	struct net_ssl_openssl* handle;
+	X509* cert;
+	int ret;
+
+	if (!con || !out || out_size == 0)
 		return 0;
-	}
 
-	SHA256(der, (size_t) der_len, digest);
-	OPENSSL_free(der);
-
-	base32_encode(digest, sizeof(digest), b32);
-
-	/* KEYP form: "<hash-name>/<base32>", e.g. "SHA256/G3PJC4F4MQ5KOX...". */
-	n = snprintf(out, out_size, "SHA256/%s", b32);
-	if (n < 0 || (size_t) n >= out_size)
+	/* Not a TLS connection, or the handshake never got far enough to have a
+	   handle: there is no peer certificate to speak of. */
+	handle = (struct net_ssl_openssl*) con->ssl;
+	if (!handle || !handle->ssl)
 		return 0;
-	return 1;
+
+	/*
+	 * OpenSSL 3.0 renamed this to SSL_get1_peer_certificate() and leaves the
+	 * old name only as a deprecated macro; LibreSSL >= 3.4 always has the old
+	 * name, and only grew the new one later. Either way the reference returned
+	 * is ours to free.
+	 */
+#if defined(LIBRESSL_VERSION_NUMBER)
+	cert = SSL_get_peer_certificate(handle->ssl);
+#else
+	cert = SSL_get1_peer_certificate(handle->ssl);
+#endif
+	if (!cert)
+		return 0;
+
+	ret = keyprint_from_x509(cert, "net_ssl_get_peer_keyprint", out, out_size);
+	X509_free(cert);
+	return ret;
+}
+
+/** ASCII fold to upper case without branching on the character value. */
+static unsigned char keyprint_upper(unsigned char c)
+{
+	unsigned int d = (unsigned int) ((c - 'a') & 0xff);
+	unsigned int is_lower = ((d - 26u) >> 8) & 1u;  /* 1 exactly when c is 'a'..'z' */
+	return (unsigned char) (c - (is_lower * 32u));
+}
+
+int net_ssl_keyprint_equal(const char* a, const char* b)
+{
+	size_t len;
+	size_t i;
+	unsigned char diff = 0;
+
+	if (!a || !b)
+		return 0;
+
+	len = strlen(a);
+	if (len == 0 || len != strlen(b))
+		return 0;
+
+	/* Base32 is case-insensitive and so is the hash name, so both sides are
+	   folded; the loop runs to the end regardless of where the first
+	   difference is, so nothing is learned from how long the answer took. */
+	for (i = 0; i < len; i++)
+		diff |= (unsigned char) (keyprint_upper((unsigned char) a[i]) ^ keyprint_upper((unsigned char) b[i]));
+
+	return diff == 0;
 }
 
 static int handle_openssl_error(struct net_connection* con, int ret, int read)
@@ -483,6 +617,16 @@ ssize_t net_con_ssl_handshake(struct net_connection* con, enum net_con_ssl_mode 
 	}
 	else
 	{
+		/* Send SNI when the context requires a named identity of the peer: a
+		   virtual-hosted server would otherwise answer with its default
+		   certificate, which then fails that very check. RFC 6066 forbids a
+		   literal address in SNI, so an IP identity sends none. */
+		if (ctx->client_verify_host
+			&& !ip_is_valid_ipv4(ctx->client_verify_host)
+			&& !ip_is_valid_ipv6(ctx->client_verify_host))
+		{
+			SSL_set_tlsext_host_name(handle->ssl, ctx->client_verify_host);
+		}
 		return net_con_ssl_connect(con);
 	}
 }
