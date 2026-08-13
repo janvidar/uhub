@@ -21,6 +21,7 @@ const util_sources = [_][]const u8{
     "src/util/rbtree.c",
     "src/util/threads.c",
     "src/util/tiger.c",
+    "src/util/tth.c",
 };
 
 const network_sources = [_][]const u8{
@@ -113,6 +114,7 @@ const tcc_sources = [_][]const u8{
     "test_tls.tcc",
     "test_testutil_user.tcc",
     "test_tokenizer.tcc",
+    "test_tth.tcc",
     "test_usermanager.tcc",
 };
 
