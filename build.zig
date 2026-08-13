@@ -73,6 +73,30 @@ const core_sources = [_][]const u8{
     "src/core/usermanager.c",
 };
 
+// All of src/seeder/*.c: the hub-agnostic half of the blob/seed cache, on its
+// way out into a separate uhub-seeder daemon. Built alongside core_sources for
+// as long as the hub still calls into it.
+// The uhub-seeder daemon. The hub links none of these -- that is the point of
+// the split. autotest-bin takes them all bar main.c.
+const seeder_sources = [_][]const u8{
+    "src/seeder/embed.c",
+    "src/seeder/fetch.c",
+    "src/seeder/http.c",
+    "src/seeder/sniff.c",
+    "src/seeder/url.c",
+};
+
+// The rest of the daemon; main.c is excluded from autotest-bin, which has its
+// own.
+const seeder_daemon_sources = [_][]const u8{
+    "src/seeder/cache.c",
+    "src/seeder/cc.c",
+    "src/seeder/commands.c",
+    "src/seeder/config.c",
+    "src/seeder/grant.c",
+    "src/seeder/hubconn.c",
+};
+
 // autotest/test_*.tcc sources, sorted, mirroring the `file(GLOB ...)` +
 // `list(SORT ...)` in CMakeLists.txt. Kept as an explicit list (like the C
 // source sets above) rather than globbed at build time; add a new .tcc here.
@@ -108,6 +132,17 @@ const tcc_sources = [_][]const u8{
     "test_regserver.tcc",
     "test_route.tcc",
     "test_rtf0.tcc",
+    "test_seedcache.tcc",
+    "test_seedcc.tcc",
+    "test_seedcommands.tcc",
+    "test_seedconfig.tcc",
+    "test_seedembed.tcc",
+    "test_seedfetch.tcc",
+    "test_seedgrant.tcc",
+    "test_seedhub.tcc",
+    "test_seedhttp.tcc",
+    "test_seedsniff.tcc",
+    "test_seedurl.tcc",
     "test_sid.tcc",
     "test_tiger.tcc",
     "test_timer.tcc",
@@ -458,6 +493,11 @@ pub fn build(b: *std.Build) void {
     const autotest: ?*std.Build.Step.Compile = if (is_windows or !tests) null else blk: {
         const autotest_mod = ctx.module();
         ctx.addSources(autotest_mod, &core_sources);
+        ctx.addSources(autotest_mod, &seeder_sources);
+        ctx.addSources(autotest_mod, &seeder_daemon_sources);
+        // hubconn.c is built on the ADC client; ioqueue.c already comes in via
+        // core_sources, so only adcclient.c is added here.
+        ctx.addSources(autotest_mod, &.{"src/tools/adcclient.c"});
         // mod_auth_sqlite.c is compiled in (not just built as a loadable
         // module) so test_mod_auth_sqlite.tcc can drive its auth functions
         // directly via plugin_register(); it pulls in SQLite, hence addSqlite.
