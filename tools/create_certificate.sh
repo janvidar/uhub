@@ -8,9 +8,7 @@ if [ ! -x ${OPENSSL} ]; then
 	exit 1
 fi
 
-${OPENSSL} genrsa -out ${NAME}.key 1024 &&
-${OPENSSL} req -new -x509 -nodes -sha1 -days 365 -key ${NAME}.key > ${NAME}.crt &&
+${OPENSSL} req -x509 -newkey ed25519 -keyout ${NAME}.key -out ${NAME}.crt -days 3650 -nodes -subj "/CN=uhub" 2>/dev/null
 cat ${NAME}.key ${NAME}.crt > ${NAME}.pem && rm -f ${NAME}.key ${NAME}.crt
-
 echo "Created certificate ${NAME}.pem"
 
