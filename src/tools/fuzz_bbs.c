@@ -78,7 +78,6 @@ int LLVMFuzzerInitialize(int* argc, char*** argv)
 
 	g_hub->bbs = hub_malloc_zero(sizeof(struct bbs_handle));
 	g_hub->bbs->boards = list_create();
-	g_hub->bbs->index = bbs_index_open(":memory:");
 
 	/* One board a guest may do everything on and one it may only read, so both
 	   the permitted and the refused paths are reachable. */
@@ -106,6 +105,18 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
 		return 0;
 	}
 
+	/* A fresh index per input, not one shared by the whole run: an index that
+	   accumulated every post ever fuzzed would make a crash depend on the order
+	   the corpus happened to be scheduled in, so the artifact libFuzzer writes
+	   out would not reproduce it. It also keeps replay bounded. */
+	g_hub->bbs->index = bbs_index_open(":memory:");
+	if (!g_hub->bbs->index)
+	{
+		hub_free(con);
+		hub_free(u);
+		return 0;
+	}
+
 	u->hub = g_hub;
 	u->connection = con;
 	u->send_queue = ioq_send_create();
@@ -120,6 +131,8 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
 	if (!line || !u->send_queue)
 	{
 		ioq_send_destroy(u->send_queue);
+		bbs_index_close(g_hub->bbs->index);
+		g_hub->bbs->index = NULL;
 		hub_free(line);
 		hub_free(con);
 		hub_free(u);
@@ -151,6 +164,8 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
 	if (user_flag_get(u, flag_dirty))
 		list_remove(g_hub->write_queue, u);
 	ioq_send_destroy(u->send_queue);
+	bbs_index_close(g_hub->bbs->index);
+	g_hub->bbs->index = NULL;
 	hub_free(line);
 	hub_free(con);
 	hub_free(u);
