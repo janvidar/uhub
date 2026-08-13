@@ -269,6 +269,16 @@ list (REMOVE_ITEM uhub_SOURCES
 	${UHUB_SOURCE_DIR}/core/main.c
 )
 
+# The hub-agnostic half of the blob/seed cache. These will become their own
+# uhub-seeder daemon; until the hub is unwired from them they are still compiled
+# into anything that links the hub core.
+file (GLOB seeder_SOURCES CONFIGURE_DEPENDS ${UHUB_SOURCE_DIR}/seeder/*.c)
+
+
+# autotest-bin exercises the daemon's modules too, but never its main().
+set (seeder_test_SOURCES ${seeder_SOURCES})
+list (REMOVE_ITEM seeder_test_SOURCES ${UHUB_SOURCE_DIR}/seeder/main.c)
+
 file (GLOB adc_SOURCES     CONFIGURE_DEPENDS ${UHUB_SOURCE_DIR}/adc/*.c)
 file (GLOB network_SOURCES CONFIGURE_DEPENDS ${UHUB_SOURCE_DIR}/network/*.c)
 file (GLOB utils_SOURCES   CONFIGURE_DEPENDS ${UHUB_SOURCE_DIR}/util/*.c)
@@ -281,6 +291,13 @@ set (adcclient_SOURCES
 add_library(adc       STATIC ${adc_SOURCES})
 add_library(network   STATIC ${network_SOURCES})
 add_library(utils     STATIC ${utils_SOURCES})
+
+# The seed cache daemon: every seeder module, plus the ADC client it uses to log
+# into the hub (adcclient_SOURCES also carries core/ioqueue.c, which adcclient
+# needs and which is not otherwise linked here).
+add_executable(uhub-seeder ${seeder_SOURCES} ${adcclient_SOURCES})
+target_link_libraries(uhub-seeder adc network utils SQLite::SQLite3)
+
 
 # utils and network are linked into the loadable mod_*.so plugins, so they
 # need position-independent code.
@@ -348,8 +365,13 @@ exotic_add_tests(autotest-bin
 # mod_auth_sqlite.c is compiled into the test binary (not just built as a
 # loadable module) so test_mod_auth_sqlite.tcc can drive its auth functions
 # directly via plugin_register(); it pulls in SQLite, hence the extra link.
+# The seeder's hub connection is built on tools/adcclient.c, so the tests need
+# it too. Listed directly rather than via adcclient_SOURCES, which also names
+# core/ioqueue.c -- already here through the core glob, and a duplicate symbol.
 target_sources(autotest-bin PRIVATE
 	${uhub_SOURCES}
+	${seeder_test_SOURCES}
+	${UHUB_SOURCE_DIR}/tools/adcclient.c
 	${UHUB_SOURCE_DIR}/plugins/mod_auth_sqlite.c)
 target_include_directories(autotest-bin PRIVATE ${AUTOTEST_DIR})
 # Absolute path to the autotest/ dir so tests can locate checked-in fixtures
@@ -532,6 +554,7 @@ message (STATUS "Configuring uhub version: ${UHUB_GIT_VERSION}")
 set(SSL_LIBS OpenSSL::SSL OpenSSL::Crypto)
 
 target_link_libraries(uhub ${SSL_LIBS})
+target_link_libraries(uhub-seeder ${SSL_LIBS})
 if (UHUB_TESTS)
 	target_link_libraries(autotest-bin PRIVATE ${SSL_LIBS})
 endif()
@@ -610,10 +633,14 @@ if (LOWLEVEL_DEBUG)
 endif()
 
 if (UNIX)
-	install( TARGETS uhub uhub-passwd RUNTIME DESTINATION bin )
+	install( TARGETS uhub uhub-passwd uhub-seeder RUNTIME DESTINATION bin )
 	install( TARGETS mod_example mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_selfregister mod_chat_history mod_chat_history_sqlite mod_chat_only mod_chat_is_privileged mod_topic mod_no_guest_downloads mod_flood mod_ucmd DESTINATION /usr/lib/uhub/ OPTIONAL )
 	if(JAVASCRIPT_SUPPORT)
 		install( TARGETS mod_javascript DESTINATION /usr/lib/uhub/ OPTIONAL )
 	endif()
 	install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub.conf ${CMAKE_CURRENT_SOURCE_DIR}/doc/plugins.conf ${CMAKE_CURRENT_SOURCE_DIR}/doc/rules.txt ${CMAKE_CURRENT_SOURCE_DIR}/doc/motd.txt ${CMAKE_CURRENT_SOURCE_DIR}/doc/boards.conf DESTINATION /etc/uhub OPTIONAL )
+	# The seeder config carries a cleartext password for its bot account, so it
+	# is installed private rather than world readable like the hub's.
+	install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub-seeder.conf DESTINATION /etc/uhub
+		PERMISSIONS OWNER_READ OWNER_WRITE OPTIONAL )
 endif()
