@@ -779,6 +779,318 @@ EXO_TEST(adc_message_timestamp_readback, {
 	return ok;
 });
 
+/*
+ * Client-to-client ('C' context) parsing, via adc_msg_parse_client().
+ *
+ * This is a separate entry point on purpose: adc_msg_parse() must keep
+ * rejecting 'C', because adc_msg_parse_verify() checks command->source
+ * against the sending user's SID, and a C context message carries no source
+ * SID at all (source stays 0). Relaxing adc_msg_parse() would therefore
+ * silently *skip* the anti-spoofing check rather than fail it.
+ */
+EXO_TEST(adc_message_parse_client_csup, {
+	const char* line = "CSUP ADBASE ADTIGR\n";
+	struct adc_message* msg = adc_msg_parse_client(line, strlen(line));
+	int ok = msg != NULL;
+	if (ok)
+		ok = (msg->cmd == FOURCC('C','S','U','P') && msg->source == 0 && msg->target == 0);
+	adc_msg_free(msg);
+	return ok;
+});
+
+EXO_TEST(adc_message_parse_client_cinf, {
+	const char* line = "CINF IDAN7ZMSLIEBL53OPTM7WXGSTXUS3XOY6KQS5LBGX\n";
+	struct adc_message* msg = adc_msg_parse_client(line, strlen(line));
+	int ok = msg != NULL;
+	if (ok)
+		ok = (msg->cmd == FOURCC('C','I','N','F') && msg->source == 0 && msg->target == 0);
+	adc_msg_free(msg);
+	return ok;
+});
+
+/* The 'C' context carries no SID and no CID, so arg offset 4 is correct
+ * and every space separated token is retrievable as an argument. */
+EXO_TEST(adc_message_parse_client_cget, {
+	const char* line = "CGET file TTH/XXXX 0 -1\n";
+	struct adc_message* msg = adc_msg_parse_client(line, strlen(line));
+	char* arg0 = NULL;
+	char* arg1 = NULL;
+	char* arg2 = NULL;
+	char* arg3 = NULL;
+	int ok = msg != NULL;
+	if (ok)
+	{
+		arg0 = adc_msg_get_argument(msg, 0);
+		arg1 = adc_msg_get_argument(msg, 1);
+		arg2 = adc_msg_get_argument(msg, 2);
+		arg3 = adc_msg_get_argument(msg, 3);
+		ok = (arg0 && strcmp(arg0, "file") == 0 &&
+		      arg1 && strcmp(arg1, "TTH/XXXX") == 0 &&
+		      arg2 && strcmp(arg2, "0") == 0 &&
+		      arg3 && strcmp(arg3, "-1") == 0);
+	}
+	hub_free(arg0);
+	hub_free(arg1);
+	hub_free(arg2);
+	hub_free(arg3);
+	adc_msg_free(msg);
+	return ok;
+});
+
+EXO_TEST(adc_message_parse_client_get_arg_offset, {
+	const char* line = "CGET file TTH/XXXX 0 -1\n";
+	struct adc_message* msg = adc_msg_parse_client(line, strlen(line));
+	int ok = msg && adc_msg_get_arg_offset(msg) == 4;
+	adc_msg_free(msg);
+	return ok;
+});
+
+/*
+ * ADC_MSG_ASSERT() checks length == strlen(cache) in debug builds, so a
+ * message the parser produces must never contain an embedded NUL. Assert it
+ * here too, since release builds compile the assert out.
+ */
+EXO_TEST(adc_message_parse_client_cache_invariant, {
+	const char* line = "CSUP ADBASE ADTIGR\n";
+	struct adc_message* msg = adc_msg_parse_client(line, strlen(line));
+	int ok = msg && msg->length == strlen(msg->cache) && msg->length <= msg->capacity;
+	adc_msg_free(msg);
+	return ok;
+});
+
+EXO_TEST(adc_message_parse_client_embedded_nul, {
+	struct adc_message* msg = adc_msg_parse_client("CSTA 000\0hi\n", 12);
+	return msg == NULL;
+});
+
+/* adc_msg_parse_client() rejects every hub context. */
+EXO_TEST(adc_message_parse_client_rejects_b, {
+	const char* line = "BMSG AAAA hello\n";
+	struct adc_message* msg = adc_msg_parse_client(line, strlen(line));
+	return msg == NULL;
+});
+
+EXO_TEST(adc_message_parse_client_rejects_d, {
+	const char* line = "DMSG AAAA BBBB hi\n";
+	struct adc_message* msg = adc_msg_parse_client(line, strlen(line));
+	return msg == NULL;
+});
+
+EXO_TEST(adc_message_parse_client_rejects_e, {
+	const char* line = "EMSG AAAA BBBB hi\n";
+	struct adc_message* msg = adc_msg_parse_client(line, strlen(line));
+	return msg == NULL;
+});
+
+EXO_TEST(adc_message_parse_client_rejects_f, {
+	const char* line = "FSCH AAAA +TCP4 ANfoo\n";
+	struct adc_message* msg = adc_msg_parse_client(line, strlen(line));
+	return msg == NULL;
+});
+
+EXO_TEST(adc_message_parse_client_rejects_h, {
+	const char* line = "HSUP ADBASE ADTIGR\n";
+	struct adc_message* msg = adc_msg_parse_client(line, strlen(line));
+	return msg == NULL;
+});
+
+EXO_TEST(adc_message_parse_client_rejects_i, {
+	const char* line = "ISTA 000 Hello\n";
+	struct adc_message* msg = adc_msg_parse_client(line, strlen(line));
+	return msg == NULL;
+});
+
+EXO_TEST(adc_message_parse_client_rejects_u, {
+	const char* line = "USCH AN7ZMSLIEBL53OPTM7WXGSTXUS3XOY6KQS5LBGX ANfoo\n";
+	struct adc_message* msg = adc_msg_parse_client(line, strlen(line));
+	return msg == NULL;
+});
+
+EXO_TEST(adc_message_parse_client_rejects_unknown_ctx, {
+	const char* line = "ZMSG hello\n";
+	struct adc_message* msg = adc_msg_parse_client(line, strlen(line));
+	return msg == NULL;
+});
+
+/*
+ * The important one: the hub side parser must still refuse to look at a
+ * client-to-client message, both directly and through the verifying wrapper.
+ */
+EXO_TEST(adc_message_parse_hub_rejects_client_ctx, {
+	const char* line = "CSUP ADBASE\n";
+	struct adc_message* msg = adc_msg_parse(line, strlen(line));
+	return msg == NULL;
+});
+
+EXO_TEST(adc_message_parse_verify_rejects_client_ctx, {
+	const char* line = "CSUP ADBASE\n";
+	struct adc_message* msg = adc_msg_parse_verify(g_user, line, strlen(line));
+	return msg == NULL;
+});
+
+EXO_TEST(adc_message_parse_hub_rejects_client_ctx_no_lf, {
+	struct adc_message* msg = adc_msg_parse("CSUP", 4);
+	return msg == NULL;
+});
+
+/* Both entry points share the same escape validation. A line carrying
+ * \s, \n and \\ is accepted and unescapes identically. */
+EXO_TEST(adc_message_parse_client_escapes, {
+	const char* line = "CSTA 000 hi\\sthere\\nx\\\\y\n";
+	struct adc_message* msg = adc_msg_parse_client(line, strlen(line));
+	char* arg = NULL;
+	char* unescaped = NULL;
+	int ok = msg != NULL;
+	if (ok)
+	{
+		arg = adc_msg_get_argument(msg, 1);
+		ok = arg != NULL;
+	}
+	if (ok)
+	{
+		unescaped = adc_msg_unescape(arg);
+		ok = unescaped && strcmp(unescaped, "hi there\nx\\y") == 0;
+	}
+	hub_free(unescaped);
+	hub_free(arg);
+	adc_msg_free(msg);
+	return ok;
+});
+
+EXO_TEST(adc_message_parse_hub_escapes_same, {
+	const char* line = "BMSG AAAB hi\\sthere\\nx\\\\y\n";
+	struct adc_message* msg = adc_msg_parse(line, strlen(line));
+	char* arg = NULL;
+	char* unescaped = NULL;
+	int ok = msg != NULL;
+	if (ok)
+	{
+		/* B carries the source SID before the arguments, so the payload is
+		 * argument 0 here and argument 1 in the C context test above. */
+		arg = adc_msg_get_argument(msg, 0);
+		ok = arg != NULL;
+	}
+	if (ok)
+	{
+		unescaped = adc_msg_unescape(arg);
+		ok = unescaped && strcmp(unescaped, "hi there\nx\\y") == 0;
+	}
+	hub_free(unescaped);
+	hub_free(arg);
+	adc_msg_free(msg);
+	return ok;
+});
+
+/* An invalid escape is rejected by both entry points. */
+EXO_TEST(adc_message_parse_client_bad_escape, {
+	const char* line = "CSTA 000 oops\\q\n";
+	struct adc_message* msg = adc_msg_parse_client(line, strlen(line));
+	return msg == NULL;
+});
+
+EXO_TEST(adc_message_parse_hub_bad_escape, {
+	const char* line = "BMSG AAAB oops\\q\n";
+	struct adc_message* msg = adc_msg_parse(line, strlen(line));
+	return msg == NULL;
+});
+
+/* A trailing lone backslash is an incomplete escape, and must not
+ * OOB-read past the end of the line. */
+EXO_TEST(adc_message_parse_client_trailing_backslash, {
+	struct adc_message* msg = adc_msg_parse_client("CSTA 000 x\\", 11);
+	return msg == NULL;
+});
+
+/* Lines shorter than a 4 byte prefix+command must not OOB-read on FOURCC. */
+EXO_TEST(adc_message_parse_client_short_1, {
+	struct adc_message* msg = adc_msg_parse_client("C", 1);
+	return msg == NULL;
+});
+
+EXO_TEST(adc_message_parse_client_short_2, {
+	struct adc_message* msg = adc_msg_parse_client("CS", 2);
+	return msg == NULL;
+});
+
+EXO_TEST(adc_message_parse_client_short_3, {
+	struct adc_message* msg = adc_msg_parse_client("CSU", 3);
+	return msg == NULL;
+});
+
+EXO_TEST(adc_message_parse_client_empty, {
+	struct adc_message* msg = adc_msg_parse_client("", 0);
+	return msg == NULL;
+});
+
+/*
+ * A bare 4 byte command with no terminator is *accepted*, and the message is
+ * terminated by the parser. This mirrors adc_msg_parse("HSUP", 4) exactly -
+ * the two entry points must not disagree about the need_terminate path.
+ */
+EXO_TEST(adc_message_parse_client_no_terminator, {
+	struct adc_message* client = adc_msg_parse_client("CSUP", 4);
+	struct adc_message* hub    = adc_msg_parse("HSUP", 4);
+	int ok = (client != NULL) && (hub != NULL);
+	if (ok)
+		ok = (client->length == hub->length && client->cache[4] == '\n');
+	adc_msg_free(client);
+	adc_msg_free(hub);
+	return ok;
+});
+
+/* Invalid UTF-8 is rejected by both entry points. */
+EXO_TEST(adc_message_parse_client_invalid_utf8, {
+	struct adc_message* msg = adc_msg_parse_client("CSTA 000 \xff\xfe\n", 12);
+	return msg == NULL;
+});
+
+EXO_TEST(adc_message_parse_hub_invalid_utf8, {
+	struct adc_message* msg = adc_msg_parse("BMSG AAAB \xff\xfe\n", 13);
+	return msg == NULL;
+});
+
+/*
+ * The parser itself imposes no upper bound on the line length - the limit is
+ * enforced by the network layer (MAX_RECV_BUF in src/uhub_limits.h, applied in
+ * netevent.c) before a line ever reaches the parser. Assert that both entry
+ * points agree on that, so nobody mistakes adc_msg_parse_client() for a place
+ * where a size check exists.
+ */
+EXO_TEST(adc_message_parse_client_oversized, {
+	size_t len = 70000;
+	char* line = hub_malloc(len + 1);
+	struct adc_message* client;
+	struct adc_message* hub;
+	int ok;
+	if (!line) return 0;
+	memset(line, 'x', len);
+	line[len - 1] = '\n';
+	memcpy(line, "CSTA 000 ", 9);
+	client = adc_msg_parse_client(line, len);
+	memcpy(line, "BMSG AAAB ", 10);
+	hub = adc_msg_parse(line, len);
+	ok = (client != NULL) && (hub != NULL) && client->length == hub->length;
+	adc_msg_free(client);
+	adc_msg_free(hub);
+	hub_free(line);
+	return ok;
+});
+
+/* Rejected client messages must not leak; run the reject paths repeatedly so
+ * a leak shows up under a sanitizer or leak checker. */
+EXO_TEST(adc_message_parse_client_reject_no_leak, {
+	int i;
+	for (i = 0; i < 1000; i++)
+	{
+		if (adc_msg_parse_client("BMSG AAAA hello\n", 16) != NULL) return 0;
+		if (adc_msg_parse_client("HSUP ADBASE\n", 12) != NULL) return 0;
+		if (adc_msg_parse_client("CSTA 000 oops\\q\n", 16) != NULL) return 0;
+		if (adc_msg_parse_client("CSTA 000 \xff\xfe\n", 12) != NULL) return 0;
+		if (adc_msg_parse("CSUP ADBASE\n", 12) != NULL) return 0;
+	}
+	return 1;
+});
+
 /* chat_timestamps=no: the flag is stripped, including one sent by a client. */
 EXO_TEST(adc_message_timestamp_remove, {
 	const char* line = "BMSG AAAB Hi TS1\n";

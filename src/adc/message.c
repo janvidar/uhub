@@ -178,10 +178,21 @@ int adc_msg_get_arg_offset(struct adc_message* msg)
 
 	switch (msg->cache[0])
 	{
-		/* These *SHOULD* never be seen on a hub */
+		/*
+		 * The 'U' context carries a CID, so its true offset is
+		 * 4 + strlen(cid) - not a constant. The hub never handles a
+		 * 'U' message (adc_msg_parse() rejects the prefix), so rather
+		 * than return a wrong constant, report "not understood".
+		 */
 		case 'U':
+			return -1;
+
+		/*
+		 * The 'C' context carries no SID and no CID (CSUP/CINF/CGET),
+		 * so 4 is correct. Only adc_msg_parse_client() produces these.
+		 */
 		case 'C':
-			return 4; /* Actually: 4 + strlen(cid). */
+			return 4;
 
 		case 'I':
 		case 'H':
@@ -329,7 +340,25 @@ struct adc_message* adc_msg_parse_verify(struct hub_user* u, const char* line, s
 }
 
 
-struct adc_message* adc_msg_parse(const char* line, size_t length)
+/*
+ * Shared implementation behind adc_msg_parse() and adc_msg_parse_client().
+ *
+ * All the UTF-8, escape, length and argument-offset validation lives here so
+ * it cannot drift between the two entry points. The only difference between
+ * the two is which context prefixes are accepted:
+ *
+ *   allow_client_ctx == 0: the hub contexts (B/D/E/F/H/I), and only those.
+ *                          'U' and 'C' are rejected - accepting them here
+ *                          would let a logged-in client inject a
+ *                          client-to-client line into the hub dispatch, and
+ *                          adc_msg_parse_verify()'s anti-spoofing check
+ *                          cannot catch it because such messages carry no
+ *                          source SID.
+ *   allow_client_ctx == 1: only 'C'. Every hub context is rejected, and
+ *                          source/target stay 0 - a client connection has no
+ *                          SID space.
+ */
+static struct adc_message* adc_msg_parse_ex(const char* line, size_t length, int allow_client_ctx)
 {
 	struct adc_message* command;
 	char prefix;
@@ -384,131 +413,143 @@ struct adc_message* adc_msg_parse(const char* line, size_t length)
 	command->priority = 0;
 	command->references = 1;
 
-	switch (prefix)
+	if (allow_client_ctx)
 	{
-		case 'U':
-		case 'C':
-			/* these should never be seen on a hub */
-			ok = 0;
-			break;
+		/*
+		 * Client-to-client context. No source or target SID exists on a
+		 * client connection, so both are left at 0. Same minimum length
+		 * as the other 4-character-command contexts.
+		 */
+		ok = (prefix == 'C' && length > 3);
+	}
+	else
+	{
+		switch (prefix)
+		{
+			case 'U':
+			case 'C':
+				/* these should never be seen on a hub */
+				ok = 0;
+				break;
 
-		case 'I':
-		case 'H':
-			ok = (length > 3);
-			break;
+			case 'I':
+			case 'H':
+				ok = (length > 3);
+				break;
 
-		case 'B':
-			ok = (length > 8 &&
-					is_space(line[4]) &&
-					is_valid_base32_char(line[5]) &&
-					is_valid_base32_char(line[6]) &&
-					is_valid_base32_char(line[7]) &&
-					is_valid_base32_char(line[8]));
+			case 'B':
+				ok = (length > 8 &&
+						is_space(line[4]) &&
+						is_valid_base32_char(line[5]) &&
+						is_valid_base32_char(line[6]) &&
+						is_valid_base32_char(line[7]) &&
+						is_valid_base32_char(line[8]));
 
-			if (!ok) break;
+				if (!ok) break;
 
-			temp_sid[0] = line[5];
-			temp_sid[1] = line[6];
-			temp_sid[2] = line[7];
-			temp_sid[3] = line[8];
-			temp_sid[4] = '\0';
-
-			command->source = string_to_sid(temp_sid);
-			break;
-
-		case 'F':
-			ok = (length > 8 &&
-					is_space(line[4]) &&
-					is_valid_base32_char(line[5]) &&
-					is_valid_base32_char(line[6]) &&
-					is_valid_base32_char(line[7]) &&
-					is_valid_base32_char(line[8]));
-
-			if (!ok) break;
-
-			temp_sid[0] = line[5];
-			temp_sid[1] = line[6];
-			temp_sid[2] = line[7];
-			temp_sid[3] = line[8];
-			temp_sid[4] = '\0';
-
-			command->source = string_to_sid(temp_sid);
-
-			/* Create feature cast lists */
-			command->feature_cast_include = list_create();
-			command->feature_cast_exclude = list_create();
-
-			if (!command->feature_cast_include || !command->feature_cast_exclude)
-			{
-				list_destroy(command->feature_cast_include);
-				list_destroy(command->feature_cast_exclude);
-				msg_free(command->cache);
-				msg_free(command);
-				return NULL; /* OOM */
-			}
-
-			n = 10;
-			while (n < length && (line[n] == '+' || line[n] == '-'))
-			{
-				if (line[n++] == '+')
-					feature_cast_list = command->feature_cast_include;
-				else
-					feature_cast_list = command->feature_cast_exclude;
-
-				if (n + 4 > length)
-				{
-					ok = 0;
-					break;
-				}
-
-				temp_sid[0] = line[n++];
-				temp_sid[1] = line[n++];
-				temp_sid[2] = line[n++];
-				temp_sid[3] = line[n++];
+				temp_sid[0] = line[5];
+				temp_sid[1] = line[6];
+				temp_sid[2] = line[7];
+				temp_sid[3] = line[8];
 				temp_sid[4] = '\0';
 
-				list_append(feature_cast_list, hub_strdup(temp_sid));
-			}
+				command->source = string_to_sid(temp_sid);
+				break;
 
-			if  (n == 10)
+			case 'F':
+				ok = (length > 8 &&
+						is_space(line[4]) &&
+						is_valid_base32_char(line[5]) &&
+						is_valid_base32_char(line[6]) &&
+						is_valid_base32_char(line[7]) &&
+						is_valid_base32_char(line[8]));
+
+				if (!ok) break;
+
+				temp_sid[0] = line[5];
+				temp_sid[1] = line[6];
+				temp_sid[2] = line[7];
+				temp_sid[3] = line[8];
+				temp_sid[4] = '\0';
+
+				command->source = string_to_sid(temp_sid);
+
+				/* Create feature cast lists */
+				command->feature_cast_include = list_create();
+				command->feature_cast_exclude = list_create();
+
+				if (!command->feature_cast_include || !command->feature_cast_exclude)
+				{
+					list_destroy(command->feature_cast_include);
+					list_destroy(command->feature_cast_exclude);
+					msg_free(command->cache);
+					msg_free(command);
+					return NULL; /* OOM */
+				}
+
+				n = 10;
+				while (n < length && (line[n] == '+' || line[n] == '-'))
+				{
+					if (line[n++] == '+')
+						feature_cast_list = command->feature_cast_include;
+					else
+						feature_cast_list = command->feature_cast_exclude;
+
+					if (n + 4 > length)
+					{
+						ok = 0;
+						break;
+					}
+
+					temp_sid[0] = line[n++];
+					temp_sid[1] = line[n++];
+					temp_sid[2] = line[n++];
+					temp_sid[3] = line[n++];
+					temp_sid[4] = '\0';
+
+					list_append(feature_cast_list, hub_strdup(temp_sid));
+				}
+
+				if  (n == 10)
+					ok = 0;
+				break;
+
+			case 'D':
+			case 'E':
+				ok = (length > 13 &&
+						is_space(line[4]) &&
+						is_valid_base32_char(line[5]) &&
+						is_valid_base32_char(line[6]) &&
+						is_valid_base32_char(line[7]) &&
+						is_valid_base32_char(line[8]) &&
+						is_space(line[9]) &&
+						is_valid_base32_char(line[10]) &&
+						is_valid_base32_char(line[11]) &&
+						is_valid_base32_char(line[12]) &&
+						is_valid_base32_char(line[13]));
+
+				if (!ok) break;
+
+				temp_sid[0] = line[5];
+				temp_sid[1] = line[6];
+				temp_sid[2] = line[7];
+				temp_sid[3] = line[8];
+				temp_sid[4] = '\0';
+
+				command->source = string_to_sid(temp_sid);
+
+				temp_sid[0] = line[10];
+				temp_sid[1] = line[11];
+				temp_sid[2] = line[12];
+				temp_sid[3] = line[13];
+				temp_sid[4] = '\0';
+
+				command->target = string_to_sid(temp_sid);
+				break;
+
+			default:
 				ok = 0;
-			break;
-
-		case 'D':
-		case 'E':
-			ok = (length > 13 &&
-					is_space(line[4]) &&
-					is_valid_base32_char(line[5]) &&
-					is_valid_base32_char(line[6]) &&
-					is_valid_base32_char(line[7]) &&
-					is_valid_base32_char(line[8]) &&
-					is_space(line[9]) &&
-					is_valid_base32_char(line[10]) &&
-					is_valid_base32_char(line[11]) &&
-					is_valid_base32_char(line[12]) &&
-					is_valid_base32_char(line[13]));
-
-			if (!ok) break;
-
-			temp_sid[0] = line[5];
-			temp_sid[1] = line[6];
-			temp_sid[2] = line[7];
-			temp_sid[3] = line[8];
-			temp_sid[4] = '\0';
-
-			command->source = string_to_sid(temp_sid);
-
-			temp_sid[0] = line[10];
-			temp_sid[1] = line[11];
-			temp_sid[2] = line[12];
-			temp_sid[3] = line[13];
-			temp_sid[4] = '\0';
-
-			command->target = string_to_sid(temp_sid);
-			break;
-
-		default:
-			ok = 0;
+		}
 	}
 
 	if (need_terminate)
@@ -543,6 +584,18 @@ struct adc_message* adc_msg_parse(const char* line, size_t length)
 
 	ADC_MSG_ASSERT(command);
 	return command;
+}
+
+
+struct adc_message* adc_msg_parse(const char* line, size_t length)
+{
+	return adc_msg_parse_ex(line, length, 0);
+}
+
+
+struct adc_message* adc_msg_parse_client(const char* line, size_t length)
+{
+	return adc_msg_parse_ex(line, length, 1);
 }
 
 
