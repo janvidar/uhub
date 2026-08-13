@@ -54,6 +54,7 @@ enum ADC_client_flags
 	cflag_ssl = 1,
 	cflag_choke = 2,
 	cflag_pipe = 4,
+	cflag_kp_warned = 8,  /* the "hub is not verified" warning has been said once */
 };
 
 struct ADC_client_address
@@ -61,6 +62,8 @@ struct ADC_client_address
 	enum Protocol { ADC, ADCS } protocol;
 	char* hostname;
 	uint16_t port;
+	/** The "?kp=" pinned by the URL, or "" for an unauthenticated connection. */
+	char keyprint[ADC_KEYPRINT_MAX];
 };
 
 struct ADC_client
@@ -83,6 +86,7 @@ struct ADC_client
 	char* fixed_pid;             /* caller-supplied PID (base32); NULL = generate a random one */
 	char* extra_support;         /* extra HSUP features, e.g. " ADBBS0"; NULL for none */
 	char cid[MAX_CID_LEN + 1];   /* CID for the current identity (set by adc_cid_pid / set_pid) */
+	char support[ADC_SUPPORT_MAX]; /* SU field, or "" to send none */
 	int flags;
 	void* ptr;
 };
@@ -142,7 +146,9 @@ static void ADC_client_set_state(struct ADC_client* client, enum ADC_client_stat
 }
 
 
-static void adc_cid_pid(struct ADC_client* client)
+/* Appends ID/PD to @p info rather than to client->info, so the INF can be built
+   for inspection without one having been sent. */
+static void adc_cid_pid(struct ADC_client* client, struct adc_message* info)
 {
 	ADC_TRACE;
 	static uint32_t counter = 0;
@@ -185,8 +191,8 @@ static void adc_cid_pid(struct ADC_client* client)
 	memcpy(client->cid, cid, MAX_CID_LEN);
 	client->cid[MAX_CID_LEN] = '\0';
 
-	adc_msg_add_named_argument(client->info, ADC_INF_FLAG_PRIVATE_ID, pid);
-	adc_msg_add_named_argument(client->info, ADC_INF_FLAG_CLIENT_ID, cid);
+	adc_msg_add_named_argument(info, ADC_INF_FLAG_PRIVATE_ID, pid);
+	adc_msg_add_named_argument(info, ADC_INF_FLAG_CLIENT_ID, cid);
 }
 
 static void event_callback(struct net_connection* con, int events, void *arg)
@@ -377,7 +383,34 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 		case ADC_CMD_BSCH:
 		case ADC_CMD_FSCH:
 		{
-			client->callback(client, ADC_CLIENT_SEARCH_REQ, 0);
+			/* The raw message is handed to the consumer; the search grammar is
+			   the consumer's business. It is only valid until this returns,
+			   since msg is freed at the end of this function. */
+			data.message = msg;
+			client->callback(client, ADC_CLIENT_SEARCH_REQ, &data);
+			break;
+		}
+
+		case ADC_CMD_DRES:
+		{
+			data.message = msg;
+			client->callback(client, ADC_CLIENT_SEARCH_REP, &data);
+			break;
+		}
+
+		case ADC_CMD_DCTM:
+		case ADC_CMD_ECTM:
+		{
+			data.message = msg;
+			client->callback(client, ADC_CLIENT_CONNECT_REQ, &data);
+			break;
+		}
+
+		case ADC_CMD_DRCM:
+		case ADC_CMD_ERCM:
+		{
+			data.message = msg;
+			client->callback(client, ADC_CLIENT_REVCONNECT_REQ, &data);
 			break;
 		}
 
@@ -401,6 +434,16 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 					EXTRACT_NAMED_ARG_X(msg, "VE", user.version, sizeof(user.version));
 					EXTRACT_NAMED_ARG_X(msg, "ID", user.cid, sizeof(user.cid));
 					EXTRACT_NAMED_ARG_X(msg, "I4", user.address, sizeof(user.address));
+
+					{
+						char ct[8];
+						EXTRACT_NAMED_ARG_X(msg, ADC_INF_FLAG_CLIENT_TYPE, ct, sizeof(ct));
+						user.client_type = ADC_client_parse_client_type(ct);
+					}
+
+					/* SU says whether this peer can be connected to, and whether
+					   it understands an encrypted transfer. */
+					EXTRACT_NAMED_ARG_X(msg, ADC_INF_FLAG_SUPPORT, user.support, sizeof(user.support));
 
 					struct ADC_client_callback_data data;
 					data.user = &user;
@@ -580,33 +623,64 @@ void ADC_client_send(struct ADC_client* client, struct adc_message* msg)
 	}
 }
 
-void ADC_client_send_info(struct ADC_client* client)
+struct adc_message* ADC_client_build_info(struct ADC_client* client)
 {
+	struct adc_message* info;
+
 	ADC_TRACE;
-	client->info = adc_msg_construct_source(ADC_CMD_BINF, client->sid, 96);
 
+	if (!client)
+		return NULL;
 
-	adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_NICK, client->nick);
+	info = adc_msg_construct_source(ADC_CMD_BINF, client->sid, 96);
+	if (!info)
+		return NULL;
+
+	adc_msg_add_named_argument_string(info, ADC_INF_FLAG_NICK, client->nick);
 
 	if (client->desc)
 	{
-		adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_DESCRIPTION, client->desc);
+		adc_msg_add_named_argument_string(info, ADC_INF_FLAG_DESCRIPTION, client->desc);
 	}
 
-	adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_USER_AGENT_PRODUCT, PRODUCT);
-	adc_msg_add_named_argument_string(client->info, ADC_INF_FLAG_USER_AGENT_VERSION, VERSION);
-	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_UPLOAD_SLOTS, 0);
-	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_SHARED_SIZE, 0);
-	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_SHARED_FILES, 0);
+	/*
+	 * SU is what tells the hub and every other client what this one can do:
+	 * TCP4/TCP6 that it accepts connections, ADCS that those connections are
+	 * encrypted. A client that listens but does not say so is treated as passive,
+	 * and two passive parties cannot connect to each other at all.
+	 */
+	if (client->support[0])
+		adc_msg_add_named_argument_string(info, ADC_INF_FLAG_SUPPORT, client->support);
 
-	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_COUNT_HUB_NORMAL, 1);
-	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_COUNT_HUB_REGISTER, 0);
-	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_COUNT_HUB_OPERATOR, 0);
+	adc_msg_add_named_argument_string(info, ADC_INF_FLAG_USER_AGENT_PRODUCT, PRODUCT);
+	adc_msg_add_named_argument_string(info, ADC_INF_FLAG_USER_AGENT_VERSION, VERSION);
+	adc_msg_add_named_argument_int(info, ADC_INF_FLAG_UPLOAD_SLOTS, 0);
+	adc_msg_add_named_argument_int(info, ADC_INF_FLAG_SHARED_SIZE, 0);
+	adc_msg_add_named_argument_int(info, ADC_INF_FLAG_SHARED_FILES, 0);
 
-	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_DOWNLOAD_SPEED, 5 * 1024 * 1024);
-	adc_msg_add_named_argument_int(client->info, ADC_INF_FLAG_UPLOAD_SPEED, 10 * 1024 * 1024);
+	adc_msg_add_named_argument_int(info, ADC_INF_FLAG_COUNT_HUB_NORMAL, 1);
+	adc_msg_add_named_argument_int(info, ADC_INF_FLAG_COUNT_HUB_REGISTER, 0);
+	adc_msg_add_named_argument_int(info, ADC_INF_FLAG_COUNT_HUB_OPERATOR, 0);
 
-	adc_cid_pid(client);
+	adc_msg_add_named_argument_int(info, ADC_INF_FLAG_DOWNLOAD_SPEED, 5 * 1024 * 1024);
+	adc_msg_add_named_argument_int(info, ADC_INF_FLAG_UPLOAD_SPEED, 10 * 1024 * 1024);
+
+	adc_cid_pid(client, info);
+
+	return info;
+}
+
+void ADC_client_send_info(struct ADC_client* client)
+{
+	ADC_TRACE;
+
+	/* A client that reconnects builds a second INF; the send queue holds its
+	   own reference (ioq_send_add increfs), so dropping ours here retires the
+	   previous one instead of leaking it. */
+	adc_msg_free(client->info);
+	client->info = ADC_client_build_info(client);
+	if (!client->info)
+		return;
 
 	ADC_client_send(client, client->info);
 }
@@ -781,6 +855,18 @@ static void ADC_client_on_connected(struct ADC_client* client)
 	ADC_TRACE;
 	if (client->flags & cflag_ssl)
 	{
+		/* No "kp=" means TLS without an identity: encrypted, but anyone able to
+		   intercept the connection can be the hub. Permitted -- it is all that
+		   works against a hub whose keyprint is unknown -- but never silent.
+		   Said once per client, so a reconnect loop does not drown the log. */
+		if (!client->address.keyprint[0] && !(client->flags & cflag_kp_warned))
+		{
+			client->flags |= cflag_kp_warned;
+			LOG_WARN("The identity of hub %s is not being verified: the address pins no certificate. "
+				"Append \"/?kp=SHA256/<the hub's keyprint>\" to the address to authenticate it.",
+				client->address.hostname ? client->address.hostname : "");
+		}
+
 		net_con_update(client->con, NET_EVENT_READ | NET_EVENT_WRITE);
 		client->callback(client, ADC_CLIENT_SSL_HANDSHAKE, 0);
 		ADC_client_set_state(client, ps_conn_ssl);
@@ -791,12 +877,52 @@ static void ADC_client_on_connected(struct ADC_client* client)
 	
 }
 
+/**
+ * Check the certificate the hub presented against the keyprint pinned in its
+ * URL. Runs after the handshake and before anything the hub says is acted on --
+ * in particular before HSUP, so an impostor never gets to issue a password
+ * challenge.
+ *
+ * @return 1 to carry on, 0 when the connection has been torn down.
+ */
+static int ADC_client_verify_keyprint(struct ADC_client* client)
+{
+	struct ADC_client_callback_data data;
+	struct ADC_client_keyprint_error error;
+	char presented[ADC_KEYPRINT_MAX];
+
+	if (!client->address.keyprint[0])
+		return 1;  /* nothing pinned; warned about at connect time */
+
+	if (!net_ssl_get_peer_keyprint(client->con, presented, sizeof(presented)))
+		presented[0] = '\0';
+
+	if (presented[0] && net_ssl_keyprint_equal(presented, client->address.keyprint))
+		return 1;
+
+	LOG_ERROR("Hub %s failed keyprint verification: expected %s, hub presented %s. Disconnecting.",
+		client->address.hostname ? client->address.hostname : "",
+		client->address.keyprint,
+		presented[0] ? presented : "no certificate");
+
+	error.expected = client->address.keyprint;
+	error.presented = presented;
+	data.keyprint = &error;
+	client->callback(client, ADC_CLIENT_SSL_KEYPRINT_ERROR, &data);
+
+	ADC_client_on_disconnected(client);
+	return 0;
+}
+
 static void ADC_client_on_connected_ssl(struct ADC_client* client)
 {
 	ADC_TRACE;
 	struct ADC_client_callback_data data;
 	struct ADC_client_tls_info tls_info;
 	data.tls_info = &tls_info;
+
+	if (!ADC_client_verify_keyprint(client))
+		return;
 
 	tls_info.version = net_ssl_get_tls_version(client->con);
 	tls_info.cipher = net_ssl_get_tls_cipher(client->con);
@@ -850,6 +976,91 @@ void ADC_client_disconnect(struct ADC_client* client)
 	}
 }
 
+/** Number of base32 characters a SHA-256 digest encodes to. */
+#define ADC_KEYPRINT_SHA256_LEN 52
+
+int ADC_client_parse_keyprint(const char* address, char* out, size_t out_size)
+{
+	const char* path;
+	const char* p;
+	const char* value = NULL;
+	const char* slash;
+	const char* hash;
+	size_t len;
+	size_t alg_len;
+	size_t hash_len;
+	size_t i;
+
+	if (!out || out_size == 0)
+		return -1;
+	out[0] = '\0';
+
+	if (!address)
+		return 0;
+
+	/* The keyprint lives in the query string, so nothing before the authority
+	   ends can be one -- "kp=" inside a hostname is part of the hostname. The
+	   scheme's own "//" is skipped first, or it would be mistaken for the start
+	   of the path and make the hostname look like a query string. */
+	path = strstr(address, "://");
+	path = path ? path + 3 : address;
+
+	path = strpbrk(path, "/?#");
+	if (!path)
+		return 0;
+
+	for (p = path; (p = strstr(p, "kp=")) != NULL; p += 3)
+	{
+		/* Only a whole parameter named "kp", never the tail of e.g. "xkp=". */
+		char prev = (p > address) ? p[-1] : '\0';
+		if (prev == '?' || prev == '&' || prev == ';' || prev == '/' || prev == '#')
+		{
+			value = p + 3;
+			break;
+		}
+	}
+
+	if (!value)
+		return 0;
+
+	/* The value contains a '/' of its own, so only a parameter separator or the
+	   end of the string terminates it. */
+	len = strcspn(value, "&#");
+	if (len == 0 || len >= out_size)
+		return -1;
+
+	slash = (const char*) memchr(value, '/', len);
+	if (!slash)
+		return -1;
+
+	/* An algorithm we do not implement cannot be checked, and pretending
+	   otherwise would leave the connection unauthenticated while looking
+	   pinned, so it is refused rather than skipped. */
+	alg_len = (size_t) (slash - value);
+	if (alg_len != 6 || strncasecmp(value, "SHA256", 6) != 0)
+		return -1;
+
+	hash = slash + 1;
+	hash_len = len - alg_len - 1;
+	if (hash_len != ADC_KEYPRINT_SHA256_LEN)
+		return -1;
+
+	for (i = 0; i < hash_len; i++)
+	{
+		/* Base32 is case-insensitive; is_valid_base32_char() only knows the
+		   canonical upper-case alphabet. */
+		char c = hash[i];
+		if (c >= 'a' && c <= 'z')
+			c = (char) (c - ('a' - 'A'));
+		if (!is_valid_base32_char(c))
+			return -1;
+	}
+
+	memcpy(out, value, len);
+	out[len] = '\0';
+	return 1;
+}
+
 static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 {
 	ADC_TRACE;
@@ -881,9 +1092,36 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 
 	/* Split hostname and port (if possible) */
 	hub_address = arg + 6 + ssl;
-	split = strrchr(hub_address, ':');
-	if (split == 0 || strlen(split) < 2 || strlen(split) > 6)
+
+	/*
+	 * An ADC URL may carry a path, and the keyprint form always does:
+	 * "adcs://host:1511/?kp=SHA256/...". Everything from the first '/' belongs
+	 * to the path, so the authority ends there. Searching the whole string for
+	 * the last ':' made the trailing slash part of the port and rejected the
+	 * address outright -- and only for ports of other than four digits, since
+	 * ":1511/" is exactly the six characters the length check allowed.
+	 */
+	const char* end = strpbrk(hub_address, "/?#");
+	if (!end)
+		end = hub_address + strlen(hub_address);
+
+	split = NULL;
+	for (const char* p = end; p > hub_address; )
+	{
+		if (*--p == ':')
+		{
+			split = p;
+			break;
+		}
+	}
+
+	if (split == 0 || (end - split) < 2 || (end - split) > 6)
 		return 0;
+
+	/* Ensure the port is all digits: strtol would otherwise accept "80x". */
+	for (const char* p = split + 1; p < end; p++)
+		if (*p < '0' || *p > '9')
+			return 0;
 
 	/* Ensure port number is valid (validate before narrowing to uint16_t). */
 	long port = strtol(split+1, NULL, 10);
@@ -891,6 +1129,27 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 		return 0;
 	client->address.port = (uint16_t) port;
 
+	/*
+	 * The pinned keyprint, if the URL carries one. A "kp=" that cannot be used
+	 * fails the whole address: an operator who wrote one down expects the hub to
+	 * be checked against it, and connecting anyway would quietly do the opposite.
+	 */
+	if (ADC_client_parse_keyprint(arg, client->address.keyprint, sizeof(client->address.keyprint)) < 0)
+	{
+		LOG_ERROR("Unusable keyprint in hub address; expected \"kp=SHA256/<52 base32 characters>\".");
+		return 0;
+	}
+
+	/* There is no certificate to check on a plain adc:// connection, so a
+	   keyprint there is a configuration that looks authenticated and is not. */
+	if (client->address.keyprint[0] && !ssl)
+	{
+		LOG_ERROR("A keyprint was given for a plain adc:// address, which cannot verify it. Use adcs://.");
+		return 0;
+	}
+
+	/* Re-parsed on every reconnect, so the previous hostname has to go. */
+	hub_free(client->address.hostname);
 	client->address.hostname = hub_strndup(hub_address, &split[0] - &hub_address[0]);
 
 	return 1;
@@ -901,6 +1160,28 @@ void ADC_client_set_password(struct ADC_client* client, const char* password)
 	ADC_TRACE;
 	hub_free(client->password);
 	client->password = password ? hub_strdup(password) : NULL;
+}
+
+int ADC_client_set_support(struct ADC_client* client, const char* su)
+{
+	ADC_TRACE;
+
+	if (!client)
+		return 0;
+
+	if (!su || !*su)
+	{
+		client->support[0] = '\0';
+		return 1;
+	}
+
+	/* Refused rather than truncated: a half-written SU is a different claim
+	   from the one the caller made, and "TCP4,ADC" is not a token at all. */
+	if (strlen(su) >= sizeof(client->support))
+		return 0;
+
+	strcpy(client->support, su);
+	return 1;
 }
 
 /* Pin the client's PID (base32, MAX_CID_LEN chars) instead of generating a
@@ -975,4 +1256,27 @@ const char* ADC_client_get_description(const struct ADC_client* client)
 void* ADC_client_get_ptr(const struct ADC_client* client)
 {
 	return client->ptr;
+}
+
+const char* ADC_client_get_keyprint(const struct ADC_client* client)
+{
+	return client ? client->address.keyprint : "";
+}
+
+const char* ADC_client_get_support(const struct ADC_client* client)
+{
+	return client ? client->support : "";
+}
+
+int ADC_client_parse_client_type(const char* ct)
+{
+	int bits = 0;
+
+	/* CT is a decimal bit mask. A hub is free to send something that is not
+	   one -- it is just a string on the wire -- so anything unparseable is
+	   read as "no client type" rather than being guessed at. */
+	if (!ct || !*ct || !is_number(ct, &bits) || bits < 0)
+		return 0;
+
+	return bits;
 }
