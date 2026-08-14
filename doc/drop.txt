@@ -1,0 +1,1273 @@
+= DROP: Diagnostic Reachability & Obstacle Probe =
+
+Status: DRAFT. Not yet implemented; not yet reviewed by client authors. Wire
+formats may change without notice until this notice is removed.
+
+DROP is a small public service that a Direct Connect client contacts at startup
+to answer two questions it cannot answer alone:
+
+  1. What are my public IPv4 and IPv6 addresses?
+  2. Can anyone actually reach me on them -- over TCP, over UDP, or not at all?
+
+The service is independent of uhub and of any particular hub software. It is
+specified here because uhub needs it and because the whole DC ecosystem lacks
+it, not because it is part of the hub.
+
+The name is a deliberate pun on the firewall verb: DROP tells you what is being
+dropped. It is also four characters, so it works unchanged as an ADC feature
+token if a hub ever advertises a checker (see "Future work").
+
+
+== Why ==
+
+ADC guarantees peer-to-peer operation only when at least one side of a transfer
+is active -- able to accept an inbound TCP connection. Two passive clients
+cannot connect to each other at all. The ADC specification says so plainly:
+"Clients that support incoming TCP connections is referenced as active where
+the opposite is passive."
+
+In practice clients get this wrong for mundane reasons. They do not know their
+own public address. They do not know whether the router needs a forwarded port.
+They do not know whether a firewall is silently dropping inbound SYNs, or
+whether the ISP has put them behind carrier-grade NAT where no amount of router
+configuration will help. So they guess, they guess wrong, and the user sees
+"no search results" or "download stuck at 0%" with no explanation.
+
+Nothing measures this today. Within a hub:
+
+  - The hub cannot tell. uhub counts a user as active purely because the client
+    put a U4 or U6 in its INF (src/core/metrics.c:236-238). It never validates
+    that port. check_network() in src/core/inf.c:346-395 passes the
+    primary-family UDP port through untouched.
+
+  - HBRI (src/core/hbri.c, see architecture.txt) proves the opposite direction:
+    that the client can dial *out* to the hub on a second address family. It
+    says nothing about inbound reachability.
+
+  - NATT (DNAT/DRNT, routed blind at src/core/hub.c:249-256) is pure
+    client-driven relay. The hub forwards hole-punch requests without knowing
+    whether hole punching can work for either party.
+
+A hub is also the wrong place to solve it. The hub sees only the address the
+client connected from, on one address family, and it cannot dial back out to
+arbitrary client ports without becoming a port scanner. A dedicated service
+with two public addresses per family, explicit consent, and its own abuse
+budget can.
+
+
+== What DROP is not ==
+
+  - DROP does not open ports. That is PCP (RFC 6887), NAT-PMP (RFC 6886) or
+    UPnP-IGD. DROP is the closed-loop verification of those -- the thing a port
+    mapping protocol cannot give you on its own, because a mapping can be
+    granted by the local router while a second, carrier-grade NAT upstream
+    still blocks inbound. The intended client loop is:
+
+        check -> if unreachable, request a mapping -> check again
+
+  - DROP does not make two passive peers able to transfer. It only tells them
+    whether hole punching could ever work for them (see "NAT behaviour
+    discovery").
+
+  - DROP does not test hairpinning (whether two clients behind the same NAT can
+    reach each other via the public address).
+
+  - DROP is not a port scanner and must never become one. See "The
+    source-address rule".
+
+
+== Overview ==
+
+Two planes. The control plane is HTTPS with JSON bodies. The UDP data plane is
+standard STUN (RFC 8489) with NAT behaviour discovery (RFC 5780); DROP adds
+only what STUN lacks, which is the unsolicited inbound probe and its
+authorisation.
+
+     client                                        DROP server
+        |                                    (2 public v4, 2 public v6)
+        |
+        |--- GET  /v1/server ------------------------>|  capabilities
+        |--- GET  /v1/whoami ------------------------>|  reflexive address
+        |--- POST /v1/session ----------------------->|  id + STUN credentials
+        |                                             |
+        |  ... client arms its TCP and UDP listeners ...
+        |                                             |
+        |--- POST /v1/session/{id}/inbound ---------->|  "probe these ports"
+        |                                             |
+        |<-------------- TCP connect ------------------|  inbound TCP probe
+        |--------------- nonce response -------------->|
+        |<-------------- STUN Binding Request ---------|  inbound UDP probe
+        |--------------- STUN Binding Response ------->|
+        |                                             |
+        |<--- 200: per-port verdicts ------------------|
+        |                                             |
+        |--- STUN Binding Requests (RFC 5780) -------->|  NAT behaviour
+        |--- TCP connect to :411, :1511 -------------->|  egress: banner
+        |--- GET /v1/server on :80 and :443 ---------->|  egress: http(s)
+
+The inbound probes are driven from the /inbound request and complete before it
+returns. NAT behaviour discovery and the egress test are client-driven and need
+no control-plane involvement beyond the endpoint list.
+
+The order shown is normative in one place: the inbound UDP probe must happen
+before the client's own STUN traffic, or the client's requests will have opened
+a path that an unsolicited datagram would not have had. See "Inbound UDP
+probe".
+
+Why STUN rather than a bespoke framing: the NAT mapping and filtering
+classification a client needs is exactly RFC 5780 behaviour discovery.
+Inventing a framing would mean re-deriving RFC 4787 semantics by hand. Reusing
+STUN means a server MAY delegate that half to a stock implementation, and a
+client MAY use an existing STUN library.
+
+
+== Terminology ==
+
+The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted
+as in BCP 14.
+
+  Control connection   The HTTPS connection from client to server.
+  Observed address     The source IP address of the control connection, as seen
+                       by the server.
+  Reflexive address    Synonym for the observed address, in STUN terminology.
+  Session              A short-lived, server-issued authorisation to probe the
+                       observed address.
+  Probe                One connection or datagram the server sends to the
+                       client, or one connection the client sends to the server
+                       in the egress test.
+  Verdict              The per-port result of a probe.
+
+NAT mapping and filtering behaviour are used strictly as defined in RFC 4787
+(BCP 127) for UDP and RFC 5382 (BCP 142) for TCP: endpoint-independent,
+address-dependent, address-and-port-dependent.
+
+
+== The source-address rule ==
+
+This is the most important rule in the specification, and it is both a
+correctness rule and the primary abuse defence:
+
+    The server probes the exact source address of the control connection, and
+    nothing else. There is no target-address parameter anywhere in this
+    protocol, and none may ever be added.
+
+A client cannot ask DROP to probe a third party, because there is no way to
+express the request. A server that adds such a parameter -- for a "diagnostics
+mode", for an operator tool, for anything -- has built a distributed port
+scanner, not a DROP server.
+
+The client's only lever over what gets tested is which source address it
+connects from. That turns out to be sufficient, and it is the mechanism clients
+must use (see the next section).
+
+
+== Address families and source-address selection ==
+
+DROP tests one address family per session, because one TCP connection has one
+source address. A client that wants both must run the flow twice.
+
+Servers MUST publish three names:
+
+    drop.example.org        A and AAAA
+    ipv4.drop.example.org   A only
+    ipv6.drop.example.org   AAAA only
+
+Clients MUST use the family-specific names rather than relying on Happy
+Eyeballs, which would otherwise make the tested family nondeterministic.
+
+Clients that are multi-homed, or that use IPv6 privacy extensions (RFC 8981),
+MUST bind the outbound control socket to the address they intend their listener
+to be reachable on.
+
+    The IPv6 trap, stated explicitly because it will otherwise be got wrong by
+    every implementation: a client listening on [::] does not choose its own
+    source address. The kernel picks one, and with privacy extensions enabled
+    it will pick a temporary address. DROP will then faithfully validate
+    reachability of a temporary address -- and the client will either advertise
+    a different, stable address that was never tested, or advertise the
+    temporary one and have it expire underneath the advertisement. Bind
+    deliberately.
+
+If the observed address is not the address the client expected, the client
+SHOULD surface that to the user rather than silently continuing; it usually
+means a VPN, a proxy, or a second interface is in the path.
+
+
+== Control plane ==
+
+All control-plane requests are HTTPS. Plaintext HTTP MUST be refused or
+redirected. Request and response bodies are UTF-8 JSON. Unknown JSON members
+MUST be ignored by both sides, so that members can be added without a version
+bump.
+
+Servers MUST NOT sit behind a CDN or a reverse proxy: they need the true peer
+address, and a proxy destroys it. If a trusted local hop is unavoidable, PROXY
+protocol or a Forwarded header MAY be honoured, but only from a configured,
+non-routable trusted source, and the server MUST refuse to start if that is
+configured together with a public bind address.
+
+
+=== GET /v1/server ===
+
+Unauthenticated capability document, so clients feature-detect rather than
+hardcode. Cacheable.
+
+    {
+      "protocol": "DROP/1",
+      "server": "drop.example.org",
+      "operator": "example.org",
+      "abuse_contact": "abuse@example.org",
+      "tests": {
+        "ipv4": ["tcp", "udp", "egress"],
+        "ipv6": ["tcp", "udp", "nat", "egress"]
+      },
+      "stun": {
+        "primary":   { "ipv4": "198.51.100.10", "ipv6": "2001:db8:1::10",
+                       "port": 3478 },
+        "alternate": { "ipv4": "198.51.100.11", "ipv6": "2001:db8:2::11",
+                       "port": 3479 }
+      },
+      "egress": {
+        "ipv4": "198.51.100.10",
+        "ipv6": "2001:db8:1::10",
+        "banner_ports": [411, 412, 1511, 5000],
+        "http_ports": [80],
+        "https_ports": [443]
+      },
+      "limits": {
+        "max_ports_per_test": 4,
+        "min_port": 1024,
+        "sessions_per_hour": 12,
+        "probe_timeout_ms": 5000
+      }
+    }
+
+"tests" is per address family, and the two lists routinely differ. A second
+IPv6 address is usually free -- a /64 is the normal allocation -- while a
+second IPv4 address usually costs money or is unavailable, so IPv6 behaviour
+discovery commonly ships before IPv4. A family whose list omits "nat" has no
+second address pair; clients MUST cope, and MUST NOT infer one family's
+capabilities from the other's.
+
+
+=== GET /v1/whoami ===
+
+Reflexive address. No session, no cost, no side effects. This alone solves the
+"what is my IP" half of the problem and clients MAY use it on its own.
+
+    {
+      "ip": "2001:db8::1",
+      "family": "ipv6",
+      "port": 54321,
+      "classification": "global",
+      "advice": "Ordinary public address.",
+      "observed_at": "2026-08-13T12:00:00Z"
+    }
+
+"port" is the observed source port of the control connection. Compared against
+the client's own local port it reveals whether a NAT is rewriting TCP source
+ports, which is a useful hint even before any probe runs.
+
+"classification" is one of:
+
+    global          Ordinary routable address.
+    cgnat           100.64.0.0/10 (RFC 6598). Carrier-grade NAT. IPv4 active
+                    mode is impossible and no router configuration will help.
+    private         10/8, 172.16/12, 192.168/16 (RFC 1918). Something in the
+                    path is proxying or the reflection is broken -- a public
+                    service should never observe these.
+    unique-local    fc00::/7 (RFC 4193). Same conclusion as private.
+    loopback        127/8 or ::1. Same conclusion.
+    teredo          2001::/32 (RFC 4380).
+    6to4            2002::/16 (RFC 3056).
+
+"advice" is a plain-language sentence explaining the classification, which
+servers SHOULD provide and clients MAY display verbatim.
+
+    It exists for the same reason the decision table does. A user who moves
+    between two DC clients and gets two different explanations of the same
+    network concludes that one of them is broken. Shipping the wording with the
+    result costs a few hundred bytes and removes the incentive for every client
+    to invent its own phrasing. Clients that localise will substitute their own
+    text, which is fine; the point is that the default is consistent.
+
+Servers SHOULD send "Access-Control-Allow-Origin: *" on this endpoint only, so
+that browser-based clients can at least learn their address. The session
+endpoints need no CORS: a browser cannot run the inbound tests regardless.
+
+
+=== POST /v1/session ===
+
+Opens a test session. Request:
+
+    { "version": 1, "client": "ncdc/1.24", "tests": ["tcp", "udp", "nat"] }
+
+Response 200:
+
+    {
+      "session_id": "0e5f9c1a7b2d4e88",
+      "expires_in": 60,
+      "observed": { "ip": "203.0.113.7", "family": "ipv4", "port": 51343,
+                    "classification": "global" },
+      "stun": { "primary":   { "ip": "198.51.100.10", "port": 3478 },
+                "alternate": { "ip": "198.51.100.11", "port": 3479 } },
+      "credentials": { "username": "0e5f9c1a7b2d4e88",
+                       "password": "u3Qb7Xf1pR9sKmT0aZ2vLw" },
+      "limits": { "max_ports_per_test": 4, "min_port": 1024,
+                  "probe_timeout_ms": 5000 }
+    }
+
+The credentials are STUN short-term credentials (RFC 8489 section 9.1), scoped
+to this session and valid until it expires. They authenticate STUN traffic in
+both directions: server-to-client for the inbound UDP probe, and
+client-to-server for behaviour discovery.
+
+=== Session identifiers must be handled canonically ===
+
+The session identifier is opaque to clients, which echo it back unchanged. A
+server MUST NOT treat the identifier string as the identity of the session. It
+MUST derive an identity that is invariant under re-encoding -- the decoded
+bytes, or a hash of them -- and key single-use tracking and any per-session
+derivation on that.
+
+    The trap is specific and easy to fall into. Unpadded base64 of a 32-byte
+    value uses 43 characters, which encode 258 bits: the last character carries
+    two bits that are not part of the value, so four distinct strings decode
+    identically. An identifier built as two such fields therefore has about
+    sixteen valid spellings. A server that records "this session already ran
+    its inbound test" against the string it received will happily run the test
+    again for each of the other fifteen, and each run passes the rate limiter
+    as a fresh session. The cost to an attacker is changing one character.
+
+    Rejecting non-canonical encodings at the decoder -- Go's base64 Strict
+    mode, or an equivalent check that the unused trailing bits are zero -- also
+    closes this, and doing both is cheap. This was a real defect in the
+    reference implementation, found by a test that failed intermittently
+    because it depended on which characters the random identifier ended with.
+
+=== Single-use tracking must fail closed ===
+
+The set of consumed sessions is the only mutable state a server needs, and it
+has to be bounded. When it is full, a server MUST refuse new entries rather
+than evict old ones, and SHOULD return 503.
+
+    Evicting the oldest entry is the reflex, and it converts single-use into
+    unlimited-use: an attacker who can fill the table can make the server
+    forget that their own session was already spent. Refusing is a denial of
+    service against new sessions for as long as the flood lasts; evicting is a
+    permanent hole. Entries can be discarded once the session they refer to has
+    expired, which bounds the table by the session TTL rather than by traffic.
+
+A server MUST consume the session only after the request has been validated. A
+client that names an out-of-range port, or too many ports, must be able to
+correct the request and retry within the same session; charging it for a
+rejected request means a typo costs a slot in the rate limiter.
+
+The "stun" endpoints in the session response are given for the session's own
+address family only. A server MAY reuse one session for both families of STUN
+endpoint, but the inbound probes still target only the observed address.
+
+
+=== POST /v1/session/{id}/inbound ===
+
+Runs the inbound probes. Request:
+
+    {
+      "tcp": [1511],
+      "udp": [1511]
+    }
+
+Ports listed in "tcp" and "udp" are the ports as the client believes them to be
+reachable from outside -- that is, after any port forward.
+
+"control_port" is optional, deprecated, and should not be sent by new
+clients. Servers MUST continue to accept and ignore it.
+
+    It was specified as the source port of "this very control connection", to
+    be compared against the port the server observed so that source-port
+    rewriting could be reported. That turns out to be unimplementable for a
+    large class of clients, and worse than useless when implemented anyway.
+
+    An HTTP client that sends one request per connection - which
+    Connection: close means, and which this specification requires elsewhere -
+    assembles the request body before the socket exists. The only port such a
+    client can name is the one from its *previous* connection, which differs
+    from the observed one on every host whether or not any NAT is present. A
+    server comparing the two then reports source-port rewriting for everybody.
+    This was found by implementing it: a host with a public address and no NAT
+    anywhere near it was told, every run, that a NAT was rewriting its ports.
+
+    The same fact needs no field at all. A client already learns the port the
+    server observed, from /v1/whoami, and it can read the local port of that
+    same connection once the response has arrived. Those two are the ends of
+    one connection, so comparing them is exact - and every client can do it,
+    whatever its HTTP stack allows. Clients SHOULD detect source-port
+    rewriting that way and report it themselves.
+
+The request is blocking. The server runs all probes concurrently and responds
+when the last one settles or the timeout expires, whichever comes first; a
+server MUST bound this at 15 seconds.
+
+    Concurrency is not an optimisation here. Four filtered ports probed one
+    after another cost four timeouts, which does not fit in the cap, so a
+    sequential server would have to truncate its own results.
+
+Response 200:
+
+    {
+      "session_id": "0e5f9c1a7b2d4e88",
+      "observed": { "ip": "203.0.113.7", "family": "ipv4", "port": 51343,
+                    "classification": "global" },
+      "tcp": [ { "port": 1511, "verdict": "open", "rtt_ms": 31 } ],
+      "udp": [ { "port": 1511, "verdict": "open",
+                 "responded_from": "203.0.113.7:1511" } ],
+      "notes": [ "Your address classifies as cgnat, so inbound connections
+                  cannot be forwarded to you." ],
+      "elapsed_ms": 3120
+    }
+
+Every result carries its own port, and servers MUST return one result per
+distinct port requested. A server MAY deduplicate a repeated port, in which
+case the duplicate counts once against max_ports_per_test.
+
+"notes" is an optional array of plain-language observations that belong to the
+run as a whole rather than to a single port, such as an unroutable observed
+address. Clients SHOULD display
+them alongside the verdicts. They are advisory: a client MUST NOT parse them or
+change behaviour based on their contents.
+
+A session MUST be single-use for /inbound. A second call returns 409.
+
+
+=== Errors ===
+
+    400  Malformed request.
+    403  Session does not belong to this source address. A session is bound to
+         the address that created it; if the client's address changed
+         mid-flow, the results would be meaningless and possibly aimed at a
+         stranger.
+    404  Unknown or expired session.
+    409  This session already ran /inbound.
+    413  Body too large.
+    422  Port out of range, or more ports than max_ports_per_test.
+    429  Rate limited. MUST carry Retry-After.
+    503  Server at capacity or a required test address is unavailable.
+
+Error bodies are JSON: { "error": "port_out_of_range", "detail": "..." }.
+
+
+== Inbound TCP probe ==
+
+For each requested TCP port, the server opens a new TCP connection from its
+primary address to (observed address, port). This is a fresh connection; it has
+nothing to do with the control connection.
+
+On connect the server writes exactly one line, LF-terminated:
+
+    DROP/1 CHALLENGE <nonce>\n
+
+The client answers with exactly one line and then closes:
+
+    DROP/1 RESPONSE <nonce>\n
+
+<nonce> is base64url without padding, at most 64 characters. The whole line is
+at most 128 bytes; both sides MUST enforce that cap and MUST NOT read further.
+The client MUST NOT send anything else on that connection.
+
+Nonces MUST be unpredictable, carry at least 128 bits of entropy, be bound to
+the session, the port and the protocol, and be single-use. They MAY be
+stateless -- a MAC over (server secret, session id, observed address, port,
+expiry) is sufficient and avoids per-probe state.
+
+Verdicts:
+
+    open        Connected and the nonce came back correct. Active mode works.
+    occupied    Connected, but no response or a wrong one within the probe
+                timeout. Something is listening, but it is not this client:
+                usually the wrong port, or a port forward pointing at a
+                different host on the LAN.
+    refused     RST, or an ICMP unreachable. The host is reachable and nothing
+                is listening on that port. The client is not bound, or the
+                forward is missing -- but nothing on the path is dropping
+                packets.
+    filtered    Timeout. A firewall or NAT is silently dropping. This is the
+                port-forwarding case.
+    error       The probe could not be carried out at all: the server could
+                not open a socket, or ran out of time before trying.
+
+The refused/filtered distinction is the diagnostic payload of the whole
+service, and clients SHOULD surface it: it is the difference between "your
+client isn't listening" and "your router is blocking".
+
+ICMP destination-unreachable, host-unreachable and network-unreachable are
+grouped with "refused" deliberately. All of them mean something on the path
+answered rather than swallowed the packet, which is the actionable distinction;
+a client that treats them as "filtered" sends the user to configure a firewall
+that is not the problem.
+
+"error" exists so that a fault at the server is never reported to a user as a
+fault in their network. A server MUST NOT report a probe it failed to perform
+as "filtered", and clients MUST NOT present "error" as a reachability result.
+
+The nonce is mandatory. Without it, "connect succeeded" is a port scan result.
+With it, the server only ever reports that *the requesting client itself*
+answered.
+
+=== Client-side demultiplexing ===
+
+The probed port is the client's ADC client-to-client port, which already
+carries at least two protocols. Adding DROP keeps it unambiguous, because the
+first bytes differ:
+
+    "CSUP"        ADC client-to-client, plaintext
+    0x16 0x03     TLS ClientHello (ADCS)
+    "DROP/1 "     DROP challenge
+
+A client whose port accepts only TLS MUST still accept the plaintext DROP
+challenge on that port. Recognising a seven-byte prefix before the TLS
+handshake is trivial, and requiring TLS for a single-use nonce exchange would
+buy nothing.
+
+Clients MUST rate-limit DROP challenge handling. They SHOULD ignore challenges
+carrying a nonce that does not match a session opened in the last 60 seconds,
+and a client that answers any well-formed challenge is still conforming.
+
+    The corresponding rule for the UDP probe is a MUST, and the asymmetry is
+    deliberate rather than an oversight. There, answering unauthenticated
+    datagrams makes every client an open reflector that an attacker can aim
+    anywhere with a spoofed source. Here the peer has completed a TCP
+    handshake, so its address is already proven and there is nothing to
+    reflect; the response is also the same size as the challenge, so it
+    amplifies nothing. What remains is a small disclosure -- that a DC client
+    is listening -- which the port itself already reveals to anyone who
+    connects. Tracking recent nonces is cheap and worth doing, but it is not
+    load-bearing, and a spec that demands it as a MUST would be requiring
+    state for its own sake.
+
+
+== Inbound UDP probe ==
+
+This is the test that matters for ADC search results, which arrive as
+unsolicited UDP from arbitrary peers to the port advertised in U4/U6.
+
+For each requested UDP port, the server sends a STUN Binding Request from an
+endpoint the client has not contacted, to (observed address, port).
+
+"An endpoint the client has not contacted" is the whole substance of the test,
+and it constrains both the source and the timing:
+
+  - The server SHOULD send from an ephemeral port it has not used for this
+    client before, on one of its own addresses. Sending from the advertised
+    STUN service port would be weaker: a client that has just run behaviour
+    discovery has a mapping open towards exactly that endpoint.
+
+  - The inbound UDP probe MUST be performed before the client runs behaviour
+    discovery, not after. This is why /inbound is server-driven and completes
+    before the client starts its own STUN traffic. Once a client has contacted
+    the server's addresses, a NAT doing address-dependent filtering will permit
+    a datagram from those addresses that it would have dropped from a stranger
+    -- and a stranger is precisely who sends ADC search results. A client that
+    reorders these two tests will be told its UDP works when it does not.
+
+The request carries:
+
+  - USERNAME and MESSAGE-INTEGRITY using the session's short-term credentials,
+    per RFC 8489 section 9.1. Both sides MUST implement MESSAGE-INTEGRITY,
+    which RFC 8489 keeps as the baseline; MESSAGE-INTEGRITY-SHA256 SHOULD be
+    used in addition when both sides support it. Requiring SHA-256 alone would
+    exclude most deployed STUN libraries for no security gain here, since the
+    credential is single-use and expires in seconds.
+  - A DROP-PROBE attribute (see below).
+
+If the client answers with a Binding Response that the server receives and
+whose MESSAGE-INTEGRITY validates, unsolicited inbound UDP demonstrably works.
+
+Verdicts:
+
+    open          Authenticated Binding Response received.
+    no_response   Nothing came back within the probe timeout.
+    error         The probe could not be carried out at all.
+
+The server cannot distinguish "inbound UDP is blocked" from "the client did not
+implement the responder", so it reports the neutral no_response. The client
+knows which of the two applies, and interprets it as filtered.
+
+=== Retransmission ===
+
+A server MUST retransmit an unanswered probe at least once before reporting
+no_response, and SHOULD retransmit twice. Clients MUST likewise retransmit
+their own Binding Requests during behaviour discovery.
+
+This is not a refinement. UDP loss on an ordinary consumer path is low but far
+from zero, and the failure it produces is the most expensive answer this
+service can give: a single dropped datagram becomes "unsolicited UDP does not
+reach you", which a user acts on by reconfiguring a firewall that was working.
+An unnecessary retransmission costs one datagram; a false negative costs
+somebody an evening.
+
+RFC 8489's full backoff schedule is longer than the 15 second cap on /inbound
+allows. Retransmitting at roughly 500 ms and 1500 ms fits comfortably inside it
+and catches the overwhelming majority of single losses.
+
+=== The DROP-PROBE attribute ===
+
+Type 0xFF0D, comprehension-optional (RFC 8489 section 14: types 0x8000-0xFFFF
+are comprehension-optional, so a stock STUN agent ignores it). Provisional and
+unregistered; it will change if a registration is ever obtained.
+
+Value: 4 bytes, big-endian, carrying the port being probed. No padding needed.
+
+Its purpose is not correlation -- the STUN transaction ID already does that --
+but signalling. Its presence tells the client that this Binding Request is a
+DROP unsolicited probe rather than ordinary STUN traffic, so the client can
+apply the response rules below. Carrying the probed port rather than an opaque
+counter costs nothing and gives a client something meaningful to log, which
+matters when a user is trying to work out which of several ports was tested.
+
+=== Client requirements, and why they are strict ===
+
+This asks clients to answer unsolicited datagrams on a public port, so the
+rules are normative:
+
+  - The client MUST run the STUN agent on the exact same socket it advertises
+    in U4/U6. A different socket measures a different port and the result is
+    worthless.
+
+  - The client MUST NOT respond to a Binding Request whose MESSAGE-INTEGRITY
+    does not validate against credentials from a session it opened within the
+    last 60 seconds. The session credential is the client-side abuse gate:
+    without it, every DC client becomes an open STUN responder that an attacker
+    can use as a spoofed-source reflector.
+
+  - The client MUST rate-limit responses, and SHOULD stop responding entirely
+    once the session's inbound test has completed.
+
+=== Demultiplexing STUN from ADC on the UDP socket ===
+
+That socket now carries two protocols, and they are trivially separable by the
+first byte:
+
+    ADC UDP messages use the 'U' context and begin with the ASCII letter 'U'
+    ("URES ..."), that is 0x55, whose top two bits are 01.
+
+    Every STUN message has its most significant two bits zero (RFC 8489
+    section 5) and carries the fixed magic cookie 0x2112A442 at byte offset 4.
+
+So: first byte in 0x00-0x03 and magic cookie present means STUN; otherwise hand
+the datagram to the ADC parser. This is the same first-byte demultiplexing
+approach standardised in RFC 7983 (as updated by RFC 9443), and 0x55 sits
+outside every range RFC 7983 assigns, so the two schemes do not conflict.
+
+
+== NAT behaviour discovery ==
+
+Straight RFC 5780, client-driven, using the session credentials. It is
+described here by reference; RFC 5780 is normative for the details.
+
+Note that RFC 5780 is Experimental and support in deployed STUN servers is
+patchy. A DROP server that advertises "nat" in its capability document MUST
+implement it, including OTHER-ADDRESS and CHANGE-REQUEST. Clients MUST check
+for OTHER-ADDRESS in the first Binding Response before attempting the rest.
+
+A server that cannot honour a CHANGE-REQUEST -- because it has no alternate
+address configured -- MUST answer with an error, and MUST NOT answer from the
+socket that received the request.
+
+    Answering anyway is the tempting behaviour, and it is the worst available.
+    To the client, a reply arriving after it asked for a changed source is
+    indistinguishable from a NAT that permitted traffic from an endpoint it
+    never contacted, so the client concludes endpoint-independent filtering --
+    the most permissive classification there is -- for a network that may be
+    the most restrictive. Silence would merely lose the measurement; a reply
+    from the wrong socket actively falsifies it.
+
+=== Pinning the source address ===
+
+Before any of the tests below, the client MUST bind its socket to a single
+concrete source address. Binding the wildcard address is not sufficient.
+
+    This is the subtlest requirement in the specification, and skipping it
+    produces a confident wrong answer on hardware that is behaving perfectly.
+    A wildcard-bound socket does not have one source address; the kernel
+    chooses per destination, and RFC 6724 prefers the address sharing the
+    longest prefix with the target. The mapping tests deliberately aim at two
+    addresses that differ only in their low bits, because they are two
+    addresses of one server -- so on any host with more than one address of
+    that family, the kernel emits a different source for Test I than for Test
+    II. The mapped addresses then differ, and the client reports
+    address-dependent mapping for a machine with no NAT anywhere near it.
+
+    This was observed in practice on a dual-stack host with two addresses in
+    one /64: every run reported address-dependent mapping until the source was
+    pinned, after which the same host correctly reported no NAT.
+
+A client with no particular address to test SHOULD determine the source the
+kernel would choose for the primary endpoint and bind that explicitly.
+Connecting a datagram socket to the primary endpoint resolves the route without
+sending anything, which is enough to learn it.
+
+=== Credentials are optional here ===
+
+A DROP server MUST answer Binding Requests that carry no USERNAME, as an
+ordinary STUN server does. Clients SHOULD present their session credentials
+when they have them, and a server that receives a USERNAME MUST validate it and
+reject a bad one with a 401 rather than ignoring the failure.
+
+    Requiring credentials would break the mapping tests for anyone who has not
+    opened a session, and mapping behaviour is useful on its own -- it is the
+    half of RFC 5780 that a client can get from any capable server. There is
+    also nothing to protect: the response tells the requester its own reflexive
+    address, which its own packet already carried.
+
+Mapping behaviour (RFC 5780 section 4.3). Compare XOR-MAPPED-ADDRESS across
+three Binding Requests:
+
+    Test I    -> primary address,   primary port    (IP_A:P_A)
+    Test II   -> alternate address, primary port    (IP_B:P_A)
+    Test III  -> alternate address, alternate port  (IP_B:P_B)
+
+    I == II              endpoint-independent mapping
+    I != II, II == III   address-dependent mapping
+    II != III            address-and-port-dependent mapping
+
+If the mapped address from Test I equals the socket's local address, there is
+no NAT in the path at all.
+
+Filtering behaviour (RFC 5780 section 4.4). All requests go to the primary
+endpoint; CHANGE-REQUEST asks the server to answer from elsewhere:
+
+    Test I    no flags                          -- baseline connectivity
+    Test II   change IP and port (0x04 | 0x02)  -- response received means
+                                                   endpoint-independent
+                                                   filtering
+    Test III  change port only (0x02)           -- response received means
+                                                   address-dependent filtering
+                                                   otherwise
+                                                   address-and-port-dependent
+
+The filtering tests MUST run on a socket that has never sent to the alternate
+address, which in practice means a socket freshly opened for them. It must be
+pinned to the same source address as the mapping socket, per the rule above.
+
+    The mapping tests just finished sending to the alternate address on
+    purpose. A NAT that saw that has a mapping open towards it, and will
+    therefore accept the very reply that Test II is designed to find out
+    whether it accepts. Reusing the socket classifies almost every NAT as
+    endpoint-independent-filtering, which is both the most permissive answer
+    and, for a restrictive NAT, exactly backwards. The two halves of RFC 5780
+    look like one sequence but cannot share state.
+
+Port preservation: compare the mapped port from Test I with the socket's local
+port. Equal means the NAT preserves ports.
+
+Two free results fall out of this:
+
+  - Test I doubles as a UDP egress test. No response at all to Test I, when the
+    control plane works, means outbound UDP is blocked -- common on corporate
+    and campus networks, and it means UDP search results will never work
+    regardless of anything else.
+
+  - Endpoint-independent mapping combined with endpoint-independent filtering
+    is the case where UDP hole punching, and therefore ADC NATT, has a
+    realistic chance. Address-and-port-dependent behaviour on either axis means
+    it does not, and a client SHOULD NOT present hole punching as a remedy to
+    the user in that case.
+
+=== What behaviour discovery is and is not good for ===
+
+Behaviour discovery answers "would hole punching work". It does not answer "can
+strangers reach my UDP port", because every request in it is client-initiated
+and therefore traverses a mapping the client just created. The authoritative
+answer to the question ADC actually cares about is the unsolicited inbound
+probe in the previous section, which arrives from an endpoint the client never
+contacted. Clients MUST NOT substitute a filtering-behaviour result for the
+inbound UDP verdict.
+
+=== Field notes on RFC 5780 in the wild ===
+
+Measured August 2026 against five public STUN servers, because this determines
+how much a client can rely on third-party infrastructure:
+
+  - Three of five (including Google's and Cloudflare's) returned no
+    OTHER-ADDRESS at all, so they cannot do behaviour discovery.
+  - The two that did advertise OTHER-ADDRESS answered the mapping tests
+    correctly: Test II from the alternate address returned the same mapped
+    address, classifying endpoint-independent mapping, port preserving.
+  - Neither answered a CHANGE-REQUEST, for either flag combination. The
+    filtering result was therefore indistinguishable from
+    address-and-port-dependent filtering.
+  - One advertised an OTHER-ADDRESS in an entirely different network from its
+    primary address, which is a misconfiguration rather than a second server
+    address.
+
+Three consequences, all normative:
+
+  - A DROP server that advertises "nat" MUST implement CHANGE-REQUEST. This is
+    the reason DROP does not simply tell clients to go and use any public STUN
+    server: the mapping half is widely available, the filtering half is
+    effectively not.
+  - A negative filtering result is ambiguous whenever the server is not a DROP
+    server. Clients using a fallback STUN server MUST report the filtering
+    behaviour as unknown rather than as restrictive.
+  - Clients SHOULD sanity-check OTHER-ADDRESS -- at minimum that it differs
+    from the primary address and is globally routable -- and skip behaviour
+    discovery if it does not look like a real second address.
+
+
+== Egress test ==
+
+The server keeps additional TCP listeners on common hub ports on its primary
+address; /v1/server publishes them. The client connects to each and notes
+whether it succeeds.
+
+Whatever the port, a bare successful connect proves nothing: the most common
+cause of blocked egress is a transparent proxy or captive portal that accepts
+the connection itself. The client MUST obtain positive evidence that it reached
+the DROP server, which means the test differs by port class.
+
+Banner ports ("banner_ports": 411, 412, 1511, 5000 by convention). On accept
+the server immediately writes one line and closes:
+
+    DROP/1 EGRESS <port>\n
+
+The client MUST check that line.
+
+HTTP and HTTPS ports ("http_ports", "https_ports": 80 and 443 by convention).
+These carry the control plane and the ACME challenge, so the server cannot
+speak first and there is no banner. The test is instead a successful fetch of
+/v1/server over that port, with the "protocol" member checked. On 443 that also
+proves TLS completes, which is the case that matters most: a TLS-intercepting
+middlebox will fail certificate validation and be caught, where a plain connect
+would not be.
+
+A server MUST NOT list a port in more than one class, and clients MUST treat an
+unknown class as untestable rather than guessing.
+
+This test needs no session and creates no new abuse surface, since the client
+is the one initiating. It detects the "my network blocks outbound DC traffic"
+case, which today reaches users as an unexplained inability to connect to any
+hub at all.
+
+
+== Interpreting the results ==
+
+This section is the point of the whole document. Without it every client will
+invent its own heuristic and users will get contradictory advice from different
+software.
+
+=== What ADC actually wants advertised ===
+
+Two things, and they are commonly confused:
+
+  - Active mode is signalled by the TCP4 and TCP6 feature tokens in the INF SU
+    field. That is what the ADC specification defines as active.
+
+  - U4 and U6 carry the UDP port for search results, and UDP4 / UDP6 in SU
+    signal UDP capability.
+
+Note the discrepancy with deployed hubs: uhub's own active/passive accounting
+looks only at the presence of U4/U6 (src/core/metrics.c:236-238), and its
+feature parser does not recognise TCP4 or UDP4 at all -- they are logged as
+unknown extensions and otherwise ignored (src/core/user.c:205-258). Clients
+SHOULD therefore set the SU tokens and the U-fields consistently, and MUST NOT
+assume a hub honours one without the other.
+
+Clients also need not, and SHOULD not, guess their own address for the INF:
+uhub discards client-supplied I4 and I6 outright and substitutes the observed
+address (src/core/inf.c:375-393). DROP's value is in deciding *whether* to
+advertise a port, not *which* address to claim.
+
+=== Decision table ===
+
+Per family, given the TCP verdict, the UDP verdict and the classification:
+
+  TCP open, UDP open
+      Fully active. Advertise TCP4/TCP6 and U4/U6.
+
+  TCP open, UDP no_response
+      Advertise active for transfers. Search results over UDP will not arrive,
+      so the client SHOULD still advertise U4/U6 only if it has another reason
+      to; it SHOULD warn that searches may return nothing.
+
+  TCP filtered or refused, UDP open
+      ADC has no way to say "passive for transfers but reachable for search
+      results": advertising U4/U6 is read as a wholesale active-mode claim by
+      hubs and peers, and remote clients will then attempt CTM to a port that
+      does not answer. The client MUST advertise passive. It MAY note the
+      asymmetry in diagnostics, since it usually means a UDP-only forward or a
+      firewall rule covering only TCP.
+
+  TCP refused, any UDP
+      The client is not listening where it thinks it is, or the forward points
+      at the wrong host. Nothing on the path is dropping packets, so this is
+      almost always fixable locally. Check the bind address and the forward
+      target before blaming the firewall.
+
+  TCP occupied
+      Another service holds that port, or the forward lands on a different
+      machine. Suggest a different port rather than a firewall change.
+
+  TCP filtered, classification cgnat
+      Passive is the only correct answer on IPv4. Tell the user their ISP uses
+      carrier-grade NAT and that router configuration cannot fix it. Point at
+      IPv6 as the actual remedy.
+
+  TCP filtered, classification global
+      The port-forwarding case. Recommend PCP, NAT-PMP or UPnP-IGD, then re-run
+      the check to confirm -- do not trust the mapping protocol's own success
+      report, which is exactly the failure mode DROP exists to catch.
+
+  classification private, unique-local or loopback
+      A proxy or middlebox is rewriting traffic. Reachability results are not
+      meaningful; report the anomaly rather than a verdict.
+
+Cross-family rule: prefer IPv6 active when IPv6 TCP is open, even when IPv4 is
+CGNAT. A client that is active on IPv6 and passive on IPv4 is in a materially
+better position than one that is passive on both, and should say so rather than
+reporting "passive".
+
+=== Caching and re-checking ===
+
+Clients SHOULD cache results keyed on the observed address, with a short TTL
+(15 minutes is reasonable), and MUST invalidate on any network change:
+interface up/down, address change, VPN connect/disconnect, or resume from
+suspend. Re-running on every hub connect is unnecessary and rude to the
+service.
+
+=== Two-server agreement ===
+
+Before advertising active mode on the strength of a DROP result, a client
+SHOULD confirm an "open" verdict against a second, independent server. A single
+misconfigured or hostile checker can otherwise talk a client into a broken
+active-mode claim, which degrades the experience of every peer that tries to
+connect to it.
+
+
+== Abuse, safety and privacy ==
+
+Read this section before implementing a server.
+
+Source address only. Probe the control connection's source address and nothing
+else. No target parameter, ever. See "The source-address rule".
+
+Proof of ownership. No port is reported "open" without a correct nonce (TCP) or
+a valid MESSAGE-INTEGRITY (UDP). The service confirms "your client answered",
+never "this port is open".
+
+The CGNAT hazard. This is the deepest problem in the design and it does not go
+away. Behind carrier-grade NAT, a public IPv4 address is shared, so a probe
+aimed at "the client" can land on a different subscriber's forwarded port. The
+mitigations, all of which servers MUST implement:
+
+  - the mandatory nonce, so a stranger's service is reported as occupied and
+    never as open;
+  - refuse ports below 1024 by default, which keeps the common administrative
+    services out of reach;
+  - cap ports per test (four is enough for any real client);
+  - rate limit per /32 and per /24 for IPv4, and per /128 and per /64 for IPv6,
+    so that one subscriber cannot walk the shared address's port space.
+
+No amplification. Every datagram the server emits is gated behind a completed
+TCP and TLS handshake from the target address, so the target cannot be spoofed,
+and the number of datagrams per session is capped. This is the property that
+makes the service safe to operate on the public Internet; a server design that
+loses it is broken. The client-side rules in "Inbound UDP probe" preserve the
+same property on the other end.
+
+Rate limiting. Token bucket per address and per prefix, with 429 and
+Retry-After. Servers MAY offer a bearer token for raised limits, which is also
+how a private instance restricts itself to its own users.
+
+Servers SHOULD budget the endpoints that emit traffic separately from those
+that do not. /v1/server and /v1/whoami cost the server nothing and reveal
+nothing the requester's own connection did not already disclose, so they should
+stay usable after the probing budget is spent: a client that has exhausted its
+sessions can still learn its address, which is half of what it came for. A
+denial of both on one counter turns a rate limit into an outage.
+
+Neither bucket may be charged for a request the other rejected. Otherwise a
+client sharing a busy prefix is billed twice for traffic that was not its own,
+and its personal budget drains through no fault of its own.
+
+Transport. TLS mandatory on the control plane; no CDN, no reverse proxy.
+
+The landing page. A server MUST serve a human-readable page at the root of its
+control plane, over both HTTP and HTTPS, explaining what the service is, that
+it connects back only to addresses that have just asked it to, and how to
+contact the operator.
+
+    This is an abuse control, not documentation. The traffic this service
+    generates is inbound connections to residential addresses, and some
+    recipient will eventually see one in a firewall log, resolve the reverse
+    DNS, and open it in a browser. What they find there decides whether the
+    next step is understanding or a complaint to the hosting provider -- and
+    providers act on complaints faster than they investigate them. The page
+    costs nothing and is the only thing standing between a puzzled sysadmin and
+    a suspended host. Reverse DNS for the probing addresses SHOULD resolve to
+    the name that serves it.
+
+Privacy. An address-reflection service handles IP addresses by definition.
+Servers SHOULD default to aggregate counters only, keeping per-address state in
+in-memory rate-limit buckets that are never written to disk. If request logging
+is enabled it SHOULD be off by default, documented, and retention-bounded.
+Publishing an operator privacy statement is not optional in practice.
+
+Consent. Running the inbound probes requires an explicit session. Clients
+SHOULD tell the user, at least once, that startup contacts an external service
+and what it reveals, and SHOULD allow it to be disabled.
+
+
+== Deployment requirements ==
+
+  - Two public IPv4 addresses and two public IPv6 addresses, all on the same
+    host. RFC 5780 behaviour discovery cannot work with fewer. A second IPv6
+    address is normally free, since a /64 is the usual allocation; a second
+    IPv4 address usually is not, which is why "tests" is per family.
+  - Two UDP ports across those addresses (3478 and 3479 by convention).
+
+    Bind address versus advertised address. On several cloud providers a
+    secondary address is not configured on any interface: traffic to it is
+    translated to a hidden per-host "anchor" address, and the machine never
+    sees the real one. DigitalOcean Reserved IPs work exactly this way, and
+    they are a natural way to obtain the second IPv4. A server MUST therefore
+    let the operator configure, per STUN endpoint, the address to bind and the
+    address to advertise, independently:
+
+      - bind is what the socket binds, which for such a secondary address is
+        the anchor, not the public address;
+      - advertise is what goes into OTHER-ADDRESS and RESPONSE-ORIGIN, and it
+        must be the address the outside world actually observes.
+
+    A server that derives the advertised address from the socket will publish
+    an unreachable OTHER-ADDRESS, and every client will then either skip
+    behaviour discovery or misclassify. This misconfiguration is invisible in
+    local testing, so operators SHOULD verify it directly: send a datagram from
+    the bound socket to an external reflector and confirm the observed source
+    is the advertised address.
+  - Unfiltered outbound TCP and UDP to arbitrary ports -- many hosting
+    providers block outbound connections to low ports or to large port ranges,
+    and such a host cannot run DROP.
+  - The three DNS names, with correct A/AAAA separation.
+  - The egress-test listener ports, free on the primary address.
+  - A TLS certificate for the control plane.
+  - An abuse contact, and an operator willing to answer it. A service that
+    connects out to arbitrary residential addresses will generate abuse
+    reports even when it is behaving correctly.
+
+
+== Discovery and versioning ==
+
+Version is in the path prefix (/v1/). Within a version, members may be added to
+any JSON object and both sides MUST ignore unknown ones. Capability changes are
+advertised through /v1/server rather than inferred.
+
+Clients SHOULD ship a small list of known servers and SHOULD allow the user to
+override it. Servers MAY additionally be discovered via SRV records:
+
+    _drop._tcp.example.org.  IN SRV 0 0 443 drop.example.org.
+
+Clients MUST NOT hardcode a single server, both for the two-server agreement
+rule and so that no operator becomes a single point of failure for the network.
+
+
+== Conformance checklist ==
+
+Items marked (S) correspond to SHOULDs: worth doing, and an implementation that
+omits one is still conforming. Everything else is a requirement.
+
+Client:
+
+   1. Uses the family-specific DNS names, one run per family.
+   2. Binds the control socket to the address it intends to advertise.
+   3. Reads /v1/server and degrades when a test is unavailable.
+   4. Accepts "DROP/1 CHALLENGE" on its client-to-client TCP port, including
+      when that port is otherwise TLS-only, and responds with exactly one line.
+   5. Enforces the 128-byte line cap and rate-limits challenge handling.
+      (S) Ignores challenges whose nonce matches no recent session.
+   6. Runs its STUN agent on the same socket it advertises in U4/U6.
+   7. Rejects Binding Requests failing MESSAGE-INTEGRITY against a recent
+      session, and rate-limits responses.
+   8. Demultiplexes STUN from ADC UDP by first byte and magic cookie.
+   9. Pins a single concrete source address for behaviour discovery, and uses a
+      socket that has never contacted the alternate address for the filtering
+      tests.
+  10. Retransmits unanswered Binding Requests before concluding anything.
+  11. Runs the inbound UDP probe before behaviour discovery, never after.
+  12. Checks for OTHER-ADDRESS, and that it looks like a real second address,
+      before attempting behaviour discovery; reports filtering as unknown when
+      the server is not a DROP server.
+  13. Obtains positive evidence on every egress port rather than trusting a
+      bare connect: the banner on banner_ports, a /v1/server fetch on the HTTP
+      and HTTPS ports.
+  14. Reads capabilities per address family and never infers one family's from
+      the other's.
+  15. Applies the decision table, sets SU tokens and U-fields consistently, and
+      does not guess its own address for I4/I6.
+  16. Never presents an "error" verdict as a reachability result.
+  17. (S) Caches by observed address and invalidates on network change.
+  18. (S) Confirms "open" against a second server before advertising active.
+
+Server:
+
+   1. Has no target-address parameter anywhere.
+   2. Binds sessions to the creating source address and returns 403 otherwise.
+   3. Keys session identity on decoded bytes, not on the identifier string, and
+      rejects non-canonical encodings.
+   4. Reports "open" only on nonce or MESSAGE-INTEGRITY success.
+   5. Refuses ports below 1024 by default and caps ports per test.
+   6. Rate limits per address and per prefix, with Retry-After, and charges
+      neither bucket for a request the other rejected.
+      (S) Budgets the informational endpoints separately from the probing ones.
+   7. Emits no datagram that is not gated behind a completed TLS handshake from
+      the target address.
+   8. Retransmits an unanswered UDP probe before reporting no_response.
+   9. Terminates TLS itself; refuses to trust forwarded-address headers from
+      untrusted sources.
+  10. Bounds /inbound at 15 seconds, probes ports concurrently, and makes
+      sessions single-use.
+  11. Consumes a session only after the request has been validated.
+  12. Refuses new entries when the consumed-session table is full, and never
+      evicts to make room.
+  13. Implements OTHER-ADDRESS and CHANGE-REQUEST if it advertises "nat", and
+      advertises "nat" only for families that really have two addresses.
+  14. Answers a CHANGE-REQUEST it cannot honour with an error, never from the
+      receiving socket.
+  15. Answers anonymous Binding Requests, so that mapping tests work before a
+      session exists.
+  16. Configures advertised addresses independently of bound addresses, and has
+      verified the two agree from outside.
+  17. Never reports a probe it failed to perform as a reachability verdict.
+  18. Serves the landing page, publishes an abuse contact, and defaults to
+      aggregate-only logging.
+
+
+== Future work ==
+
+Non-normative, listed so the design leaves room for it:
+
+  - A hub advertising a DROP endpoint to its clients, so that users need no
+    configuration. The token "DROP" is four characters and would fit ADC's
+    feature namespace; arbitrary FOURCCs already work for feature-casts in uhub
+    via user_set_feature_cast_support (src/core/route.c:296-320) without
+    touching convert_support_fourcc.
+
+  - A hub cross-checking DROP verdicts against its own observations -- it
+    already knows whether CTM requests to a given user ever result in a
+    connection -- and warning users whose advertised active mode never works.
+
+  - Hairpinning detection, which needs two cooperating clients behind the same
+    NAT and therefore a different design.
+
+  - Reporting aggregate, anonymised reachability statistics, which would for
+    the first time give the DC network real numbers on how many users are
+    passive and why.
+
+
+== Appendix A: worked example ==
+
+An IPv4 client on a home router with no port forward configured.
+
+    > GET /v1/whoami HTTP/1.1
+    > Host: v4.drop.example.org
+    <
+    < { "ip": "203.0.113.7", "family": "ipv4", "port": 51343,
+    <   "classification": "global", "observed_at": "2026-08-13T12:00:00Z" }
+
+    > POST /v1/session HTTP/1.1
+    > { "version": 1, "client": "ncdc/1.24", "tests": ["tcp","udp","nat"] }
+    <
+    < { "session_id": "0e5f9c1a7b2d4e88", "expires_in": 60, ... }
+
+The client arms its listeners, then:
+
+    > POST /v1/session/0e5f9c1a7b2d4e88/inbound HTTP/1.1
+    > { "tcp": [1511], "udp": [1511] }
+
+The server connects to 203.0.113.7:1511 and times out; it sends a Binding
+Request to 203.0.113.7:1511 and hears nothing.
+
+    < { "tcp": [ { "port": 1511, "verdict": "filtered" } ],
+    <   "udp": [ { "port": 1511, "verdict": "no_response" } ],
+    <   "elapsed_ms": 5010 }
+
+Behaviour discovery then reports endpoint-independent mapping with
+address-dependent filtering, and the observed port differs from the local port.
+
+The client concludes: passive on IPv4; the router is dropping inbound; a port
+forward or a PCP mapping is the remedy; hole punching is unlikely to help
+because filtering is address-dependent. It tells the user exactly that, offers
+to request a mapping, and re-runs the check afterwards.
+
+
+== Appendix B: notes for a uhub-based implementation ==
+
+Should a reference server be written in this tree, the survey has already been
+done. Reusable as-is:
+
+  - The reactor. net_backend_process() (src/network/backend.c:168) driven from
+    a plain while loop; see src/tools/linktest.c:213 for the shape.
+  - net_con_connect() (src/network/connection.c:614) -- asynchronous outbound
+    connect with DNS resolution and Happy Eyeballs, and a status enum that maps
+    almost exactly onto the TCP verdicts. This is the inbound-TCP probe
+    primitive, already written.
+  - The listening-socket recipe, start_listening_socket() (src/core/hub.c:952)
+    and the accept loop net_on_accept() (src/core/netevent.c:180). Note the
+    backend indexes conns[fd], so file descriptors at or above
+    net_backend_get_max_connections() must be rejected.
+  - HTTP. src/core/metrics.c is the only HTTP implementation in the tree:
+    metrics_classify_request() (metrics.c:344) is the request parser, roughly
+    seventy lines, and metrics_send_response() (metrics.c:311) the response
+    builder. Both work identically over TLS with no changes.
+  - TLS contexts, both server and client (src/network/tls.h).
+  - ip_addr_encap and src/network/ipcalc.c for address parsing, formatting and
+    range matching -- the classification table above is a handful of
+    ip_convert_address_to_range() and ip_in_range() calls.
+  - cbuffer, linked_list, and hub_malloc/hub_free.
+  - Nonce construction can follow HBRI's stateless token: a Tiger MAC over a
+    per-server secret, with the constant-time comparison at src/core/hbri.c:68.
+
+What does not exist and must be written:
+
+  - UDP, entirely. The only SOCK_DGRAM in the tree is a capability probe at
+    src/network/network.c:510; there is no recvfrom or sendto anywhere, and no
+    sockaddr-to-ip_addr_encap converter (that logic is inlined in net_accept(),
+    network.c:461-486). The reactor itself is indifferent and will deliver read
+    events on a datagram socket without modification.
+  - STUN message encoding and the RFC 5780 server side.
+  - Binding to multiple specific addresses, which the hub does not need today.
+
+Gotchas: ip_convert_to_string() returns a pointer into a rotating ring of eight
+static buffers (ipcalc.c:100), so it is safe to call twice in one printf but
+the result must not be retained. hub_free is a macro and must not be passed as
+a function pointer; pass hub_free_handle instead.
+
+
+== References ==
+
+  RFC 8489  Session Traversal Utilities for NAT (STUN). Obsoletes RFC 5389.
+            Short-term credentials are section 9.1; the comprehension-optional
+            attribute range and the magic cookie are sections 14 and 5.
+  RFC 5780  NAT Behavior Discovery Using STUN. Experimental. Sections 4.3 and
+            4.4 are the mapping and filtering tests; section 6 states the
+            two-address requirement.
+  RFC 4787  NAT Behavioral Requirements for Unicast UDP (BCP 127).
+  RFC 5382  NAT Behavioral Requirements for TCP (BCP 142).
+  RFC 8085  UDP Usage Guidelines (BCP 145).
+  RFC 7983  Multiplexing Scheme Updates for SRTP/DTLS. First-byte
+            demultiplexing precedent.
+  RFC 9443  Multiplexing Scheme Updates for QUIC. Updates RFC 7983.
+  RFC 6887  Port Control Protocol (PCP).
+  RFC 6886  NAT Port Mapping Protocol (NAT-PMP).
+  RFC 6598  IANA-Reserved IPv4 Prefix for Shared Address Space (100.64.0.0/10).
+  RFC 1918  Address Allocation for Private Internets.
+  RFC 4193  Unique Local IPv6 Unicast Addresses.
+  RFC 8981  Temporary Address Extensions for SLAAC in IPv6.
+  RFC 4380  Teredo (2001::/32).
+  RFC 3056  Connection of IPv6 Domains via IPv4 Clouds (6to4, 2002::/16).
+
+  ADC       https://adc.sourceforge.io/ADC.html
+  ADC-EXT   https://adc.sourceforge.io/ADC-EXT.html
+
+  architecture.txt   uhub's login state machine and HBRI.
+  linking.txt        uhub's hub-to-hub link protocol.
+  prometheus.txt     uhub's metrics, including its active/passive definition.
