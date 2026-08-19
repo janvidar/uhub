@@ -18,6 +18,7 @@
  */
 
 #include "util/log.h"
+#include "util/memory.h"
 #include "adc/message.h"
 #include "core/config.h"
 #include "core/hub.h"
@@ -77,6 +78,114 @@ struct adc_message* route_rtf0_variant(struct hub_user* user, struct adc_message
 	return rich;
 }
 
+/*
+ * ADCS compatibility (adcs_translate).
+ *
+ * The encrypted client-to-client extension is announced in the INF "SU" field
+ * as either ADCS (ADC-EXT) or ADC0 (the draft, and what the DC++ family sends),
+ * and the connect requests name the matching protocol version, ADCS/1.0 or
+ * ADCS/0.10. A fourcc in SU is matched whole and a protocol version compared as
+ * a string, so a client that knows only one of the two reads the other as an
+ * extension it does not have and a protocol it cannot speak: it refuses the
+ * transfer, or arranges a plaintext one.
+ *
+ * Clients that understand both spellings need none of this, and the hub
+ * rewriting the protocol field of a peer connection is not something to do by
+ * default -- it is the one field in a CTM the hub gets to touch on the way past,
+ * and clients treat "the hub relayed this" as a reason to distrust a weaker
+ * protocol than they asked for. Translating between the two TLS spellings is
+ * not a downgrade, but it is still the hub deciding, so it is opt-in.
+ *
+ * The rewrite is stateless and symmetric: every relayed connect request, and
+ * every status message refusing one, is put into the spelling its single
+ * recipient announced. An RCM asking for ADCS/1.0 reaches an ADC0 client as
+ * ADCS/0.10, its CTM comes back as ADCS/0.10 and reaches the asker as
+ * ADCS/1.0, and the STA that refuses either arrives in the reader's own words.
+ */
+
+/** Which spelling this user recognises, or NULL if it does not matter. */
+static const char* adcs_spelling_for(struct hub_user* user)
+{
+	int spec = user_flag_get(user, feature_adcs) != 0;
+	int draft = user_flag_get(user, feature_adc0) != 0;
+
+	/* Both: it reads either, and the sender's own choice is left alone.
+	   Neither: it announced no encryption at all, and there is nothing to
+	   translate to -- inventing a spelling for it would be guessing. */
+	if (spec == draft)
+		return NULL;
+
+	return spec ? ADC_PROTO_TLS : ADC_PROTO_TLS_DRAFT;
+}
+
+static int adcs_is_tls_protocol(const char* protocol)
+{
+	return strcmp(protocol, ADC_PROTO_TLS) == 0 || strcmp(protocol, ADC_PROTO_TLS_DRAFT) == 0;
+}
+
+struct adc_message* route_adcs_translate(struct hub_info* hub, struct hub_user* target, struct adc_message* msg)
+{
+	const char* want;
+	char* have;
+	struct adc_message* copy;
+	int named;
+	int rewrite;
+
+	if (!hub->config->adcs_translate)
+		return NULL;
+
+	switch (msg->cmd)
+	{
+		/* The protocol is the first argument of a connect request. */
+		case ADC_CMD_DCTM:
+		case ADC_CMD_DRCM:
+		case ADC_CMD_DNAT:
+		case ADC_CMD_DRNT:
+			named = 0;
+			break;
+
+		/* A status message refusing one echoes it back in "PR". */
+		case ADC_CMD_DSTA:
+			named = 1;
+			break;
+
+		default:
+			return NULL;
+	}
+
+	want = adcs_spelling_for(target);
+	if (!want)
+		return NULL;
+
+	have = named ? adc_msg_get_named_argument(msg, ADC_STA_FLAG_PROTOCOL)
+	             : adc_msg_get_argument(msg, 0);
+	if (!have)
+		return NULL;
+
+	/* Only the other TLS spelling is rewritten. Plain ADC/1.0 is left as it
+	   is -- translating it would be offering encryption on the sender's behalf
+	   -- and so is anything else, which is not ours to name. */
+	rewrite = adcs_is_tls_protocol(have) && strcmp(have, want) != 0;
+	hub_free(have);
+
+	if (!rewrite)
+		return NULL;
+
+	copy = adc_msg_copy(msg);
+	if (!copy)
+		return NULL; /* OOM: the original goes out, in the sender's spelling */
+
+	if ((named ? adc_msg_replace_named_argument(copy, ADC_STA_FLAG_PROTOCOL, want)
+	           : adc_msg_replace_argument(copy, 0, want)) == -1)
+	{
+		adc_msg_free(copy);
+		return NULL;
+	}
+
+	return copy;
+}
+
+
 static int route_to_all_ex(struct hub_info* hub, struct adc_message* rich, struct adc_message* plain);
 static int route_to_subscribers_ex(struct hub_info* hub, struct adc_message* rich, struct adc_message* plain);
 
@@ -97,7 +206,13 @@ int route_message(struct hub_info* hub, struct hub_user* u, struct adc_message* 
 			target = uman_get_user_by_sid(hub->users, msg->target);
 			if (target)
 			{
-				route_to_user(hub, target, route_rtf0_variant(target, rich, plain));
+				struct adc_message* variant = route_rtf0_variant(target, rich, plain);
+				struct adc_message* translated = route_adcs_translate(hub, target, variant);
+
+				route_to_user(hub, target, translated ? translated : variant);
+
+				/* The recipient took its own reference in ioq_send_add(). */
+				adc_msg_free(translated);
 			}
 			break;
 

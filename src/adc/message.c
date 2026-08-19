@@ -854,6 +854,80 @@ int adc_msg_add_named_argument_uint64(struct adc_message* cmd, const char prefix
 	return ret;
 }
 
+/*
+ * Replace one positional argument in place, keeping every other argument where
+ * it is. Unlike adc_msg_replace_named_argument() -- which removes and re-adds,
+ * so the field ends up last -- position matters here: the protocol field of a
+ * CTM is the first argument and nothing else identifies it.
+ *
+ * The replacement may be longer or shorter than what it replaces, so the tail
+ * of the message is moved and the buffer grown when needed.
+ */
+int adc_msg_replace_argument(struct adc_message* cmd, int offset, const char* string)
+{
+	size_t arg_start = 0;
+	size_t arg_end = 0;
+	size_t old_len, new_len, tail;
+	int count = 0;
+	int found = 0;
+	int arg_offset = adc_msg_get_arg_offset(cmd);
+	char* pos;
+
+	ADC_MSG_ASSERT(cmd);
+
+	if (!string || offset < 0)
+		return -1;
+
+	if (arg_offset < 1 || (size_t) arg_offset > cmd->length)
+		return -1;
+
+	adc_msg_unterminate(cmd);
+
+	/* Walk the space separated arguments, as adc_msg_get_argument() does. */
+	pos = strchr(&cmd->cache[arg_offset - 1], ' ');
+	while (pos)
+	{
+		char* end = strchr(&pos[1], ' ');
+		if (count == offset)
+		{
+			arg_start = (size_t) (&pos[1] - cmd->cache);
+			arg_end = end ? (size_t) (end - cmd->cache) : cmd->length;
+			found = 1;
+			break;
+		}
+		count++;
+		pos = end;
+	}
+
+	if (!found)
+	{
+		adc_msg_terminate(cmd);
+		return -1;
+	}
+
+	old_len = arg_end - arg_start;
+	new_len = strlen(string);
+
+	/* Room for the longer argument, the terminating newline and the NUL. */
+	if (new_len > old_len && !adc_msg_grow(cmd, cmd->length + (new_len - old_len) + 1))
+	{
+		adc_msg_terminate(cmd);
+		return -1; /* OOM */
+	}
+
+	tail = cmd->length - arg_end;
+	memmove(&cmd->cache[arg_start + new_len], &cmd->cache[arg_end], tail);
+	memcpy(&cmd->cache[arg_start], string, new_len);
+	adc_msg_set_length(cmd, cmd->length + new_len - old_len);
+	cmd->cache[cmd->length] = 0;
+
+	adc_msg_terminate(cmd);
+
+	ADC_MSG_ASSERT(cmd);
+	return 0;
+}
+
+
 int adc_msg_add_argument(struct adc_message* cmd, const char* string)
 {
 	if (!string)

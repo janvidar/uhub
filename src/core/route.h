@@ -64,6 +64,20 @@ extern struct adc_message* route_rtf0_baseline(struct hub_info* hub, struct adc_
 extern struct adc_message* route_rtf0_variant(struct hub_user* user, struct adc_message* rich, struct adc_message* plain);
 
 /**
+ * ADCS compatibility (adcs_translate): put the protocol field of a relayed
+ * connect request -- or of the status message refusing one -- into the spelling
+ * its recipient announced in the INF "SU" field. ADCS/1.0 goes to a client that
+ * claimed ADCS, ADCS/0.10 to one that claimed only ADC0; a client claiming both
+ * or neither is left with what the sender sent, as is a request that named no
+ * encryption at all.
+ *
+ * @return a translated copy, which the caller must adc_msg_free(), or NULL when
+ *         nothing needs translating (the common case, and what the caller sends
+ *         instead).
+ */
+extern struct adc_message* route_adcs_translate(struct hub_info* hub, struct hub_user* target, struct adc_message* msg);
+
+/**
  * Send queued messages.
  */
 extern int route_flush_pipeline(struct hub_info* hub, struct hub_user* u);

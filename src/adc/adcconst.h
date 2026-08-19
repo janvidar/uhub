@@ -50,9 +50,24 @@ typedef uint32_t fourcc_t;
 #define ADC_EXT_TIGR "TIGR"
 #define ADC_EXT_UCMD "UCMD" /* ADC-EXT 3.7 */
 #define ADC_EXT_RTF0 "RTF0"
+#define ADC_EXT_ADCS "ADCS" /* ADC-EXT: encrypted client-to-client connections */
+#define ADC_EXT_ADC0 "ADC0" /* the same extension, as its draft named it */
 #define ADC_EXT_BBS0 "BBS0" /* BBS0: bulletin boards. Hub feature only -- it is
                                never a flag in the INF "SU" field, since no
                                client ever sends a bulletin to another. */
+
+/*
+ * The two spellings of the encrypted client-to-client protocol, as they appear
+ * in the protocol field of CTM/RCM/NAT/RNT and in the "PR" field of the STA
+ * that refuses one.
+ *
+ * ADCS/1.0 is what ADC-EXT settled on; ADCS/0.10 is the version number the
+ * extension carried while it was a draft, and the DC++ family still sends it.
+ * They name the same TLS, but a client recognises the one it announced and no
+ * other -- which is what the adcs_translate compatibility mode is about.
+ */
+#define ADC_PROTO_TLS "ADCS/1.0"
+#define ADC_PROTO_TLS_DRAFT "ADCS/0.10"
 
 /* Server sent commands */
 #define ADC_CMD_ISID FOURCC('I', 'S', 'I', 'D')
@@ -227,6 +242,7 @@ typedef uint32_t fourcc_t;
 
 /* Status message flags (ADC "General defined fields"), used on ISTA. */
 #define ADC_STA_FLAG_FOURCC "FC"        /* the command the status refers to */
+#define ADC_STA_FLAG_PROTOCOL "PR"      /* the protocol a refused CTM/RCM named */
 #define ADC_STA_FLAG_MISSING_FIELD "FM" /* name of a missing required field */
 #define ADC_STA_FLAG_BAD_FIELD "FB"     /* name of an invalid field */
 

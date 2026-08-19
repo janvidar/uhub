@@ -902,6 +902,39 @@
 		<since>0.5.0</since>
 	</option>
 
+	<option name="adcs_translate" type="boolean" default="0">
+		<short>Translate between the two spellings of the ADCS extension</short>
+		<description><![CDATA[
+			<p>
+			Encrypted client-to-client connections are announced in the <code>SU</code>
+			field as either <code>ADCS</code> (the name ADC-EXT settled on) or
+			<code>ADC0</code> (the name the extension had while it was a draft, and the
+			one the DC++ family still uses), and the connect requests name the matching
+			protocol version, <code>ADCS/1.0</code> or <code>ADCS/0.10</code>.
+			</p>
+			<p>
+			They mean the same TLS, but a client recognises the spelling it announced and
+			no other, so two clients that each know only one of them cannot arrange an
+			encrypted transfer: the request names a protocol the other has never heard of,
+			and it is refused or falls back to plain text.
+			</p>
+			<p>
+			When enabled the hub rewrites the protocol field of every relayed
+			<code>CTM</code>, <code>RCM</code>, <code>NAT</code> and <code>RNT</code> --
+			and the <code>PR</code> field of the status message refusing one -- into the
+			spelling the recipient announced. Clients announcing both spellings, or
+			neither, are sent what the other end sent.
+			</p>
+			<p>
+			This is off by default: the protocol field belongs to the two clients, and a
+			hub that rewrites it is a hub deciding something about a connection it is not
+			part of. Enable it on a hub whose users cannot all be expected to speak both
+			spellings; the better fix is a client that reads and writes both.
+			</p>
+		]]></description>
+		<since>0.8.0</since>
+	</option>
+
 	<option name="file_acl" type="file" default="">
 		<short>File containing access control lists (bans and denied nicks)</short>
 		<description><![CDATA[

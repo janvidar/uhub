@@ -242,8 +242,16 @@ static int convert_support_fourcc(int fourcc)
 		case FOURCC('L','I','N','K'):
 			return feature_link;
 
+		/* ADCS is the ADC-EXT spelling of the client-to-client TLS flag;
+		   ADC0 is what the extension was called while it was a draft, and
+		   what the DC++ family still announces. They are tracked apart
+		   because which one a client announced decides which spelling of the
+		   protocol it recognises -- see route_adcs_translate(). */
 		case FOURCC('A','D','C','S'):
 			return feature_adcs;
+
+		case FOURCC('A','D','C','0'):
+			return feature_adc0;
 
 		case FOURCC('H','B','R','I'):
 			return feature_hbri;

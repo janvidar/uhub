@@ -154,6 +154,19 @@ extern int adc_msg_is_empty(struct adc_message* cmd);
 extern char* adc_msg_get_argument(struct adc_message* cmd, int offset);
 
 /**
+ * Replace the positional argument at the given offset, in place -- the
+ * argument keeps its position and every other argument keeps its own. Use this
+ * where the position is what identifies the field (the protocol field of a
+ * CTM, for instance), since adc_msg_replace_named_argument() moves the field it
+ * rewrites to the end of the message.
+ *
+ * @arg offset zero-based argument index, as for adc_msg_get_argument().
+ * @arg string must be escaped (see adc_msg_escape).
+ * @return  0 if successful, or -1 if there is no such argument (or on OOM).
+ */
+extern int adc_msg_replace_argument(struct adc_message* cmd, int offset, const char* string);
+
+/**
  * Replace a named argument in the command.
  * This will remove any matching arguments (multiple, or none),
  * then add 'string' as an argument using the given prefix.

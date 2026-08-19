@@ -34,6 +34,13 @@ New features:
   SQLite (file_bbs_index). The hub holds the index only -- post content travels
   between clients over the ordinary search and transfer machinery and is never
   stored on or served by the hub. Off by default; see doc/bbs.txt.
+- New adcs_translate option: an ADCS compatibility mode. The encrypted
+  client-to-client extension has two names -- ADCS/ADCS-1.0 as ADC-EXT settled
+  on it, ADC0/ADCS-0.10 as its draft did and the DC++ family still sends -- and
+  a client recognises only the one it announced, so a mismatched pair gets a
+  plaintext transfer or none. When enabled the hub puts the protocol field of
+  every relayed CTM, RCM, NAT and RNT, and the PR field of the status message
+  refusing one, into the spelling its recipient announced. Off by default.
 - New operator command !unban to lift a ban by nick, CID or IP/range. Runtime
   bans could previously only be cleared by restarting the hub.
 - !ban takes an optional duration ("!ban nick 30m", 12h, 7d) and a reason
