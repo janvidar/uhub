@@ -74,6 +74,8 @@ struct seed_hub
 	char  cid[MAX_CID_LEN + 1];
 	char  support[SEED_SUPPORT_MAX]; /** SU advertised in the INF; "" for none. */
 
+	int bbs;             /** Offer BBS0 in the HSUP, i.e. seed_bbs_enable. */
+
 	int started;         /** seed_hub_start() was called and stop() was not. */
 	int logged_in;
 	int announced;       /** on_logged_in has fired for the current connection. */
@@ -454,6 +456,250 @@ int seed_hub_parse_rcm(struct adc_message* msg, struct seed_connect* out)
 }
 
 /* -------------------------------------------------------------------------
+ * BBS0 bulletin boards
+ * ------------------------------------------------------------------------- */
+
+int seed_hub_bbs_board_valid(const char* board)
+{
+	size_t i;
+
+	if (!board || !*board)
+		return 0;
+
+	for (i = 0; board[i]; i++)
+	{
+		char c = board[i];
+
+		/* The set BBS0 fixes, and nothing else. It excludes the path
+		   separators but permits '.', so ".." is a legal board name -- which is
+		   exactly why a name from here must never reach the filesystem. */
+		if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+			(c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_'))
+		{
+			return 0;
+		}
+	}
+
+	return (i <= SEED_BBS_BOARD_MAX) ? 1 : 0;
+}
+
+/*
+ * Read a named argument as display text: unescaped, then bounded.
+ *
+ * @return 1 when the argument was present and fitted.
+ */
+static int seed_hub_named_text(struct adc_message* msg, const char* name, char* dst, size_t size)
+{
+	char* raw = adc_msg_get_named_argument(msg, name);
+	char* plain;
+	int ok;
+
+	if (!raw)
+		return 0;
+
+	plain = adc_msg_unescape(raw);
+	hub_free(raw);
+	if (!plain)
+		return 0;
+
+	ok = seed_hub_copy_arg(dst, size, plain);
+	hub_free(plain);
+	return ok;
+}
+
+/*
+ * Read a named argument as an unsigned decimal.
+ *
+ * Nothing is unescaped first: a number carrying an escape is not a number, and
+ * accepting one would mean accepting "1\s" as 1. Overflow is a parse failure
+ * rather than a wrap, since a timestamp is a cursor and a wrapped one would ask
+ * the hub to replay from the wrong place forever.
+ *
+ * @return 1 when the argument was present and well formed.
+ */
+static int seed_hub_named_uint(struct adc_message* msg, const char* name, uint64_t* out)
+{
+	char* raw = adc_msg_get_named_argument(msg, name);
+	uint64_t value = 0;
+	int ok;
+	size_t i;
+
+	if (!raw)
+		return 0;
+
+	ok = (raw[0] != '\0');
+	for (i = 0; ok && raw[i]; i++)
+	{
+		if (raw[i] < '0' || raw[i] > '9')
+		{
+			ok = 0;
+			break;
+		}
+		if (value > (UINT64_MAX - (uint64_t) (raw[i] - '0')) / 10)
+		{
+			ok = 0;
+			break;
+		}
+		value = value * 10 + (uint64_t) (raw[i] - '0');
+	}
+
+	hub_free(raw);
+
+	if (ok)
+		*out = value;
+	return ok;
+}
+
+/* A TTH-shaped named argument: present, and 39 base32 characters. */
+static int seed_hub_named_tth(struct adc_message* msg, const char* name, char* dst, size_t size)
+{
+	if (!seed_hub_named_text(msg, name, dst, size))
+		return 0;
+
+	if (!seed_hub_tth_is_valid(dst))
+	{
+		dst[0] = '\0';
+		return 0;
+	}
+	return 1;
+}
+
+/* RM is "1" for gone/withdrawn; every other value is reserved and ignored. */
+static int seed_hub_named_removed(struct adc_message* msg)
+{
+	uint64_t value = 0;
+
+	if (!seed_hub_named_uint(msg, ADC_BBS_FLAG_REMOVED, &value))
+		return 0;
+	return (value == 1) ? 1 : 0;
+}
+
+int seed_hub_parse_bbs_board(struct adc_message* msg, struct seed_bbs_board* out)
+{
+	uint64_t value = 0;
+
+	if (!msg || !out)
+		return 0;
+
+	memset(out, 0, sizeof(*out));
+
+	if (!seed_hub_named_text(msg, ADC_BBS_FLAG_BOARD, out->board, sizeof(out->board)) ||
+		!seed_hub_bbs_board_valid(out->board))
+	{
+		memset(out, 0, sizeof(*out));
+		return 0;
+	}
+
+	out->removed = seed_hub_named_removed(msg);
+
+	/*
+	 * A descriptor announcing that the board is gone is accepted on the board
+	 * name alone. The only thing to do with one is forget the board, and
+	 * holding a removal notice to the full set of required fields would mean
+	 * ignoring it -- leaving a subscription to a board that no longer exists.
+	 */
+	if (out->removed)
+		return 1;
+
+	if (!seed_hub_named_uint(msg, ADC_BBS_FLAG_PERMISSIONS, &value))
+	{
+		memset(out, 0, sizeof(*out));
+		return 0;
+	}
+	out->permissions = (unsigned int) (value & 0xffffffffu);
+
+	if (!seed_hub_named_uint(msg, ADC_BBS_FLAG_MAX_SIZE, &out->max_size) ||
+		!seed_hub_named_uint(msg, ADC_MSG_FLAG_TIMESTAMP, &out->newest) ||
+		!seed_hub_named_uint(msg, ADC_BBS_FLAG_OLDEST, &out->oldest))
+	{
+		memset(out, 0, sizeof(*out));
+		return 0;
+	}
+
+	/* Informative, so absence is not a failure. */
+	seed_hub_named_uint(msg, ADC_BBS_FLAG_NUM_POSTS, &out->num_posts);
+	seed_hub_named_text(msg, ADC_INF_FLAG_NICK, out->name, sizeof(out->name));
+
+	return 1;
+}
+
+int seed_hub_parse_bbs_entry(struct adc_message* msg, struct seed_bbs_entry* out)
+{
+	if (!msg || !out)
+		return 0;
+
+	memset(out, 0, sizeof(*out));
+
+	/* TR, BD and TS are what a tombstone carries, so they are what every entry
+	   is required to have here. */
+	if (!seed_hub_named_tth(msg, ADC_SCH_FLAG_TTH, out->tth, sizeof(out->tth)) ||
+		!seed_hub_named_text(msg, ADC_BBS_FLAG_BOARD, out->board, sizeof(out->board)) ||
+		!seed_hub_bbs_board_valid(out->board) ||
+		!seed_hub_named_uint(msg, ADC_MSG_FLAG_TIMESTAMP, &out->timestamp))
+	{
+		memset(out, 0, sizeof(*out));
+		return 0;
+	}
+
+	out->removed = seed_hub_named_removed(msg);
+
+	/*
+	 * A tombstone is required to carry only the three fields above and should
+	 * carry nothing else -- the subject and author of a withdrawn post are
+	 * usually the reason it was withdrawn -- so nothing further is read from
+	 * one even if the hub sent it.
+	 */
+	if (out->removed)
+		return 1;
+
+	if (!seed_hub_named_uint(msg, ADC_RES_FLAG_FILE_SIZE, &out->size) ||
+		!seed_hub_named_text(msg, ADC_INF_FLAG_CLIENT_ID, out->author_cid, sizeof(out->author_cid)))
+	{
+		memset(out, 0, sizeof(*out));
+		return 0;
+	}
+
+	/* Copied from the document, and hints until the document is in hand. */
+	seed_hub_named_tth(msg, ADC_BBS_FLAG_PARENT, out->parent, sizeof(out->parent));
+	seed_hub_named_text(msg, ADC_BBS_FLAG_SUBJECT, out->subject, sizeof(out->subject));
+
+	/*
+	 * TH is the hub's grouping and is never verified. A post with no parent is
+	 * its own thread root, which is what it falls back to when the hub omits
+	 * it: the seeder fetches by TR and does not thread anything, so this is
+	 * carried for provenance rather than acted on.
+	 */
+	if (!seed_hub_named_tth(msg, ADC_BBS_FLAG_THREAD, out->thread, sizeof(out->thread)) &&
+		!*out->parent)
+	{
+		strcpy(out->thread, out->tth);
+	}
+
+	seed_hub_named_text(msg, ADC_INF_FLAG_NICK, out->nick, sizeof(out->nick));
+
+	return 1;
+}
+
+int seed_hub_parse_result(struct adc_message* msg, struct seed_result* out)
+{
+	if (!msg || !out)
+		return 0;
+
+	memset(out, 0, sizeof(*out));
+
+	/* A content-addressed cache can do nothing with a result that names no
+	   hash, so one is refused here rather than surfaced and dropped later. */
+	if (!seed_hub_named_tth(msg, ADC_SCH_FLAG_TTH, out->tth, sizeof(out->tth)))
+		return 0;
+
+	out->from = msg->source;
+	seed_hub_named_uint(msg, ADC_RES_FLAG_FILE_SIZE, &out->size);
+	seed_hub_named_text(msg, ADC_RES_FLAG_TOKEN, out->token, sizeof(out->token));
+
+	return 1;
+}
+
+/* -------------------------------------------------------------------------
  * Outgoing messages
  * ------------------------------------------------------------------------- */
 
@@ -625,6 +871,101 @@ int seed_hub_send_pm(struct seed_hub* hub, sid_t to, const char* text)
 	   -- the same convention the hub itself uses for its command replies. */
 	snprintf(pm_flag, sizeof(pm_flag), "%s%s", ADC_MSG_FLAG_PRIVATE, sid_to_string(seed_hub_own_sid(hub)));
 	adc_msg_add_argument(msg, pm_flag);
+
+	ret = seed_hub_send(hub, msg);
+	adc_msg_free(msg);
+	return ret;
+}
+
+int seed_hub_bbs_available(struct seed_hub* hub)
+{
+	if (!hub || !hub->client)
+		return 0;
+
+	return ADC_client_hub_supports(hub->client, ADC_EXT_BBS0);
+}
+
+/*
+ * The one builder behind subscribe, cancel and single-entry request: all three
+ * are an HBBL differing only in which fields they carry.
+ *
+ * BBS0 forbids sending BBL on a hub that has not announced the feature, whether
+ * or not this end offered it, so the check is here rather than in each caller.
+ * TR and TS must not both be present -- a request is a question and not a
+ * subscription -- which the callers arrange by passing one or the other.
+ */
+static int seed_hub_send_bbl(struct seed_hub* hub, const char* board,
+	const uint64_t* from_ts, const char* tth, int cancel)
+{
+	struct adc_message* msg;
+	int ret;
+
+	if (!hub || !hub->logged_in || !seed_hub_bbs_available(hub))
+		return 0;
+
+	if (!seed_hub_bbs_board_valid(board))
+		return 0;
+
+	if (tth && !seed_hub_tth_is_valid(tth))
+		return 0;
+
+	msg = adc_msg_construct(ADC_CMD_HBBL, 64 + SEED_BBS_BOARD_MAX + SEED_TTH_STR_LEN);
+	if (!msg)
+		return 0;
+
+	/* The board name is protocol text from a set that contains none of the
+	   characters ADC escapes, so it goes on the wire as it stands. */
+	adc_msg_add_named_argument(msg, ADC_BBS_FLAG_BOARD, board);
+
+	if (cancel)
+		adc_msg_add_named_argument(msg, ADC_BBS_FLAG_REMOVED, "1");
+	else if (tth)
+		adc_msg_add_named_argument(msg, ADC_SCH_FLAG_TTH, tth);
+	else if (from_ts)
+		adc_msg_add_named_argument_uint64(msg, ADC_MSG_FLAG_TIMESTAMP, *from_ts);
+
+	ret = seed_hub_send(hub, msg);
+	adc_msg_free(msg);
+	return ret;
+}
+
+int seed_hub_send_bbs_subscribe(struct seed_hub* hub, const char* board, uint64_t from_ts)
+{
+	return seed_hub_send_bbl(hub, board, &from_ts, NULL, 0);
+}
+
+int seed_hub_send_bbs_cancel(struct seed_hub* hub, const char* board)
+{
+	return seed_hub_send_bbl(hub, board, NULL, NULL, 1);
+}
+
+int seed_hub_send_bbs_request(struct seed_hub* hub, const char* board, const char* tth)
+{
+	return seed_hub_send_bbl(hub, board, NULL, tth, 0);
+}
+
+int seed_hub_send_search_tth(struct seed_hub* hub, const char* tth, const char* token)
+{
+	struct adc_message* msg;
+	int ret;
+
+	if (!hub || !hub->logged_in || !seed_hub_tth_is_valid(tth))
+		return 0;
+
+	/*
+	 * Broadcast, because the point of searching is not knowing who has it. An
+	 * exact TTH search is the cheapest question ADC has -- a client either
+	 * holds that hash or does not -- and it is the only kind this cache can
+	 * ask or answer.
+	 */
+	msg = adc_msg_construct_source(ADC_CMD_BSCH, seed_hub_own_sid(hub),
+		32 + SEED_TTH_STR_LEN + SEED_TOKEN_MAX);
+	if (!msg)
+		return 0;
+
+	adc_msg_add_named_argument(msg, ADC_SCH_FLAG_TTH, tth);
+	if (token && *token)
+		adc_msg_add_named_argument_string(msg, ADC_SCH_FLAG_TOKEN, token);
 
 	ret = seed_hub_send(hub, msg);
 	adc_msg_free(msg);
@@ -1120,8 +1461,33 @@ static int seed_hub_client_callback(struct ADC_client* client, enum ADC_client_c
 			break;
 
 		case ADC_CLIENT_SEARCH_REP:
-			/* Search results are the fetch layer's business, not ours. */
+		{
+			/* Answers to searches this seeder issued, looking for a peer that
+			   holds a post document whose author has left the hub. */
+			struct seed_result result;
+
+			if (data && hub->cb.on_search_result && seed_hub_parse_result(data->message, &result))
+				hub->cb.on_search_result(hub->ptr, &result);
 			break;
+		}
+
+		case ADC_CLIENT_BBS_BOARD:
+		{
+			struct seed_bbs_board board;
+
+			if (data && hub->cb.on_bbs_board && seed_hub_parse_bbs_board(data->message, &board))
+				hub->cb.on_bbs_board(hub->ptr, &board);
+			break;
+		}
+
+		case ADC_CLIENT_BBS_ENTRY:
+		{
+			struct seed_bbs_entry entry;
+
+			if (data && hub->cb.on_bbs_entry && seed_hub_parse_bbs_entry(data->message, &entry))
+				hub->cb.on_bbs_entry(hub->ptr, &entry);
+			break;
+		}
 
 		case ADC_CLIENT_USER_JOIN:
 		case ADC_CLIENT_USER_UPDATE:
@@ -1191,6 +1557,16 @@ static void seed_hub_open(struct seed_hub* hub)
 	   time, and one that forgot its SU would come back as a passive seeder. */
 	ADC_client_set_support(hub->client, hub->support);
 
+	/*
+	 * Offering BBS0 in the HSUP is what makes the hub send board descriptors:
+	 * a session that did not offer it receives none. It is offered only when
+	 * the operator wants boards seeded, because a client must not claim an
+	 * extension it will not act on -- and because asking for descriptors the
+	 * daemon would then ignore is work for the hub and noise on the wire.
+	 */
+	if (hub->bbs)
+		ADC_client_add_support(hub->client, "AD" ADC_EXT_BBS0);
+
 	/* Cached now so seed_hub_own_cid() answers even between connections. */
 	memset(hub->cid, 0, sizeof(hub->cid));
 	strncpy(hub->cid, ADC_client_get_cid(hub->client), sizeof(hub->cid) - 1);
@@ -1218,6 +1594,7 @@ struct seed_hub* seed_hub_create(const struct seed_config* config, const struct 
 	hub->password    = hub_strdup(config->seed_password ? config->seed_password : "");
 	hub->description = hub_strdup(config->seed_description ? config->seed_description : "");
 	hub->cache_dir   = hub_strdup(config->seed_cache_dir ? config->seed_cache_dir : "");
+	hub->bbs         = config->seed_bbs_enable ? 1 : 0;
 
 	if (cb)
 		hub->cb = *cb;

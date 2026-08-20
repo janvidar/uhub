@@ -87,6 +87,15 @@ struct ADC_client
 	char* extra_support;         /* extra HSUP features, e.g. " ADBBS0"; NULL for none */
 	char cid[MAX_CID_LEN + 1];   /* CID for the current identity (set by adc_cid_pid / set_pid) */
 	char support[ADC_SUPPORT_MAX]; /* SU field, or "" to send none */
+
+	/*
+	 * The features the hub announced in ISUP, as a comma separated list of
+	 * bare FOURCCs ("BASE,TIGR,BBS0"). Rebuilt from every ISUP, so an AD/RM
+	 * pair issued later in the session takes effect, and cleared on connect:
+	 * an extension a hub announced once is not a promise about the next
+	 * connection.
+	 */
+	char hub_support[ADC_SUPPORT_MAX];
 	int flags;
 	void* ptr;
 };
@@ -279,6 +288,115 @@ static void event_callback(struct net_connection* con, int events, void *arg)
 		} while (0)
 
 
+/* ------------------------------------------------------- the hub's SUP list */
+
+/*
+ * The hub's announced features are kept as a comma separated list of bare
+ * FOURCCs rather than as a bitmask. This library models no extension itself, so
+ * it has nothing to map a bitmask onto, and a caller asking whether the hub
+ * speaks something names it as text.
+ */
+static int adc_sup_has(const char* list, const char* feature)
+{
+	const char* p = list;
+	size_t len;
+
+	if (!list || !feature || !*feature)
+		return 0;
+
+	len = strlen(feature);
+	while (*p)
+	{
+		const char* end = strchr(p, ',');
+		size_t span = end ? (size_t) (end - p) : strlen(p);
+
+		if (span == len && strncasecmp(p, feature, len) == 0)
+			return 1;
+		if (!end)
+			break;
+		p = end + 1;
+	}
+	return 0;
+}
+
+static void adc_sup_add(char* list, size_t size, const char* feature)
+{
+	size_t used = strlen(list);
+
+	if (adc_sup_has(list, feature))
+		return;
+
+	/* +1 for the separator when the list is not empty, +1 for the NUL. */
+	if (used + strlen(feature) + (used ? 1 : 0) + 1 > size)
+		return;
+
+	if (used)
+		list[used++] = ',';
+	strcpy(list + used, feature);
+}
+
+static void adc_sup_remove(char* list, size_t size, const char* feature)
+{
+	char kept[ADC_SUPPORT_MAX];
+	const char* p = list;
+	size_t len;
+
+	if (!adc_sup_has(list, feature))
+		return;
+
+	len = strlen(feature);
+	kept[0] = '\0';
+	while (*p)
+	{
+		const char* end = strchr(p, ',');
+		size_t span = end ? (size_t) (end - p) : strlen(p);
+
+		if (span != len || strncasecmp(p, feature, len) != 0)
+		{
+			char token[ADC_SUPPORT_MAX];
+
+			if (span < sizeof(token))
+			{
+				memcpy(token, p, span);
+				token[span] = '\0';
+				adc_sup_add(kept, sizeof(kept), token);
+			}
+		}
+		if (!end)
+			break;
+		p = end + 1;
+	}
+
+	if (strlen(kept) < size)
+		strcpy(list, kept);
+}
+
+/*
+ * Record what the hub said in ISUP.
+ *
+ * A hub may revise the list later in the session -- the BBS0 extension makes a
+ * point of allowing it -- so this applies AD and RM against what is already
+ * held rather than replacing it wholesale.
+ */
+static void ADC_client_on_hub_support(struct ADC_client* client, struct adc_message* msg)
+{
+	char* arg;
+	int i = 0;
+
+	while ((arg = adc_msg_get_argument(msg, i++)))
+	{
+		/* A SUP token is a two character verb and a four character FOURCC.
+		   Anything else is not this grammar, and is left unrecorded rather
+		   than guessed at. */
+		if (strlen(arg) == 6 && memcmp(arg, "AD", 2) == 0)
+			adc_sup_add(client->hub_support, sizeof(client->hub_support), arg + 2);
+		else if (strlen(arg) == 6 && memcmp(arg, "RM", 2) == 0)
+			adc_sup_remove(client->hub_support, sizeof(client->hub_support), arg + 2);
+
+		hub_free(arg);
+	}
+}
+
 static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, size_t length)
 {
 	struct ADC_chat_message chat;
@@ -314,6 +432,7 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 	switch (msg->cmd)
 	{
 		case ADC_CMD_ISUP:
+			ADC_client_on_hub_support(client, msg);
 			break;
 
 		case ADC_CMD_IGPA:
@@ -395,6 +514,23 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 		{
 			data.message = msg;
 			client->callback(client, ADC_CLIENT_SEARCH_REP, &data);
+			break;
+		}
+
+		case ADC_CMD_IBBD:
+		{
+			/* BBS0 board descriptor. Handed over raw: the board grammar
+			   belongs to the consumer, exactly as the search grammar does. */
+			data.message = msg;
+			client->callback(client, ADC_CLIENT_BBS_BOARD, &data);
+			break;
+		}
+
+		case ADC_CMD_IBBL:
+		{
+			/* BBS0 index entry, or a tombstone when it carries RM1. */
+			data.message = msg;
+			client->callback(client, ADC_CLIENT_BBS_ENTRY, &data);
 			break;
 		}
 
@@ -821,6 +957,10 @@ int ADC_client_connect(struct ADC_client* client, const char* address)
 		if (!ADC_client_parse_address(client, address))
 			return 0;
 	}
+
+	/* A feature list is per connection. Carrying one across a reconnect would
+	   let a client keep using an extension the hub has stopped announcing. */
+	client->hub_support[0] = '\0';
 
 	ADC_client_set_state(client, ps_conn);
 	client->callback(client, ADC_CLIENT_CONNECTING, 0);
@@ -1266,6 +1406,16 @@ const char* ADC_client_get_keyprint(const struct ADC_client* client)
 const char* ADC_client_get_support(const struct ADC_client* client)
 {
 	return client ? client->support : "";
+}
+
+int ADC_client_hub_supports(const struct ADC_client* client, const char* feature)
+{
+	return client ? adc_sup_has(client->hub_support, feature) : 0;
+}
+
+const char* ADC_client_hub_support_list(const struct ADC_client* client)
+{
+	return client ? client->hub_support : "";
 }
 
 int ADC_client_parse_client_type(const char* ct)
