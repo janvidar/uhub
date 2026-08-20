@@ -623,6 +623,10 @@ if (FUZZING)
 	add_core_fuzzer(fuzz_login          ${UHUB_SOURCE_DIR}/tools/fuzz_login.c)
 	# The BBS0 commands live in the hub core and pull in the SQLite index.
 	add_core_fuzzer(fuzz_bbs            ${UHUB_SOURCE_DIR}/tools/fuzz_bbs.c)
+	# The BBS0 post document parser is the seeder's, not the hub's: it needs
+	# only seeder/post.c and the magnet scanner it hands the body to.
+	add_fuzzer(fuzz_bbs_post ${UHUB_SOURCE_DIR}/tools/fuzz_bbs_post.c
+		${UHUB_SOURCE_DIR}/seeder/post.c ${UHUB_SOURCE_DIR}/seeder/embed.c)
 endif()
 
 configure_file ("${UHUB_SOURCE_DIR}/version.h.in" "${PROJECT_BINARY_DIR}/version.h")

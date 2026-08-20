@@ -90,6 +90,7 @@ const seeder_sources = [_][]const u8{
 // The rest of the daemon; main.c is excluded from autotest-bin, which has its
 // own.
 const seeder_daemon_sources = [_][]const u8{
+    "src/seeder/bbs.c",
     "src/seeder/cache.c",
     "src/seeder/cc.c",
     "src/seeder/commands.c",
@@ -133,6 +134,7 @@ const tcc_sources = [_][]const u8{
     "test_regserver.tcc",
     "test_route.tcc",
     "test_rtf0.tcc",
+    "test_seedbbs.tcc",
     "test_seedcache.tcc",
     "test_seedcc.tcc",
     "test_seedcommands.tcc",
