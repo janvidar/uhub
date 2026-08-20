@@ -111,6 +111,22 @@ struct seed_config
 	/* Optional HTTP serving. Unauthenticated, hence opt-in. */
 	int   seed_http_enable;           /* boolean, default 0 */
 	int   seed_http_port;             /* 1024..65535, default 1513 */
+
+	/*
+	 * BBS0 bulletin boards. On by default: keeping a board readable after its
+	 * authors have gone is the same job as keeping a chat attachment readable,
+	 * and BBS0 says outright that a durable board is a hub operator running a
+	 * client that subscribes and fetches every post. This is that client.
+	 *
+	 * It costs nothing on a hub that does not announce BBS0 -- no descriptors
+	 * arrive, so nothing is subscribed to and nothing is fetched.
+	 */
+	int   seed_bbs_enable;            /* boolean, default 1 */
+	char* seed_bbs_boards;            /* comma separated names; empty = every board allowed */
+	int   seed_bbs_max_backlog;       /* entries replayed per board per session, 0..1000000, default 5000 */
+	int   seed_bbs_fetch_delay;       /* seconds to wait before fetching, 0..3600, default 5 */
+	int   seed_bbs_attachments;       /* boolean, default 1: also seed what a post links to */
+	int   seed_bbs_search_fallback;   /* boolean, default 1: search when the author is gone */
 };
 
 /**

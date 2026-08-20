@@ -210,7 +210,7 @@ EXO_TEST(seedsniff_binary_inside_prefix, {
 
 /* seed_sniff_type_allowed */
 
-#define SEEDSNIFF_DEFAULT_TYPES "image/png,image/jpeg,image/gif,image/webp"
+#define SEEDSNIFF_DEFAULT_TYPES "image/png,image/jpeg,image/gif,image/webp,application/x-adc-bbs-post"
 
 EXO_TEST(seedsniff_allowed_exact, { return seed_sniff_type_allowed("image/png", "image/png") == 1; });
 EXO_TEST(seedsniff_allowed_first, { return seed_sniff_type_allowed("image/png", SEEDSNIFF_DEFAULT_TYPES) == 1; });
@@ -254,4 +254,53 @@ EXO_TEST(seedsniff_svg_refused_end_to_end, {
 EXO_TEST(seedsniff_png_accepted_end_to_end, {
 	const char* type = seed_sniff_media_type(sniff_png, sizeof(sniff_png));
 	return seed_sniff_type_allowed(type, SEEDSNIFF_DEFAULT_TYPES) == 1;
+});
+
+/* ------------------------------------------------- BBS0 post documents ----- */
+
+/*
+ * A post document is detected from its own magic and given its own media type,
+ * so that a board post can be admitted without admitting text/plain -- which is
+ * where SVG and every other markup dialect lands.
+ */
+
+#define SNIFF_POST_HEADER "IBB0 IDIPJJWEPPPLCA3PF2ZCRRYO4F2ZX2EV2JMW2KC3I SJHi\n"
+
+EXO_TEST(seedsniff_bbs_post, {
+	const char* doc = SNIFF_POST_HEADER "Hello, board.\n";
+	return strcmp(seed_sniff_media_type((const uint8_t*) doc, strlen(doc)),
+		"application/x-adc-bbs-post") == 0;
+});
+
+EXO_TEST(seedsniff_bbs_post_allowed_by_default, {
+	const char* doc = SNIFF_POST_HEADER "Hello, board.\n";
+	const char* type = seed_sniff_media_type((const uint8_t*) doc, strlen(doc));
+	return seed_sniff_type_allowed(type, SEEDSNIFF_DEFAULT_TYPES) == 1;
+});
+
+/* The space after the FOURCC is part of the magic: BBS0 requires the ID field,
+   so a well formed header always has at least one parameter after it. A file
+   that is only the four characters is not claimed as a post. */
+EXO_TEST(seedsniff_bbs_post_needs_the_space, {
+	const char* doc = "IBB0";
+	return strcmp(seed_sniff_media_type((const uint8_t*) doc, strlen(doc)),
+		"application/x-adc-bbs-post") != 0;
+});
+
+EXO_TEST(seedsniff_bbs_post_prefix_only, {
+	const char* doc = "IBB";
+	return strcmp(seed_sniff_media_type((const uint8_t*) doc, strlen(doc)),
+		"application/x-adc-bbs-post") != 0;
+});
+
+/* A document that merely mentions the FOURCC later on is not one. */
+EXO_TEST(seedsniff_bbs_post_not_at_offset_zero, {
+	const char* doc = "xIBB0 IDAAA\n";
+	return strcmp(seed_sniff_media_type((const uint8_t*) doc, strlen(doc)),
+		"application/x-adc-bbs-post") != 0;
+});
+
+/* Admitting post documents must not have admitted text/plain along with them. */
+EXO_TEST(seedsniff_text_still_not_allowed_with_posts, {
+	return seed_sniff_type_allowed("text/plain", SEEDSNIFF_DEFAULT_TYPES) == 0;
 });

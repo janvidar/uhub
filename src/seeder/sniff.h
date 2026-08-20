@@ -36,6 +36,10 @@
  *
  * Note that SVG is deliberately not detectable, and that "text/plain" is
  * deliberately absent from the default allowlist. See seeder/sniff.c.
+ *
+ * A BBS0 post document is detected as "application/x-adc-bbs-post" -- its own
+ * type rather than text/plain, so that admitting board posts does not mean
+ * admitting every markup dialect that also looks like text.
  */
 
 /** Number of leading bytes the sniffer needs. The ingest path buffers exactly

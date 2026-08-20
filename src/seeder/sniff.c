@@ -54,6 +54,24 @@
 #define SEED_TYPE_TEXT    "text/plain"
 #define SEED_TYPE_UNKNOWN "application/octet-stream"
 
+/*
+ * A BBS0 bulletin board post document.
+ *
+ * Detected from content like everything else here, and given a type of its own
+ * rather than being admitted as text/plain. Two reasons. A post document is
+ * refused unless its type is on the operator's allowlist, and "text/plain" must
+ * stay off that list -- it is where SVG and every other markup dialect lands.
+ * And a distinct type keeps the storage policy legible: an operator can see in
+ * the cache listing which entries are board posts, and can decline to hold them
+ * at all by removing this one type from seed_allowed_types.
+ *
+ * The magic is the FOURCC and the space that must follow it: BBS0 requires the
+ * ID field, so a well formed header always carries at least one parameter and
+ * therefore always has that space. A document that is nothing but "IBB0" is not
+ * a valid post and is not claimed here.
+ */
+#define SEED_TYPE_BBS_POST "application/x-adc-bbs-post"
+
 /**
  * Compare @p magic_len bytes of @p magic against @p buf at @p offset.
  * Returns 0 rather than reading out of bounds whenever the buffer is too
@@ -111,6 +129,11 @@ const char* seed_sniff_media_type(const uint8_t* buf, size_t len)
 
 	if (magic_at(buf, n, 0, "%PDF-", 5))
 		return SEED_TYPE_PDF;
+
+	/* Checked before the printable-UTF-8 fallback below, which would otherwise
+	   claim a post document as text/plain. */
+	if (magic_at(buf, n, 0, "IBB0 ", 5))
+		return SEED_TYPE_BBS_POST;
 
 	/* Last resort, and only when the whole prefix is printable UTF-8. This is
 	   where SVG, XML, HTML and every other markup dialect lands on purpose --

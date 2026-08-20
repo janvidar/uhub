@@ -149,7 +149,8 @@ EXO_TEST(seedconfig_defaults_cache, {
 	      && cfg.seed_entry_ttl == 2592000
 	      && cfg.seed_max_concurrent_ingest == 4
 	      && cfg.seed_max_concurrent_upload == 16
-	      && strcmp(cfg.seed_allowed_types, "image/png,image/jpeg,image/gif,image/webp") == 0;
+	      && strcmp(cfg.seed_allowed_types,
+			"image/png,image/jpeg,image/gif,image/webp,application/x-adc-bbs-post") == 0;
 	seed_config_free(&cfg);
 	return ok;
 });
