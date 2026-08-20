@@ -1,10 +1,11 @@
 The uhub seed cache
 -------------------
 
-uhub-seeder is a separate daemon that keeps content posted in hub chat
-available after the user who posted it has gone. This document explains what it
-does, how to set it up, what goes over the wire, what ends up on disk, and what
-an operator takes on by running it.
+uhub-seeder is a separate daemon that keeps content available after the user who
+posted it has gone -- files linked in hub chat, and the posts and attachments of
+the hub's bulletin boards. This document explains what it does, how to set it up,
+what goes over the wire, what ends up on disk, and what an operator takes on by
+running it.
 
 It assumes you have a working hub. See uhub-seeder(1) for the command line, and
 getstarted.txt for the hub itself.
@@ -23,6 +24,11 @@ for the file, downloads it over an ordinary client-to-client connection,
 verifies that what arrived hashes to the TTH that was advertised, and stores it
 in a local cache. From then on it answers TR searches for that TTH and serves
 the file to whoever asks.
+
+If the hub runs bulletin boards (the BBS0 extension) it does the same for those,
+which is a larger job than it sounds: a BBS0 hub holds an index of posts and
+none of their bytes, so a board with no seeder is readable only for as long as
+its authors and readers stay online. See section 4.2.
 
 Two things follow from that, and they are the whole point:
 
@@ -170,8 +176,17 @@ search for that TTH; the result should be attributed to the bot, and the
 download should complete.
 
 
-4. Posting content: the magnet embed
-------------------------------------
+4. Content the seeder picks up
+------------------------------
+
+There are two ways something ends up in the cache: somebody posts a magnet link
+in chat (4.1), or it is a post on one of the hub's bulletin boards, or an
+attachment to one (4.2). Both arrive as a tiger tree hash and are fetched,
+verified and served by exactly the same machinery.
+
+
+4.1 Magnet embeds in chat
+-------------------------
 
 Content is referred to by a magnet link inside a rich text (RTF0) chat message,
 in CommonMark link syntax:
@@ -217,6 +232,88 @@ flag the hub publishes in the poster's INF (no CT for a guest, CT2 for a
 registered user, CT4 and up for operators). Per-user quotas limit how much any
 one account can push into the cache within a window -- seed_ingest_per_user
 files and seed_ingest_quota_kb kilobytes per seed_ingest_interval seconds.
+
+
+4.2 Bulletin board posts (BBS0)
+-------------------------------
+
+If the hub runs bulletin boards -- the BBS0 extension -- the seeder subscribes
+to them and keeps their posts readable. This is on by default; set
+seed_bbs_enable = no to switch it off.
+
+Why it needs doing at all is worth stating, because it is the same problem the
+seeder was built for in a different place. In BBS0 the hub holds an index and
+none of the bytes. A post is a file named by its tiger tree hash, and it travels
+between clients over ordinary searches and transfers. So a board is only as
+readable as the clients that still happen to hold its posts: when the author of
+a thread has left and nobody who read it is online, the index still lists the
+post and nobody can open it. The specification says as much, and says what to do
+about it -- run a client that subscribes to the board and fetches and serves
+every post. That is this.
+
+What the seeder does, in order:
+
+  * Offers BBS0 at login. That is what makes the hub send board descriptors; a
+    session that never offered it is sent none. If the hub does not announce
+    BBS0 in return, nothing else here happens and nothing is wasted.
+
+  * Subscribes to every board the hub says this account may read, or to just the
+    ones named in seed_bbs_boards. Board names are case-sensitive.
+
+  * Fetches the document behind every entry. It asks the author first, while
+    they are still online -- they are the one party certain to have the bytes,
+    since BBS0 requires a client to be able to serve a post before submitting
+    it. When the author has gone, it searches the hub for the hash and asks
+    whoever answers. That second path is what makes an old board recoverable,
+    and it is what seed_bbs_search_fallback turns off.
+
+  * Reads each document it fetched and goes after the attachments the body links
+    to. These are ordinary magnet embeds, identical to 4.1 -- but with a very
+    different lifetime, since an attachment to a chat message is fetched within
+    minutes by the people present and an attachment to a post may be wanted
+    years later. Without seed_bbs_attachments a seeded post keeps its text and
+    loses its images.
+
+  * Serves all of it by exact TTH, like everything else in the cache.
+
+A post document is verified twice over. The cache checks that the bytes hash to
+the TTH that was asked for, as it does for any content; then the header is
+parsed strictly, and a document that is not in the canonical form BBS0 requires
+is refused rather than repaired -- repairing it would change its hash, so a
+repaired post is a different post. Neither check trusts anything the hub said.
+
+Post documents are detected as the media type "application/x-adc-bbs-post" and
+are subject to seed_allowed_types like everything else, so removing that one
+type from the list stops board posts being stored while leaving image
+attachments alone. Attachments keep whatever policy seed_allowed_types already
+states for them: the default list admits the common image types and nothing
+else, which is as true of a post's images as of a chat message's.
+
+Resuming. The highest timestamp seen on each board is written to
+<seed_cache_dir>/bbs-cursors, so a restart catches up instead of replaying the
+whole board. The cursor is deliberately the highest timestamp seen and not one
+past it: BBS0 timestamps are not unique, and a cursor moved past the last entry
+would skip a post accepted in the same second. The last second therefore arrives
+twice on every resume, which costs nothing -- an entry for a hash already held is
+not work. seed_bbs_max_backlog caps how much of a board's history is taken on in
+one session; the rest follows on the next resume.
+
+Withdrawal. When the hub says a post has been withdrawn, the seeder deletes its
+cached copy. That is a request and not a deletion -- every client that read the
+post may still hold it, and BBS0 is explicit that a withdrawal must never be
+presented to a user as a guarantee that a post is gone -- but honouring it is
+what a cache should do. Replies to a withdrawn post are separate posts and are
+left alone.
+
+One thing to be aware of before turning this on for a hub you do not run. BBS0
+tells an ordinary client never to fetch a post merely because its entry arrived,
+because fetching promptly identifies a reader who was online and subscribed at
+that moment, and a board makes that disclosure systematic. The seeder is the
+exception the specification carves out for, and the reason it is an exception is
+worth being precise about: it fetches every post regardless of what anyone is
+reading, so what it fetches says nothing about any user. What it does disclose is
+itself -- it announces, to anyone watching, that this account holds every post on
+the board. That is the whole point of running it.
 
 
 5. The exchange on the wire
@@ -455,6 +552,11 @@ answer beyond a refusal.
   stats            Cache size and entry count against their limits, how many
                    entries are pinned, how many ingests are running, how many
                    TTHs are blocked, and whether the cache has gone degraded.
+  boards           Bulletin board progress: boards known and subscribed to, how
+                   much work is queued and in flight, and how many posts and
+                   attachments have been cached, failed or been withdrawn. Also
+                   says so when a board's history is older than the hub will
+                   replay, which is a gap that cannot be closed from this hub.
   list [N]         The N most recently used entries, 20 by default: TTH, size,
                    media type and name.
   info <tth>       Everything known about one entry, including who posted it --

@@ -6,8 +6,9 @@ uhub\-seeder \- seed cache daemon for the uhub ADC hub
 .B uhub\-seeder
 .RI [ options ]
 .SH DESCRIPTION
-uhub\-seeder keeps content posted in hub chat available after the user who
-posted it has left.
+uhub\-seeder keeps content available after the user who posted it has left \-\-
+files linked in hub chat, and the posts and attachments of the hub's bulletin
+boards.
 .PP
 It is not part of the hub. It logs into a uhub as a registered bot account and
 behaves as an ordinary ADC client: it appears in the user list, watches chat
@@ -18,6 +19,18 @@ From then on it answers
 searches for that TTH and serves the file over ordinary client\-to\-client
 connections, so the content stays reachable on a hub where every other user is
 passive, and remains reachable after the poster disconnects.
+.PP
+If the hub announces the
+.B BBS0
+bulletin board extension, uhub\-seeder also subscribes to every board it is
+permitted to read and fetches the document behind each index entry, along with
+any attachments the post body links to. A BBS0 hub keeps an index of posts and
+none of their bytes, so a board is otherwise readable only for as long as its
+authors and readers remain online. The seeder asks the post's author first and
+searches the hub for the hash when the author has gone. This is enabled by
+default and is controlled by the
+.B seed_bbs_*
+options.
 .PP
 Because it runs as a separate process it can fail without affecting the hub.
 Nothing it does needs hub internals, and a crash, a stalled disk or a hostile
@@ -72,6 +85,10 @@ the seeder does not read the hub's configuration.
 Default seed cache directory. It holds the cached files, each named after its
 verified TTH, and the SQLite database of cache metadata. The directory is
 created with mode 0700.
+.TP
+.I /var/lib/uhub/seed/bbs\-cursors
+Per\-board resume position: the highest bulletin board timestamp seen on each
+board, so a restart catches up instead of replaying the whole board.
 .SH "SEE ALSO"
 .BR uhub (1),
 .BR uhub\-passwd (1)
