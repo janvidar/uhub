@@ -87,7 +87,7 @@ static const struct seed_cfg_key SEED_CONFIG_KEYS[] =
 	INT_KEY(seed_entry_ttl,             2592000, 0, 315360000),
 	INT_KEY(seed_max_concurrent_ingest, 4,    1, 64),
 	INT_KEY(seed_max_concurrent_upload, 16,   1, 1024),
-	STR_KEY(seed_allowed_types,         0, "image/png,image/jpeg,image/gif,image/webp", NULL),
+	STR_KEY(seed_allowed_types,         0, "image/png,image/jpeg,image/gif,image/webp,application/x-adc-bbs-post", NULL),
 
 	/* Ingest policy */
 	STR_KEY(seed_min_credentials,       0, "user", "guest,user,operator,super,admin"),
@@ -107,7 +107,15 @@ static const struct seed_cfg_key SEED_CONFIG_KEYS[] =
 
 	/* Optional HTTP serving */
 	BOOL_KEY(seed_http_enable,          0),
-	INT_KEY(seed_http_port,             1513, 1024, 65535)
+	INT_KEY(seed_http_port,             1513, 1024, 65535),
+
+	/* BBS0 bulletin boards */
+	BOOL_KEY(seed_bbs_enable,           1),
+	STR_KEY(seed_bbs_boards,            0, NULL,                NULL),
+	INT_KEY(seed_bbs_max_backlog,       5000, 0, 1000000),
+	INT_KEY(seed_bbs_fetch_delay,       5,    0, 3600),
+	BOOL_KEY(seed_bbs_attachments,      1),
+	BOOL_KEY(seed_bbs_search_fallback,  1)
 };
 
 #define SEED_CONFIG_KEY_COUNT (sizeof(SEED_CONFIG_KEYS) / sizeof(SEED_CONFIG_KEYS[0]))
