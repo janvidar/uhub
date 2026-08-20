@@ -481,15 +481,37 @@ EXO_TEST(seedhttp_request_over_cap, {
 	return bh_parse_n(req, SEED_HTTP_REQ_MAX + 1) == 0;
 });
 
+/*
+ * snprintf() returns the length it *would* have written, so adding that return
+ * value to a running offset can push the offset past the end of the buffer.
+ * Append through this instead: it clamps, and stops once the buffer is full.
+ */
+static void bh_appendf(char* buf, size_t cap, size_t* at, const char* fmt, ...)
+{
+	va_list ap;
+	int n;
+
+	if (!cap || *at >= cap - 1)
+		return;
+
+	va_start(ap, fmt);
+	n = vsnprintf(buf + *at, cap - *at, fmt, ap);
+	va_end(ap);
+
+	if (n < 0)
+		return;
+	*at += ((size_t) n < cap - *at) ? (size_t) n : cap - *at - 1;
+}
+
 /* A long run of header lines does not disturb the request line result. */
 EXO_TEST(seedhttp_many_headers, {
 	char req[2048];
 	size_t n = 0;
 	int i;
-	n += (size_t) snprintf(req + n, sizeof(req) - n, "GET /seed/%s HTTP/1.1\r\n", BH_TTH);
+	bh_appendf(req, sizeof(req), &n, "GET /seed/%s HTTP/1.1\r\n", BH_TTH);
 	for (i = 0; i < 40; i++)
-		n += (size_t) snprintf(req + n, sizeof(req) - n, "X-Pad-%d: value\r\n", i);
-	n += (size_t) snprintf(req + n, sizeof(req) - n, "Range: bytes=3-4\r\n\r\n");
+		bh_appendf(req, sizeof(req), &n, "X-Pad-%d: value\r\n", i);
+	bh_appendf(req, sizeof(req), &n, "Range: bytes=3-4\r\n\r\n");
 	return bh_parse_n(req, n) == 1 && bh_start == 3 && bh_end == 4;
 });
 

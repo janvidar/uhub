@@ -38,6 +38,7 @@ jobs:
         uses: github/codeql-action/init@411c4c9a36b3fca4d674f06b6396b2c6d23522c6 # v3.36.3
         with:
           languages: c-cpp
+          config-file: ./.github/codeql/codeql-config.yml
 
       # Manual build (not autobuild) so CodeQL traces the real compilation of
       # this CMake project. RELEASE=OFF so the DEBUG-only code paths are compiled

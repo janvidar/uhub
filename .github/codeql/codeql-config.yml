@@ -1,0 +1,11 @@
+# CodeQL configuration for the c-cpp analysis in .github/workflows/codeql.yml.
+name: "uhub CodeQL config"
+
+query-filters:
+  # cpp/non-https-url flags every literal http:// URL. The seeder's mirror
+  # fetcher speaks plain HTTP on purpose (seed_url_allow_ports defaults to
+  # "80,443"), so its tests are full of http://cdn.example.org fixtures that the
+  # query cannot tell apart from a real downgrade. TLS enforcement for the hub
+  # itself is a build-time requirement, not something this query guards.
+  - exclude:
+      id: cpp/non-https-url

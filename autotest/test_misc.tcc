@@ -241,3 +241,33 @@ EXO_TEST(dur_bad_unit,     { return dur_bad("10y"); });
 EXO_TEST(dur_bad_trailing, { return dur_bad("10mm"); });
 EXO_TEST(dur_bad_nonnum,   { return dur_bad("abc"); });
 EXO_TEST(dur_bad_negative, { return dur_bad("-5"); });
+
+/* uhub_strlcpy: always terminates, never writes past dstsize, and reports the
+   source length so the caller can spot a truncation. */
+static int slc(const char* src, size_t dstsize, const char* expect, size_t expect_ret)
+{
+	char buf[16];
+	size_t ret;
+
+	memset(buf, 'x', sizeof(buf));
+	ret = uhub_strlcpy(buf, src, dstsize);
+	if (ret != expect_ret)
+		return 0;
+	if (strcmp(buf, expect))
+		return 0;
+	/* Nothing beyond the buffer we were handed may have been touched. */
+	for (size_t k = dstsize; k < sizeof(buf); k++)
+		if (buf[k] != 'x') return 0;
+	return 1;
+}
+
+EXO_TEST(strlcpy_fits,       { return slc("abc", 8, "abc", 3); });
+EXO_TEST(strlcpy_exact,      { return slc("abc", 4, "abc", 3); });
+EXO_TEST(strlcpy_truncates,  { return slc("abcdef", 4, "abc", 6); });
+EXO_TEST(strlcpy_empty_src,  { return slc("", 8, "", 0); });
+EXO_TEST(strlcpy_one_byte,   { return slc("abc", 1, "", 3); });
+EXO_TEST(strlcpy_zero_size,  {
+	char buf[4];
+	memset(buf, 'x', sizeof(buf));
+	return uhub_strlcpy(buf, "abc", 0) == 3 && buf[0] == 'x';
+});
