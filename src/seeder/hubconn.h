@@ -73,6 +73,16 @@ struct seed_roster;
 /** Longest CTM/RCM protocol string accepted, e.g. "ADCS/0.10". */
 #define SEED_PROTOCOL_MAX 31
 
+/**
+ * Longest board name, excluding NUL. Fixed by BBS0, which also restricts the
+ * character set to [A-Za-z0-9._-] -- a name is protocol text and never a path
+ * component, and the set permits '.', so ".." is a legal board name.
+ */
+#define SEED_BBS_BOARD_MAX 64
+
+/** Buffer for a subject, including NUL. Matches the post document's own bound. */
+#define SEED_BBS_SUBJECT_MAX 512
+
 /* Also defined by seeder/cache.h; identical, and guarded so hubconn.h can be
    included without dragging the cache in. */
 #ifndef SEED_TTH_STR_LEN
@@ -109,6 +119,66 @@ struct seed_user
 };
 
 /**
+ * A BBS0 board, as the hub described it in an IBBD.
+ *
+ * Every field here is the hub's own testimony and can be checked against
+ * nothing. @c permissions in particular is what the hub says this session may
+ * do, is stated per session, and is not a security boundary: an operation it
+ * appears to allow may still be refused when it arrives.
+ */
+struct seed_bbs_board
+{
+	char board[SEED_BBS_BOARD_MAX + 1];   /** BD. The board's identity. */
+	char name[SEED_BBS_SUBJECT_MAX];      /** NI, a human readable title. "" when absent. */
+	unsigned int permissions;             /** PE, a bitmask; see ADC_BBS_PERM_*. */
+	uint64_t max_size;                    /** MS, the largest post document the board accepts. */
+	uint64_t newest;                      /** TS of the newest entry, 0 on an empty board. */
+	uint64_t oldest;                       /** OT, the oldest timestamp the hub will replay. */
+	uint64_t num_posts;                   /** NP, excluding tombstones. 0 when absent. */
+	int removed;                          /** 1 when RM1 says the board is gone. */
+};
+
+/**
+ * One index entry, as the hub sent it in an IBBL.
+ *
+ * A tombstone -- an entry withdrawn, carrying RM1 -- is required to carry only
+ * TR, BD and TS, so every other field may legitimately be empty on one. Check
+ * @c removed before reading anything else.
+ *
+ * The fields copied out of the document (@c parent, @c subject and the author's
+ * claimed @c author_cid) are hints until the document has been fetched and
+ * verified, at which point the document is authoritative and these are not.
+ */
+struct seed_bbs_entry
+{
+	char tth[SEED_TTH_STR_LEN + 1];       /** TR. The post's identity. */
+	uint64_t size;                        /** SI, as declared by the author. Not a bound. */
+	char board[SEED_BBS_BOARD_MAX + 1];   /** BD. */
+	char author_cid[MAX_CID_LEN + 1];     /** ID, the CID the hub accepted the post from. */
+	char nick[MAX_NICK_LEN + 1];          /** NI, informative. Never used to attribute a post. */
+	char parent[SEED_TTH_STR_LEN + 1];    /** PA, "" in a post that starts a thread. */
+	char thread[SEED_TTH_STR_LEN + 1];    /** TH, derived by the hub and never verified. */
+	char subject[SEED_BBS_SUBJECT_MAX];   /** SJ, "" when absent. */
+	uint64_t timestamp;                   /** TS. The board's order, and the resume cursor. */
+	int removed;                          /** 1 when this is a tombstone. */
+};
+
+/**
+ * A search result, as extracted from a DRES.
+ *
+ * The seeder answers searches and also issues them, to find a peer holding a
+ * post document whose author has left. Only a result naming a TTH is of any use
+ * for that, so a result without one never reaches a callback.
+ */
+struct seed_result
+{
+	sid_t from;                           /** The SID that answered. */
+	char tth[SEED_TTH_STR_LEN + 1];       /** TR. */
+	uint64_t size;                        /** SI, 0 when absent. */
+	char token[SEED_TOKEN_MAX + 1];       /** TO, "" when the responder echoed none. */
+};
+
+/**
  * What the owner of the connection wants to hear about. Every member may be
  * NULL, in which case that event is dropped.
  */
@@ -128,6 +198,19 @@ struct seed_hub_callbacks
 
 	/** RCM: the peer wants us to send it a CTM. */
 	void (*on_revconnect_req)(void* ptr, const struct seed_user* from, const char* protocol, const char* token);
+
+	/** A DRES answering one of our own searches. */
+	void (*on_search_result)(void* ptr, const struct seed_result* result);
+
+	/**
+	 * A BBS0 board descriptor. Sent once per board after login, and again
+	 * whenever any field changes -- including when this session's permissions
+	 * change, or the board goes away (@c removed).
+	 */
+	void (*on_bbs_board)(void* ptr, const struct seed_bbs_board* board);
+
+	/** A BBS0 index entry, or a tombstone when @c removed is set. */
+	void (*on_bbs_entry)(void* ptr, const struct seed_bbs_entry* entry);
 };
 
 /**
@@ -250,6 +333,60 @@ extern int seed_hub_send_rcm(struct seed_hub* hub, sid_t to, const char* protoco
 /** Send a private message. @p text is escaped internally. @return 1 if queued. */
 extern int seed_hub_send_pm(struct seed_hub* hub, sid_t to, const char* text);
 
+/**
+ * Did this hub announce BBS0 in its ISUP?
+ *
+ * The hub's announcement is what authorises the extension, so nothing may send
+ * BBL until this answers 1. It is per connection and is not cached across a
+ * reconnect, and a hub may withdraw the feature mid-session with "RMBBS0",
+ * after which every subscription is cancelled and this answers 0 again.
+ */
+extern int seed_hub_bbs_available(struct seed_hub* hub);
+
+/**
+ * Subscribe to @p board, replaying every entry from @p from_ts onwards and then
+ * receiving entries as the hub accepts them.
+ *
+ * Pass the highest timestamp already seen, *not* one second later: timestamps
+ * are not unique, and a cursor advanced past the last entry received would skip
+ * a post accepted in the same second. The cost is that the final second arrives
+ * twice, which the caller discards by keying on TR.
+ *
+ * A second subscription to a board replaces the first and replays from the newly
+ * requested timestamp.
+ *
+ * @return 1 if the request was queued, 0 when not logged in, the hub never
+ *         announced BBS0, or the board name is not one BBS0 permits.
+ */
+extern int seed_hub_send_bbs_subscribe(struct seed_hub* hub, const char* board, uint64_t from_ts);
+
+/** Cancel a subscription (HBBL with RM1). @return 1 if queued. */
+extern int seed_hub_send_bbs_cancel(struct seed_hub* hub, const char* board);
+
+/**
+ * Ask for one entry by hash rather than subscribing (HBBL with TR).
+ *
+ * This is a question, not a subscription: the hub answers with the single
+ * matching entry, or with status code 76 where it holds none, and the session's
+ * subscriptions are untouched either way.
+ *
+ * @return 1 if queued.
+ */
+extern int seed_hub_send_bbs_request(struct seed_hub* hub, const char* board, const char* tth);
+
+/**
+ * Search the hub for a file by exact TTH (a BSCH carrying TR).
+ *
+ * This is how a post document is found once its author has gone: the hub serves
+ * no post bodies, so the only other source is whichever client has read it and
+ * kept it. Answers arrive as on_search_result().
+ *
+ * @param token echoed by responders in TO, so an answer can be matched to the
+ *              question. May be NULL or "" for none.
+ * @return 1 if the search was queued.
+ */
+extern int seed_hub_send_search_tth(struct seed_hub* hub, const char* tth, const char* token);
+
 
 /* -------------------------------------------------------------------------
  * The pieces below are the parsing and bookkeeping this module is built from.
@@ -292,6 +429,30 @@ extern int seed_hub_parse_search(struct adc_message* msg, struct seed_search* ou
  */
 extern int seed_hub_parse_ctm(struct adc_message* msg, struct seed_connect* out);
 extern int seed_hub_parse_rcm(struct adc_message* msg, struct seed_connect* out);
+
+/**
+ * Extract a board descriptor from an IBBD, or an index entry from an IBBL.
+ *
+ * Both refuse an entry missing a field BBS0 makes REQUIRED, or carrying one
+ * that is malformed -- a board name outside the permitted character set, a TTH
+ * that is not 39 base32 characters, a non-numeric timestamp. A tombstone is
+ * held to the shorter list of fields BBS0 requires of one.
+ *
+ * @return 1 if @p out was filled, 0 on a message that is not usable.
+ */
+extern int seed_hub_parse_bbs_board(struct adc_message* msg, struct seed_bbs_board* out);
+extern int seed_hub_parse_bbs_entry(struct adc_message* msg, struct seed_bbs_entry* out);
+
+/**
+ * Extract a search result from a DRES. Only a result naming a TTH is usable to
+ * a content-addressed cache, so anything else is refused here.
+ *
+ * @return 1 if @p out was filled, 0 otherwise.
+ */
+extern int seed_hub_parse_result(struct adc_message* msg, struct seed_result* out);
+
+/** 1 if @p board is a name BBS0 permits: 1..64 of [A-Za-z0-9._-]. */
+extern int seed_hub_bbs_board_valid(const char* board);
 
 /**
  * The next reconnect delay after @p seconds, in seconds. Pass 0 for the first

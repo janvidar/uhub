@@ -209,6 +209,33 @@ struct seed_cc_policy
 	 * that fails to parse, and the connection is dropped.
 	 */
 	struct ssl_context_handle* ssl_ctx;
+
+	/**
+	 * Called when a solicited download runs to the end of its body.
+	 *
+	 * The seeder asks a peer for a TTH and the answer arrives much later on a
+	 * connection this module owns, so a caller that needs to do something with
+	 * the bytes -- read a post document and go after what it links to, most of
+	 * all -- has no other way to learn that they arrived.
+	 *
+	 * @c entry is the published entry on success and NULL otherwise, and is
+	 * valid only for the duration of the call. @c err is SEED_OK exactly when
+	 * the content is now in the cache. A duplicate counts as success: the
+	 * content is there, which is all the caller asked for.
+	 *
+	 * This is NOT a completion for every request. A peer that never connects,
+	 * hangs up mid-body, or is refused before the transfer starts produces no
+	 * call at all -- there is no single place those paths converge on, and
+	 * inventing one would mean reporting a failure for every grant that quietly
+	 * expired. A caller that must not wait for ever therefore needs its own
+	 * timeout regardless of this callback, and once it has one this is a
+	 * fast-path signal rather than the thing it depends on.
+	 *
+	 * May be NULL, in which case completions are not reported. Must not destroy
+	 * the connection or the cache; it runs inside the transfer's own teardown.
+	 */
+	void (*on_download)(void* ptr, const char* tth, enum seed_error err, const struct seed_entry* entry);
+	void* on_download_ptr;
 };
 
 /**

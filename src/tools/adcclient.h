@@ -134,6 +134,11 @@ enum ADC_client_callback_type
 
 	ADC_CLIENT_HUB_INFO         = 5001, /* data->hubinfo */
 
+	/* BBS0 bulletin boards. Both carry data->message: this library models the
+	   board grammar no more than it models the search grammar. */
+	ADC_CLIENT_BBS_BOARD        = 5101, /* data->message (IBBD) */
+	ADC_CLIENT_BBS_ENTRY        = 5102, /* data->message (IBBL) */
+
 	/* Every line received from the hub, raw, before it is dispatched. Set only
 	   by tests that need to observe commands this client does not model -- the
 	   BBS0 descriptors and index entries, for instance. */
@@ -248,8 +253,9 @@ struct ADC_client_callback_data
 		const char* line;                     /* ADC_CLIENT_RAW_LINE */
 
 		/* The raw parsed command, for the events that have no richer payload:
-		   ADC_CLIENT_SEARCH_REQ, ADC_CLIENT_SEARCH_REP, ADC_CLIENT_CONNECT_REQ
-		   and ADC_CLIENT_REVCONNECT_REQ. The search/CTM/RCM grammar belongs to
+		   ADC_CLIENT_SEARCH_REQ, ADC_CLIENT_SEARCH_REP, ADC_CLIENT_CONNECT_REQ,
+		   ADC_CLIENT_REVCONNECT_REQ, ADC_CLIENT_BBS_BOARD and
+		   ADC_CLIENT_BBS_ENTRY. The search/CTM/RCM and board grammars belong to
 		   the consumer, not to this transport, so the arguments are left
 		   unparsed here.
 
@@ -326,6 +332,28 @@ int ADC_client_set_support(struct ADC_client* client, const char* su);
 
 /** The SU currently advertised, or "" if none. Never NULL. */
 const char* ADC_client_get_support(const struct ADC_client* client);
+
+/**
+ * Did the hub announce @p feature (a bare FOURCC, e.g. "BBS0") in its ISUP?
+ *
+ * The hub's announcement is what authorises a client to use an extension, and
+ * it is per connection: the list is cleared when a connection attempt starts
+ * and rebuilt from every ISUP received, so a hub that withdraws a feature with
+ * "RMBBS0" mid-session is honoured, and nothing survives a reconnect.
+ *
+ * Matching is case insensitive and on whole tokens, so "BBS" never matches
+ * "BBS0".
+ *
+ * @return 1 if the hub announced it and has not withdrawn it.
+ */
+int ADC_client_hub_supports(const struct ADC_client* client, const char* feature);
+
+/**
+ * The hub's announced features as a comma separated list of bare FOURCCs
+ * ("BASE,TIGR,BBS0"), or "" before an ISUP has arrived. Never NULL. For
+ * logging; use ADC_client_hub_supports() to test for one.
+ */
+const char* ADC_client_hub_support_list(const struct ADC_client* client);
 
 /**
  * Build the INF this client would send, without sending it or needing a

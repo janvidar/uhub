@@ -928,13 +928,30 @@ static int cc_handle_gfi(struct seed_cc_connection* b, const struct seed_cc_requ
 static void cc_finish_ingest(struct seed_cc_connection* b)
 {
 	struct seed_ingest* job = b->ingest;
+	struct seed_entry entry;
 	enum seed_error error = SEED_OK;
+	int published;
 
 	b->ingest = NULL; /* seed_ingest_finish() owns and frees the job */
 
-	if (!seed_ingest_finish(job, NULL, &error))
+	memset(&entry, 0, sizeof(entry));
+	published = seed_ingest_finish(job, &entry, &error);
+
+	if (!published)
 		LOG_DEBUG("seed_cc: ingest of TTH=%s from %s failed (%s)",
 			b->want_tth, ip_convert_to_string(&b->addr), seed_error_string(error));
+
+	/*
+	 * Reported before the connection is torn down, so a caller waiting on this
+	 * TTH hears about it on the same turn of the loop. The TTH comes from
+	 * want_tth rather than from the entry: on a failure there is no entry, and
+	 * the caller still needs to know which of its requests just ended.
+	 */
+	if (b->policy->on_download)
+	{
+		b->policy->on_download(b->policy->on_download_ptr, b->want_tth,
+			published ? SEED_OK : error, published ? &entry : NULL);
+	}
 
 	seed_cc_destroy(b);
 }
