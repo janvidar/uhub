@@ -43,6 +43,7 @@
  * so this module never needs to know how a message reaches the hub.
  */
 
+struct seed_bbs;
 struct seed_cache;
 struct seed_commands;
 
@@ -74,6 +75,18 @@ struct seed_commands;
 typedef void (*seed_command_reply)(void* ptr, sid_t to, const char* text);
 
 extern struct seed_commands* seed_commands_create(struct seed_cache* cache, seed_command_reply reply, void* ptr);
+
+/**
+ * Give the command handler the bulletin board engine, so "boards" can report on
+ * it. Borrowed, and must outlive the handler.
+ *
+ * Set separately rather than passed to seed_commands_create() because the board
+ * engine is built after the command handler: it needs the client-to-client
+ * policy, which needs the CID the hub connection settles on.
+ *
+ * Without it, "boards" reports that board seeding is not enabled.
+ */
+extern void seed_commands_set_bbs(struct seed_commands* cmds, struct seed_bbs* bbs);
 extern void seed_commands_destroy(struct seed_commands* cmds);
 
 /**

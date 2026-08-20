@@ -45,6 +45,7 @@
 #include "network/tls.h"
 #include "network/notify.h"
 #include "network/timeout.h"
+#include "seeder/bbs.h"
 #include "seeder/cache.h"
 #include "seeder/cc.h"
 #include "seeder/commands.h"
@@ -196,6 +197,7 @@ static struct seeder_context
 	struct seed_hub*            hub;
 	struct seed_commands*       commands;
 	struct seed_ingest_trigger* ingest;
+	struct seed_bbs*            bbs;
 	struct seed_cc_policy       cc_policy;
 	struct ssl_context_handle*  tls_ctx;   /* server context, NULL without a certificate */
 	struct net_connection*      listener;
@@ -218,13 +220,20 @@ static void seeder_on_logged_in(void* ptr)
 	ctx->cc_policy.cid = seed_hub_own_cid(ctx->hub);
 
 	LOG_INFO("Logged in to %s as \"%s\".", ctx->config.seed_hub_url, ctx->config.seed_nick);
+
+	/* Subscriptions belong to a connection, so the board layer re-establishes
+	   them from the descriptors this session is about to send. */
+	seed_bbs_on_logged_in(ctx->bbs);
 }
 
 static void seeder_on_disconnected(void* ptr)
 {
-	(void) ptr;
+	struct seeder_context* ctx = (struct seeder_context*) ptr;
+
 	/* seeder/hubconn.c reconnects on its own, with backoff. */
 	LOG_INFO("Disconnected from the hub; will retry.");
+
+	seed_bbs_on_disconnected(ctx->bbs);
 }
 
 /** One line of a command reply, sent back as a private message. */
@@ -287,6 +296,43 @@ static void seeder_on_search(void* ptr, const struct seed_user* from, const char
 	{
 		LOG_WARN("seed: could not answer %s for TTH=%s", from->nick, entry.tth);
 	}
+}
+
+/* ------------------------------------------------------- bulletin boards */
+
+static void seeder_on_bbs_board(void* ptr, const struct seed_bbs_board* board)
+{
+	struct seeder_context* ctx = (struct seeder_context*) ptr;
+	seed_bbs_on_board(ctx->bbs, board);
+}
+
+static void seeder_on_bbs_entry(void* ptr, const struct seed_bbs_entry* entry)
+{
+	struct seeder_context* ctx = (struct seeder_context*) ptr;
+	seed_bbs_on_entry(ctx->bbs, entry);
+}
+
+static void seeder_on_search_result(void* ptr, const struct seed_result* result)
+{
+	struct seeder_context* ctx = (struct seeder_context*) ptr;
+
+	/* The only searches this daemon issues are the board layer's, looking for a
+	   post whose author has left. */
+	seed_bbs_on_search_result(ctx->bbs, result);
+}
+
+/*
+ * A solicited download reached the end of its body.
+ *
+ * Chat attachments need nothing done here -- they are simply cached -- so this
+ * exists for the board layer, which has to read a post document to find out
+ * what it links to.
+ */
+static void seeder_on_download(void* ptr, const char* tth, enum seed_error err,
+	const struct seed_entry* entry)
+{
+	struct seeder_context* ctx = (struct seeder_context*) ptr;
+	seed_bbs_on_download(ctx->bbs, tth, err, entry);
 }
 
 /**
@@ -624,6 +670,7 @@ static void seeder_sweep_timer(struct timeout_evt* t)
 
 	seed_cache_sweep(ctx->cache, now);
 	seed_grant_sweep(ctx->grants, now);
+	seed_bbs_tick(ctx->bbs, now);
 
 	timeout_queue_reschedule(net_backend_get_timeout_queue(), ctx->sweep, SEED_SWEEP_INTERVAL);
 }
@@ -783,6 +830,9 @@ static int seeder_start(struct seeder_context* ctx)
 	callbacks.on_search         = seeder_on_search;
 	callbacks.on_connect_req    = seeder_on_connect_req;
 	callbacks.on_revconnect_req = seeder_on_revconnect_req;
+	callbacks.on_search_result  = seeder_on_search_result;
+	callbacks.on_bbs_board      = seeder_on_bbs_board;
+	callbacks.on_bbs_entry      = seeder_on_bbs_entry;
 
 	ctx->hub = seed_hub_create(&ctx->config, &callbacks, ctx);
 	if (!ctx->hub)
@@ -818,6 +868,8 @@ static int seeder_start(struct seeder_context* ctx)
 	ctx->cc_policy.tls_ciphersuite  = ctx->config.seed_tls_ciphersuite;
 	ctx->cc_policy.tls_ciphersuites = ctx->config.seed_tls_ciphersuites;
 	ctx->cc_policy.ssl_ctx          = ctx->tls_ctx;
+	ctx->cc_policy.on_download      = seeder_on_download;
+	ctx->cc_policy.on_download_ptr  = ctx;
 
 	ctx->commands = seed_commands_create(ctx->cache, seeder_command_reply, ctx);
 	if (!ctx->commands)
@@ -832,6 +884,18 @@ static int seeder_start(struct seeder_context* ctx)
 		LOG_FATAL("Unable to create the ingest trigger.");
 		return -1;
 	}
+
+	/* Created even when boards are disabled: it then accepts every event and
+	   acts on none, which keeps the callbacks above free of conditionals. */
+	ctx->bbs = seed_bbs_create(ctx->cache, &ctx->cc_policy, ctx->hub, &ctx->config);
+	if (!ctx->bbs)
+	{
+		LOG_FATAL("Unable to create the bulletin board handler.");
+		return -1;
+	}
+
+	/* So an operator can ask "boards" what the board side is doing. */
+	seed_commands_set_bbs(ctx->commands, ctx->bbs);
 
 	/* 6. The client transfer port. */
 	ctx->listener = seeder_listen(ctx);
@@ -894,6 +958,11 @@ static void seeder_shutdown(struct seeder_context* ctx)
 	   connection past the cache it is writing into. */
 	seed_ingest_trigger_destroy(ctx->ingest);
 	ctx->ingest = NULL;
+
+	/* Writes the resume cursors out, so the next run picks each board up where
+	   this one left off instead of replaying it. */
+	seed_bbs_destroy(ctx->bbs);
+	ctx->bbs = NULL;
 
 	seed_commands_destroy(ctx->commands);
 	ctx->commands = NULL;

@@ -19,6 +19,7 @@
 
 #include "system.h"
 
+#include "seeder/bbs.h"
 #include "seeder/cache.h"
 #include "seeder/commands.h"
 #include "util/cbuffer.h"
@@ -35,6 +36,7 @@
 struct seed_commands
 {
 	struct seed_cache* cache;
+	struct seed_bbs* bbs;   /** Bulletin boards, or NULL when there are none. */
 	seed_command_reply reply;
 	void* ptr;
 };
@@ -290,6 +292,37 @@ static void seed_cmd_stats(struct seed_commands* cmds, sid_t from, int client_ty
 	seed_send(cmds, from, buf);
 }
 
+static void seed_cmd_boards(struct seed_commands* cmds, sid_t from, int client_type, const char* args)
+{
+	struct seed_bbs_stats stats;
+	struct cbuffer* buf;
+
+	(void) args;
+	(void) client_type;
+
+	if (!cmds->bbs)
+	{
+		buf = cbuf_create(128);
+		cbuf_append(buf, "Bulletin board seeding is not enabled (seed_bbs_enable).");
+		seed_send(cmds, from, buf);
+		return;
+	}
+
+	seed_bbs_get_stats(cmds->bbs, &stats);
+
+	buf = cbuf_create(256);
+	cbuf_append_format(buf, "Boards: " PRINTF_SIZE_T " known, " PRINTF_SIZE_T " subscribed; "
+		PRINTF_SIZE_T " queued, " PRINTF_SIZE_T " in flight; "
+		"%" PRIu64 " posts, %" PRIu64 " attachments cached; "
+		"%" PRIu64 " failed, %" PRIu64 " withdrawn%s%s",
+		stats.boards, stats.subscribed, stats.queued, stats.inflight,
+		stats.posts_fetched, stats.attachments,
+		stats.posts_failed, stats.withdrawn,
+		stats.dropped ? " (queue overflowed; a full replay will recover it)" : "",
+		stats.gap ? " (a board's history is older than the hub will replay)" : "");
+	seed_send(cmds, from, buf);
+}
+
 static void seed_cmd_list(struct seed_commands* cmds, sid_t from, int client_type, const char* args)
 {
 	struct seed_cache* cache = seed_command_cache(cmds, from);
@@ -525,6 +558,7 @@ static void seed_cmd_help(struct seed_commands* cmds, sid_t from, int client_typ
  */
 static const struct seed_command_def seed_command_table[] = {
 	{ "stats",   SEED_CRED_OPERATOR, seed_cmd_stats,   "stats",              "Show seed cache usage" },
+	{ "boards",  SEED_CRED_OPERATOR, seed_cmd_boards,  "boards",             "Show bulletin board seeding progress" },
 	{ "list",    SEED_CRED_OPERATOR, seed_cmd_list,    "list [N]",           "List cached files, most recently used first" },
 	{ "info",    SEED_CRED_OPERATOR, seed_cmd_info,    "info <tth>",         "Show who posted a cached file, and when" },
 	{ "del",     SEED_CRED_OPERATOR, seed_cmd_del,     "del <tth>",          "Delete a cached file by TTH" },
@@ -651,6 +685,12 @@ struct seed_commands* seed_commands_create(struct seed_cache* cache, seed_comman
 	cmds->reply = reply;
 	cmds->ptr = ptr;
 	return cmds;
+}
+
+void seed_commands_set_bbs(struct seed_commands* cmds, struct seed_bbs* bbs)
+{
+	if (cmds)
+		cmds->bbs = bbs;
 }
 
 void seed_commands_destroy(struct seed_commands* cmds)
