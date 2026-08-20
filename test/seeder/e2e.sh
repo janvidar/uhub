@@ -215,6 +215,7 @@ hub_answers_adc()
 BIN_UHUB=""
 BIN_PASSWD=""
 BIN_SEEDER=""
+BIN_ADC_CMD=""
 PLUGIN_DIR=""
 
 check_binaries()
@@ -226,6 +227,12 @@ check_binaries()
 	BIN_PASSWD=${UHUB_PASSWD_BIN:-$BUILD_DIR/uhub-passwd}
 	BIN_SEEDER=${UHUB_SEEDER_BIN:-$BUILD_DIR/uhub-seeder}
 	PLUGIN_DIR=${UHUB_PLUGIN_DIR:-$BUILD_DIR}
+
+	# Optional: the scriptable ADC client, used only by the bulletin board
+	# checks. Those are skipped rather than failed when it is not built, since
+	# everything else here works without it.
+	BIN_ADC_CMD=${ADC_CMD_BIN:-$BUILD_DIR/adc_cmd}
+	[ -x "$BIN_ADC_CMD" ] || BIN_ADC_CMD=""
 
 	[ -x "$BIN_UHUB" ]   || missing="$missing $BIN_UHUB"
 	[ -x "$BIN_PASSWD" ] || missing="$missing $BIN_PASSWD"
@@ -343,7 +350,19 @@ write_configs()
 	tls_certificate = $WORK/server.crt
 	tls_private_key = $WORK/server.key
 
+	# Bulletin boards, so the seeder's BBS0 side is exercised too. The seeder
+	# is an ordinary subscriber: it offers BBS0, is sent the descriptors, and
+	# goes after the document behind every entry it is told about.
+	bbs_enable = yes
+	file_bbs_boards = $WORK/boards.conf
+	file_bbs_index = $WORK/bbs.db
+	bbs_post_interval = 0
+
 	file_plugins = $WORK/plugins.conf
+	EOF
+
+	cat > "$WORK/boards.conf" <<-EOF
+	board general title="General discussion" post=guest withdraw_own=guest
 	EOF
 
 	mkdir -p "$WORK/cache"
@@ -379,6 +398,12 @@ write_seeder_config()
 	seed_max_file_size = 2
 	seed_max_entries   = 64
 	seed_entry_ttl     = 3600
+
+	# Bulletin boards are on by default; the delay before a fetch is not
+	# something this harness wants to sit through, so it is turned off. An
+	# operator would leave it alone.
+	seed_bbs_enable       = yes
+	seed_bbs_fetch_delay  = 0
 	EOF
 }
 
@@ -896,6 +921,83 @@ check_cache_survives_restart()
 	return 1
 }
 
+# ---------------------------------------------------------------------------
+# Bulletin boards
+#
+# The seeder is a BBS0 subscriber, and these are the parts of that which can be
+# checked without a second client able to serve a file: that it offers the
+# feature and is told about the boards, that it subscribes, and that an entry
+# arriving makes it go and ask the author for the bytes. The transfer itself is
+# the same client-to-client path a chat attachment takes, and is covered above.
+# ---------------------------------------------------------------------------
+
+check_seeder_subscribes_to_boards()
+{
+	local name="seeder subscribes to a bulletin board"
+	if [ "$SEEDER_WIRED" = "no" ]; then
+		skip "$name" "$UNWIRED_REASON"
+		return 0
+	fi
+
+	seeder_subscribed() { grep -q 'subscribed to board "general"' "$WORK/seeder.log" 2>/dev/null; }
+
+	if wait_for 30 seeder_subscribed; then
+		pass "$name"
+		info "seeder: $(sed -n 's/.*\(seed_bbs: subscribed.*\)/\1/p' "$WORK/seeder.log" | head -n 1)"
+		return 0
+	fi
+
+	fail "$name" "the seeder never subscribed; see $WORK/seeder.log"
+	if grep -q 'does not announce BBS0' "$WORK/seeder.log" 2>/dev/null; then
+		info "the seeder says the hub did not announce BBS0 -- check bbs_enable in the hub config"
+	fi
+	sed -n '/seed_bbs/p' "$WORK/seeder.log" 2>/dev/null | sed 's/^/        /' | head -n 10
+	return 1
+}
+
+check_seeder_fetches_a_post()
+{
+	local name="an index entry makes the seeder ask the author for the post"
+	# A well formed tiger tree root. Nothing hashes to it: the point is what the
+	# seeder does when it is told the post exists, not what arrives.
+	local tth="KX3TQ7ZVN5PLQGKD3NDBK6ZTZG5PYQXSNMFYVJH"
+
+	if [ "$SEEDER_WIRED" = "no" ]; then
+		skip "$name" "$UNWIRED_REASON"
+		return 0
+	fi
+	if [ -z "$BIN_ADC_CMD" ]; then
+		skip "$name" "adc_cmd is not built; build it or set ADC_CMD_BIN"
+		return 0
+	fi
+
+	# Submit a post and stay logged in long enough for the seeder to come
+	# asking. The seeder acts on its own timer, so the linger has to outlast one
+	# tick of it. adc_cmd serves no files, so the transfer never completes --
+	# what is being checked is that the request goes out at all.
+	"$BIN_ADC_CMD" "adcs://127.0.0.1:$HUB_PORT/" --nick bbsposter --sup ADBBS0 \
+		--raw "HBBP TR$tth SI412 BDgeneral SJSaturday\\smaintenance" \
+		--linger 25 --expect ok >"$WORK/bbs-post.log" 2>&1 &
+	local poster_pid=$!
+
+	seeder_asked() { grep -q "for TTH=$tth" "$WORK/seeder.log" 2>/dev/null; }
+
+	if wait_for 30 seeder_asked; then
+		pass "$name"
+		info "seeder: $(sed -n "s/.*\(seed_bbs: asked.*\)/\1/p" "$WORK/seeder.log" | head -n 1)"
+		kill_pid "$poster_pid" TERM >/dev/null 2>&1 || true
+		wait "$poster_pid" 2>/dev/null || true
+		return 0
+	fi
+
+	kill_pid "$poster_pid" TERM >/dev/null 2>&1 || true
+	wait "$poster_pid" 2>/dev/null || true
+
+	fail "$name" "the seeder never asked for the post; see $WORK/seeder.log and $WORK/bbs-post.log"
+	sed -n '/seed_bbs/p' "$WORK/seeder.log" 2>/dev/null | sed 's/^/        /' | head -n 10
+	return 1
+}
+
 check_hub_still_healthy()
 {
 	local name="hub survived the whole run"
@@ -1023,6 +1125,8 @@ if check_hub_starts; then
 		check_seeder_serves_adcs
 		check_seeder_adcs_speaks_adc
 		check_seeder_plain_still_works
+		check_seeder_subscribes_to_boards
+		check_seeder_fetches_a_post
 		check_crash_isolation
 		check_seeder_restarts
 		check_cache_survives_restart
@@ -1033,6 +1137,8 @@ if check_hub_starts; then
 		skip "seeder transfer port serves ADCS"   "the seeder would not start"
 		skip "seeder answers CSUP over ADCS"      "the seeder would not start"
 		skip "seeder answers plain ADC"           "the seeder would not start"
+		skip "seeder subscribes to a board"       "the seeder would not start"
+		skip "an entry makes the seeder ask"      "the seeder would not start"
 		skip "CRASH ISOLATION"                    "the seeder would not start"
 		skip "seeder restarts after SIGKILL"      "the seeder would not start"
 		skip "cache survives the crash"           "the seeder would not start"
