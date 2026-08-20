@@ -1260,10 +1260,10 @@ static void seed_hub_on_user(struct seed_hub* hub, const struct ADC_user* adc_us
 	memset(&user, 0, sizeof(user));
 	user.sid = adc_user->sid;
 	user.client_type = adc_user->client_type;
-	strncpy(user.cid, adc_user->cid, sizeof(user.cid) - 1);
-	strncpy(user.nick, adc_user->name, sizeof(user.nick) - 1);
-	strncpy(user.address, adc_user->address, sizeof(user.address) - 1);
-	strncpy(user.support, adc_user->support, sizeof(user.support) - 1);
+	uhub_strlcpy(user.cid, adc_user->cid, sizeof(user.cid));
+	uhub_strlcpy(user.nick, adc_user->name, sizeof(user.nick));
+	uhub_strlcpy(user.address, adc_user->address, sizeof(user.address));
+	uhub_strlcpy(user.support, adc_user->support, sizeof(user.support));
 
 	/* SU decides whether a transfer with this peer can be encrypted, and it is
 	   not the peer's own claim that arrives here but whatever the hub chose to

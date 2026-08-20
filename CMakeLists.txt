@@ -505,6 +505,9 @@ if(UNIX)
 	set_target_properties(mod_e2e_test PROPERTIES PREFIX "")
 	target_link_libraries(mod_e2e_test utils)
 	target_link_libraries(uhub pthread)
+	# libutils carries util/threads.c; glibc folds pthread_create into libc but
+	# FreeBSD does not, so the seeder has to ask for it too.
+	target_link_libraries(uhub-seeder pthread)
 	if (UHUB_TESTS)
 		target_link_libraries(autotest-bin PRIVATE pthread)
 	endif()

@@ -29,6 +29,7 @@
 #include "seeder/post.h"
 #include "util/log.h"
 #include "util/memory.h"
+#include "util/misc.h"
 
 /** Name of the cursor file inside the cache directory. */
 #define SEED_BBS_CURSOR_FILE "bbs-cursors"
@@ -450,7 +451,7 @@ static struct bbs_board* bbs_add_board(struct seed_bbs* bbs, const char* name)
 		{
 			memset(&bbs->boards[i], 0, sizeof(bbs->boards[i]));
 			bbs->boards[i].used = 1;
-			strncpy(bbs->boards[i].board, name, SEED_BBS_BOARD_MAX);
+			uhub_strlcpy(bbs->boards[i].board, name, sizeof(bbs->boards[i].board));
 			return &bbs->boards[i];
 		}
 	}

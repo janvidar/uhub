@@ -440,6 +440,20 @@ const char* uhub_ulltoa(uint64_t val)
 
 
 
+size_t uhub_strlcpy(char* dst, const char* src, size_t dstsize)
+{
+	size_t len = strlen(src);
+	size_t copy;
+
+	if (!dstsize)
+		return len;
+
+	copy = MIN(len, dstsize - 1);
+	memcpy(dst, src, copy);
+	dst[copy] = 0;
+	return len;
+}
+
 #ifndef HAVE_STRNDUP
 char* strndup(const char* string, size_t n)
 {

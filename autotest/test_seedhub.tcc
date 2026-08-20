@@ -1,6 +1,7 @@
 #include "system.h"
 #include "uhub_limits.h"
 #include "util/memory.h"
+#include "util/misc.h"
 #include "adc/message.h"
 #include "adc/sid.h"
 #include "tools/adcclient.h"
@@ -32,11 +33,11 @@ static void sh_fill(struct seed_user* user, sid_t sid, const char* cid, const ch
 	user->sid = sid;
 	user->client_type = ct;
 	if (cid)
-		strncpy(user->cid, cid, sizeof(user->cid) - 1);
+		uhub_strlcpy(user->cid, cid, sizeof(user->cid));
 	if (nick)
-		strncpy(user->nick, nick, sizeof(user->nick) - 1);
+		uhub_strlcpy(user->nick, nick, sizeof(user->nick));
 	if (address)
-		strncpy(user->address, address, sizeof(user->address) - 1);
+		uhub_strlcpy(user->address, address, sizeof(user->address));
 }
 
 /* Parse a wire line into a message the parsers can be pointed at. */

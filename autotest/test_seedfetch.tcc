@@ -353,21 +353,43 @@ EXO_TEST(seedfetch_header_unknown_ignored, {
 		&& bf_resp.header_lines == 3;
 });
 
+/*
+ * snprintf() returns the length it *would* have written, so adding that return
+ * value to a running offset can push the offset past the end of the buffer.
+ * Append through this instead: it clamps, and stops once the buffer is full.
+ */
+static void bf_appendf(char* buf, size_t cap, size_t* at, const char* fmt, ...)
+{
+	va_list ap;
+	int n;
+
+	if (!cap || *at >= cap - 1)
+		return;
+
+	va_start(ap, fmt);
+	n = vsnprintf(buf + *at, cap - *at, fmt, ap);
+	va_end(ap);
+
+	if (n < 0)
+		return;
+	*at += ((size_t) n < cap - *at) ? (size_t) n : cap - *at - 1;
+}
+
 /* Exactly SEED_FETCH_HDR_MAX_LINES header lines is accepted, one more is not. */
 static char* bf_build_lines(size_t count, size_t* out_len)
 {
 	size_t cap = 64 + (count * 32);
 	char* buf = hub_malloc(cap);
-	size_t len;
+	size_t len = 0;
 	size_t i;
 
 	if (!buf)
 		return NULL;
 
-	len = (size_t) snprintf(buf, cap, "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n");
+	bf_appendf(buf, cap, &len, "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n");
 	for (i = 1; i < count; i++)
-		len += (size_t) snprintf(buf + len, cap - len, "X%04u: y\r\n", (unsigned) i);
-	len += (size_t) snprintf(buf + len, cap - len, "\r\n");
+		bf_appendf(buf, cap, &len, "X%04u: y\r\n", (unsigned) i);
+	bf_appendf(buf, cap, &len, "\r\n");
 
 	*out_len = len;
 	return buf;

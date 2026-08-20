@@ -89,6 +89,16 @@ extern int uhub_atoi(const char* value);
  */
 extern int parse_duration_seconds(const char* str, int* seconds_out);
 
+/**
+ * Copy a string into a fixed size buffer. Unlike strncpy() the destination is
+ * always nul-terminated, and nothing beyond it is written -- so the usual
+ * strncpy(dst, src, sizeof(dst) - 1) dance, which leaves dst unterminated
+ * exactly when src is as wide as dst, is not needed.
+ *
+ * @return the length of src, so a truncation shows up as a value >= dstsize.
+ */
+extern size_t uhub_strlcpy(char* dst, const char* src, size_t dstsize);
+
 #ifndef HAVE_STRNDUP
 extern char* strndup(const char* string, size_t n);
 #endif
