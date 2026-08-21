@@ -2,6 +2,8 @@
 #include "util/memory.h"
 #include "fuse/filelist.h"
 
+#include <stdarg.h>
+
 #ifdef HAVE_BZLIB
 #include <bzlib.h>
 #endif
@@ -235,23 +237,56 @@ EXO_TEST(fuse_filelist_self_closing_directory, {
 		&& fs_filelist_lookup(list, "empty/a") == NULL;
 });
 
+/*
+ * Append to @p buf, advancing @p n by what was actually written.
+ *
+ * snprintf() returns the length it *would* have needed, so "n += snprintf(...)"
+ * walks n past the end of the buffer as soon as anything is truncated, and the
+ * next "cap - n" underflows. @return 0 if it did not fit.
+ */
+static int append_fmt(char* buf, size_t cap, size_t* n, const char* fmt, ...)
+{
+	va_list args;
+	int written;
+
+	if (*n >= cap)
+		return 0;
+
+	va_start(args, fmt);
+	written = vsnprintf(&buf[*n], cap - *n, fmt, args);
+	va_end(args);
+
+	if (written < 0 || (size_t) written >= cap - *n)
+		return 0;
+
+	*n += (size_t) written;
+	return 1;
+}
+
 /* Build "<FileListing>" wrapping @p depth nested directories. */
 static char* nested_document(int depth, size_t* out_len)
 {
 	size_t cap = 64 * 1024;
 	char* xml = hub_malloc(cap);
 	size_t n = 0;
+	int ok = 1;
 	int i;
 
 	if (!xml)
 		return NULL;
 
-	n += (size_t) snprintf(&xml[n], cap - n, "<FileListing>");
-	for (i = 0; i < depth; i++)
-		n += (size_t) snprintf(&xml[n], cap - n, "<Directory Name=\"d%d\">", i);
-	for (i = 0; i < depth; i++)
-		n += (size_t) snprintf(&xml[n], cap - n, "</Directory>");
-	n += (size_t) snprintf(&xml[n], cap - n, "</FileListing>");
+	ok = append_fmt(xml, cap, &n, "<FileListing>");
+	for (i = 0; ok && i < depth; i++)
+		ok = append_fmt(xml, cap, &n, "<Directory Name=\"d%d\">", i);
+	for (i = 0; ok && i < depth; i++)
+		ok = append_fmt(xml, cap, &n, "</Directory>");
+	ok = ok && append_fmt(xml, cap, &n, "</FileListing>");
+
+	if (!ok)
+	{
+		hub_free(xml);
+		return NULL;
+	}
 
 	*out_len = n;
 	return xml;
