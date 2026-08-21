@@ -109,6 +109,18 @@ struct seed_cc_request
 {
 	enum seed_cc_type type;
 	char     tth[SEED_TTH_STR_LEN + 1];  /** GET/GFI/SND identifier, "" if none. */
+
+	/**
+	 * The identifier as it appeared on the wire, when it was not a TTH: a
+	 * plain file name such as "files.xml.bz2". Empty for a TTH identifier, and
+	 * empty for anything that is neither.
+	 *
+	 * Only a download the caller itself asked for ever looks at this. A CGET
+	 * *served* by this module is answered from the cache by TTH and by nothing
+	 * else, so a named identifier arriving from a peer names nothing it can
+	 * reach.
+	 */
+	char     name[SEED_GRANT_FILENAME_MAX];
 	char     cid[SEED_CID_LEN + 1];      /** CINF ID, "" if absent. */
 	char     token[SEED_TOKEN_MAX + 1];  /** CINF TO, "" if absent. Kept ADC-escaped. */
 	int      have_base;                  /** CSUP advertised BASE. */
@@ -236,6 +248,31 @@ struct seed_cc_policy
 	 */
 	void (*on_download)(void* ptr, const char* tth, enum seed_error err, const struct seed_entry* entry);
 	void* on_download_ptr;
+
+	/**
+	 * Where the body of a *ranged* download goes.
+	 *
+	 * A range is bytes out of the middle of a file, so there is nothing to
+	 * check them against: a TTH covers a whole file, and this module asks for
+	 * no leaf hashes. They are therefore never ingested as cached content --
+	 * which would be claiming they had been verified -- and are handed to the
+	 * caller as they arrive instead.
+	 *
+	 * @param token  the token the grant was issued with, which is how the
+	 *               caller tells its outstanding requests apart.
+	 * @param offset the absolute position in the file of the first byte of
+	 *               @p data.
+	 * @return 0 to abandon the transfer.
+	 *
+	 * Both may be NULL, in which case a ranged grant is never issued and this
+	 * whole path is unreachable.
+	 */
+	int (*on_body)(void* ptr, const char* token, uint64_t offset, const void* data, size_t len);
+
+	/** The range ended: @p ok is 1 when every byte asked for arrived. */
+	void (*on_body_done)(void* ptr, const char* token, int ok);
+
+	void* on_body_ptr;
 };
 
 /**

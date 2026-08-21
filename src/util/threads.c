@@ -68,6 +68,30 @@ void uhub_cond_wait(uhub_cond_t* cond, uhub_mutex_t* mutex)
 	pthread_cond_wait(cond, mutex);
 }
 
+int uhub_cond_timedwait(uhub_cond_t* cond, uhub_mutex_t* mutex, unsigned int ms)
+{
+	struct timespec deadline;
+
+	/*
+	 * CLOCK_REALTIME because that is what a condition variable uses unless it
+	 * was created with a different one, and these are created with the
+	 * defaults. A step in the wall clock therefore lengthens or shortens the
+	 * wait -- acceptable for a poll interval, which is all this is used for.
+	 */
+	clock_gettime(CLOCK_REALTIME, &deadline);
+
+	deadline.tv_sec += ms / 1000;
+	deadline.tv_nsec += (long) (ms % 1000) * 1000000L;
+
+	if (deadline.tv_nsec >= 1000000000L)
+	{
+		deadline.tv_sec++;
+		deadline.tv_nsec -= 1000000000L;
+	}
+
+	return pthread_cond_timedwait(cond, mutex, &deadline) != ETIMEDOUT;
+}
+
 void uhub_cond_signal(uhub_cond_t* cond)
 {
 	pthread_cond_signal(cond);
@@ -165,6 +189,11 @@ void uhub_cond_destroy(uhub_cond_t* cond)
 void uhub_cond_wait(uhub_cond_t* cond, uhub_mutex_t* mutex)
 {
 	SleepConditionVariableCS(cond, mutex, INFINITE);
+}
+
+int uhub_cond_timedwait(uhub_cond_t* cond, uhub_mutex_t* mutex, unsigned int ms)
+{
+	return SleepConditionVariableCS(cond, mutex, (DWORD) ms) ? 1 : 0;
 }
 
 void uhub_cond_signal(uhub_cond_t* cond)

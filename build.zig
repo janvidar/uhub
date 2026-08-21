@@ -100,6 +100,28 @@ const seeder_daemon_sources = [_][]const u8{
     "src/seeder/ingest.c",
 };
 
+// uhub-fuse. fs.c and main.c are the only files that include <fuse.h>, so the
+// rest builds into autotest-bin on a machine with no libfuse at all -- which is
+// where the path, roster and rendering logic is tested. Mirrors fuse_SOURCES /
+// fuse_test_SOURCES in CMakeLists.txt.
+const fuse_sources = [_][]const u8{
+    "src/fuse/bridge.c",
+    "src/fuse/chatlog.c",
+    "src/fuse/config.c",
+    "src/fuse/filelist.c",
+    "src/fuse/nodes.c",
+    "src/fuse/render.c",
+    "src/fuse/roster.c",
+    "src/fuse/session.c",
+    "src/fuse/stream.c",
+    "src/fuse/transfer.c",
+};
+
+const fuse_daemon_sources = [_][]const u8{
+    "src/fuse/fs.c",
+    "src/fuse/main.c",
+};
+
 // autotest/test_*.tcc sources, sorted, mirroring the `file(GLOB ...)` +
 // `list(SORT ...)` in CMakeLists.txt. Kept as an explicit list (like the C
 // source sets above) rather than globbed at build time; add a new .tcc here.
@@ -115,6 +137,12 @@ const tcc_sources = [_][]const u8{
     "test_connect.tcc",
     "test_credentials.tcc",
     "test_eventqueue.tcc",
+    "test_fuse_chatlog.tcc",
+    "test_fuse_config.tcc",
+    "test_fuse_filelist.tcc",
+    "test_fuse_nodes.tcc",
+    "test_fuse_render.tcc",
+    "test_fuse_roster.tcc",
     "test_hbri.tcc",
     "test_help_rtf0.tcc",
     "test_hub.tcc",
@@ -308,6 +336,7 @@ pub fn build(b: *std.Build) void {
     const release = b.option(bool, "release", "Release build; disables the DEBUG define when on") orelse true;
     const systemd = b.option(bool, "systemd", "Enable systemd notify and journal logging") orelse false;
     const adc_stress = b.option(bool, "adc-stress", "Build the adcrush stress-tester client") orelse false;
+    const fuse = b.option(bool, "fuse", "Build uhub-fuse, the filesystem client (needs libfuse3)") orelse false;
     const lowlevel_debug = b.option(bool, "lowlevel-debug", "Enable low level debug messages") orelse false;
     const javascript = b.option(bool, "javascript", "Build the mod_javascript plugin (embeds QuickJS, a git submodule)") orelse false;
     // TLS is mandatory. By default we build the bundled LibreSSL (a zig
@@ -500,6 +529,9 @@ pub fn build(b: *std.Build) void {
         ctx.addSources(autotest_mod, &core_sources);
         ctx.addSources(autotest_mod, &seeder_sources);
         ctx.addSources(autotest_mod, &seeder_daemon_sources);
+        ctx.addSources(autotest_mod, &fuse_sources);
+        // fuse/filelist.c is compiled into the tests, and it uses bzlib.
+        autotest_mod.linkSystemLibrary("bz2", .{});
         // hubconn.c is built on the ADC client; ioqueue.c already comes in via
         // core_sources, so only adcclient.c is added here.
         ctx.addSources(autotest_mod, &.{"src/tools/adcclient.c"});
@@ -541,6 +573,34 @@ pub fn build(b: *std.Build) void {
         const admin = b.addExecutable(.{ .name = "uhub-admin", .root_module = admin_mod });
         admin.pie = true;
         b.installArtifact(admin);
+
+        if (fuse) {
+            const fuse_mod = ctx.module();
+            ctx.addSources(fuse_mod, &fuse_sources);
+            ctx.addSources(fuse_mod, &fuse_daemon_sources);
+            // The transfer half is uhub-seeder's, driven rather than
+            // reimplemented; mirrors fuse_seeder_SOURCES in CMakeLists.txt.
+            ctx.addSources(fuse_mod, &.{
+                "src/seeder/cache.c",
+                "src/seeder/cc.c",
+                "src/seeder/grant.c",
+                "src/seeder/sniff.c",
+                "src/tools/adcclient.c",
+                "src/core/ioqueue.c",
+            });
+            ctx.addSqlite(fuse_mod);
+            fuse_mod.linkLibrary(common);
+            ctx.linkExternal(fuse_mod);
+            // No pkg-config here, unlike CMake: name the library and let the
+            // linker find it. The headers live in a subdirectory of their own.
+            fuse_mod.addIncludePath(.{ .cwd_relative = "/usr/include/fuse3" });
+            fuse_mod.linkSystemLibrary("fuse3", .{});
+            // A peer's share is browsed by reading its bzip2'd file list.
+            fuse_mod.linkSystemLibrary("bz2", .{});
+            const fuse_exe = b.addExecutable(.{ .name = "uhub-fuse", .root_module = fuse_mod });
+            fuse_exe.pie = true;
+            b.installArtifact(fuse_exe);
+        }
 
         if (adc_stress) {
             const adcrush_mod = ctx.module();

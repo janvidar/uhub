@@ -1,0 +1,291 @@
+Mounting a hub
+--------------
+
+uhub-fuse mounts an ADC hub as a directory. The hub becomes a filesystem: who
+is online is a directory listing, what a user advertises is a file you can cat,
+and anything that reads files can read the hub -- ls, grep, find, a shell loop,
+a monitoring script that wants a number without speaking a protocol.
+
+It is not part of the hub and needs no support from it. It logs in as an
+ordinary client, over the same port and the same protocol as everybody else,
+and appears in the user list like anyone else.
+
+See uhub-fuse(1) for the command line, and getstarted.txt for the hub itself.
+
+
+1. What it looks like
+---------------------
+
+    /mnt/hub/
+      hub/          what the hub says about itself
+        state         offline, connecting, online or failed
+        name          the hub's name
+        description   its description, which is also its topic
+        version       the software it runs
+        address       the URL this mount was pointed at
+        support       the extensions it announced
+        users         how many are online
+        sid           our session id
+        tls           the TLS version and cipher, or "no"
+      me/           nick, cid, sid, support -- the mount's own identity
+      chat/
+        main          the hub's chat: read it, tail it, write to it
+        private       what was said to you, and what you said to somebody
+      users/
+        <CID>/      one directory per user, named by their CID
+          nick description share_size shared_files slots ip
+          user_agent version client_type support sid connected
+          inf         the raw INF line, verbatim
+          msg         write-only: sends a private message
+          files/      what that user is sharing
+      by-nick/
+        <nick>      a symlink to ../users/<CID>
+      by-tth/
+        <TTH>       any file on the hub, by hash
+
+A CID is 39 base32 characters, which makes it usable as a directory name
+without escaping anything: the alphabet has no slash, no NUL and no dot, so a
+CID can never spell "." or "..". It is also the only name a user has that is
+stable -- a nick can be changed, and is not unique across a reconnect.
+
+Everything is read-only. There is nothing to sync, nothing is cached to disk,
+and unmounting leaves nothing behind.
+
+
+2. Reading it
+-------------
+
+    $ uhub-fuse --hub=adc://hub.example.org:1511 /mnt/hub
+
+    $ cat /mnt/hub/hub/users
+    42
+
+    $ ls /mnt/hub/by-nick
+    alice   bob   carol
+
+    $ cat /mnt/hub/by-nick/alice/share_size
+    1099511627776
+
+    # everyone sharing nothing:
+    $ for u in /mnt/hub/users/*/; do
+    >     [ "$(cat "$u/share_size")" = 0 ] && cat "$u/nick"
+    > done
+
+    # the fields this mount does not model are still there:
+    $ grep -o 'EM[^ ]*' /mnt/hub/by-nick/alice/inf
+
+A file holds one value and a trailing newline, so no parser is needed. A field
+the user did not advertise is an empty file; a numeric one that was not
+advertised reads as 0, because that is what every client that omits it means.
+
+users/<cid>/inf is the line the hub sent, escapes and all. It is there for the
+fields this mount has no name for -- the ADC INF grammar grows with every
+extension, and a mount that only showed what it knew about would quietly hide
+the rest.
+
+
+3. Chat
+-------
+
+chat/main is the hub's main chat. Reading it gives the recent history; writing
+to it says something:
+
+    $ tail -f /mnt/hub/chat/main
+    2026-08-21T00:27:44Z -- connected to adc://hub.example.org:1511
+    2026-08-21T00:28:02Z <alice> anyone got the new release?
+    2026-08-21T00:28:19Z * bob waves
+
+    $ echo "over here" > /mnt/hub/chat/main
+
+One line per message: a timestamp, who said it, and what they said. An action
+("/me waves") is marked with a star instead of angle brackets. Lines beginning
+with "--" are the connection itself rather than anything anyone said, so that
+a quiet hub can be told apart from one that is not there any more.
+
+A newline ends a message, so a single write can say several things and a write
+with no newline in it is said when the file is closed -- `echo -n` works, and
+so does a program writing in chunks. A message longer than 1024 bytes is
+refused with EMSGSIZE rather than truncated.
+
+Private messages have their own file, because they are not part of the room:
+
+    $ echo "on my way" > /mnt/hub/users/<CID>/msg
+    $ cat /mnt/hub/chat/private
+    2026-08-21T00:29:03Z <alice> where are you?
+    2026-08-21T00:29:31Z -> <alice> on my way
+
+users/<CID>/msg is write-only -- there is no such thing as reading a message
+you have not sent. Outgoing messages are written to chat/private by the mount
+itself, since a hub delivers a private message to its recipient and not back to
+its sender; without that, chat/private would hold one half of every
+conversation.
+
+chat/main and chat/private are streams, not snapshots: their size is how much
+has ever been said, and a reader picks up where it left off. Only the most
+recent 256 KB is kept -- a reader that falls further behind than that is given
+the oldest bytes still held rather than an error.
+
+
+4. Files
+--------
+
+users/<CID>/files/ is what that user is sharing, as a directory tree:
+
+    $ ls /mnt/hub/by-nick/alice/files/
+    Music  Photos  incoming
+
+    $ cat /mnt/hub/by-nick/alice/files/Music/song.flac > song.flac
+
+The listing comes from that user's file list -- the XML document every DC
+client publishes as "files.xml.bz2" -- which is fetched the first time the
+directory is listed and kept for five minutes. Stat'ing files/ does not fetch
+one, so "ls -l users/" over a busy hub does not start a download per user.
+
+by-tth/<hash> is the same thing without a name: any file on the hub, addressed
+by its tiger tree hash, wherever it is. The directory has no listing -- there
+is no set of hashes to enumerate, only the one you already know -- and reading
+one asks the hub who has it.
+
+    $ cat /mnt/hub/by-tth/AI3IWQOWFWVLPBKQ3JMOQJVUVKUFZLKA3TFXKHY > file
+
+Where the bytes come from:
+
+  * A file in somebody's share is asked of that somebody. We know whose share
+    it is, so there is nothing to search for.
+  * A hash under by-tth is searched for on the hub, and asked of whoever
+    answers.
+
+Either way the mount is the one listening and the peer dials in, which is what
+makes this work when the peer is passive -- and why uhub-fuse needs a port of
+its own (transfer_port) and says so in its INF.
+
+
+5. What is verified, and what is not
+------------------------------------
+
+A file small enough to hold -- up to max_file_size, 1 GiB by default -- is
+downloaded in one piece, hashed, and kept only if it hashes to the name it was
+asked for. Content that does not is discarded before any reader sees a byte of
+it. That is what makes by-tth trustworthy: the name *is* the checksum.
+
+A file larger than that is read through a sliding window instead: the range a
+reader asked for is requested, plus a little of what it is likely to ask for
+next, and nothing is written to disk. Reading a 20 GB film does not download
+20 GB, and seeking into the middle of one does not download the beginning.
+
+The cost is that such a read cannot be verified. A TTH covers a whole file, and
+the leaf hashes that would let part of one be checked (ADC's "CGET tthl") are
+not implemented on either side of this codebase. So bytes read that way are
+what a peer chose to send, and nothing here can tell you they are what you
+asked for.
+
+That is why the boundary is the size ceiling and not a convenience setting:
+everything that *can* be verified still is, and streaming applies only where
+verification was never available. Raising max_file_size moves more content onto
+the verified path, at the cost of holding it in the cache.
+
+Cached content lives under cache_dir and survives a restart. Streamed content
+is never cached -- storing unverified bytes as though they had been checked
+would be a lie the next reader could not see through.
+
+
+6. Snapshots, and what is live
+------------------------------
+
+A hub changes while you read it. Two rules make that predictable:
+
+  * A metadata file is rendered when it is opened, and reading it returns that snapshot
+    however long the descriptor stays open. A user's INF can be replaced
+    between two reads of one file, and a reader that got the first half of one
+    nick and the second half of another would have no way to notice. Open it
+    again to see the new value.
+
+  * A directory listing is generated when it is read, so it is as current as
+    the moment of the ls.
+
+chat/ is the exception to both: see section 3.
+
+When the hub connection drops, users/ empties and hub/ forgets what the hub
+said about itself. hub/state says what is going on, and hub/address -- which is
+configuration, not something the hub claimed -- stays. A stale user list that
+looks live is worse than an empty one, so there is no last known state to read.
+The mount stays up and keeps answering throughout, and reconnects on its own
+with a widening delay of up to a minute.
+
+The exception is a hub that was pinned with ?kp= and presented a different
+certificate. That is a configuration error or an interception, never a
+transient fault, so it is not retried: hub/state reads "failed" and stays there.
+
+
+7. Connecting to it
+-------------------
+
+    adc://host:port                 plaintext
+    adcs://host:port                TLS, unauthenticated
+    adcs://host:port/?kp=SHA256/... TLS, with the hub's certificate pinned
+
+TLS without a keyprint is encrypted but not authenticated -- an ADC hub's
+certificate is normally self-signed, so there is no CA to check it against.
+Pin the keyprint on any hub where it matters; the hub publishes it in its own
+URL.
+
+    $ uhub-fuse --hub='adcs://hub.example.org:1511/?kp=SHA256/ABC...' \
+        --nick=archivist --config=/etc/uhub/uhub-fuse.conf /mnt/hub
+
+Without --nick the mount logs in as "uhub-fuse". It is a login like any other:
+the hub sees it, counts it, and can ban it.
+
+A password does not belong on the command line -- an argument is in the
+process's argv, which every user on the machine can read out of ps. Put it in a
+configuration file instead, mode 600:
+
+    # /etc/uhub/uhub-fuse.conf
+    hub = adcs://hub.example.org:1511/?kp=SHA256/ABC...
+    nick = archivist
+    password = secret
+
+    $ uhub-fuse --config=/etc/uhub/uhub-fuse.conf /mnt/hub
+
+uhub-fuse says so if that file holds a password and is readable by anyone but
+its owner. Anything given on the command line overrides the file, so one file
+can still be pointed at a different hub for a single run. A value runs to the
+end of its line and is not interpreted further, so a password may contain '#',
+'=' and spaces.
+
+
+8. What is not there yet
+------------------------
+
+  * Partial file lists. A share is fetched as one document, so the first `ls`
+    of a very large share pays for all of it. ADC can ask for one directory at
+    a time ("CGET list /dir/"), which is the shape readdir actually wants.
+  * Leaf hashes, which would let a streamed read be verified. See section 5.
+  * Uploading. The mount shares nothing and answers no searches; it is a
+    reader.
+
+
+9. How it works
+---------------
+
+Two threads. One is uhub's ordinary event loop, and owns the ADC client, the
+roster and everything else; the other is libfuse's. Nothing in the hub half is
+reentrant and none of it is locked, so a filesystem operation does not touch it
+directly: it is packed into a task, handed to the event loop through the same
+self-pipe the DNS resolver uses, and waited for. The answer comes back on the
+same task. src/fuse/bridge.h has the details.
+
+That is also why metadata reads are snapshots. Rendering happens once, on the
+event loop, at open(); after that a read is a memcpy on the FUSE thread and
+never crosses over at all. A chat read does cross over, because the log it
+reads from is being appended to by the event loop as it goes.
+
+A read that has to fetch something is *parked*: the FUSE thread stays blocked
+in the bridge, and the task is completed when the content arrives, when the
+search comes back empty, or when the clock runs out. Nothing else on the mount
+is held up meanwhile -- other threads keep answering -- and a reader that gives
+up (^C) is let go at once rather than held for the rest of the timeout.
+
+The transfer machinery itself is uhub-seeder's, driven rather than
+reimplemented: seeder/cc.c speaks the client-to-client protocol, seeder/cache.c
+stores and verifies, seeder/grant.c decides which connection may do what. See
+seedcache.txt section 5 for that exchange written out.

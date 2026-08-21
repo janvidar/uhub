@@ -354,6 +354,78 @@ int seed_grant_issue(struct seed_grants* grants, const char* token, const char* 
 	return 1;
 }
 
+/**
+ * A file name that may be asked for by name.
+ *
+ * No '/' and no space: the first would make it a path (and a path is not what
+ * this asks for), the second would split the ADC line it goes into. Both are
+ * refused rather than escaped, because nothing legitimate needs them here.
+ */
+static int grant_valid_filename(const char* name)
+{
+	size_t n;
+
+	if (!name || !*name)
+		return 0;
+
+	for (n = 0; name[n]; n++)
+	{
+		if (n + 1 >= SEED_GRANT_FILENAME_MAX)
+			return 0;
+
+		if (name[n] == '/' || name[n] == ' ' || name[n] == '\n' || (unsigned char) name[n] < 0x20)
+			return 0;
+	}
+
+	return 1;
+}
+
+int seed_grant_issue_filelist(struct seed_grants* grants, const char* token, const char* cid,
+	const char* filename, time_t now)
+{
+	struct seed_grant_entry* entry;
+
+	if (!grant_valid_filename(filename))
+		return 0;
+
+	/* No TTH: there is none to know in advance, which is the point. */
+	if (!seed_grant_issue(grants, token, cid, NULL, now))
+		return 0;
+
+	entry = grant_lookup(grants, token);
+	if (!entry)
+		return 0;
+
+	entry->grant.is_download = 1;
+	strncpy(entry->grant.filename, filename, sizeof(entry->grant.filename) - 1);
+	entry->grant.filename[sizeof(entry->grant.filename) - 1] = '\0';
+	return 1;
+}
+
+int seed_grant_issue_range(struct seed_grants* grants, const char* token, const char* cid,
+	const char* tth, uint64_t start, uint64_t length, time_t now)
+{
+	struct seed_grant_entry* entry;
+
+	/* A zero length range is not a request for anything, and "to end of file"
+	   is what the whole-file grant is for. */
+	if (!length)
+		return 0;
+
+	if (!seed_grant_issue(grants, token, cid, tth, now))
+		return 0;
+
+	entry = grant_lookup(grants, token);
+	if (!entry)
+		return 0;
+
+	entry->grant.is_download = 1;
+	entry->grant.start = start;
+	entry->grant.length = length;
+	entry->grant.size = length;
+	return 1;
+}
+
 int seed_grant_issue_download(struct seed_grants* grants, const char* token, const char* cid,
 	const char* tth, uint64_t size, const char* name, time_t now)
 {

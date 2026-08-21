@@ -28,6 +28,7 @@ option(RELEASE "Release build, debug build if disabled" ON)
 option(LOWLEVEL_DEBUG "Enable low level debug messages." OFF)
 option(SYSTEMD_SUPPORT "Enable systemd notify and journal logging" OFF)
 option(ADC_STRESS "Enable the stress tester client" OFF)
+option(FUSE_SUPPORT "Build uhub-fuse, the filesystem client (needs libfuse3)" OFF)
 option(FUZZING "Build libFuzzer fuzz targets (requires clang)" OFF)
 option(JAVASCRIPT_SUPPORT "Build the mod_javascript plugin (embeds QuickJS, a git submodule)" OFF)
 
@@ -279,6 +280,16 @@ file (GLOB seeder_SOURCES CONFIGURE_DEPENDS ${UHUB_SOURCE_DIR}/seeder/*.c)
 set (seeder_test_SOURCES ${seeder_SOURCES})
 list (REMOVE_ITEM seeder_test_SOURCES ${UHUB_SOURCE_DIR}/seeder/main.c)
 
+# The filesystem client. fs.c and main.c are the only files that include
+# <fuse.h>; everything else is ordinary C that autotest-bin compiles whether or
+# not libfuse3 is installed, which is what keeps the path, roster and rendering
+# logic under test on a machine that cannot mount anything.
+file (GLOB fuse_SOURCES CONFIGURE_DEPENDS ${UHUB_SOURCE_DIR}/fuse/*.c)
+set (fuse_test_SOURCES ${fuse_SOURCES})
+list (REMOVE_ITEM fuse_test_SOURCES
+	${UHUB_SOURCE_DIR}/fuse/main.c
+	${UHUB_SOURCE_DIR}/fuse/fs.c)
+
 file (GLOB adc_SOURCES     CONFIGURE_DEPENDS ${UHUB_SOURCE_DIR}/adc/*.c)
 file (GLOB network_SOURCES CONFIGURE_DEPENDS ${UHUB_SOURCE_DIR}/network/*.c)
 file (GLOB utils_SOURCES   CONFIGURE_DEPENDS ${UHUB_SOURCE_DIR}/util/*.c)
@@ -371,9 +382,21 @@ exotic_add_tests(autotest-bin
 target_sources(autotest-bin PRIVATE
 	${uhub_SOURCES}
 	${seeder_test_SOURCES}
+	${fuse_test_SOURCES}
 	${UHUB_SOURCE_DIR}/tools/adcclient.c
 	${UHUB_SOURCE_DIR}/plugins/mod_auth_sqlite.c)
 target_include_directories(autotest-bin PRIVATE ${AUTOTEST_DIR})
+
+# fuse/filelist.c is in fuse_test_SOURCES and uses bzlib; the tests drive it
+# directly, so autotest-bin needs the library whether or not uhub-fuse is built.
+find_path(BZIP2_INCLUDE_DIR bzlib.h)
+find_library(BZIP2_LIBRARY NAMES bz2 bzip2)
+if (BZIP2_INCLUDE_DIR AND BZIP2_LIBRARY)
+	target_include_directories(autotest-bin PRIVATE ${BZIP2_INCLUDE_DIR})
+	target_link_libraries(autotest-bin PRIVATE ${BZIP2_LIBRARY})
+else()
+	message (FATAL_ERROR "The test suite needs libbz2 (install libbz2-dev).")
+endif()
 # Absolute path to the autotest/ dir so tests can locate checked-in fixtures
 # (e.g. the TLS test certificate) regardless of the working directory.
 target_compile_definitions(autotest-bin PRIVATE UHUB_TEST_DIR="${AUTOTEST_DIR}")
@@ -500,6 +523,25 @@ if(UNIX)
 	add_executable(adc_cmd ${CMAKE_SOURCE_DIR}/test/e2e/adc_cmd.c)
 	target_include_directories(adc_cmd PRIVATE ${UHUB_SOURCE_DIR}/tools)
 	target_link_libraries(adc_cmd adcclient adc network utils pthread)
+	# Puts a file into a seed cache and prints its TTH, so an end-to-end script
+	# can set up content to be served without a real DC client to transfer it
+	# in first. Test-only, not installed.
+	add_executable(seed_put ${CMAKE_SOURCE_DIR}/test/e2e/seed_put.c
+		${UHUB_SOURCE_DIR}/seeder/cache.c
+		${UHUB_SOURCE_DIR}/seeder/sniff.c)
+	target_link_libraries(seed_put adc network utils SQLite::SQLite3 pthread)
+
+	# A user on a hub with a share, for uhub-fuse's browse tests: uhub-seeder
+	# serves content by hash and has no share to list, so it cannot stand in
+	# for a peer being browsed. Needs libbz2 for the file list it publishes.
+	find_path(BZIP2_INCLUDE_DIR bzlib.h)
+	find_library(BZIP2_LIBRARY NAMES bz2 bzip2)
+	if (BZIP2_INCLUDE_DIR AND BZIP2_LIBRARY)
+		add_executable(filelist_peer ${CMAKE_SOURCE_DIR}/test/e2e/filelist_peer.c ${adcclient_SOURCES})
+		target_include_directories(filelist_peer PRIVATE ${UHUB_SOURCE_DIR}/tools ${BZIP2_INCLUDE_DIR})
+		target_link_libraries(filelist_peer adc network utils ${BZIP2_LIBRARY} pthread)
+	endif()
+
 	# Test-only plugin exercising the validate/ban hooks (not installed).
 	add_library(mod_e2e_test MODULE ${CMAKE_SOURCE_DIR}/test/e2e/mod_e2e_test.c)
 	set_target_properties(mod_e2e_test PROPERTIES PREFIX "")
@@ -510,6 +552,37 @@ if(UNIX)
 	target_link_libraries(uhub-seeder pthread)
 	if (UHUB_TESTS)
 		target_link_libraries(autotest-bin PRIVATE pthread)
+	endif()
+
+	# uhub-fuse: the hub, mounted. An ordinary ADC client like uhub-seeder, so
+	# it links the same libraries plus libfuse3. Off by default: libfuse is a
+	# dependency the hub itself does not have, and the mount is Linux/macOS only.
+	if (FUSE_SUPPORT)
+		find_package(PkgConfig REQUIRED)
+		pkg_check_modules(FUSE3 REQUIRED IMPORTED_TARGET fuse3)
+		message (STATUS "FUSE support: libfuse ${FUSE3_VERSION}")
+
+		# A peer's share is browsed by reading its file list, which every DC
+		# client publishes bzip2-compressed. libbz2 ships no .pc file, hence
+		# find_library rather than pkg-config.
+		find_path(BZIP2_INCLUDE_DIR bzlib.h)
+		find_library(BZIP2_LIBRARY NAMES bz2 bzip2)
+		if (NOT BZIP2_INCLUDE_DIR OR NOT BZIP2_LIBRARY)
+			message (FATAL_ERROR "FUSE_SUPPORT needs libbz2 (install libbz2-dev).")
+		endif()
+		message (STATUS "FUSE support: bzip2 ${BZIP2_LIBRARY}")
+		# The transfer half is uhub-seeder's, driven rather than reimplemented:
+		# the client-to-client protocol, the content cache and the grants that
+		# authorise a connection. Only those three, not the whole daemon --
+		# nothing here wants its hub connection, its config or its boards.
+		set (fuse_seeder_SOURCES
+			${UHUB_SOURCE_DIR}/seeder/cache.c
+			${UHUB_SOURCE_DIR}/seeder/cc.c
+			${UHUB_SOURCE_DIR}/seeder/grant.c
+			${UHUB_SOURCE_DIR}/seeder/sniff.c)
+		add_executable(uhub-fuse ${fuse_SOURCES} ${fuse_seeder_SOURCES} ${adcclient_SOURCES})
+		target_include_directories(uhub-fuse PRIVATE ${BZIP2_INCLUDE_DIR})
+		target_link_libraries(uhub-fuse adc network utils PkgConfig::FUSE3 SQLite::SQLite3 ${BZIP2_LIBRARY} pthread)
 	endif()
 
 	if (ADC_STRESS)
@@ -564,6 +637,13 @@ endif()
 if(UNIX)
 	target_link_libraries(uhub-admin ${SSL_LIBS})
 	target_link_libraries(adc_cmd ${SSL_LIBS})
+	if (TARGET filelist_peer)
+		target_link_libraries(filelist_peer ${SSL_LIBS})
+	endif()
+	target_link_libraries(seed_put ${SSL_LIBS})
+	if (FUSE_SUPPORT)
+		target_link_libraries(uhub-fuse ${SSL_LIBS})
+	endif()
 endif()
 target_link_libraries(mod_welcome ${SSL_LIBS})
 target_link_libraries(mod_logging ${SSL_LIBS})
@@ -630,6 +710,18 @@ if (FUZZING)
 	# only seeder/post.c and the magnet scanner it hands the body to.
 	add_fuzzer(fuzz_bbs_post ${UHUB_SOURCE_DIR}/tools/fuzz_bbs_post.c
 		${UHUB_SOURCE_DIR}/seeder/post.c ${UHUB_SOURCE_DIR}/seeder/embed.c)
+	# uhub-fuse's file list parser: XML and bzip2 from another user, turned
+	# into names in a mounted filesystem. Needs libbz2 but nothing else.
+	find_path(BZIP2_INCLUDE_DIR bzlib.h)
+	find_library(BZIP2_LIBRARY NAMES bz2 bzip2)
+	if (BZIP2_INCLUDE_DIR AND BZIP2_LIBRARY)
+		add_fuzzer(fuzz_filelist ${UHUB_SOURCE_DIR}/tools/fuzz_filelist.c
+			${UHUB_SOURCE_DIR}/fuse/filelist.c)
+		target_include_directories(fuzz_filelist PRIVATE ${BZIP2_INCLUDE_DIR})
+		target_link_libraries(fuzz_filelist ${BZIP2_LIBRARY})
+	else()
+		message (STATUS "fuzz_filelist skipped: libbz2 not found")
+	endif()
 endif()
 
 configure_file ("${UHUB_SOURCE_DIR}/version.h.in" "${PROJECT_BINARY_DIR}/version.h")
@@ -641,13 +733,21 @@ endif()
 
 if (UNIX)
 	install( TARGETS uhub uhub-passwd uhub-seeder RUNTIME DESTINATION bin )
+	if (FUSE_SUPPORT)
+		install( TARGETS uhub-fuse RUNTIME DESTINATION bin )
+	endif()
 	install( TARGETS mod_example mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_selfregister mod_chat_history mod_chat_history_sqlite mod_chat_only mod_chat_is_privileged mod_topic mod_no_guest_downloads mod_flood mod_ucmd DESTINATION /usr/lib/uhub/ OPTIONAL )
 	if(JAVASCRIPT_SUPPORT)
 		install( TARGETS mod_javascript DESTINATION /usr/lib/uhub/ OPTIONAL )
 	endif()
 	install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub.conf ${CMAKE_CURRENT_SOURCE_DIR}/doc/plugins.conf ${CMAKE_CURRENT_SOURCE_DIR}/doc/rules.txt ${CMAKE_CURRENT_SOURCE_DIR}/doc/motd.txt ${CMAKE_CURRENT_SOURCE_DIR}/doc/boards.conf DESTINATION /etc/uhub OPTIONAL )
 	# The seeder config carries a cleartext password for its bot account, so it
-	# is installed private rather than world readable like the hub's.
+	# is installed private rather than world readable like the hub's. The same
+	# goes for the mount's, for the same reason.
 	install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub-seeder.conf DESTINATION /etc/uhub
 		PERMISSIONS OWNER_READ OWNER_WRITE OPTIONAL )
+	if (FUSE_SUPPORT)
+		install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub-fuse.conf DESTINATION /etc/uhub
+			PERMISSIONS OWNER_READ OWNER_WRITE OPTIONAL )
+	endif()
 endif()

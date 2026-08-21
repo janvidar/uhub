@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<FileListing Version="1" CID="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" Base="/" Generator="DC++ 0.868">
+<Directory Name="Music">
+<File Name="song.flac" Size="41234567" TTH="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"/>
+<Directory Name="Live">
+<File Name="set.mp3" Size="12" TTH="BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"/>
+</Directory>
+</Directory>
+<File Name="readme.txt" Size="7" TTH="CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"/>
+</FileListing>

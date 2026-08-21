@@ -1,0 +1,193 @@
+.TH UHUB-FUSE 1 "August 2026"
+.\" Please adjust this date whenever revising the manpage.
+.SH NAME
+uhub\-fuse \- mount an ADC hub as a filesystem
+.SH SYNOPSIS
+.B uhub\-fuse
+.BI \-\-hub= URL
+.RI [ options ]
+.I mountpoint
+.SH DESCRIPTION
+uhub\-fuse mounts an ADC hub as a directory. Who is online becomes a directory
+listing, what each user advertises becomes a file, and anything that can read a
+file can read the hub.
+.PP
+It is not part of the hub and needs no support from it. It logs in as an
+ordinary client over the same port and the same protocol as everybody else, and
+appears in the user list like anyone else.
+.PP
+The mount holds
+.B hub/
+(what the hub says about itself, including
+.BR hub/state ),
+.B me/
+(the mount's own identity),
+.BR chat/ ,
+.B users/
+\- one directory per user, named by their CID, holding
+.BR nick ,
+.BR description ,
+.BR share_size ,
+.BR ip ,
+the raw
+.B inf
+line and the rest \- and
+.BR by\-nick/ ,
+which is symlinks into
+.BR users/ .
+.PP
+A CID is used as the directory name because it is the only name a user has that
+is stable, and because its 39 base32 characters are safe in a path.
+.PP
+.B chat/main
+is the hub's chat: reading it gives the recent history, and writing to it says
+something. A newline ends a message, and so does closing the file, so both
+.B echo
+and a program writing in chunks work.
+.B chat/private
+holds what was said to you privately and what you said to somebody, and
+.BI users/ CID /msg
+is write-only and sends one.
+.PP
+.BI users/ CID /files/
+is what that user is sharing, browsable as a directory tree, and
+.BI by\-tth/ TTH
+is any file on the hub addressed by its tiger tree hash. Reading either fetches
+the file from whoever has it over an ordinary client\-to\-client connection, so
+the mount needs a
+.B transfer_port
+that the hub's other users can reach.
+.PP
+A file up to
+.B max_file_size
+is fetched whole, checked against the hash that named it, and kept in
+.BR cache_dir .
+A larger one is read through a sliding window and never stored \- and, because
+a TTH covers a whole file and this build asks for no leaf hashes, never
+verified. See
+.B fuse.txt
+section 5.
+.PP
+Everything else is read-only and unmounting leaves nothing behind. See
+.BR fuse.txt (in the documentation directory)
+for the full layout and for what each file contains.
+.SH OPTIONS
+.TP
+.BI \-\-config= FILE
+Read the settings below from
+.I FILE
+instead of the command line, in the hub's "key = value" format. This is where a
+password belongs: an argument is in the process's argv, which every user on the
+machine can read out of
+.BR ps .
+uhub\-fuse warns if the file holds a password and is readable by anyone but its
+owner. Options given on the command line override the file. See
+.B uhub\-fuse.conf
+for a commented example.
+.TP
+.BI \-\-hub= URL
+The hub to mount:
+.BI adc:// host : port
+for a plaintext connection,
+.BI adcs:// host : port
+for TLS, or
+.BI adcs:// host : port /?kp=SHA256/ base32
+to also pin the hub's certificate. TLS without a keyprint is encrypted but not
+authenticated. Required.
+.TP
+.BI \-\-nick= NAME
+The nick to log in with. Defaults to
+.BR uhub\-fuse .
+.TP
+.BI \-\-password= SECRET
+The password, for a hub where the account is registered. Every user on the
+machine can read this out of
+.BR ps ;
+prefer
+.BR \-\-config .
+.TP
+.B \-f
+Stay in the foreground.
+.TP
+.B \-d
+Foreground, with libfuse's protocol tracing.
+.TP
+.B \-s
+Serve the filesystem from a single thread.
+.TP
+.BI \-o " OPTION" [,...]
+Mount options, passed to libfuse \-\-
+.BR ro ,
+.BR allow_other
+and the rest. See
+.BR mount.fuse3 (8).
+.TP
+.BR \-h ", " \-\-help
+The options above, followed by libfuse's own.
+.TP
+.BR \-V ", " \-\-version
+Print the version and exit.
+.SH BEHAVIOUR
+A metadata file is rendered when it is opened, and reading it returns that
+snapshot for as long as the descriptor is open; open it again to see a newer
+value. A directory listing is generated when it is read.
+.PP
+When the hub connection drops,
+.B users/
+empties and
+.B hub/
+forgets what the hub said about itself, rather than leaving a stale list that
+looks live.
+.B hub/state
+says what is happening and
+.B hub/address
+stays, since it is what was configured. The mount keeps answering throughout and
+reconnects on its own, with a delay that widens to a minute.
+.PP
+A hub that was pinned with
+.B ?kp=
+and presented a different certificate is not retried:
+.B hub/state
+reads
+.B failed
+and stays there.
+.SH EXIT STATUS
+0 when the filesystem was unmounted or the process was signalled, and 1 when it
+could not start or the session failed.
+.SH EXAMPLES
+.PP
+Mount a local hub in the foreground:
+.PP
+.RS
+.nf
+uhub\-fuse \-\-hub=adc://127.0.0.1:1511 \-f /mnt/hub
+.fi
+.RE
+.PP
+List everyone who is sharing nothing:
+.PP
+.RS
+.nf
+for u in /mnt/hub/users/*/; do
+    [ "$(cat "$u/share_size")" = 0 ] && cat "$u/nick"
+done
+.fi
+.RE
+.SH FILES
+.TP
+.I /etc/uhub/uhub\-fuse.conf
+The commented example configuration. Mode 600, since it may hold a password.
+.TP
+.IR $XDG_CACHE_HOME/uhub\-fuse , " $HOME/.cache/uhub\-fuse"
+Where downloaded content and the mount's stable identity are kept, unless
+.B cache_dir
+says otherwise.
+.SH SEE ALSO
+.BR uhub (1),
+.BR uhub\-seeder (1),
+.BR fusermount3 (1)
+.PP
+Project home page:
+.BR https://www.uhub.org/
+.SH AUTHOR
+Jan Vidar Krey

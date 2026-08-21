@@ -63,6 +63,110 @@ static enum seed_cc_type scc_type(const char* line)
 	return scc_req.type;
 }
 
+/* --- named identifiers, for a download asked for by name ------------------ */
+
+/*
+ * A file list has no hash until it has been received, so it is asked for by
+ * name. The parser therefore understands both forms and says which one it saw:
+ * a TTH lands in .tth and a name lands in .name, never both.
+ */
+
+/* A CGET is a peer asking us to serve, and we serve by hash: a name there is
+   not a request we can answer, and never becomes one. */
+EXO_TEST(seedcc_parse_get_refuses_a_name, {
+	return scc_type("CGET file files.xml.bz2 0 -1\n") == SEED_CC_UNSUPPORTED;
+});
+
+EXO_TEST(seedcc_parse_snd_named_identifier, {
+	return scc_type("CSND file files.xml.bz2 0 4096\n") == SEED_CC_SND
+		&& strcmp(scc_req.name, "files.xml.bz2") == 0
+		&& scc_req.tth[0] == '\0';
+});
+
+EXO_TEST(seedcc_parse_get_tth_leaves_name_empty, {
+	return scc_type("CGET file TTH/" SCC_TTH " 0 -1\n") == SEED_CC_GET_FILE
+		&& strcmp(scc_req.tth, SCC_TTH) == 0
+		&& scc_req.name[0] == '\0';
+});
+
+/* A name is a name, not a path: a peer must not be able to spell a directory,
+   let alone one above the share. */
+EXO_TEST(seedcc_parse_named_rejects_path, {
+	return scc_type("CSND file dir/files.xml.bz2 0 10\n") == SEED_CC_UNSUPPORTED;
+});
+
+EXO_TEST(seedcc_parse_named_rejects_traversal, {
+	return scc_type("CSND file ../../etc/passwd 0 10\n") == SEED_CC_UNSUPPORTED;
+});
+
+EXO_TEST(seedcc_parse_named_rejects_absolute, {
+	return scc_type("CSND file /etc/passwd 0 10\n") == SEED_CC_UNSUPPORTED;
+});
+
+EXO_TEST(seedcc_parse_named_rejects_oversized, {
+	char line[256];
+	char name[SEED_GRANT_FILENAME_MAX + 8];
+	memset(name, 'a', sizeof(name) - 1);
+	name[sizeof(name) - 1] = '\0';
+	snprintf(line, sizeof(line), "CSND file %s 0 10\n", name);
+	return scc_type(line) == SEED_CC_UNSUPPORTED;
+});
+
+/* A malformed TTH stays malformed: "TTH/" is a prefix the parser commits to,
+   so a bad hash after it is not silently reinterpreted as a file name. */
+EXO_TEST(seedcc_parse_named_does_not_rescue_a_bad_tth, {
+	return scc_type("CSND file TTH/not-a-hash 0 10\n") == SEED_CC_UNSUPPORTED;
+});
+
+/* CGFI asks about content, which is addressed by hash and nothing else. */
+EXO_TEST(seedcc_parse_gfi_refuses_a_name, {
+	return scc_type("CGFI file files.xml.bz2\n") == SEED_CC_UNSUPPORTED;
+});
+
+/* --- grants for a named download ----------------------------------------- */
+
+EXO_TEST(seedcc_grant_filelist, {
+	struct seed_grants* grants = seed_grants_create();
+	struct seed_grant grant;
+	int ok = seed_grant_issue_filelist(grants, SCC_TOKEN, SCC_CID, "files.xml.bz2", 1000)
+		&& seed_grant_is_download(grants, SCC_TOKEN, 1000, &grant)
+		&& strcmp(grant.filename, "files.xml.bz2") == 0
+		&& grant.tth[0] == '\0';
+	seed_grants_destroy(grants);
+	return ok;
+});
+
+EXO_TEST(seedcc_grant_filelist_refuses_a_path, {
+	struct seed_grants* grants = seed_grants_create();
+	int ok = !seed_grant_issue_filelist(grants, SCC_TOKEN, SCC_CID, "../etc/passwd", 1000);
+	seed_grants_destroy(grants);
+	return ok;
+});
+
+EXO_TEST(seedcc_grant_filelist_refuses_a_space, {
+	struct seed_grants* grants = seed_grants_create();
+	int ok = !seed_grant_issue_filelist(grants, SCC_TOKEN, SCC_CID, "two words", 1000);
+	seed_grants_destroy(grants);
+	return ok;
+});
+
+EXO_TEST(seedcc_grant_filelist_refuses_empty, {
+	struct seed_grants* grants = seed_grants_create();
+	int ok = !seed_grant_issue_filelist(grants, SCC_TOKEN, SCC_CID, "", 1000)
+	      && !seed_grant_issue_filelist(grants, SCC_TOKEN, SCC_CID, NULL, 1000);
+	seed_grants_destroy(grants);
+	return ok;
+});
+
+/* An ordinary download grant still has to name a hash. */
+EXO_TEST(seedcc_grant_download_still_requires_a_tth, {
+	struct seed_grants* grants = seed_grants_create();
+	int ok = !seed_grant_issue_download(grants, SCC_TOKEN, SCC_CID, NULL, 0, NULL, 1000)
+	      && !seed_grant_issue_download(grants, SCC_TOKEN, SCC_CID, "nope", 0, NULL, 1000);
+	seed_grants_destroy(grants);
+	return ok;
+});
+
 /* --- the constants the protocol depends on ------------------------------- */
 
 EXO_TEST(seedcc_tth_constants_are_well_formed, {
