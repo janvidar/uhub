@@ -34,7 +34,7 @@ jobs:
           sudo apt-get update -qq
           # SQLite3 and a TLS library are hard requirements of CMakeLists.txt:
           # TLS is mandatory, so find_package(OpenSSL REQUIRED) always runs.
-          sudo apt-get install -y cmake libsqlite3-dev libssl-dev ${{ matrix.compiler }}
+          sudo apt-get install -y cmake libsqlite3-dev libssl-dev libbz2-dev ${{ matrix.compiler }}
 
       - name: Configure
         run: |
@@ -197,7 +197,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y cmake libsqlite3-dev libssl-dev clang
+          sudo apt-get install -y cmake libsqlite3-dev libssl-dev libbz2-dev clang
 
       # Built with RELEASE=OFF so the DEBUG-only internal ADC_MSG_ASSERT
       # consistency checks run under the sanitizers as well.
@@ -234,7 +234,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y cmake libsqlite3-dev libssl-dev clang
+          sudo apt-get install -y cmake libsqlite3-dev libssl-dev libbz2-dev clang
 
       - name: Configure (TSan)
         run: |
@@ -309,7 +309,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y cmake libsqlite3-dev libssl-dev clang gdb
+          sudo apt-get install -y cmake libsqlite3-dev libssl-dev libbz2-dev clang gdb
 
       - name: Configure (ASan/UBSan + stress tools)
         run: |
@@ -351,7 +351,7 @@ jobs:
           sudo apt-get update -qq
           # libsqlite3-dev / libssl-dev: CMakeLists requires SQLite3 and a TLS
           # library to configure, even though the fuzz targets don't use them.
-          sudo apt-get install -y cmake clang libsqlite3-dev libssl-dev
+          sudo apt-get install -y cmake clang libsqlite3-dev libssl-dev libbz2-dev
 
       - name: Configure (libFuzzer)
         run: cmake -S . -B build-fuzz -DFUZZING=ON -DRELEASE=ON
@@ -450,7 +450,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y cmake libsqlite3-dev libssl-dev gcc gcovr
+          sudo apt-get install -y cmake libsqlite3-dev libssl-dev libbz2-dev gcc gcovr
 
       - name: Configure (coverage)
         run: |
