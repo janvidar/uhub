@@ -280,6 +280,25 @@ file (GLOB seeder_SOURCES CONFIGURE_DEPENDS ${UHUB_SOURCE_DIR}/seeder/*.c)
 set (seeder_test_SOURCES ${seeder_SOURCES})
 list (REMOVE_ITEM seeder_test_SOURCES ${UHUB_SOURCE_DIR}/seeder/main.c)
 
+# libbz2, for uhub-fuse: a peer's share is browsed by reading its file list,
+# which every DC client publishes bzip2-compressed. It ships no .pc file, hence
+# find_library rather than pkg-config.
+#
+# Optional on purpose. fuse/filelist.c is compiled into autotest-bin so that its
+# parser -- which reads bytes a stranger sent and turns them into path
+# components -- is tested in every build, and that part needs no library at all.
+# Without libbz2 the decompressor is a stub, the handful of tests that need one
+# skip, and only uhub-fuse itself insists on it.
+find_path(BZIP2_INCLUDE_DIR bzlib.h)
+find_library(BZIP2_LIBRARY NAMES bz2 bzip2)
+if (BZIP2_INCLUDE_DIR AND BZIP2_LIBRARY)
+	set (HAVE_BZLIB ON)
+	message (STATUS "bzip2: ${BZIP2_LIBRARY}")
+else()
+	set (HAVE_BZLIB OFF)
+	message (STATUS "bzip2: not found (uhub-fuse needs it; the file list tests will skip)")
+endif()
+
 # The filesystem client. fs.c and main.c are the only files that include
 # <fuse.h>; everything else is ordinary C that autotest-bin compiles whether or
 # not libfuse3 is installed, which is what keeps the path, roster and rendering
@@ -387,15 +406,12 @@ target_sources(autotest-bin PRIVATE
 	${UHUB_SOURCE_DIR}/plugins/mod_auth_sqlite.c)
 target_include_directories(autotest-bin PRIVATE ${AUTOTEST_DIR})
 
-# fuse/filelist.c is in fuse_test_SOURCES and uses bzlib; the tests drive it
-# directly, so autotest-bin needs the library whether or not uhub-fuse is built.
-find_path(BZIP2_INCLUDE_DIR bzlib.h)
-find_library(BZIP2_LIBRARY NAMES bz2 bzip2)
-if (BZIP2_INCLUDE_DIR AND BZIP2_LIBRARY)
+# fuse/filelist.c is in fuse_test_SOURCES. Its parser needs no library; its
+# decompressor does, and stubs itself out without one.
+if (HAVE_BZLIB)
 	target_include_directories(autotest-bin PRIVATE ${BZIP2_INCLUDE_DIR})
 	target_link_libraries(autotest-bin PRIVATE ${BZIP2_LIBRARY})
-else()
-	message (FATAL_ERROR "The test suite needs libbz2 (install libbz2-dev).")
+	target_compile_definitions(autotest-bin PRIVATE HAVE_BZLIB)
 endif()
 # Absolute path to the autotest/ dir so tests can locate checked-in fixtures
 # (e.g. the TLS test certificate) regardless of the working directory.
@@ -534,9 +550,7 @@ if(UNIX)
 	# A user on a hub with a share, for uhub-fuse's browse tests: uhub-seeder
 	# serves content by hash and has no share to list, so it cannot stand in
 	# for a peer being browsed. Needs libbz2 for the file list it publishes.
-	find_path(BZIP2_INCLUDE_DIR bzlib.h)
-	find_library(BZIP2_LIBRARY NAMES bz2 bzip2)
-	if (BZIP2_INCLUDE_DIR AND BZIP2_LIBRARY)
+	if (HAVE_BZLIB)
 		add_executable(filelist_peer ${CMAKE_SOURCE_DIR}/test/e2e/filelist_peer.c ${adcclient_SOURCES})
 		target_include_directories(filelist_peer PRIVATE ${UHUB_SOURCE_DIR}/tools ${BZIP2_INCLUDE_DIR})
 		target_link_libraries(filelist_peer adc network utils ${BZIP2_LIBRARY} pthread)
@@ -562,15 +576,10 @@ if(UNIX)
 		pkg_check_modules(FUSE3 REQUIRED IMPORTED_TARGET fuse3)
 		message (STATUS "FUSE support: libfuse ${FUSE3_VERSION}")
 
-		# A peer's share is browsed by reading its file list, which every DC
-		# client publishes bzip2-compressed. libbz2 ships no .pc file, hence
-		# find_library rather than pkg-config.
-		find_path(BZIP2_INCLUDE_DIR bzlib.h)
-		find_library(BZIP2_LIBRARY NAMES bz2 bzip2)
-		if (NOT BZIP2_INCLUDE_DIR OR NOT BZIP2_LIBRARY)
-			message (FATAL_ERROR "FUSE_SUPPORT needs libbz2 (install libbz2-dev).")
+		if (NOT HAVE_BZLIB)
+			message (FATAL_ERROR "FUSE_SUPPORT needs libbz2 (install libbz2-dev): "
+				"a peer's share is browsed by reading its bzip2-compressed file list.")
 		endif()
-		message (STATUS "FUSE support: bzip2 ${BZIP2_LIBRARY}")
 		# The transfer half is uhub-seeder's, driven rather than reimplemented:
 		# the client-to-client protocol, the content cache and the grants that
 		# authorise a connection. Only those three, not the whole daemon --
@@ -582,6 +591,7 @@ if(UNIX)
 			${UHUB_SOURCE_DIR}/seeder/sniff.c)
 		add_executable(uhub-fuse ${fuse_SOURCES} ${fuse_seeder_SOURCES} ${adcclient_SOURCES})
 		target_include_directories(uhub-fuse PRIVATE ${BZIP2_INCLUDE_DIR})
+		target_compile_definitions(uhub-fuse PRIVATE HAVE_BZLIB)
 		target_link_libraries(uhub-fuse adc network utils PkgConfig::FUSE3 SQLite::SQLite3 ${BZIP2_LIBRARY} pthread)
 	endif()
 
@@ -711,13 +721,13 @@ if (FUZZING)
 	add_fuzzer(fuzz_bbs_post ${UHUB_SOURCE_DIR}/tools/fuzz_bbs_post.c
 		${UHUB_SOURCE_DIR}/seeder/post.c ${UHUB_SOURCE_DIR}/seeder/embed.c)
 	# uhub-fuse's file list parser: XML and bzip2 from another user, turned
-	# into names in a mounted filesystem. Needs libbz2 but nothing else.
-	find_path(BZIP2_INCLUDE_DIR bzlib.h)
-	find_library(BZIP2_LIBRARY NAMES bz2 bzip2)
-	if (BZIP2_INCLUDE_DIR AND BZIP2_LIBRARY)
+	# into names in a mounted filesystem. The harness compresses its input, so
+	# unlike the parser it does need the library.
+	if (HAVE_BZLIB)
 		add_fuzzer(fuzz_filelist ${UHUB_SOURCE_DIR}/tools/fuzz_filelist.c
 			${UHUB_SOURCE_DIR}/fuse/filelist.c)
 		target_include_directories(fuzz_filelist PRIVATE ${BZIP2_INCLUDE_DIR})
+		target_compile_definitions(fuzz_filelist PRIVATE HAVE_BZLIB)
 		target_link_libraries(fuzz_filelist ${BZIP2_LIBRARY})
 	else()
 		message (STATUS "fuzz_filelist skipped: libbz2 not found")

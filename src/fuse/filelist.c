@@ -22,8 +22,11 @@
 #include "util/memory.h"
 #include "util/misc.h"
 
-#include <bzlib.h>
 #include <ctype.h>
+
+#ifdef HAVE_BZLIB
+#include <bzlib.h>
+#endif
 
 /** Growth step while decompressing, and the initial buffer. */
 #define FS_FILELIST_CHUNK (256 * 1024)
@@ -67,6 +70,29 @@ int fs_filelist_safe_name(const char* name, char* buf, size_t size)
 }
 
 /* ------------------------------------------------------- decompression */
+
+#ifndef HAVE_BZLIB
+
+/*
+ * Built without libbz2.
+ *
+ * A file list arrives compressed and there is nothing here to decompress it
+ * with, so browsing a share does not work in such a build -- which is why
+ * uhub-fuse requires the library and only the test suite may be built without
+ * it. Everything above this point, including the parser that reads what a peer
+ * sent, is unaffected and still built and tested.
+ */
+char* fs_filelist_decompress(const void* data, size_t len, size_t* out_len)
+{
+	(void) data;
+	(void) len;
+	(void) out_len;
+
+	LOG_DEBUG("filelist: built without bzip2 support");
+	return NULL;
+}
+
+#else
 
 char* fs_filelist_decompress(const void* data, size_t len, size_t* out_len)
 {
@@ -163,6 +189,8 @@ char* fs_filelist_decompress(const void* data, size_t len, size_t* out_len)
 
 	return out;
 }
+
+#endif /* HAVE_BZLIB */
 
 /* -------------------------------------------------------------- XML */
 

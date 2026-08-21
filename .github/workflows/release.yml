@@ -73,7 +73,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y cmake libsqlite3-dev libssl-dev
+          sudo apt-get install -y cmake libsqlite3-dev libssl-dev libbz2-dev
 
       # The gate that would have caught the incomplete 0.8.0 assets: unpack the
       # tarball somewhere with no .git anywhere above it and build it cold, with

@@ -400,6 +400,11 @@ pub fn build(b: *std.Build) void {
     if (!release) flags.append("-DDEBUG") catch @panic("OOM");
     if (lowlevel_debug) flags.append("-DLOWLEVEL_DEBUG") catch @panic("OOM");
     if (systemd) flags.append("-DSYSTEMD") catch @panic("OOM");
+    // fuse/filelist.c decompresses a peer's file list with libbz2. Its parser
+    // needs no library and is built and tested regardless; the decompressor
+    // stubs itself out without this, so a tests-only build -- and Windows --
+    // needs no bzip2 at all.
+    if (fuse) flags.append("-DHAVE_BZLIB") catch @panic("OOM");
     if (target.result.cpu.arch.endian() == .big) flags.append("-DARCH_BIGENDIAN") catch @panic("OOM");
     const cflags = flags.toOwnedSlice() catch @panic("OOM");
 
@@ -530,8 +535,11 @@ pub fn build(b: *std.Build) void {
         ctx.addSources(autotest_mod, &seeder_sources);
         ctx.addSources(autotest_mod, &seeder_daemon_sources);
         ctx.addSources(autotest_mod, &fuse_sources);
-        // fuse/filelist.c is compiled into the tests, and it uses bzlib.
-        autotest_mod.linkSystemLibrary("bz2", .{});
+        // fuse/filelist.c is compiled into the tests. Its parser needs no
+        // library; its decompressor does, and stubs itself out without one, so
+        // libbz2 is linked only where it was asked for -- a tests-only build,
+        // and Windows, must not need it.
+        if (fuse) autotest_mod.linkSystemLibrary("bz2", .{});
         // hubconn.c is built on the ADC client; ioqueue.c already comes in via
         // core_sources, so only adcclient.c is added here.
         ctx.addSources(autotest_mod, &.{"src/tools/adcclient.c"});

@@ -2,7 +2,9 @@
 #include "util/memory.h"
 #include "fuse/filelist.h"
 
+#ifdef HAVE_BZLIB
 #include <bzlib.h>
+#endif
 
 /*
  * The file list parser. Every byte it sees came from a peer over a connection
@@ -278,6 +280,17 @@ EXO_TEST(fuse_filelist_deep_but_allowed, {
 
 /* --- decompression -------------------------------------------------------- */
 
+/*
+ * Built without libbz2 the decompressor is a stub, so the tests below have
+ * nothing to decompress with. The parser above them needs no library and is
+ * tested either way -- it is the part that reads what a stranger sent.
+ */
+#ifndef HAVE_BZLIB
+#define SKIP_WITHOUT_BZLIB EXO_SKIP("built without libbz2")
+#else
+#define SKIP_WITHOUT_BZLIB do { } while (0)
+#endif
+
 EXO_TEST(fuse_filelist_decompress_garbage, {
 	size_t len = 0;
 	return fs_filelist_decompress("not a bzip2 stream", 18, &len) == NULL;
@@ -295,6 +308,8 @@ EXO_TEST(fuse_filelist_load_garbage, {
 
 /* The real path: a list as it actually arrives, compressed. */
 EXO_TEST(fuse_filelist_load_round_trip, {
+	SKIP_WITHOUT_BZLIB;
+#ifdef HAVE_BZLIB
 	unsigned int packed_len = 64 * 1024;
 	char* packed = hub_malloc(packed_len);
 	struct fs_filelist* loaded;
@@ -318,9 +333,12 @@ EXO_TEST(fuse_filelist_load_round_trip, {
 
 	fs_filelist_destroy(loaded);
 	return ok;
+#endif
 });
 
 EXO_TEST(fuse_filelist_load_truncated_stream, {
+	SKIP_WITHOUT_BZLIB;
+#ifdef HAVE_BZLIB
 	unsigned int packed_len = 64 * 1024;
 	char* packed = hub_malloc(packed_len);
 	int refused;
@@ -336,6 +354,7 @@ EXO_TEST(fuse_filelist_load_truncated_stream, {
 	refused = (fs_filelist_load(packed, packed_len / 2) == NULL);
 	hub_free(packed);
 	return refused;
+#endif
 });
 
 EXO_TEST(fuse_filelist_teardown, {
