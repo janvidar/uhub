@@ -235,20 +235,37 @@ EXO_TEST(fuse_filelist_self_closing_directory, {
 		&& fs_filelist_lookup(list, "empty/a") == NULL;
 });
 
+/* Build "<FileListing>" wrapping @p depth nested directories. */
+static char* nested_document(int depth, size_t* out_len)
+{
+	size_t cap = 64 * 1024;
+	char* xml = hub_malloc(cap);
+	size_t n = 0;
+	int i;
+
+	if (!xml)
+		return NULL;
+
+	n += (size_t) snprintf(&xml[n], cap - n, "<FileListing>");
+	for (i = 0; i < depth; i++)
+		n += (size_t) snprintf(&xml[n], cap - n, "<Directory Name=\"d%d\">", i);
+	for (i = 0; i < depth; i++)
+		n += (size_t) snprintf(&xml[n], cap - n, "</Directory>");
+	n += (size_t) snprintf(&xml[n], cap - n, "</FileListing>");
+
+	*out_len = n;
+	return xml;
+}
+
 EXO_TEST(fuse_filelist_deep_nesting_is_refused, {
 	/* Deeper than FS_FILELIST_MAX_DEPTH: refused outright rather than
 	   truncated, and above all not recursed into. */
-	char* xml = hub_malloc(64 * 1024);
 	size_t n = 0;
-	int i;
+	char* xml = nested_document(FS_FILELIST_MAX_DEPTH + 10, &n);
 	int refused;
 
-	n += sprintf(&xml[n], "<FileListing>");
-	for (i = 0; i < FS_FILELIST_MAX_DEPTH + 10; i++)
-		n += sprintf(&xml[n], "<Directory Name=\"d%d\">", i);
-	for (i = 0; i < FS_FILELIST_MAX_DEPTH + 10; i++)
-		n += sprintf(&xml[n], "</Directory>");
-	n += sprintf(&xml[n], "</FileListing>");
+	if (!xml)
+		return 0;
 
 	refused = (fs_filelist_parse(xml, n) == NULL);
 	hub_free(xml);
@@ -256,26 +273,22 @@ EXO_TEST(fuse_filelist_deep_nesting_is_refused, {
 });
 
 EXO_TEST(fuse_filelist_deep_but_allowed, {
-	char* xml = hub_malloc(64 * 1024);
 	size_t n = 0;
-	int i;
+	char* xml = nested_document(32, &n);
 	struct fs_filelist* deep;
+	int ok;
 
-	n += sprintf(&xml[n], "<FileListing>");
-	for (i = 0; i < 32; i++)
-		n += sprintf(&xml[n], "<Directory Name=\"d%d\">", i);
-	for (i = 0; i < 32; i++)
-		n += sprintf(&xml[n], "</Directory>");
-	n += sprintf(&xml[n], "</FileListing>");
+	if (!xml)
+		return 0;
 
 	deep = fs_filelist_parse(xml, n);
 	hub_free(xml);
 	if (!deep)
 		return 0;
 
-	i = (fs_filelist_lookup(deep, "d0/d1/d2") != NULL);
+	ok = (fs_filelist_lookup(deep, "d0/d1/d2") != NULL);
 	fs_filelist_destroy(deep);
-	return i;
+	return ok;
 });
 
 /* --- decompression -------------------------------------------------------- */
