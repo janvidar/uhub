@@ -34,6 +34,10 @@
 #include "util/log.h"
 #include "util/memory.h"
 
+/* For the mode bits on the identity file. system.h brings in <fcntl.h> but not
+   this, and on FreeBSD nothing else does either. */
+#include <sys/stat.h>
+
 #define FS_CLIENT_DESCRIPTION "filesystem"
 
 static void session_schedule_reconnect(struct fs_session* session);

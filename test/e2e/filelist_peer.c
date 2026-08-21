@@ -55,6 +55,7 @@
 #include "util/tth.h"
 
 #include <bzlib.h>
+#include <stdarg.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
@@ -145,6 +146,32 @@ static int scan_share(const char* dir)
 	return 1;
 }
 
+/*
+ * Append to @p buf, advancing @p n by what was actually written.
+ *
+ * snprintf() returns the length it *would* have needed, so "n += snprintf(...)"
+ * walks n past the end of the buffer as soon as anything is truncated, and the
+ * next "cap - n" underflows into a very large size. @return 0 if it did not fit.
+ */
+static int append_fmt(char* buf, size_t cap, size_t* n, const char* fmt, ...)
+{
+	va_list args;
+	int written;
+
+	if (*n >= cap)
+		return 0;
+
+	va_start(args, fmt);
+	written = vsnprintf(&buf[*n], cap - *n, fmt, args);
+	va_end(args);
+
+	if (written < 0 || (size_t) written >= cap - *n)
+		return 0;
+
+	*n += (size_t) written;
+	return 1;
+}
+
 /** Build the file list document and compress it, once. */
 static int build_list(void)
 {
@@ -153,26 +180,34 @@ static int build_list(void)
 	size_t n = 0;
 	unsigned int packed_len;
 	size_t i;
+	int ok;
 
 	xml = (char*) hub_malloc(cap);
 	if (!xml)
 		return 0;
 
-	n += snprintf(&xml[n], cap - n,
+	ok = append_fmt(xml, cap, &n,
 		"<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>\r\n"
 		"<FileListing Version=\"1\" CID=\"%s\" Base=\"/\" Generator=\"filelist_peer\">\r\n",
 		g_own_cid);
 
 	/* One directory, so that a browse has something to descend into, plus the
 	   files at the top level. */
-	n += snprintf(&xml[n], cap - n, "<Directory Name=\"Shared\">\r\n");
+	ok = ok && append_fmt(xml, cap, &n, "<Directory Name=\"Shared\">\r\n");
 
-	for (i = 0; i < g_file_count; i++)
-		n += snprintf(&xml[n], cap - n,
+	for (i = 0; ok && i < g_file_count; i++)
+		ok = append_fmt(xml, cap, &n,
 			"<File Name=\"%s\" Size=\"%llu\" TTH=\"%s\"/>\r\n",
 			g_files[i].name, (unsigned long long) g_files[i].size, g_files[i].tth);
 
-	n += snprintf(&xml[n], cap - n, "</Directory>\r\n</FileListing>\r\n");
+	ok = ok && append_fmt(xml, cap, &n, "</Directory>\r\n</FileListing>\r\n");
+
+	if (!ok)
+	{
+		fprintf(stderr, "filelist_peer: the share does not fit in one document\n");
+		hub_free(xml);
+		return 0;
+	}
 
 	packed_len = (unsigned int) (n * 2 + 1024);
 	g_list_bz2 = (char*) hub_malloc(packed_len);

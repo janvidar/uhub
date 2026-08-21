@@ -4,6 +4,17 @@
 
 static struct fs_config cfg;
 
+/*
+ * fs_config_defaults() zeroes the struct before filling it in, so whatever a
+ * previous test left in it has to be released first or it is orphaned. The
+ * program does this once at startup; a test file does it over and over.
+ */
+static void reset_config(void)
+{
+	fs_config_free(&cfg);
+	fs_config_defaults(&cfg);
+}
+
 /* fs_config_parse_line() modifies the line in place, so tests hand it a copy. */
 static int parse(const char* text)
 {
@@ -118,7 +129,7 @@ static int write_config(const char* contents)
 }
 
 EXO_TEST(fuse_config_read_file, {
-	fs_config_defaults(&cfg);
+	reset_config();
 	return write_config("# a hub\nhub = adc://file:1511\nnick = fromfile\n")
 		&& fs_config_read(config_path(), &cfg) == 1
 		&& strcmp(cfg.address, "adc://file:1511") == 0
@@ -126,14 +137,14 @@ EXO_TEST(fuse_config_read_file, {
 });
 
 EXO_TEST(fuse_config_read_no_trailing_newline, {
-	fs_config_defaults(&cfg);
+	reset_config();
 	return write_config("hub = adc://last:1511")
 		&& fs_config_read(config_path(), &cfg) == 1
 		&& strcmp(cfg.address, "adc://last:1511") == 0;
 });
 
 EXO_TEST(fuse_config_read_crlf, {
-	fs_config_defaults(&cfg);
+	reset_config();
 	return write_config("hub = adc://crlf:1511\r\nnick = dos\r\n")
 		&& fs_config_read(config_path(), &cfg) == 1
 		&& strcmp(cfg.address, "adc://crlf:1511") == 0
@@ -142,7 +153,7 @@ EXO_TEST(fuse_config_read_crlf, {
 
 /* A file that does not parse leaves nothing half-applied behind. */
 EXO_TEST(fuse_config_read_bad_line, {
-	fs_config_defaults(&cfg);
+	reset_config();
 	return write_config("hub = adc://ok:1511\nnope = 1\n")
 		&& fs_config_read(config_path(), &cfg) == 0
 		&& cfg.address == NULL && cfg.nick == NULL;
@@ -151,7 +162,7 @@ EXO_TEST(fuse_config_read_bad_line, {
 /* --------------------------------------------------------- numeric keys */
 
 EXO_TEST(fuse_config_int, {
-	fs_config_defaults(&cfg);
+	reset_config();
 	return parse("transfer_port = 4711") == 1 && cfg.transfer_port == 4711;
 });
 
@@ -176,13 +187,13 @@ EXO_TEST(fuse_config_enumerated_value_refused, {
 /* A certificate without its key would come up serving plain ADC while looking
    like it was serving ADCS. */
 EXO_TEST(fuse_config_tls_pair_incomplete, {
-	fs_config_defaults(&cfg);
+	reset_config();
 	return write_config("hub = adc://x:1511\ntls_certificate = /tmp/cert.pem\n")
 		&& fs_config_read(config_path(), &cfg) == 0;
 });
 
 EXO_TEST(fuse_config_tls_pair_complete, {
-	fs_config_defaults(&cfg);
+	reset_config();
 	return write_config("hub = adc://x:1511\ntls_certificate = /tmp/c.pem\ntls_private_key = /tmp/k.pem\n")
 		&& fs_config_read(config_path(), &cfg) == 1;
 });
@@ -200,12 +211,12 @@ EXO_TEST(fuse_config_cache_dir_no_room, {
 });
 
 EXO_TEST(fuse_config_read_missing_file, {
-	fs_config_defaults(&cfg);
+	reset_config();
 	return fs_config_read("/nonexistent/uhub-fuse.conf", &cfg) == 0;
 });
 
 EXO_TEST(fuse_config_read_null_file, {
-	fs_config_defaults(&cfg);
+	reset_config();
 	return fs_config_read(NULL, &cfg) == 0;
 });
 
