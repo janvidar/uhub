@@ -168,6 +168,16 @@ int seed_sniff_type_allowed(const char* type, const char* list)
 		while (end > start && is_white_space(end[-1]))
 			end--;
 
+		/*
+		 * "*" is every type. There has to be a way to say that: a cache that
+		 * exists to serve whatever a hash names -- uhub-fuse's, where the
+		 * content is whatever file the user asked for -- has no list of types
+		 * to write down, and enumerating the ones that happen to be common
+		 * would silently refuse the rest.
+		 */
+		if ((end - start) == 1 && start[0] == '*')
+			return 1;
+
 		if ((size_t) (end - start) == type_len && memcmp(start, type, type_len) == 0)
 			return 1;
 

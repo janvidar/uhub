@@ -52,6 +52,9 @@
 /** Longest token accepted. A token is echoed back to a peer, so it is bounded. */
 #define SEED_TOKEN_MAX 64
 
+/** Room for a named download's file name, including NUL. */
+#define SEED_GRANT_FILENAME_MAX 64
+
 /** Seconds a grant stays valid after it was issued. */
 #define SEED_GRANT_TTL 60
 
@@ -101,6 +104,29 @@ struct seed_grant
 	char     token[SEED_TOKEN_MAX + 1];
 	char     cid[SEED_CID_LEN + 1];      /** The peer this grant was issued to. */
 	char     tth[SEED_TTH_STR_LEN + 1];  /** Content named by the grant, "" if none. */
+
+	/**
+	 * What to ask for when the wanted thing has no hash yet: a file name such
+	 * as "files.xml.bz2". Empty for an ordinary content-addressed download.
+	 *
+	 * A grant carries one or the other and never both. The distinction decides
+	 * whether the reply is verified against a hash that was known in advance,
+	 * so it is recorded explicitly rather than inferred from the shape of a
+	 * string.
+	 */
+	char     filename[SEED_GRANT_FILENAME_MAX];
+
+	/**
+	 * A ranged download: the first byte and how many of them. @c length is 0
+	 * for the ordinary whole-file case.
+	 *
+	 * A range cannot be checked against the TTH -- a hash covers a whole file
+	 * and there is no leaf-hash support here to check a part of one with -- so
+	 * a grant records that it is one, and the transfer hands its bytes to the
+	 * caller instead of ingesting them into the cache as verified content.
+	 */
+	uint64_t start;
+	uint64_t length;
 	int      is_download;                /** The seeder connects to receive, not to serve. */
 	uint64_t size;                       /** Announced size of a download, 0 if unknown. */
 	char     name[SEED_NAME_MAX];        /** Display name of a download, "" if unknown. */
@@ -148,6 +174,38 @@ extern int seed_grant_issue(struct seed_grants* grants, const char* token, const
  */
 extern int seed_grant_issue_download(struct seed_grants* grants, const char* token, const char* cid,
                                      const char* tth, uint64_t size, const char* name, time_t now);
+
+/**
+ * Record a download grant for a file named rather than hashed: a peer's file
+ * list, which cannot be asked for by TTH because its hash is not knowable
+ * until it has been received.
+ *
+ * The reply to such a request is therefore not verified against anything, and
+ * that is the whole of the difference. What limits it is what limited it
+ * before: we chose the peer, we chose the name, and the cache's per-file
+ * ceiling bounds what arrives. A peer still cannot decide *what* is asked for,
+ * which is the property this module exists to keep.
+ *
+ * @param filename must be non-empty, free of '/' and of spaces, and short
+ *                 enough to fit; anything else is refused.
+ * @return 1 if the grant was recorded.
+ */
+extern int seed_grant_issue_filelist(struct seed_grants* grants, const char* token, const char* cid,
+                                     const char* filename, time_t now);
+
+/**
+ * Record a download grant for part of a file.
+ *
+ * For content too large to be worth holding whole -- a mount reading one page
+ * out of a film. What arrives cannot be verified against the TTH, so it is
+ * never cached as though it had been: it goes to the caller's sink and nowhere
+ * else. @see seed_cc_policy::on_body.
+ *
+ * @param length must be non-zero.
+ * @return 1 if the grant was recorded.
+ */
+extern int seed_grant_issue_range(struct seed_grants* grants, const char* token, const char* cid,
+                                  const char* tth, uint64_t start, uint64_t length, time_t now);
 
 /**
  * Look up the unexpired grant for @p token.

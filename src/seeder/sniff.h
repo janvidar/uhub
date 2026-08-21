@@ -68,7 +68,8 @@ extern const char* seed_sniff_media_type(const uint8_t* buf, size_t len);
  * Matching is exact and case sensitive on whole list items; a type is never
  * matched as a prefix or a substring of an item. Space and tab around an item
  * are ignored, so "image/png, image/gif" holds two types. An empty list
- * matches nothing.
+ * matches nothing, and a list item of "*" matches everything -- which is what
+ * a cache serving arbitrary content, rather than a curated set, wants.
  *
  * @param type the media type to look for, as returned by seed_sniff_media_type().
  * @param list a comma separated list of media types. NULL matches nothing.

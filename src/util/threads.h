@@ -49,6 +49,19 @@ extern int uhub_mutex_trylock(uhub_mutex_t* mutex);
 extern void uhub_cond_init(uhub_cond_t* cond);
 extern void uhub_cond_destroy(uhub_cond_t* cond);
 extern void uhub_cond_wait(uhub_cond_t* cond, uhub_mutex_t* mutex);
+
+/**
+ * uhub_cond_wait() with a deadline, for a waiter that has something else to
+ * check on while it waits.
+ *
+ * Like uhub_cond_wait(), the mutex is released while blocking and held again
+ * on return, and a wake-up may be spurious -- the predicate must be re-tested
+ * either way.
+ *
+ * @param ms how long to wait for, in milliseconds.
+ * @return 1 if the wait ended in a signal, 0 if it ended in the timeout.
+ */
+extern int uhub_cond_timedwait(uhub_cond_t* cond, uhub_mutex_t* mutex, unsigned int ms);
 extern void uhub_cond_signal(uhub_cond_t* cond);
 extern void uhub_cond_broadcast(uhub_cond_t* cond);
 

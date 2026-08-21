@@ -176,6 +176,20 @@ struct seed_cc_connection
 	/* Download role. */
 	struct seed_ingest* ingest; /* live job while non-NULL */
 	char     want_tth[SEED_TTH_STR_LEN + 1];
+
+	/**
+	 * The file name asked for when the wanted thing has no hash yet -- a
+	 * peer's file list. Empty for an ordinary content-addressed download, and
+	 * exactly one of the two is ever set.
+	 */
+	char     want_file[SEED_GRANT_FILENAME_MAX];
+
+	/* A ranged download: what was asked for, and how far it has got. */
+	uint64_t want_start;
+	uint64_t want_range;   /** 0 when this is not a ranged download. */
+	int      range_done;   /** The range was delivered in full and reported. */
+	uint64_t in_offset;    /** Absolute position of the next byte expected. */
+
 	uint64_t want_size;
 	char     want_name[SEED_NAME_MAX];
 	uint64_t in_remaining; /* body bytes still to read */
@@ -245,23 +259,71 @@ static int cc_valid_tth(const char* str)
 }
 
 /*
- * A file identifier, which for the seeder is only ever "TTH/<base32 root>".
+ * A file identifier: "TTH/<base32 root>", or a plain name.
+ *
+ * Content is addressed by hash, and that is the only form this module will
+ * *serve*. A name is understood so that a download this daemon asked for by
+ * name -- a peer's file list, whose hash cannot be known before it arrives --
+ * can recognise the CSND that answers it. Which of the two a request carried
+ * is reported, never guessed at by the caller.
+ *
+ * A name is bounded, must not be a path, and must not contain a space (which
+ * would have split the ADC line before this ever saw it).
+ *
+ * @return 1 for a TTH, 2 for a name, 0 for neither.
  */
-static int cc_parse_identifier(const char* ident, char out[SEED_TTH_STR_LEN + 1])
+static int cc_parse_identifier(const char* ident, char out_tth[SEED_TTH_STR_LEN + 1],
+	char out_name[SEED_GRANT_FILENAME_MAX])
 {
-	if (!ident || strncmp(ident, "TTH/", 4) != 0)
-		return 0;
-	if (!cc_valid_tth(ident + 4))
+	size_t n;
+
+	if (!ident || !*ident)
 		return 0;
 
-	memcpy(out, ident + 4, SEED_TTH_STR_LEN);
-	out[SEED_TTH_STR_LEN] = '\0';
-	return 1;
+	if (strncmp(ident, "TTH/", 4) == 0)
+	{
+		if (!cc_valid_tth(ident + 4))
+			return 0;
+
+		memcpy(out_tth, ident + 4, SEED_TTH_STR_LEN);
+		out_tth[SEED_TTH_STR_LEN] = '\0';
+		return 1;
+	}
+
+	for (n = 0; ident[n]; n++)
+	{
+		if (n + 1 >= SEED_GRANT_FILENAME_MAX)
+			return 0;
+
+		if (ident[n] == '/' || (unsigned char) ident[n] <= 0x20)
+			return 0;
+	}
+
+	memcpy(out_name, ident, n + 1);
+	return 2;
 }
 
-/* CGET/CSND share their argument shape: "<type> <identifier> <start> <bytes>". */
+/** Was the identifier one this command is allowed to carry? */
+static int cc_identifier_ok(int kind, int allow_name)
+{
+	if (kind == 1)
+		return 1;   /* A hash is always allowed. */
+
+	return (kind == 2 && allow_name);
+}
+
+/*
+ * CGET/CSND share their argument shape: "<type> <identifier> <start> <bytes>".
+ *
+ * @p allow_name decides whether the identifier may be a plain file name rather
+ * than a hash, and it is set for a CSND only. The asymmetry is the point: a
+ * CSND answers a request this daemon made, so it may name whatever that
+ * request named, while a CGET is a peer asking us to serve -- and what we
+ * serve is content, which is addressed by hash. Letting a name through there
+ * would be inventing a namespace for peers to explore.
+ */
 static void cc_parse_transfer(struct adc_message* msg, struct seed_cc_request* req,
-	enum seed_cc_type file_type, enum seed_cc_type tthl_type)
+	enum seed_cc_type file_type, enum seed_cc_type tthl_type, int allow_name)
 {
 	char* type = adc_msg_get_argument(msg, 0);
 	char* ident = adc_msg_get_argument(msg, 1);
@@ -275,7 +337,7 @@ static void cc_parse_transfer(struct adc_message* msg, struct seed_cc_request* r
 		req->type = tthl_type;
 	}
 	else if (type && strcmp(type, "file") == 0 &&
-		cc_parse_identifier(ident, req->tth) &&
+		cc_identifier_ok(cc_parse_identifier(ident, req->tth, req->name), allow_name) &&
 		cc_parse_u64(start, &req->start) &&
 		cc_parse_length(bytes, &req->bytes))
 	{
@@ -378,18 +440,21 @@ int seed_cc_parse(const char* line, size_t length, struct seed_cc_request* out)
 			break;
 
 		case ADC_CMD_CGET:
-			cc_parse_transfer(msg, &req, SEED_CC_GET_FILE, SEED_CC_GET_TTHL);
+			cc_parse_transfer(msg, &req, SEED_CC_GET_FILE, SEED_CC_GET_TTHL, 0);
 			break;
 
 		case ADC_CMD_CSND:
-			cc_parse_transfer(msg, &req, SEED_CC_SND, SEED_CC_UNSUPPORTED);
+			cc_parse_transfer(msg, &req, SEED_CC_SND, SEED_CC_UNSUPPORTED, 1);
 			break;
 
 		case ADC_CMD_CGFI:
 		{
 			char* type = adc_msg_get_argument(msg, 0);
 			char* ident = adc_msg_get_argument(msg, 1);
-			if (type && strcmp(type, "file") == 0 && cc_parse_identifier(ident, req.tth))
+			/* CGFI asks about content, which is addressed by hash: a named
+			   identifier names nothing this can answer for. */
+			if (type && strcmp(type, "file") == 0 &&
+				cc_parse_identifier(ident, req.tth, req.name) == 1)
 				req.type = SEED_CC_GFI;
 			hub_free(type);
 			hub_free(ident);
@@ -672,6 +737,23 @@ static void seed_cc_destroy(struct seed_cc_connection* b)
 		b->ingest = NULL;
 	}
 
+	/*
+	 * A ranged download that did not finish has to say so here: there is no
+	 * ingest to fail and no entry to be absent, so this is the only place a
+	 * caller waiting on the range would hear about it -- including the case
+	 * where the peer refused before a single byte, which is why this turns on
+	 * a flag set at completion rather than on how much is left. Cleared first,
+	 * so a callback that starts another request does not see a second
+	 * completion for the old one.
+	 */
+	if (b->want_range && !b->range_done)
+	{
+		b->want_range = 0;
+
+		if (b->policy->on_body_done)
+			b->policy->on_body_done(b->policy->on_body_ptr, b->token, 0);
+	}
+
 	if (b->fd >= 0)
 	{
 		close(b->fd);
@@ -846,6 +928,15 @@ static int cc_handle_get(struct seed_cc_connection* b, const struct seed_cc_requ
 	uint64_t length = 0;
 	char line[128];
 
+	/*
+	 * Only by hash. The parser does not let a name reach a CGET at all (see
+	 * cc_parse_transfer); this says so again where it matters, because the
+	 * cost of being wrong is a peer naming files on the far side of a cache
+	 * that has no names in it.
+	 */
+	if (*req->name)
+		return cc_send_status(b, SEED_CC_STATUS_NO_FILE, "File\\snot\\savailable", 1);
+
 	if (!seed_cache_lookup(cache, req->tth, &entry) || seed_cache_is_blocked(cache, req->tth))
 		return cc_send_status(b, SEED_CC_STATUS_NO_FILE, "File\\snot\\savailable", 0);
 
@@ -962,7 +1053,18 @@ static int cc_ingest_bytes(struct seed_cc_connection* b, const char* data, size_
 	if ((uint64_t) len > b->in_remaining)
 		len = (size_t) b->in_remaining; /* the peer overran its own announcement */
 
-	if (len && seed_ingest_write(b->ingest, data, len) != 0)
+	if (b->want_range)
+	{
+		if (len && b->policy->on_body &&
+		    !b->policy->on_body(b->policy->on_body_ptr, b->token, b->in_offset, data, len))
+		{
+			seed_cc_destroy(b);
+			return 0;
+		}
+
+		b->in_offset += (uint64_t) len;
+	}
+	else if (len && seed_ingest_write(b->ingest, data, len) != 0)
 	{
 		seed_cc_destroy(b);
 		return 0;
@@ -972,6 +1074,17 @@ static int cc_ingest_bytes(struct seed_cc_connection* b, const char* data, size_
 
 	if (b->in_remaining == 0)
 	{
+		if (b->want_range)
+		{
+			b->range_done = 1;
+
+			if (b->policy->on_body_done)
+				b->policy->on_body_done(b->policy->on_body_ptr, b->token, 1);
+
+			seed_cc_destroy(b);
+			return 0;
+		}
+
 		cc_finish_ingest(b);
 		return 0;
 	}
@@ -984,20 +1097,40 @@ static int cc_handle_snd(struct seed_cc_connection* b, const struct seed_cc_requ
 	struct seed_ingest_request ireq;
 	enum seed_error error = SEED_OK;
 
-	/* Only the exact content we asked for, at the offset we asked for, and with
-	   a length stated up front: a peer must not be able to redirect the transfer
+	/* Only the exact thing we asked for, at the offset we asked for, and with a
+	   length stated up front: a peer must not be able to redirect the transfer
 	   onto something else, and "to end of file" gives nothing to check the body
-	   length against. */
-	if (strcmp(req->tth, b->want_tth) != 0 || req->start != 0 || req->bytes <= 0 ||
-		(b->want_size && (uint64_t) req->bytes > b->want_size))
+	   length against. Whichever way it was named, the answer has to use the
+	   same name. */
+	if (strcmp(req->tth, b->want_tth) != 0 || strcmp(req->name, b->want_file) != 0 ||
+		req->start != b->want_start || req->bytes <= 0 ||
+		(b->want_size && (uint64_t) req->bytes > b->want_size) ||
+		(b->want_range && (uint64_t) req->bytes != b->want_range))
 	{
 		LOG_DEBUG("seed_cc: unexpected CSND from %s", ip_convert_to_string(&b->addr));
 		seed_cc_destroy(b);
 		return 0;
 	}
 
+	/*
+	 * A range goes to the caller rather than into the cache. There is nothing
+	 * to verify it with, and storing it as cached content would mean claiming
+	 * otherwise.
+	 */
+	if (b->want_range)
+	{
+		b->in_remaining = (uint64_t) req->bytes;
+		b->in_total = (uint64_t) req->bytes;
+		b->state = CC_STATE_DL_BODY;
+		return 1;
+	}
+
 	memset(&ireq, 0, sizeof(ireq));
-	ireq.expect_tth = b->want_tth;
+
+	/* A file asked for by name has no hash to be checked against -- that is
+	   what asking by name means. What bounds it instead is the cache's own
+	   per-file ceiling, applied to the bytes that actually arrive. */
+	ireq.expect_tth = *b->want_tth ? b->want_tth : NULL;
 	ireq.announced_size = (uint64_t) req->bytes;
 	ireq.name = *b->want_name ? b->want_name : NULL;
 	ireq.origin_cid = *b->cid ? b->cid : NULL;
@@ -1139,11 +1272,32 @@ static int cc_handle_inf(struct seed_cc_connection* b, const struct seed_cc_requ
 	}
 
 	memcpy(b->want_tth, grant.tth, SEED_TTH_STR_LEN + 1);
+	memcpy(b->want_file, grant.filename, sizeof(b->want_file));
+
+	/*
+	 * Keep the token this grant was matched by. On a connection we dialled it
+	 * is already here (we quoted it ourselves); on one we accepted it arrived
+	 * in the peer's CINF and was used and dropped. A ranged download reports
+	 * its bytes under it, and a caller with more than one request outstanding
+	 * has nothing else to tell them apart by.
+	 */
+	strncpy(b->token, grant.token, SEED_TOKEN_MAX);
+	b->token[SEED_TOKEN_MAX] = '\0';
+
+	b->want_start = grant.start;
+	b->want_range = grant.length;
+	b->in_offset = grant.start;
 	b->want_size = grant.size;
 	memcpy(b->want_name, grant.name, sizeof(b->want_name));
 	b->want_name[sizeof(b->want_name) - 1] = '\0';
 
-	snprintf(line, sizeof(line), "CGET file TTH/%s 0 -1\n", b->want_tth);
+	if (*b->want_file)
+		snprintf(line, sizeof(line), "CGET file %s 0 -1\n", b->want_file);
+	else if (b->want_range)
+		snprintf(line, sizeof(line), "CGET file TTH/%s %" PRIu64 " %" PRIu64 "\n",
+			b->want_tth, b->want_start, b->want_range);
+	else
+		snprintf(line, sizeof(line), "CGET file TTH/%s 0 -1\n", b->want_tth);
 	if (!cc_queue(b, line))
 		return 0;
 
