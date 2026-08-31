@@ -20,21 +20,103 @@
 #include "plugin_api/handle.h"
 #include "plugin_api/command_api.h"
 #include "util/config_token.h"
+#include <sqlite3.h>
 #include "util/memory.h"
 #include "util/misc.h"
 #include "util/list.h"
 #include "util/cbuffer.h"
 
-#define MAX_HISTORY_SIZE 16384
+/*
+ * Chat history, backed by SQLite.
+ *
+ * This plugin used to come in two flavours -- an in-memory one and a SQLite
+ * one -- which differed only in whether the history survived a restart. SQLite
+ * is linked into the hub itself for the bulletin board index, so the storage
+ * cost the in-memory version saved was zero, and ":memory:" gives back the
+ * non-persistent behaviour exactly. Leaving "file" unset selects it, so a hub
+ * that wants history but no file on disk still has it.
+ */
+#define DEFAULT_DATABASE ":memory:"
+
+/* Initial size for the reply buffer; cbuffer grows on demand. */
+#define HISTORY_BUFFER_HINT 1024
 
 struct chat_history_data
 {
-	size_t history_max;      ///<<< "the maximum number of chat messages kept in history."
-	size_t history_default;  ///<<< "the default number of chat messages returned if no limit was provided"
-	size_t history_connect;  ///<<< "the number of chat messages provided when users connect to the hub."
-	struct linked_list* chat_history; ///<<< "The chat history storage."
-	struct plugin_command_handle* command_history_handle; ///<<< "A handle to the !history command."
+	size_t history_max;	///<<< "the maximum number of chat messages kept in history."
+	size_t history_default;	///<<< "the default number of chat messages returned if no limit was provided"
+	size_t history_connect;	///<<< "the number of chat messages provided when users connect to the hub."
+	sqlite3* db;		///<<< "The chat history storage database."
+	struct plugin_command_handle* command_history_handle;		///<<< "A handle to the !history command."
+	struct plugin_command_handle* command_historycleanup_handle;	///<<< "A handle to the !historycleanup command."
 };
+
+/*
+ * One row read back out of the history table. The message is heap allocated
+ * rather than an inline fixed-size array: a chat line is normally tens of
+ * bytes, and reserving the protocol maximum per row meant that reading back
+ * the default 25 lines allocated ~15 MB for a few kilobytes of text.
+ */
+struct chat_history_line
+{
+	char* message;
+	char* from;
+	char* time;
+};
+
+static void chat_history_line_free(struct chat_history_line* line)
+{
+	if (!line)
+		return;
+	hub_free(line->message);
+	hub_free(line->from);
+	hub_free(line->time);
+	hub_free(line);
+}
+
+static void chat_history_line_free_handle(void* ptr)
+{
+	chat_history_line_free((struct chat_history_line*) ptr);
+}
+
+static int null_callback(void* ptr, int argc, char **argv, char **colName) {
+	(void) ptr; (void) argc; (void) argv; (void) colName;
+	return 0; }
+
+static int sql_execute(struct chat_history_data* sql, int (*callback)(void* ptr, int argc, char **argv, char **colName), void* ptr, const char* sql_fmt, ...)
+{
+	va_list args;
+	char query[1024];
+	char* errMsg;
+	int rc;
+
+	va_start(args, sql_fmt);
+	vsnprintf(query, sizeof(query), sql_fmt, args);
+	va_end(args);
+
+	rc = sqlite3_exec(sql->db, query, callback, ptr, &errMsg);
+	if (rc != SQLITE_OK)
+	{
+		sqlite3_free(errMsg);
+		return -rc;
+	}
+
+	rc = sqlite3_changes(sql->db);
+	return rc;
+}
+
+static void create_tables(struct plugin_handle* plugin)
+{
+	const char* table_create = "CREATE TABLE IF NOT EXISTS chat_history"
+		"("
+			"from_nick CHAR,"
+			"message TEXT,"
+			"time TIMESTAMP DEFAULT (DATETIME('NOW'))"
+		");";
+
+	struct chat_history_data* data = (struct chat_history_data*) plugin->ptr;
+	sql_execute(data, null_callback, NULL, table_create);
+}
 
 /**
  * Add a chat message to history.
@@ -43,85 +125,113 @@ static void history_add(struct plugin_handle* plugin, struct plugin_user* from, 
 {
 	(void) flags;
 	struct chat_history_data* data = (struct chat_history_data*) plugin->ptr;
-	const char* ts = get_timestamp(time(NULL));
-	const char* nick = plugin->hub.get_user_nick(plugin, from);
-	/* Format: "%s <%s> %s\n" = timestamp + " <" + nick + "> " + message + "\n" */
-	size_t loglen = strlen(ts) + strlen(nick) + strlen(message) + 6;
-	char* log = hub_malloc(loglen + 1);
+	sqlite3_stmt* stmt;
+	int rc;
 
-	if (!log)
-		return;
-
-	snprintf(log, loglen + 1, "%s <%s> %s\n", ts, nick, message);
-	list_append(data->chat_history, log);
-	while (list_size(data->chat_history) > data->history_max)
+	/* Insert new message using prepared statement */
+	rc = sqlite3_prepare_v2(data->db, "INSERT INTO chat_history (from_nick, message) VALUES(?, ?);", -1, &stmt, NULL);
+	if (rc == SQLITE_OK)
 	{
-		list_remove_first(data->chat_history, hub_free_handle);
+		sqlite3_bind_text(stmt, 1, plugin->hub.get_user_nick(plugin, from), -1, SQLITE_STATIC);
+		sqlite3_bind_text(stmt, 2, message, -1, SQLITE_STATIC);
+		sqlite3_step(stmt);
+		sqlite3_finalize(stmt);
+	}
+
+	/* Trim to the newest history_max rows.
+	 *
+	 * Keyed on rowid, not on time: the time column has one-second resolution,
+	 * so several messages routinely share a value. "time <= (the Nth newest
+	 * time)" then deletes every message sent in that second rather than just
+	 * the ones past the limit. rowid is monotonic per insert, so it orders and
+	 * trims exactly. */
+	rc = sqlite3_prepare_v2(data->db, "DELETE FROM chat_history WHERE rowid <= (SELECT rowid FROM chat_history ORDER BY rowid DESC LIMIT ?,1);", -1, &stmt, NULL);
+	if (rc == SQLITE_OK)
+	{
+		sqlite3_bind_int(stmt, 1, (int)data->history_max);
+		sqlite3_step(stmt);
+		sqlite3_finalize(stmt);
 	}
 }
 
 /**
- * Obtain 'num' messages from the chat history and append them to outbuf.
- *
- * @return the number of messages added to the buffer.
+ * Obtain messages from the chat history as a linked list
  */
-static size_t get_messages(struct chat_history_data* data, size_t num, struct cbuffer* outbuf)
+static int get_messages_callback(void* ptr, int argc, char **argv, char **colName)
 {
-	struct linked_list* messages = data->chat_history;
-	char* message;
-	int skiplines = 0;
-	size_t lines = 0;
-	size_t total = list_size(messages);
+	struct linked_list* messages = (struct linked_list*) ptr;
+	struct chat_history_line* line = hub_malloc_zero(sizeof(struct chat_history_line));
+	int i = 0;
 
-	if (total == 0)
+	if (!line)
 		return 0;
 
-	if (num <= 0 || num > total)
-		num = total;
+	for (; i < argc; i++) {
+		/* A NULL column value is possible (the schema does not enforce NOT NULL);
+		   skip it rather than passing NULL to hub_strdup. */
+		if (!argv[i])
+			continue;
+		if (strcmp(colName[i], "from_nick") == 0)
+			line->from = hub_strdup(argv[i]);
+		else if (strcmp(colName[i], "message") == 0)
+			line->message = hub_strdup(argv[i]);
+		else if (strcmp(colName[i], "time") == 0)
+			line->time = hub_strdup(argv[i]);
+	}
 
-	if (num != total)
-		skiplines = total - num;
-
-	cbuf_append(outbuf, "\n");
-	LIST_FOREACH(char*, message, messages,
+	/* A row that could not be copied in full would render as "(null)", so drop it. */
+	if (!line->from || !line->message || !line->time)
 	{
-		if (--skiplines < 0)
-		{
-			cbuf_append(outbuf, message);
-			lines++;
-		}
-	});
-	cbuf_append(outbuf, "\n");
-	return lines;
+		chat_history_line_free(line);
+		return 0;
+	}
+
+	list_append(messages, line);
+	return 0;
 }
 
-void user_login(struct plugin_handle* plugin, struct plugin_user* user)
+/**
+ * Append the rows in 'found' to 'buf', oldest first, consuming the list.
+ */
+static void append_messages(struct cbuffer* buf, struct linked_list* found)
+{
+	struct chat_history_line* line = (struct chat_history_line*) list_get_last(found);
+
+	while (line)
+	{
+		cbuf_append_format(buf, "[%s] <%s> %s\n", line->time, line->from, line->message);
+		list_remove(found, line);
+		chat_history_line_free(line);
+		line = (struct chat_history_line*) list_get_last(found);
+	}
+}
+
+static void user_login(struct plugin_handle* plugin, struct plugin_user* user)
 {
 	struct chat_history_data* data = (struct chat_history_data*) plugin->ptr;
 	struct cbuffer* buf = NULL;
-	// size_t messages = 0;
+	struct linked_list* found;
 
-	if (data->history_connect > 0 && list_size(data->chat_history) > 0)
+	if (!data->history_connect)
+		return;
+
+	found = (struct linked_list*) list_create();
+	if (!found)
+		return;
+
+	sql_execute(data, get_messages_callback, found, "SELECT from_nick,message, datetime(time, 'localtime') as time FROM chat_history ORDER BY rowid DESC LIMIT 0,%d;", (int) data->history_connect);
+
+	if (list_size(found) > 0)
 	{
-		buf = cbuf_create(MAX_HISTORY_SIZE);
-		cbuf_append(buf, "Chat history:\n");
-		get_messages(data, data->history_connect, buf);
+		buf = cbuf_create(HISTORY_BUFFER_HINT);
+		cbuf_append(buf, "Chat history:\n\n");
+		append_messages(buf, found);
 		plugin->hub.send_message(plugin, user, cbuf_get(buf));
 		cbuf_destroy(buf);
 	}
-}
 
-/**
- * Send a status message back to the user who issued the !history command.
- */
-static int command_status(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_command* cmd, struct cbuffer* buf)
-{
-	struct cbuffer* msg = cbuf_create(cbuf_size(buf) + strlen(cmd->prefix) + 8);
-	cbuf_append_format(msg, "*** %s: %s", cmd->prefix, cbuf_get(buf));
-	plugin->hub.send_message(plugin, user, cbuf_get(msg));
-	cbuf_destroy(msg);
-	cbuf_destroy(buf);
-	return 0;
+	list_clear(found, chat_history_line_free_handle);
+	list_destroy(found);
 }
 
 /**
@@ -129,25 +239,63 @@ static int command_status(struct plugin_handle* plugin, struct plugin_user* user
  */
 static int command_history(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_command* cmd)
 {
-	struct cbuffer* buf;
 	struct chat_history_data* data = (struct chat_history_data*) plugin->ptr;
+	struct cbuffer* buf = cbuf_create(HISTORY_BUFFER_HINT);
+	struct linked_list* found = (struct linked_list*) list_create();
 	struct plugin_command_arg_data* arg = plugin->hub.command_arg_next(plugin, cmd, plugin_cmd_arg_type_integer);
 	int maxlines;
-
-	if (!list_size(data->chat_history))
-		return command_status(plugin, user, cmd, cbuf_create_const("No messages."));
 
 	if (arg)
 		maxlines = arg->data.integer;
 	else
 		maxlines = data->history_default;
 
-	buf = cbuf_create(MAX_HISTORY_SIZE);
-	cbuf_append_format(buf, "*** %s: Chat History:\n", cmd->prefix);
-	get_messages(data, maxlines, buf);
+	/* Clamp the user-supplied count to [0, history_max]. A negative value is
+	 * "no limit" to SQLite's LIMIT clause, so "!history -1" would otherwise
+	 * dump the entire table -- a memory-amplification lever. */
+	if (maxlines < 0)
+		maxlines = 0;
+	else if ((size_t) maxlines > data->history_max)
+		maxlines = (int) data->history_max;
+
+	sql_execute(data, get_messages_callback, found, "SELECT from_nick,message, datetime(time, 'localtime') as time FROM chat_history ORDER BY rowid DESC LIMIT 0,%d;", maxlines);
+
+	if (list_size(found) > 0)
+	{
+		cbuf_append_format(buf, "*** %s: Chat History:\n\n", cmd->prefix);
+		append_messages(buf, found);
+	}
+	else
+	{
+		cbuf_append_format(buf, "*** %s: No messages found.", cmd->prefix);
+	}
 
 	plugin->hub.send_message(plugin, user, cbuf_get(buf));
 	cbuf_destroy(buf);
+	list_clear(found, chat_history_line_free_handle);
+	list_destroy(found);
+
+	return 0;
+}
+
+static int command_historycleanup(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_command* cmd)
+{
+	struct chat_history_data* data = (struct chat_history_data*) plugin->ptr;
+	struct cbuffer* buf = cbuf_create(128);
+	int rc = 0;
+
+	rc = sql_execute(data, null_callback, NULL, "DELETE FROM chat_history;");
+
+	if (!rc)
+		cbuf_append_format(buf, "*** %s: Unable to clean chat history table.", cmd->prefix);
+	else
+		cbuf_append_format(buf, "*** %s: Cleaned chat history table.", cmd->prefix);
+
+	plugin->hub.send_message(plugin, user, cbuf_get(buf));
+	cbuf_destroy(buf);
+
+	sql_execute(data, null_callback, NULL, "VACUUM;");
+
 	return 0;
 }
 
@@ -174,7 +322,6 @@ static struct chat_history_data* parse_config(const char* line, struct plugin_ha
 	data->history_max = 200;
 	data->history_default = 25;
 	data->history_connect = 5;
-	data->chat_history = list_create();
 
 	while (token)
 	{
@@ -188,7 +335,21 @@ static struct chat_history_data* parse_config(const char* line, struct plugin_ha
 			return 0;
 		}
 
-		if (strcmp(cfg_settings_get_key(setting), "history_max") == 0)
+		if (strcmp(cfg_settings_get_key(setting), "file") == 0)
+		{
+			if (!data->db)
+			{
+				if (sqlite3_open(cfg_settings_get_value(setting), &data->db))
+				{
+					cfg_tokens_free(tokens);
+					cfg_settings_free(setting);
+					hub_free(data);
+					set_error_message(plugin, "Unable to open database file");
+					return 0;
+				}
+			}
+		}
+		else if (strcmp(cfg_settings_get_key(setting), "history_max") == 0)
 		{
 			data->history_max = (size_t) uhub_atoi(cfg_settings_get_value(setting));
 		}
@@ -213,25 +374,42 @@ static struct chat_history_data* parse_config(const char* line, struct plugin_ha
 		token = cfg_token_get_next(tokens);
 	}
 	cfg_tokens_free(tokens);
+
+	/* No "file" given: keep the history for the lifetime of the hub only.
+	   This is what the separate in-memory version of this plugin used to do. */
+	if (!data->db && sqlite3_open(DEFAULT_DATABASE, &data->db))
+	{
+		hub_free(data);
+		set_error_message(plugin, "Unable to open in-memory database");
+		return 0;
+	}
+
 	return data;
 }
 
 int plugin_register(struct plugin_handle* plugin, const char* config)
 {
 	struct chat_history_data* data;
-	PLUGIN_INITIALIZE(plugin, "Chat history plugin", "1.0", "Provide a global chat history log.");
+	PLUGIN_INITIALIZE(plugin, "Chat history plugin", "2.0", "Provide a global chat history log.");
 
 	plugin->funcs.on_user_chat_message = history_add;
 	plugin->funcs.on_user_login = user_login;
 	data = parse_config(config, plugin);
+
 	if (!data)
 		return -1;
 
 	plugin->ptr = data;
 
+	create_tables(plugin);
+
 	data->command_history_handle = (struct plugin_command_handle*) hub_malloc(sizeof(struct plugin_command_handle));
 	PLUGIN_COMMAND_INITIALIZE(data->command_history_handle, plugin, "history", "?N", auth_cred_guest, &command_history, "Show chat message history.");
 	plugin->hub.command_add(plugin, data->command_history_handle);
+
+	data->command_historycleanup_handle = (struct plugin_command_handle*) hub_malloc(sizeof(struct plugin_command_handle));
+	PLUGIN_COMMAND_INITIALIZE(data->command_historycleanup_handle, plugin, "historycleanup", "", auth_cred_admin, &command_historycleanup, "Clean chat message history.");
+	plugin->hub.command_add(plugin, data->command_historycleanup_handle);
 
 	return 0;
 }
@@ -242,14 +420,14 @@ int plugin_unregister(struct plugin_handle* plugin)
 
 	if (data)
 	{
-		list_clear(data->chat_history, hub_free_handle);
-		list_destroy(data->chat_history);
+		sqlite3_close(data->db);
 
 		plugin->hub.command_del(plugin, data->command_history_handle);
+		plugin->hub.command_del(plugin, data->command_historycleanup_handle);
 		hub_free(data->command_history_handle);
+		hub_free(data->command_historycleanup_handle);
 		hub_free(data);
 	}
 
 	return 0;
 }
-

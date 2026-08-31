@@ -16,6 +16,11 @@ Incompatible changes (action required beyond replacing the binaries):
 - Plugins must be rebuilt against plugin API 8 (minimum 8): struct plugin_user
   is opaque, so e.g. user->nick becomes plugin->hub.get_user_nick(plugin, user).
   Older plugins are refused at load.
+- mod_chat_history_sqlite is gone; mod_chat_history absorbed it and is now
+  SQLite backed, taking the same file= parameter. Without file= the history is
+  kept in memory for the lifetime of the hub, as the old mod_chat_history did:
+    old:  plugin .../mod_chat_history_sqlite.so "file=/var/lib/uhub/history.db"
+    new:  plugin .../mod_chat_history.so "file=/var/lib/uhub/history.db"
 
 New features:
 - New plugin mod_javascript: hub logic in JavaScript, embedding QuickJS. Scripts

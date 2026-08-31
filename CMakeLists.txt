@@ -416,7 +416,11 @@ target_sources(autotest-bin PRIVATE
 	${seeder_test_SOURCES}
 	${fuse_test_SOURCES}
 	${UHUB_SOURCE_DIR}/tools/adcclient.c
-	${UHUB_SOURCE_DIR}/plugins/mod_auth_sqlite.c)
+	${UHUB_SOURCE_DIR}/plugins/mod_auth_sqlite.c
+	# Every plugin exports the same two entry points, so mod_chat_history.c is
+	# pulled in through a shim that renames them rather than compiled directly
+	# -- otherwise they would clash with mod_auth_sqlite's above.
+	${AUTOTEST_DIR}/mod_chat_history_shim.c)
 target_include_directories(autotest-bin PRIVATE ${AUTOTEST_DIR})
 
 # fuse/filelist.c is in fuse_test_SOURCES. Its parser needs no library; its
@@ -439,7 +443,6 @@ add_library(mod_welcome MODULE ${UHUB_SOURCE_DIR}/plugins/mod_welcome.c)
 add_library(mod_logging MODULE ${UHUB_SOURCE_DIR}/plugins/mod_logging.c ${UHUB_SOURCE_DIR}/adc/sid.c)
 add_library(mod_auth_simple MODULE ${UHUB_SOURCE_DIR}/plugins/mod_auth_simple.c)
 add_library(mod_chat_history MODULE ${UHUB_SOURCE_DIR}/plugins/mod_chat_history.c)
-add_library(mod_chat_history_sqlite MODULE ${UHUB_SOURCE_DIR}/plugins/mod_chat_history_sqlite.c)
 add_library(mod_chat_only MODULE ${UHUB_SOURCE_DIR}/plugins/mod_chat_only.c)
 add_library(mod_chat_is_privileged MODULE ${UHUB_SOURCE_DIR}/plugins/mod_chat_is_privileged.c)
 add_library(mod_topic MODULE ${UHUB_SOURCE_DIR}/plugins/mod_topic.c)
@@ -504,7 +507,6 @@ set_target_properties(
 	mod_auth_sqlite
 	mod_selfregister
 	mod_chat_history
-	mod_chat_history_sqlite
 	mod_chat_only
 	mod_chat_is_privileged
 	mod_no_guest_downloads
@@ -536,8 +538,7 @@ target_link_libraries(mod_welcome network utils)
 target_link_libraries(mod_auth_simple utils)
 target_link_libraries(mod_auth_sqlite SQLite::SQLite3 utils)
 target_link_libraries(mod_selfregister utils)
-target_link_libraries(mod_chat_history utils)
-target_link_libraries(mod_chat_history_sqlite SQLite::SQLite3 utils)
+target_link_libraries(mod_chat_history SQLite::SQLite3 utils)
 target_link_libraries(mod_no_guest_downloads utils)
 target_link_libraries(mod_flood utils)
 target_link_libraries(mod_chat_only utils)
@@ -773,7 +774,7 @@ if (UNIX)
 
 	# mod_example is sample code, not a feature -- it is built (so it keeps
 	# compiling against the current plugin API) but deliberately not installed.
-	install( TARGETS mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_selfregister mod_chat_history mod_chat_history_sqlite mod_chat_only mod_chat_is_privileged mod_topic mod_no_guest_downloads mod_flood mod_ucmd DESTINATION ${UHUB_PLUGIN_DIR} OPTIONAL )
+	install( TARGETS mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_selfregister mod_chat_history mod_chat_only mod_chat_is_privileged mod_topic mod_no_guest_downloads mod_flood mod_ucmd DESTINATION ${UHUB_PLUGIN_DIR} OPTIONAL )
 	if(JAVASCRIPT_SUPPORT)
 		install( TARGETS mod_javascript DESTINATION ${UHUB_PLUGIN_DIR} OPTIONAL )
 	endif()

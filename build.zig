@@ -156,6 +156,7 @@ const tcc_sources = [_][]const u8{
     "test_metrics.tcc",
     "test_misc.tcc",
     "test_mod_auth_sqlite.tcc",
+    "test_mod_chat_history.tcc",
     "test_netbackend.tcc",
     "test_probe.tcc",
     "test_rbtree.tcc",
@@ -200,8 +201,7 @@ const plugins = [_]Plugin{
     .{ .name = "mod_auth_simple" },
     .{ .name = "mod_auth_sqlite", .sqlite = true },
     .{ .name = "mod_selfregister" },
-    .{ .name = "mod_chat_history" },
-    .{ .name = "mod_chat_history_sqlite", .sqlite = true },
+    .{ .name = "mod_chat_history", .sqlite = true },
     .{ .name = "mod_chat_only" },
     .{ .name = "mod_chat_is_privileged" },
     .{ .name = "mod_topic" },
@@ -562,6 +562,11 @@ pub fn build(b: *std.Build) void {
         // module) so test_mod_auth_sqlite.tcc can drive its auth functions
         // directly via plugin_register(); it pulls in SQLite, hence addSqlite.
         ctx.addSources(autotest_mod, &.{"src/plugins/mod_auth_sqlite.c"});
+        // mod_chat_history.c comes in through a shim that renames its entry
+        // points: every plugin exports the same plugin_register() /
+        // plugin_unregister(), so a second one compiled in would clash with
+        // mod_auth_sqlite's above.
+        ctx.addSources(autotest_mod, &.{"autotest/mod_chat_history_shim.c"});
         ctx.addSqlite(autotest_mod);
         ctx.addAutotest(autotest_mod);
         autotest_mod.linkLibrary(common);
