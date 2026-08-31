@@ -102,6 +102,29 @@ Or, for the lazy people
 
   % killall -HUP uhub
 
+Running it under systemd
+
+Build with -DSYSTEMD_SUPPORT=ON and the install provides two units:
+
+  % sudo systemctl enable --now uhub
+
+The hub then runs as the "uhub" user, logs to the journal, and reloads its
+configuration on "systemctl reload uhub" (which is the SIGHUP below). The unit
+is sandboxed: the hub may write only to its state directory, so a mod_logging
+configured with file= needs that path added, for example with
+
+  % sudo systemctl edit uhub
+    [Service]
+    LogsDirectory=uhub
+
+The default server_port is above 1024 and needs no privilege. For a port below
+1024, add CAP_NET_BIND_SERVICE the same way rather than running as root.
+
+uhub-seeder has its own unit, deliberately not enabled: it needs a registered
+bot account, a password and a port of its own first. See doc/seedcache.txt.
+
+Running it without systemd
+
 In order to run uhub as a daemon, start it with the -f switch which will make it fork into the background.
 In addition, use the -l to specify a log file instead of stdout. One can also specify a specific user and/or group, 
 if one wishes to run uhub as a specific user using the -u and -g switches.

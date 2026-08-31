@@ -36,6 +36,8 @@ set (UHUB_CONFIG_DIR "${CMAKE_INSTALL_FULL_SYSCONFDIR}/uhub"
 	CACHE PATH "Directory holding uhub.conf and the other example configs")
 set (UHUB_STATE_DIR "${CMAKE_INSTALL_FULL_LOCALSTATEDIR}/lib/uhub"
 	CACHE PATH "Directory for hub state (the default user database)")
+set (UHUB_SYSTEMD_UNIT_DIR "${CMAKE_INSTALL_FULL_LIBDIR}/systemd/system"
+	CACHE PATH "Directory for the systemd service units (SYSTEMD_SUPPORT only)")
 
 option(RELEASE "Release build, debug build if disabled" ON)
 option(LOWLEVEL_DEBUG "Enable low level debug messages." OFF)
@@ -688,20 +690,12 @@ if (ADC_STRESS)
 endif()
 
 if (SYSTEMD_SUPPORT)
-	target_link_libraries(uhub PkgConfig::SD)
-	if (UHUB_TESTS)
-		target_link_libraries(autotest-bin PRIVATE PkgConfig::SD)
-	endif()
-	target_link_libraries(uhub-passwd PkgConfig::SD)
-	target_link_libraries(uhub-admin PkgConfig::SD)
-	if(UNIX)
-		# adc_cmd links libutils (log.c -> sd_journal_print) too.
-		target_link_libraries(adc_cmd PkgConfig::SD)
-		if (ADC_STRESS)
-			target_link_libraries(adcrush PkgConfig::SD)
-			target_link_libraries(linktest PkgConfig::SD)
-		endif()
-	endif()
+	# libsystemd is needed by util/log.c (sd_journal_print), which lives in
+	# libutils -- so attach it there and let it propagate to everything that
+	# links utils. This used to be a hand-maintained list of targets, and it
+	# drifted: uhub-seeder and the seeder test helpers were added later and
+	# failed to link with SYSTEMD_SUPPORT=ON.
+	target_link_libraries(utils PUBLIC PkgConfig::SD)
 	add_compile_definitions(SYSTEMD)
 endif()
 
@@ -801,6 +795,23 @@ if (UNIX)
 	if (FUSE_SUPPORT)
 		install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub-fuse.1
 			DESTINATION ${CMAKE_INSTALL_MANDIR}/man1 )
+	endif()
+
+	# systemd units. Only installed for a build with SYSTEMD_SUPPORT: the hub's
+	# unit is Type=notify, and a hub built without it never sends readiness and
+	# would be killed at the start timeout.
+	if (SYSTEMD_SUPPORT)
+		configure_file (${CMAKE_CURRENT_SOURCE_DIR}/doc/systemd/uhub.service.in
+			${PROJECT_BINARY_DIR}/uhub.service @ONLY)
+		configure_file (${CMAKE_CURRENT_SOURCE_DIR}/doc/systemd/uhub-seeder.service.in
+			${PROJECT_BINARY_DIR}/uhub-seeder.service @ONLY)
+		install( FILES
+			${PROJECT_BINARY_DIR}/uhub.service
+			${PROJECT_BINARY_DIR}/uhub-seeder.service
+			DESTINATION ${UHUB_SYSTEMD_UNIT_DIR} )
+		# The seeder keeps its cache here; the hub's own state directory is
+		# installed above.
+		install( DIRECTORY DESTINATION ${UHUB_STATE_DIR}/seed )
 	endif()
 
 	# The seeder config carries a cleartext password for its bot account, so it

@@ -91,6 +91,13 @@ Packaging:
 - The RPM spec and the Gentoo ebuild build with CMake. Both had been calling a
   hand-written Makefile that no longer exists, and neither could be built.
 - mod_example is built but no longer installed; it is sample code.
+- systemd units for uhub and uhub-seeder, installed by a -DSYSTEMD_SUPPORT=ON
+  build. The hub's is Type=notify, which is what that option's sd_notify call
+  is for. Both are sandboxed; the hub may write only to its state directory,
+  so a file-based mod_logging needs a LogsDirectory drop-in.
+- Fixed SYSTEMD_SUPPORT=ON, which had not linked since uhub-seeder was added:
+  libsystemd was attached to a hand-maintained list of targets rather than to
+  libutils, where the sd_journal_print call actually is.
 - !ban takes an optional duration ("!ban nick 30m", 12h, 7d) and a reason
   ("!ban nick 30m <reason>"). The reason is shown to the banned user on a
   refused reconnect, persisted by a storage plugin, and propagated to linked

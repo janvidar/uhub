@@ -1,0 +1,63 @@
+# systemd service for uhub-seeder, the seed cache daemon.
+#
+# This is NOT started by uhub, and enabling it is not enough to make it work: it
+# logs into a hub as a registered bot account and needs a nick, a password and a
+# listening port of its own, none of which the shipped configuration has. Set
+# those in @UHUB_CONFIG_DIR@/uhub-seeder.conf first -- see uhub-seeder(1) and
+# doc/seedcache.txt. It does not read uhub.conf.
+#
+# Type=exec rather than notify: unlike the hub, the seeder sends no readiness
+# notification, so systemd considers it started once the process has been
+# executed successfully.
+
+[Unit]
+Description=uhub seed cache daemon
+Documentation=man:uhub-seeder(1) https://www.uhub.org
+After=network-online.target uhub.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+ExecStart=@CMAKE_INSTALL_FULL_BINDIR@/uhub-seeder -c @UHUB_CONFIG_DIR@/uhub-seeder.conf
+# The seeder reconnects on its own, but a hub that is down when it starts, or a
+# hub it is disconnected from for long enough, is worth retrying from scratch.
+Restart=on-failure
+RestartSec=30s
+
+# uhub-seeder has no -u/-g of its own. It must be this user in any case: the
+# configuration file holds the bot account password and is installed 0600.
+User=uhub
+Group=uhub
+UMask=0077
+
+# The seed cache. seed_cache_dir in uhub-seeder.conf must stay inside this path.
+ReadWritePaths=@UHUB_STATE_DIR@/seed
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectProc=invisible
+ProtectClock=yes
+ProtectHostname=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RemoveIPC=yes
+# AF_NETLINK: glibc's getaddrinfo() uses it to decide which address families
+# are configured, and the seeder resolves the hub's hostname.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_NETLINK
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

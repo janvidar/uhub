@@ -1,0 +1,79 @@
+# systemd service for the uhub ADC hub.
+#
+# Type=notify requires uhub to be built with -DSYSTEMD_SUPPORT=ON: that is what
+# compiles in the sd_notify(READY=1) call, sent once the listening socket is
+# bound. A hub built without it never sends readiness and would be killed at the
+# start timeout, so this unit is only installed for such a build. To use it with
+# a hub built without systemd support, change Type to "exec" and drop -L.
+
+[Unit]
+Description=uhub ADC peer-to-peer hub
+Documentation=man:uhub(1) https://www.uhub.org
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+ExecStart=@CMAKE_INSTALL_FULL_BINDIR@/uhub -L -c @UHUB_CONFIG_DIR@/uhub.conf
+# The hub re-reads its configuration and ACL file on SIGHUP.
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5s
+
+User=uhub
+Group=uhub
+UMask=0077
+
+# The hub creates its default user database here when no plugins configuration
+# overrides the built-in plugin set, and the bulletin board index lives here
+# too. Everything else stays read-only.
+ReadWritePaths=@UHUB_STATE_DIR@
+
+# A file-based mod_logging (file=) writes outside this set. Either leave it on
+# syslog, which is what the built-in default plugin set uses, or add the path
+# with a drop-in: systemctl edit uhub.service
+#   [Service]
+#   LogsDirectory=uhub
+
+# Hardening. The hub parses attacker-controlled bytes before authentication, so
+# it is worth confining. Note it dlopens its plugins, which only needs to read
+# and map them -- ProtectSystem=strict leaves that working.
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectProc=invisible
+ProtectClock=yes
+ProtectHostname=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+# Safe with mod_javascript: QuickJS is a bytecode interpreter and does not
+# generate code at runtime.
+MemoryDenyWriteExecute=yes
+RemoveIPC=yes
+# AF_UNIX for the inter-worker sockets in multi-process mode. AF_NETLINK
+# because glibc's getaddrinfo() uses it to decide which address families are
+# configured, and the hub resolves hostnames for hub linking and the
+# registration-server announce; it degrades gracefully without it, but not on
+# every glibc, and a local read-only interface query costs nothing to allow.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+# The default server_port (1511) is above 1024, so no capability is needed. For
+# a privileged port, grant it with a drop-in:
+#   [Service]
+#   AmbientCapabilities=CAP_NET_BIND_SERVICE
+#   CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

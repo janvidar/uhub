@@ -63,6 +63,7 @@ src_configure() {
 		-DUHUB_CONFIG_DIR="${EPREFIX}/etc/uhub"
 		-DUHUB_STATE_DIR="${EPREFIX}/var/lib/uhub"
 		-DSYSTEMD_SUPPORT=$(usex systemd ON OFF)
+		-DUHUB_SYSTEMD_UNIT_DIR="${EPREFIX}/lib/systemd/system"
 		# uhub-fuse mounts a hub as a filesystem; file lists are bzip2'd XML.
 		-DFUSE_SUPPORT=$(usex fuse ON OFF)
 		-DJAVASCRIPT_SUPPORT=$(usex javascript ON OFF)
@@ -106,8 +107,9 @@ src_install() {
 	fowners uhub:uhub /var/lib/uhub/seed
 	fperms 0700 /var/lib/uhub/seed
 
-	# There is no OpenRC or systemd service file for either daemon in the tree,
-	# so they come from the overlay's FILESDIR when it provides them.
+	# cmake_src_install puts the systemd units in place when USE=systemd; the
+	# tree carries no OpenRC service, so that one comes from the overlay's
+	# FILESDIR when it provides one.
 	if [[ -f ${FILESDIR}/uhub.rc ]]; then
 		newinitd "${FILESDIR}"/uhub.rc uhub
 	fi
