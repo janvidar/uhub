@@ -760,6 +760,36 @@ if (LOWLEVEL_DEBUG)
 	add_compile_definitions(LOWLEVEL_DEBUG)
 endif()
 
+# Installs a sample configuration file without ever clobbering a live one. Every
+# file here is meant to be edited in place, so an existing copy is left exactly
+# as it is and only the missing ones are written -- the same courtesy
+# %config(noreplace) gives an RPM upgrade (doc/uhub.spec) and CONFIG_PROTECT
+# gives a Gentoo one, extended to a plain "make install" over a running hub.
+# OPTIONAL keeps the old behaviour of skipping a source file that is not there.
+function (uhub_install_config)
+	cmake_parse_arguments (ARG "OPTIONAL" "DESTINATION" "FILES;PERMISSIONS" ${ARGN})
+	set (perms "")
+	if (ARG_PERMISSIONS)
+		string (REPLACE ";" " " perms "PERMISSIONS ${ARG_PERMISSIONS}")
+	endif()
+	# file(INSTALL) prepends $ENV{DESTDIR} on its own -- which is why the
+	# generated cmake_install.cmake never mentions it -- so only the EXISTS
+	# probe spells it out. Prefixing the DESTINATION too would stage the file
+	# under DESTDIR twice.
+	foreach (src IN LISTS ARG_FILES)
+		get_filename_component (name "${src}" NAME)
+		install (CODE "
+			if (EXISTS \"\$ENV{DESTDIR}${ARG_DESTINATION}/${name}\")
+				message (STATUS \"Keeping existing: ${ARG_DESTINATION}/${name}\")
+			elseif (EXISTS \"${src}\")
+				file (INSTALL DESTINATION \"${ARG_DESTINATION}\" TYPE FILE ${perms} FILES \"${src}\")
+			elseif (NOT ${ARG_OPTIONAL})
+				message (FATAL_ERROR \"Missing configuration file: ${src}\")
+			endif()
+		")
+	endforeach()
+endfunction()
+
 if (UNIX)
 	install( TARGETS uhub uhub-passwd uhub-seeder RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} )
 	if (FUSE_SUPPORT)
@@ -773,7 +803,7 @@ if (UNIX)
 		install( TARGETS mod_javascript DESTINATION ${UHUB_PLUGIN_DIR} OPTIONAL )
 	endif()
 
-	install( FILES
+	uhub_install_config( FILES
 		${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub.conf
 		${CMAKE_CURRENT_SOURCE_DIR}/doc/plugins.conf
 		${CMAKE_CURRENT_SOURCE_DIR}/doc/messages.conf
@@ -817,10 +847,10 @@ if (UNIX)
 	# The seeder config carries a cleartext password for its bot account, so it
 	# is installed private rather than world readable like the hub's. The same
 	# goes for the mount's, for the same reason.
-	install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub-seeder.conf DESTINATION ${UHUB_CONFIG_DIR}
+	uhub_install_config( FILES ${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub-seeder.conf DESTINATION ${UHUB_CONFIG_DIR}
 		PERMISSIONS OWNER_READ OWNER_WRITE OPTIONAL )
 	if (FUSE_SUPPORT)
-		install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub-fuse.conf DESTINATION ${UHUB_CONFIG_DIR}
+		uhub_install_config( FILES ${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub-fuse.conf DESTINATION ${UHUB_CONFIG_DIR}
 			PERMISSIONS OWNER_READ OWNER_WRITE OPTIONAL )
 	endif()
 endif()

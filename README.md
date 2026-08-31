@@ -114,6 +114,8 @@ zig build test                   # run the test suite
 
 `sudo make install` puts the sample configuration in `/etc/uhub` and the
 plugins where the hub looks for them, so there is nothing to set up first.
+Reinstalling never overwrites those files: an existing `/etc/uhub/uhub.conf`
+and friends are kept as they are, and only the missing ones are written.
 Start the hub in the foreground (stop it with Ctrl+C):
 
 ```sh
