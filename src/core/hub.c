@@ -1301,7 +1301,10 @@ void hub_shutdown_service(struct hub_info* hub)
 
 int hub_plugins_load(struct hub_info* hub)
 {
-	if (!hub->config->file_plugins || !*hub->config->file_plugins)
+	/* An empty file_plugins no longer means "no plugins": it selects the
+	   built-in default set, which plugin_initialize() resolves. Only an
+	   explicit plugin_defaults = no leaves the hub with none. */
+	if ((!hub->config->file_plugins || !*hub->config->file_plugins) && !hub->config->plugin_defaults)
 		return 0;
 
 	hub->plugins = hub_malloc_zero(sizeof(struct uhub_plugins));

@@ -21,8 +21,20 @@ Incompatible changes (action required beyond replacing the binaries):
   kept in memory for the lifetime of the hub, as the old mod_chat_history did:
     old:  plugin .../mod_chat_history_sqlite.so "file=/var/lib/uhub/history.db"
     new:  plugin .../mod_chat_history.so "file=/var/lib/uhub/history.db"
+- Setting file_plugins now REPLACES the hub's built-in default plugin set
+  rather than being the only way to get any plugins (see below). An existing
+  plugins file keeps working unchanged; there is nothing to migrate.
 
 New features:
+- The hub loads a built-in default set of plugins when no plugins file is
+  configured -- mod_auth_sqlite, mod_logging, mod_topic, mod_chat_history and
+  mod_ucmd -- so a fresh install has working authentication, logging and chat
+  history with no configuration at all. Previously an unconfigured hub ran with
+  no plugins, which meant no account could hold a credential and no operator
+  command was reachable. A default plugin that fails to load is reported and
+  skipped; a plugin named in a plugins file is still fatal. Turn the set off
+  with plugin_defaults = no.
+- "uhub -C" now also reports which plugins the configuration would load.
 - New plugin mod_javascript: hub logic in JavaScript, embedding QuickJS. Scripts
   load with script=<file>, dir=<directory> or config=<list>; JavaScript versions
   of the welcome, chat-only and flood plugins ship as examples.

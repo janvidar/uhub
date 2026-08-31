@@ -1083,7 +1083,10 @@
 	<option name="file_plugins" type="file" default="">
 		<short>Plugin configuration file</short>
 		<description><![CDATA[
-			Plugin configuration file.
+			Plugin configuration file. When this is left empty the hub loads a
+			built-in default set of plugins instead (see plugin_defaults), so a
+			plugins configuration file is only needed in order to depart from
+			those defaults. Setting this replaces the built-in set entirely.
 		]]></description>
 		<since>0.3.3</since>
 		<example><![CDATA[
@@ -1091,6 +1094,19 @@
 				file_plugins = "/etc/uhub/plugins.conf"
 			</p>
 		]]></example>
+	</option>
+
+	<option name="plugin_defaults" type="boolean" default="1">
+		<short>Load the built-in default plugin set</short>
+		<description><![CDATA[
+			When no plugin configuration file is given (see file_plugins), the hub
+			loads a default set of plugins compiled into it: SQLite authentication,
+			logging, topic commands, chat history and user commands. This is what
+			makes a freshly installed hub usable without any configuration at all.
+			A default plugin that cannot be loaded is reported and skipped rather
+			than aborting startup. Set this to no to run with no plugins at all.
+		]]></description>
+		<since>0.8.0</since>
 	</option>
 
 	<option name="msg_hub_full" type="message" default="Hub is full" >

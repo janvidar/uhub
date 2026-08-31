@@ -85,19 +85,37 @@ static struct sql_data *parse_config(const char *line, struct plugin_handle *plu
     /* Defensively ensure a case-insensitive UNIQUE index on the nick exists, so
        databases created before the schema carried COLLATE NOCASE also reject
        nicks that differ only by case -- matching the case-insensitive lookups.
-       Best-effort: it fails on a table that does not exist yet or that already
-       holds case-duplicate rows; warn (so the operator can clean up) and carry
-       on rather than refuse to load and break an existing hub. */
+       Best-effort: it fails on a table that already holds case-duplicate rows;
+       warn (so the operator can clean up) and carry on rather than refuse to
+       load and break an existing hub.
+
+       A database with no users table at all is not that case -- it is a hub
+       that has not had uhub-passwd run against it yet, which is the normal
+       state of a fresh install (SQLite creates the file on open). Skip
+       silently there, so the first thing a new operator sees is not a warning
+       about a database they have not created yet. */
     {
-        char* err = 0;
-        if (sqlite3_exec(data->db,
-                "CREATE UNIQUE INDEX IF NOT EXISTS uhub_users_nickname_nocase "
-                "ON users (nickname COLLATE NOCASE);",
-                NULL, NULL, &err) != SQLITE_OK) {
-            fprintf(stderr, "mod_auth_sqlite: case-insensitive nickname uniqueness "
-                "not enforced (%s); resolve any case-duplicate nicks in the database.\n",
-                err ? err : "unknown error");
-            sqlite3_free(err);
+        sqlite3_stmt* stmt = 0;
+        int have_users = 0;
+
+        if (sqlite3_prepare_v2(data->db,
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='users';",
+                -1, &stmt, NULL) == SQLITE_OK) {
+            have_users = (sqlite3_step(stmt) == SQLITE_ROW);
+            sqlite3_finalize(stmt);
+        }
+
+        if (have_users) {
+            char* err = 0;
+            if (sqlite3_exec(data->db,
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uhub_users_nickname_nocase "
+                    "ON users (nickname COLLATE NOCASE);",
+                    NULL, NULL, &err) != SQLITE_OK) {
+                fprintf(stderr, "mod_auth_sqlite: case-insensitive nickname uniqueness "
+                    "not enforced (%s); resolve any case-duplicate nicks in the database.\n",
+                    err ? err : "unknown error");
+                sqlite3_free(err);
+            }
         }
     }
 

@@ -25,6 +25,7 @@
 #include "network/notify.h"
 #include "core/auth.h"
 #include "core/config.h"
+#include "core/pluginloader.h"
 #include "core/hub.h"
 #include "core/regserver.h"
 #include "util/getopt.h" /* bundled getopt on platforms without one (NEED_GETOPT; e.g. Windows) */
@@ -447,24 +448,32 @@ int main_loop()
 int check_configuration(int dump)
 {
 	struct hub_config configuration;
-	int ret = read_config(arg_config, &configuration, 0);
-
-	if (dump)
-	{
-		if (ret != -1)
-		{
-			dump_config(&configuration, dump > 1);
-		}
-		return 0;
-	}
+	/* A missing file is only an error when one was actually named. Without
+	   -c the hub runs on built-in defaults, so -s/-S must be able to show
+	   those defaults -- which is exactly when they are most worth seeing. */
+	int ret = read_config(arg_config, &configuration, !arg_have_config);
 
 	if (ret == -1)
 	{
 		fprintf(stderr, "ERROR\n");
-        	return 1;
+		return 1;
 	}
 
-	fprintf(stdout, "OK\n");
+	if (dump)
+	{
+		dump_config(&configuration, dump > 1);
+	}
+	else
+	{
+		fprintf(stdout, "OK\n");
+	}
+
+	/* Which plugins this configuration would actually run is not answerable
+	   from the option dump alone, since an empty file_plugins means the
+	   built-in set rather than none. */
+	plugin_dump_effective(&configuration);
+
+	free_config(&configuration);
 	return 0;
 }
 

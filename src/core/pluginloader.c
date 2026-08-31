@@ -18,6 +18,7 @@
  */
 
 #include "system.h"
+#include "uhub_limits.h"
 #include "util/config_token.h"
 #include "util/list.h"
 #include "util/log.h"
@@ -401,6 +402,103 @@ static int plugin_parse_line(char* line, int line_count, void* ptr_data)
 
 static void plugin_unload_ptr(void* ptr);
 
+/*
+ * The plugin set a hub runs when no plugins configuration file is given.
+ *
+ * Without an authentication plugin no account can ever hold a credential, so
+ * a hub with no plugins is one nobody can administer -- every operator and
+ * admin command is unreachable. Making that the out-of-the-box state meant a
+ * fresh install was never usable until a plugins file had been written, so the
+ * hub now carries a default set and plugins.conf is purely an override.
+ *
+ * Only plugins that work with no data files of their own belong here.
+ * mod_welcome needs a motd/rules file that may not exist, mod_selfregister
+ * lets any guest claim any free nick, and mod_chat_only / mod_flood and the
+ * rest encode policy a hub has to opt into -- none of those can be a default.
+ * mod_auth_sqlite is included because SQLite creates the database on open, and
+ * mod_logging logs to syslog rather than a path that may not be writable.
+ */
+struct plugin_default
+{
+	const char* name;   /* Bare name; the loader supplies the extension. */
+	const char* params;
+};
+
+static const struct plugin_default default_plugins[] = {
+	{ "mod_auth_sqlite",  "file=" UHUB_STATE_DIR "/users.db" },
+#ifndef WIN32
+	{ "mod_logging",      "syslog=true" },
+#endif
+	{ "mod_topic",        "" },
+	{ "mod_chat_history", "" },
+	{ "mod_ucmd",         "" },
+};
+
+/*
+ * Loads the built-in plugin set. Unlike a configured plugins file, a default
+ * that fails to load is reported and skipped rather than taken as fatal: the
+ * operator did not ask for these by name, and killing a hub over a default is
+ * exactly the failure this set exists to avoid. Always succeeds.
+ */
+static void plugin_load_defaults(struct hub_info* hub)
+{
+	struct uhub_plugins* handle = hub->plugins;
+	size_t i;
+
+	LOG_INFO("No plugin configuration file given, loading default plugins from %s.", UHUB_PLUGIN_DIR);
+
+	for (i = 0; i < (sizeof(default_plugins) / sizeof(default_plugins[0])); i++)
+	{
+		const struct plugin_default* def = &default_plugins[i];
+		struct plugin_handle* plugin;
+		char* named = plugin_add_extension(def->name);
+		char* path;
+
+		if (!named)
+			continue;
+
+		path = plugin_join_path(UHUB_PLUGIN_DIR, named);
+		hub_free(named);
+		if (!path)
+			continue;
+
+		LOG_PLUGIN("Load default plugin: \"%s\", params=\"%s\"", path, def->params);
+		plugin = plugin_load(path, def->params, hub);
+		hub_free(path);
+
+		if (plugin)
+			list_append(handle->loaded, plugin);
+		else
+			LOG_WARN("Skipping default plugin \"%s\" -- it could not be loaded.", def->name);
+	}
+}
+
+/*
+ * Reports the plugins the hub would run for this configuration, without
+ * loading anything. Used by the -C / -s command line options so that the
+ * effective plugin set is answerable without starting the hub.
+ */
+void plugin_dump_effective(struct hub_config* config)
+{
+	size_t i;
+
+	if (config && *config->file_plugins)
+	{
+		fprintf(stdout, "# plugins: from %s\n", config->file_plugins);
+		return;
+	}
+
+	if (config && !config->plugin_defaults)
+	{
+		fprintf(stdout, "# plugins: none (plugin_defaults is disabled)\n");
+		return;
+	}
+
+	fprintf(stdout, "# plugins: built-in defaults, from %s\n", UHUB_PLUGIN_DIR);
+	for (i = 0; i < (sizeof(default_plugins) / sizeof(default_plugins[0])); i++)
+		fprintf(stdout, "#   %s %s\n", default_plugins[i].name, default_plugins[i].params);
+}
+
 int plugin_initialize(struct hub_config* config, struct hub_info* hub)
 {
 	int ret;
@@ -409,11 +507,11 @@ int plugin_initialize(struct hub_config* config, struct hub_info* hub)
 	if (!hub->plugins->loaded)
 		return -1;
 
-	if (config)
-	{
-		if (!*config->file_plugins)
-			return 0;
+	if (!config)
+		return 0;
 
+	if (*config->file_plugins)
+	{
 		ret = file_read_lines(config->file_plugins, hub, &plugin_parse_line);
 		if (ret == -1)
 		{
@@ -426,7 +524,20 @@ int plugin_initialize(struct hub_config* config, struct hub_info* hub)
 			hub->plugins->loaded = 0;
 			return -1;
 		}
+
+		/* -2 means the file itself is missing. Falling back to the defaults
+		   beats the silent zero-plugin hub that used to result, which looked
+		   like it had started correctly but had no working authentication. */
+		if (ret != -2)
+			return 0;
+
+		LOG_WARN("Plugin configuration file \"%s\" is missing, falling back to the default plugins.",
+			config->file_plugins);
 	}
+
+	if (config->plugin_defaults)
+		plugin_load_defaults(hub);
+
 	return 0;
 }
 

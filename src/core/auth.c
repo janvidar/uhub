@@ -17,6 +17,7 @@
  *
  */
 
+#include "uhub_limits.h"
 #include "util/list.h"
 #include "util/log.h"
 #include "util/memory.h"
@@ -275,9 +276,14 @@ int acl_initialize(struct hub_config* config, struct acl_handle* handle)
 		if (acl_add_address_list(handle->nat_override, config->nat_override) == -1)
 			return -1;
 
-		if (!*config->file_acl) return 0;
+		/* With no file_acl configured, fall back to the users.conf that ships
+		   in the configuration directory -- the same reasoning as the built-in
+		   plugin set: the shipped deny_nick list should take effect on a fresh
+		   install without a configuration line naming an absolute path that a
+		   relocated install would get wrong. A missing file stays non-fatal. */
+		const char* file_acl = *config->file_acl ? config->file_acl : UHUB_CONFIG_DIR "/users.conf";
 
-		ret = file_read_lines(config->file_acl, handle, &acl_parse_line);
+		ret = file_read_lines(file_acl, handle, &acl_parse_line);
 		if (ret == -1)
 			return -1;
 	}

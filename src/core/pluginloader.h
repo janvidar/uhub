@@ -47,6 +47,12 @@ extern void plugin_unload(struct plugin_handle* plugin);
 
 // extern void plugin_unload(struct plugin_handle*);
 extern int plugin_initialize(struct hub_config* config, struct hub_info* hub);
+
+/**
+ * Print the plugin set this configuration would run -- either the configured
+ * plugins file or the built-in defaults -- without loading anything.
+ */
+extern void plugin_dump_effective(struct hub_config* config);
 extern void plugin_shutdown(struct uhub_plugins* handle);
 
 // Low level plugin loader code (used internally)
