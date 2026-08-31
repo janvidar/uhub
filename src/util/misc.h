@@ -22,6 +22,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <sys/types.h> /* mode_t, for uhub_mkdir() */
 #include <time.h>
 
 typedef int (*file_line_handler_t)(char* line, int line_number, void* data);
@@ -98,6 +99,15 @@ extern int parse_duration_seconds(const char* str, int* seconds_out);
  * @return the length of src, so a truncation shows up as a value >= dstsize.
  */
 extern size_t uhub_strlcpy(char* dst, const char* src, size_t dstsize);
+
+/**
+ * Create a directory, as mkdir(2). The mode is applied where the platform has
+ * one; the Windows CRT mkdir() takes a path only, and ignores it.
+ *
+ * @return 0 on success, -1 with errno set on failure (EEXIST if it is there
+ * already).
+ */
+extern int uhub_mkdir(const char* path, mode_t mode);
 
 #ifndef HAVE_STRNDUP
 extern char* strndup(const char* string, size_t n);

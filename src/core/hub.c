@@ -18,7 +18,6 @@
  */
 
 #include "uhub_limits.h"
-#include <sys/stat.h> /* mkdir() for the state directory holding the TLS pair */
 #include <openssl/rand.h>
 #include "util/log.h"
 #include "util/memory.h"
@@ -1138,7 +1137,7 @@ static int resolve_ssl_certificates(struct hub_config* config, const char** cert
 
 	/* The state directory is created by the installation, but a hub run
 	   straight out of a build tree has never had one. */
-	if (mkdir(UHUB_STATE_DIR, 0750) == -1 && errno != EEXIST)
+	if (uhub_mkdir(UHUB_STATE_DIR, 0750) == -1 && errno != EEXIST)
 		LOG_DEBUG("Unable to create %s: %s", UHUB_STATE_DIR, strerror(errno));
 
 	LOG_INFO("No TLS certificate yet, creating a self-signed one: %s", *cert);

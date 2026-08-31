@@ -17,6 +17,8 @@
  *
  */
 
+#include <sys/stat.h> /* mkdir() */
+
 #include "uhub_limits.h"
 #include "util/list.h"
 #include "util/log.h"
@@ -24,6 +26,16 @@
 #include "util/misc.h"
 
 static const char* BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+int uhub_mkdir(const char* path, mode_t mode)
+{
+#ifdef WIN32
+	(void) mode;
+	return mkdir(path);
+#else
+	return mkdir(path, mode);
+#endif
+}
 
 int is_space(char c)
 {

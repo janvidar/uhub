@@ -28,6 +28,9 @@
 #include "network/backend.h"
 
 #include <sys/stat.h> /* fchmod() on the generated private key */
+#ifdef WIN32
+#include <io.h> /* _commit(), the Windows fsync() */
+#endif
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <openssl/sha.h>
@@ -376,6 +379,45 @@ int ssl_load_private_key(struct ssl_context_handle* ctx_, const char* pem_file)
 #define UHUB_CERT_VALIDITY_DAYS (3650)
 
 /*
+ * Push a file's contents out to the storage layer. POSIX spells this fsync();
+ * on Windows it is _commit(), and there are no file permissions to narrow, so
+ * pem_set_mode() is a no-op there.
+ */
+static int pem_sync(FILE* fh)
+{
+#ifdef WIN32
+	return _commit(fileno(fh));
+#else
+	return fsync(fileno(fh));
+#endif
+}
+
+static int pem_set_mode(int fd, mode_t mode)
+{
+#ifdef WIN32
+	(void) fd; (void) mode;
+	return 0;
+#else
+	return fchmod(fd, mode);
+#endif
+}
+
+/*
+ * Rename over the target. POSIX rename() replaces an existing file; the
+ * Windows CRT one fails with EEXIST instead, so remove the target first. That
+ * loses atomicity on Windows, but only for the case where a file is already
+ * there -- which the caller has already established is not the case for the
+ * private key.
+ */
+static int pem_rename(const char* tmp, const char* path)
+{
+#ifdef WIN32
+	unlink(path);
+#endif
+	return rename(tmp, path);
+}
+
+/*
  * Write one PEM file atomically: to a temporary file in the same directory,
  * then rename over the target. The rename is what makes it atomic, and doing
  * it in the same directory is what makes the rename possible.
@@ -402,7 +444,7 @@ static int write_pem_atomic(const char* path, mode_t mode, int (*emit)(FILE*, vo
 	}
 
 	/* mkstemp() gives 0600; widen only where the file is not secret. */
-	if (fchmod(fd, mode) == -1)
+	if (pem_set_mode(fd, mode) == -1)
 	{
 		LOG_ERROR("Unable to set permissions on %s: %s", tmp, strerror(errno));
 		close(fd);
@@ -423,14 +465,14 @@ static int write_pem_atomic(const char* path, mode_t mode, int (*emit)(FILE*, vo
 
 	ok = emit(fh, arg);
 	/* Flush before the rename: a successful PEM_write_ is not a written file. */
-	if (ok && (fflush(fh) != 0 || fsync(fileno(fh)) != 0))
+	if (ok && (fflush(fh) != 0 || pem_sync(fh) != 0))
 	{
 		LOG_ERROR("Unable to flush %s: %s", tmp, strerror(errno));
 		ok = 0;
 	}
 	fclose(fh);
 
-	if (ok && rename(tmp, path) == -1)
+	if (ok && pem_rename(tmp, path) == -1)
 	{
 		LOG_ERROR("Unable to rename %s to %s: %s", tmp, path, strerror(errno));
 		ok = 0;
