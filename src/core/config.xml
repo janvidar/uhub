@@ -816,7 +816,13 @@
 	<option name="tls_certificate" type="file" default="">
 		<short>Certificate file</short>
 		<description><![CDATA[
-			Path to a TLS/SSL certificate or certificate chain (PEM format).
+			Path to the server certificate (PEM). When both this and the
+			matching option are left empty, the hub uses a self-signed pair in
+			its own state directory, creating it on first start if it is not
+			there. Set both to use your own certificate; a path that does not
+			exist is then an error rather than a cue to generate one, since
+			replacing a certificate silently would change the key fingerprint
+			that ADC clients pin.
 		]]></description>
 		<since>0.3.0</since>
 	</option>
@@ -824,7 +830,13 @@
 	<option name="tls_private_key" type="file" default="">
 		<short>Private key file</short>
 		<description><![CDATA[
-			Path to a TLS/SSL private key (PEM format).
+			Path to the server private key (PEM). When both this and the
+			matching option are left empty, the hub uses a self-signed pair in
+			its own state directory, creating it on first start if it is not
+			there. Set both to use your own certificate; a path that does not
+			exist is then an error rather than a cue to generate one, since
+			replacing a certificate silently would change the key fingerprint
+			that ADC clients pin.
 		]]></description>
 		<since>0.3.0</since>
 	</option>

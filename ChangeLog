@@ -35,6 +35,16 @@ Incompatible changes (action required beyond replacing the binaries):
   history_max= parameter respectively. A leftover line is a startup error.
 
 New features:
+- TLS is enabled by default. Plaintext adc:// keeps working on the same port,
+  so this only adds adcs://; set tls_require=1 to refuse plaintext or
+  tls_enable=0 to turn it off. A hub that cannot create or load a certificate
+  logs a warning and runs without TLS rather than refusing to start.
+- The hub creates a self-signed TLS certificate for itself when it has not
+  been given one, in its state directory, so adcs:// works without preparing
+  key material. ECDSA P-256, valid for ten years, written once: ADC clients pin
+  the key fingerprint, so the hub never regenerates it. Setting tls_certificate
+  and tls_private_key still selects your own pair, and a path that does not
+  exist is then an error rather than a cue to generate one.
 - The hub loads a built-in default set of plugins when no plugins file is
   configured -- mod_auth_sqlite, mod_logging, mod_topic, mod_chat_history and
   mod_ucmd -- so a fresh install has working authentication, logging and chat

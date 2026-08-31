@@ -1088,21 +1088,81 @@ static void server_alt_port_stop(struct hub_info* hub)
 	}
 }
 
+/*
+ * The certificate and key a hub uses when it has not been given any.
+ *
+ * They live in the state directory rather than next to the configuration:
+ * a generated private key is state the hub creates, not something an operator
+ * edits, and packaging marks the configuration directory as files it must not
+ * overwrite on upgrade.
+ */
+#define UHUB_DEFAULT_TLS_CERT UHUB_STATE_DIR "/server.crt"
+#define UHUB_DEFAULT_TLS_KEY  UHUB_STATE_DIR "/server.key"
+
+/*
+ * Resolves which certificate and key to use, creating a self-signed pair when
+ * the hub has not been given one.
+ *
+ * Generation happens only for the managed pair, and only when the key is
+ * absent. A configured tls_private_key that does not exist is an error, not a
+ * cue to generate: silently replacing a certificate an operator meant to use
+ * would change the hub's advertised identity, which for ADC -- where clients
+ * pin the key fingerprint -- is the one thing that must not happen by accident.
+ */
+static int resolve_ssl_certificates(struct hub_config* config, const char** cert, const char** key)
+{
+	int managed = !*config->tls_certificate && !*config->tls_private_key;
+
+	*cert = managed ? UHUB_DEFAULT_TLS_CERT : config->tls_certificate;
+	*key  = managed ? UHUB_DEFAULT_TLS_KEY  : config->tls_private_key;
+
+	if (!managed)
+	{
+		/* Half-configured is a mistake worth naming: falling back to the
+		   managed pair here would quietly ignore the path that was given. */
+		if (!**cert || !**key)
+		{
+			LOG_FATAL("Both tls_certificate and tls_private_key must be set, or neither.");
+			return 0;
+		}
+		return 1;
+	}
+
+	if (access(*key, F_OK) == 0)
+		return 1;
+
+	LOG_INFO("No TLS certificate yet, creating a self-signed one: %s", *cert);
+	if (!net_ssl_certificate_create(*cert, *key, PRODUCT))
+	{
+		LOG_FATAL("Unable to create a TLS certificate in %s. Set tls_certificate and "
+			"tls_private_key to use your own, or tls_enable=no to run without TLS.",
+			UHUB_STATE_DIR);
+		return 0;
+	}
+	return 1;
+}
+
 static int load_ssl_certificates(struct hub_info* hub, struct hub_config* config)
 {
 	if (config->tls_enable)
 	{
+		const char* cert;
+		const char* key;
+
+		if (!resolve_ssl_certificates(config, &cert, &key))
+			return 0;
+
 		hub->ctx = net_ssl_context_create(config->tls_version, config->tls_ciphersuite, config->tls_ciphersuites);
 
 		if (!hub->ctx)
 		  return 0;
 
-		if (ssl_load_certificate(hub->ctx, config->tls_certificate) &&
-			ssl_load_private_key(hub->ctx, config->tls_private_key) &&
+		if (ssl_load_certificate(hub->ctx, cert) &&
+			ssl_load_private_key(hub->ctx, key) &&
 			ssl_check_private_key(hub->ctx))
 		{
 			char keyprint[80];
-			LOG_INFO("Enabling TLS (%s), using certificate: %s, private key: %s", net_ssl_get_provider(), config->tls_certificate, config->tls_private_key);
+			LOG_INFO("Enabling TLS (%s), using certificate: %s, private key: %s", net_ssl_get_provider(), cert, key);
 
 			/* Cache the certificate's KEYP keyprint so it can be advertised in
 			 * adcs:// URLs (HH field / registration) without re-hashing per use. */

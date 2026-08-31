@@ -27,6 +27,7 @@
 #include "network/tls.h"
 #include "network/backend.h"
 
+#include <sys/stat.h> /* fchmod() on the generated private key */
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <openssl/sha.h>
@@ -366,6 +367,195 @@ int ssl_load_private_key(struct ssl_context_handle* ctx_, const char* pem_file)
 		return 0;
 	}
 	return 1;
+}
+
+/* Validity of a generated certificate. ADC pins the key fingerprint rather
+ * than checking an expiry date, and the hub never regenerates -- see
+ * net_ssl_certificate_create() -- so this only has to outlast the deployment.
+ */
+#define UHUB_CERT_VALIDITY_DAYS (3650)
+
+/*
+ * Write one PEM file atomically: to a temporary file in the same directory,
+ * then rename over the target. The rename is what makes it atomic, and doing
+ * it in the same directory is what makes the rename possible.
+ */
+static int write_pem_atomic(const char* path, mode_t mode, int (*emit)(FILE*, void*), void* arg)
+{
+	char* tmp;
+	size_t len = strlen(path) + sizeof(".tmpXXXXXX");
+	int fd;
+	FILE* fh;
+	int ok;
+
+	tmp = hub_malloc(len);
+	if (!tmp)
+		return 0;
+	snprintf(tmp, len, "%s.tmpXXXXXX", path);
+
+	fd = mkstemp(tmp);
+	if (fd == -1)
+	{
+		LOG_ERROR("Unable to create %s: %s", tmp, strerror(errno));
+		hub_free(tmp);
+		return 0;
+	}
+
+	/* mkstemp() gives 0600; widen only where the file is not secret. */
+	if (fchmod(fd, mode) == -1)
+	{
+		LOG_ERROR("Unable to set permissions on %s: %s", tmp, strerror(errno));
+		close(fd);
+		unlink(tmp);
+		hub_free(tmp);
+		return 0;
+	}
+
+	fh = fdopen(fd, "w");
+	if (!fh)
+	{
+		LOG_ERROR("Unable to write %s: %s", tmp, strerror(errno));
+		close(fd);
+		unlink(tmp);
+		hub_free(tmp);
+		return 0;
+	}
+
+	ok = emit(fh, arg);
+	/* Flush before the rename: a successful PEM_write_ is not a written file. */
+	if (ok && (fflush(fh) != 0 || fsync(fileno(fh)) != 0))
+	{
+		LOG_ERROR("Unable to flush %s: %s", tmp, strerror(errno));
+		ok = 0;
+	}
+	fclose(fh);
+
+	if (ok && rename(tmp, path) == -1)
+	{
+		LOG_ERROR("Unable to rename %s to %s: %s", tmp, path, strerror(errno));
+		ok = 0;
+	}
+
+	if (!ok)
+		unlink(tmp);
+	hub_free(tmp);
+	return ok;
+}
+
+static int emit_private_key(FILE* fh, void* arg)
+{
+	if (PEM_write_PrivateKey(fh, (EVP_PKEY*) arg, NULL, NULL, 0, NULL, NULL) == 1)
+		return 1;
+	LOG_ERROR("PEM_write_PrivateKey: %s", ERR_error_string(ERR_get_error(), NULL));
+	return 0;
+}
+
+static int emit_certificate(FILE* fh, void* arg)
+{
+	if (PEM_write_X509(fh, (X509*) arg) == 1)
+		return 1;
+	LOG_ERROR("PEM_write_X509: %s", ERR_error_string(ERR_get_error(), NULL));
+	return 0;
+}
+
+int net_ssl_certificate_create(const char* cert_file, const char* key_file, const char* cn)
+{
+	EVP_PKEY* pkey = NULL;
+	X509* cert = NULL;
+	X509_NAME* name;
+	ASN1_INTEGER* serial = NULL;
+	BIGNUM* bn = NULL;
+	int ok = 0;
+
+	/* ECDSA on P-256, signed with SHA-256.
+	 *
+	 * Ed25519 would be the nicer key -- smaller, no curve to name, no digest to
+	 * choose -- but LibreSSL's TLS stack refuses to serve an Ed25519
+	 * certificate ("unknown certificate type") even though its EVP layer will
+	 * happily generate one, and LibreSSL is what the prebuilt binary packages
+	 * are built against. P-256 is accepted by both providers and by every
+	 * client that can do TLS 1.2.
+	 *
+	 * EVP_PKEY_CTX_new_id() rather than OpenSSL 3.0's shorter EVP_PKEY_Q_keygen(),
+	 * which LibreSSL does not have. */
+	{
+		EVP_PKEY_CTX* kctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
+		int kok = kctx
+			&& EVP_PKEY_keygen_init(kctx) == 1
+			&& EVP_PKEY_CTX_set_ec_paramgen_curve_nid(kctx, NID_X9_62_prime256v1) == 1
+			&& EVP_PKEY_keygen(kctx, &pkey) == 1;
+		EVP_PKEY_CTX_free(kctx);
+		if (!kok || !pkey)
+		{
+			LOG_ERROR("Unable to generate an EC key: %s", ERR_error_string(ERR_get_error(), NULL));
+			goto out;
+		}
+	}
+
+	cert = X509_new();
+	if (!cert)
+		goto out;
+
+	/* X509_set_version() takes the zero-based version, so 2 is X.509 v3. */
+	if (X509_set_version(cert, 2) != 1)
+		goto out;
+
+	/* A random serial rather than a counter: nothing here keeps state between
+	 * runs, and a self-signed certificate has no issuer to be unique against. */
+	bn = BN_new();
+	serial = ASN1_INTEGER_new();
+	if (!bn || !serial || BN_rand(bn, 159, BN_RAND_TOP_ANY, BN_RAND_BOTTOM_ANY) != 1
+		|| !BN_to_ASN1_INTEGER(bn, serial) || X509_set_serialNumber(cert, serial) != 1)
+	{
+		LOG_ERROR("Unable to set the certificate serial number: %s", ERR_error_string(ERR_get_error(), NULL));
+		goto out;
+	}
+
+	if (!X509_gmtime_adj(X509_getm_notBefore(cert), 0)
+		|| !X509_gmtime_adj(X509_getm_notAfter(cert), (long) UHUB_CERT_VALIDITY_DAYS * 24 * 60 * 60))
+		goto out;
+
+	if (X509_set_pubkey(cert, pkey) != 1)
+		goto out;
+
+	/* Self-signed: subject and issuer are the same name. */
+	name = X509_get_subject_name(cert);
+	if (!name || X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC,
+			(const unsigned char*) cn, -1, -1, 0) != 1)
+	{
+		LOG_ERROR("Unable to set the certificate subject: %s", ERR_error_string(ERR_get_error(), NULL));
+		goto out;
+	}
+	if (X509_set_issuer_name(cert, name) != 1)
+		goto out;
+
+	if (X509_sign(cert, pkey, EVP_sha256()) == 0)
+	{
+		LOG_ERROR("Unable to sign the certificate: %s", ERR_error_string(ERR_get_error(), NULL));
+		goto out;
+	}
+
+	/* Key first: a certificate without its key is useless, and leaving the
+	 * certificate behind on a failure would make the next start believe a pair
+	 * already exists. */
+	if (!write_pem_atomic(key_file, 0600, emit_private_key, pkey))
+		goto out;
+	if (!write_pem_atomic(cert_file, 0644, emit_certificate, cert))
+	{
+		unlink(key_file);
+		goto out;
+	}
+
+	ok = 1;
+
+out:
+	if (!ok && ERR_peek_error())
+		LOG_ERROR("Certificate generation failed: %s", ERR_error_string(ERR_get_error(), NULL));
+	ASN1_INTEGER_free(serial);
+	BN_free(bn);
+	X509_free(cert);
+	EVP_PKEY_free(pkey);
+	return ok;
 }
 
 int ssl_check_private_key(struct ssl_context_handle* ctx_)

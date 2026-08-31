@@ -104,6 +104,27 @@ extern int ssl_load_private_key(struct ssl_context_handle* ctx, const char* pem_
 extern int ssl_check_private_key(struct ssl_context_handle* ctx);
 
 /**
+ * Create a self-signed certificate and its private key at the given paths.
+ *
+ * Intended for a hub that has never been given a certificate. ADC
+ * authenticates a hub by its key fingerprint (the KEYP extension), which
+ * clients pin on first use, so a self-signed pair is the normal case and its
+ * subject carries no weight -- but its identity does. The pair is therefore
+ * written once and never regenerated: a new key is a new hub identity to every
+ * client that pinned the old one.
+ *
+ * The key is written with owner-only permissions, and both files are created
+ * atomically, so a half-written key cannot be left behind or picked up by a
+ * second process starting at the same time.
+ *
+ * @param cert_file where to write the certificate (PEM)
+ * @param key_file  where to write the private key (PEM)
+ * @param cn        the certificate's common name
+ * @return 1 on success, 0 on failure (the reason is logged).
+ */
+extern int net_ssl_certificate_create(const char* cert_file, const char* key_file, const char* cn);
+
+/**
  * Compute the ADC KEYP keyprint of the leaf certificate installed in @p ctx.
  * Writes the NUL-terminated form "SHA256/<base32>" (the SHA256 hash of the
  * certificate's DER encoding, Base32-encoded without padding) into @p out. This

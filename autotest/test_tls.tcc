@@ -4,6 +4,7 @@
 #include "network/connection.h"
 #include "network/backend.h"
 #include <sys/socket.h>
+#include <sys/stat.h>
 
 /*
  * Unit tests for the TLS backend (network/openssl.c) -- the parts that do not
@@ -469,4 +470,80 @@ done:
 	if (cctx) net_ssl_context_destroy(cctx);
 	net_destroy();
 	return ok;
+});
+
+/*
+ * Certificate generation (net_ssl_certificate_create).
+ *
+ * A hub that has never been given a certificate creates one for itself. What
+ * matters is not the certificate's contents -- ADC pins the key fingerprint and
+ * ignores the subject -- but that the pair is usable, that the key is not
+ * readable by anyone else, and above all that it is stable: the fingerprint is
+ * the hub's identity to every client that has pinned it.
+ */
+
+#define TLS_GEN_CERT "test_tls_generated.crt"
+#define TLS_GEN_KEY  "test_tls_generated.key"
+
+static int tls_gen_keyprint(const char* cert, const char* key, char* out, size_t out_size)
+{
+	struct ssl_context_handle* ctx = net_ssl_context_create("1.2", TLS_CIPHERS, NULL);
+	int ok = 0;
+	if (!ctx)
+		return 0;
+	if (ssl_load_certificate(ctx, cert) && ssl_load_private_key(ctx, key)
+		&& ssl_check_private_key(ctx))
+		ok = net_ssl_get_keyprint(ctx, out, out_size);
+	net_ssl_context_destroy(ctx);
+	return ok;
+}
+
+EXO_TEST(tls_generate_setup, {
+	remove(TLS_GEN_CERT);
+	remove(TLS_GEN_KEY);
+	net_initialize();
+	return net_ssl_certificate_create(TLS_GEN_CERT, TLS_GEN_KEY, "uhub") == 1;
+});
+
+/* The generated pair loads, and the key matches the certificate. */
+EXO_TEST(tls_generate_usable, {
+	char kp[80];
+	return tls_gen_keyprint(TLS_GEN_CERT, TLS_GEN_KEY, kp, sizeof(kp))
+		&& !strncmp(kp, "SHA256/", 7);
+});
+
+/* The private key must not be readable by anyone but its owner. */
+EXO_TEST(tls_generate_key_is_private, {
+	struct stat st;
+	if (stat(TLS_GEN_KEY, &st) != 0)
+		return 0;
+	return (st.st_mode & (S_IRWXG | S_IRWXO)) == 0;
+});
+
+/* Generating again produces a different key: the caller, not this function, is
+   what must decline to overwrite an existing pair. This is why the hub keys
+   generation on the key file being absent -- a regenerated certificate is a new
+   hub identity to every client that pinned the old one. */
+EXO_TEST(tls_generate_is_not_idempotent, {
+	char before[80];
+	char after[80];
+	if (!tls_gen_keyprint(TLS_GEN_CERT, TLS_GEN_KEY, before, sizeof(before)))
+		return 0;
+	if (!net_ssl_certificate_create(TLS_GEN_CERT, TLS_GEN_KEY, "uhub"))
+		return 0;
+	if (!tls_gen_keyprint(TLS_GEN_CERT, TLS_GEN_KEY, after, sizeof(after)))
+		return 0;
+	return strcmp(before, after) != 0;
+});
+
+/* A path that cannot be written fails cleanly rather than half-creating. */
+EXO_TEST(tls_generate_bad_path, {
+	return net_ssl_certificate_create("no_such_dir/x.crt", "no_such_dir/x.key", "uhub") == 0;
+});
+
+EXO_TEST(tls_generate_teardown, {
+	remove(TLS_GEN_CERT);
+	remove(TLS_GEN_KEY);
+	net_destroy();
+	return 1;
 });
