@@ -124,18 +124,24 @@ static int apply_integer(const char* key, const char* data, int* target, int* mi
 
 #include "gen_config.c"
 
-static int config_parse_line(char* line, int line_count, void* ptr_data)
+/*
+ * Splits one "key = value" line into its two halves in place.
+ *
+ * Returns 1 when a key/value pair was extracted, 0 when the line holds nothing
+ * to apply (blank, or comment-only), and -1 on a malformed line. A line with no
+ * '=' is deliberately ignored rather than rejected -- see the note in
+ * config_parse_line().
+ */
+static int config_split_line(char* line, int line_count, char** key, char** data)
 {
 	char* pos;
-	char* key;
-	char* data;
-	struct hub_config* config = (struct hub_config*) ptr_data;
+	int quoted_empty;
 
 	strip_off_ini_line_comments(line, line_count);
 
 	if (!*line) return 0;
 
-	LOG_DUMP("config_parse_line(): '%s'", line);
+	LOG_DUMP("config_split_line(): '%s'", line);
 
 	if (!is_valid_utf8(line))
 	{
@@ -151,22 +157,56 @@ static int config_parse_line(char* line, int line_count, void* ptr_data)
 		return 0;
 	}
 
-	key = line;
-	data = &pos[1];
+	*key = strip_white_space(line);
+	*data = strip_white_space(&pos[1]);
 
-	key = strip_white_space(key);
-	data = strip_white_space(data);
-	data = strip_off_quotes(data);
+	/* An explicitly quoted empty value ("") is a value: it sets a string option
+	   to the empty string. A key with nothing after the '=' at all is not.
+	   Checked before the quotes come off, since afterwards the two look alike.
+	   This is what makes the output of "uhub -s" -- which writes every empty
+	   string option as key = "" -- parse back in as a configuration file. */
+	quoted_empty = !strcmp(*data, "\"\"") || !strcmp(*data, "''");
+	*data = strip_off_quotes(*data);
 
-	if (!*key || !*data)
+	if (!**key || (!**data && !quoted_empty))
 	{
 		LOG_FATAL("Configuration parse error on line %d", line_count);
 		return -1;
 	}
 
-	LOG_DUMP("config_parse_line: '%s' => '%s'", key, data);
+	LOG_DUMP("config_split_line: '%s' => '%s'", *key, *data);
+	return 1;
+}
+
+static int config_parse_line(char* line, int line_count, void* ptr_data)
+{
+	char* key;
+	char* data;
+	struct hub_config* config = (struct hub_config*) ptr_data;
+	int ret = config_split_line(line, line_count, &key, &data);
+
+	if (ret <= 0)
+		return ret;
 
 	return apply_config(config, key, data, line_count);
+}
+
+/*
+ * Same shape as config_parse_line(), but backed by apply_message_config(),
+ * which knows only the msg_* status strings. Anything else in a messages file
+ * is an error -- that file exists to hold messages and nothing else.
+ */
+static int config_parse_message_line(char* line, int line_count, void* ptr_data)
+{
+	char* key;
+	char* data;
+	struct hub_config* config = (struct hub_config*) ptr_data;
+	int ret = config_split_line(line, line_count, &key, &data);
+
+	if (ret <= 0)
+		return ret;
+
+	return apply_message_config(config, key, data, line_count);
 }
 
 
@@ -194,3 +234,17 @@ int read_config(const char* file, struct hub_config* config, int allow_missing)
 }
 
 
+int read_messages(const char* file, struct hub_config* config)
+{
+	/* Applied on top of an already-populated config, so the defaults and
+	   anything the main configuration file set are both already in place. */
+	int ret = file_read_lines(file, config, &config_parse_message_line);
+
+	if (ret == -2)
+	{
+		LOG_WARN("Unable to open status message file \"%s\", using the configured messages.", file);
+		return 0;
+	}
+
+	return (ret < 0) ? -1 : 0;
+}

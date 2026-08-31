@@ -184,6 +184,16 @@ class CSourceGenerator(SourceGenerator):
 		for option in options:
 			self._write_apply_impl(option)
 		self.f.write("\t/* Still here -- unknown directive */\n\tLOG_ERROR(\"Unknown configuration directive: '%s'\", key);\n\treturn -1;\n}\n\n")
+
+		# The msg_* status strings can also live in their own file (file_messages),
+		# which accepts nothing else. Everything here is a subset of apply_config
+		# above, so the main configuration file keeps accepting these keys too.
+		self.f.write("/* Applies only the msg_* status strings, for the file_messages file. */\n")
+		self.f.write("static int apply_message_config(struct hub_config* config, char* key, char* data, int line_count)\n{\n")
+		for option in options:
+			if option.otype == "message":
+				self._write_apply_impl(option)
+		self.f.write("\t/* Still here -- not a status message */\n\tLOG_ERROR(\"Not a status message directive: '%s'\", key);\n\treturn -1;\n}\n\n")
 		self.f.write("void free_config(struct hub_config* config)\n{\n")
 		for option in options:
 			self._write_free_impl(option)

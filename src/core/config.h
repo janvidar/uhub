@@ -41,6 +41,16 @@ extern void config_defaults(struct hub_config* config);
 extern int read_config(const char* file, struct hub_config* config, int allow_missing);
 
 /**
+ * Read the msg_* status strings from a separate file (the file_messages
+ * option) and apply them on top of an already-populated configuration.
+ * Only msg_* keys are accepted; anything else is an error.
+ * A missing file is not an error -- the configured messages are kept.
+ *
+ * @return -1 on error, 0 on success.
+ */
+extern int read_messages(const char* file, struct hub_config* config);
+
+/**
  * Free the configuration data (allocated by read_config, or config_defaults).
  */
 extern void free_config(struct hub_config* config);

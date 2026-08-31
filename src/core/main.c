@@ -42,6 +42,9 @@
 #include <systemd/sd-daemon.h>
 #endif
 
+/* Defined below check_configuration(), but used from main_loop() above it. */
+static int load_configuration(struct hub_config* config, int allow_missing);
+
 static int arg_verbose = 5;
 static int arg_fork    = 0;
 static int arg_check_config = 0;
@@ -371,7 +374,7 @@ int main_loop()
 			hub_set_log_verbosity(arg_verbose);
 		}
 
-		if (read_config(arg_config, &configuration, !arg_have_config) == -1)
+		if (load_configuration(&configuration, !arg_have_config) == -1)
 			return -1;
 
 #ifndef WIN32
@@ -445,13 +448,38 @@ int main_loop()
 }
 
 
+/*
+ * Reads the hub configuration, then layers the msg_* status strings from the
+ * separate file_messages file on top of it if one is configured. Sites that
+ * only need a single early option (the worker count, the socket directory)
+ * call read_config() directly -- the messages are irrelevant to those.
+ */
+static int load_configuration(struct hub_config* config, int allow_missing)
+{
+	if (read_config(arg_config, config, allow_missing) == -1)
+	{
+		/* read_config() has already applied the defaults, so the strings are
+		   allocated even when parsing failed part way through. */
+		free_config(config);
+		return -1;
+	}
+
+	if (*config->file_messages && read_messages(config->file_messages, config) == -1)
+	{
+		free_config(config);
+		return -1;
+	}
+
+	return 0;
+}
+
 int check_configuration(int dump)
 {
 	struct hub_config configuration;
 	/* A missing file is only an error when one was actually named. Without
 	   -c the hub runs on built-in defaults, so -s/-S must be able to show
 	   those defaults -- which is exactly when they are most worth seeing. */
-	int ret = read_config(arg_config, &configuration, !arg_have_config);
+	int ret = load_configuration(&configuration, !arg_have_config);
 
 	if (ret == -1)
 	{

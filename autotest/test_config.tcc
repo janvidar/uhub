@@ -223,6 +223,29 @@ EXO_TEST(cfg_re_bind_bad,  { return cfg_expect("server_bind_addr = not!an!addr\n
 EXO_TEST(cfg_re_hbri6_ok,  { return cfg_expect("hbri_address6 = 2001:db8::10\n", 0); });
 EXO_TEST(cfg_re_hbri6_bad, { return cfg_expect("hbri_address6 = zzz!!\n", -1); });
 
+/* An explicitly quoted empty value sets a string option to the empty string.
+   A key with nothing after the '=' at all is still an error (cfg_err_empty_value
+   above). Together with the patterns below this is what makes the output of
+   "uhub -s" -- which writes every empty string option as key = "" -- parse back
+   in as a configuration file. */
+EXO_TEST(cfg_quoted_empty_value, {
+	struct hub_config config;
+	int ok = cfg_read("hub_name = \"\"\n", &config) == 0
+	         && config.hub_name[0] == '\0';
+	free_config(&config);
+	return ok;
+});
+
+/* These three default to the empty string, so their own validation pattern has
+   to accept it -- otherwise dumping and re-reading the defaults fails. */
+EXO_TEST(cfg_empty_alt_ports,    { return cfg_expect("server_alt_ports = \"\"\n", 0); });
+EXO_TEST(cfg_empty_redirect,     { return cfg_expect("redirect_addr = \"\"\n", 0); });
+EXO_TEST(cfg_empty_tls_redirect, { return cfg_expect("tls_require_redirect_addr = \"\"\n", 0); });
+
+/* An empty value does not disable validation for a non-empty value. */
+EXO_TEST(cfg_alt_ports_still_checked, { return cfg_expect("server_alt_ports = not,ports\n", -1); });
+EXO_TEST(cfg_redirect_still_checked,  { return cfg_expect("redirect_addr = ftp://elsewhere\n", -1); });
+
 /* An unchecked string option (no regexp) accepts arbitrary text. */
 EXO_TEST(cfg_re_unchecked, {
 	struct hub_config config;
@@ -232,4 +255,93 @@ EXO_TEST(cfg_re_unchecked, {
 	return ok;
 });
 
-EXO_TEST(cfg_teardown, { remove(cfg_test_file); net_destroy(); return 1; });
+/*
+ * The msg_* status strings can also be kept in their own file, named by the
+ * file_messages option and read by read_messages(). It shares the line parser
+ * with read_config() but applies through apply_message_config(), which knows
+ * only the message options.
+ */
+
+static const char* msg_test_file = "test_messages.tmp";
+
+/* Apply a messages snippet on top of a default config. */
+static int msg_read(const char* contents, struct hub_config* config)
+{
+	FILE* fh = fopen(msg_test_file, "w");
+	if (!fh) return -99;
+	fwrite(contents, 1, strlen(contents), fh);
+	fclose(fh);
+
+	if (read_config("test_config_does_not_exist.tmp", config, 1) == -1)
+		return -99;
+	return read_messages(msg_test_file, config);
+}
+
+EXO_TEST(msg_applies_value, {
+	struct hub_config config;
+	int ok = msg_read("msg_hub_full = No room at the inn\n", &config) == 0
+	         && strcmp(config.msg_hub_full, "No room at the inn") == 0;
+	free_config(&config);
+	return ok;
+});
+
+/* Anything that is not a status message belongs in uhub.conf, not here. */
+EXO_TEST(msg_rejects_non_message_key, {
+	struct hub_config config;
+	int ret = msg_read("server_port = 1234\n", &config);
+	free_config(&config);
+	return ret == -1;
+});
+
+EXO_TEST(msg_rejects_unknown_key, {
+	struct hub_config config;
+	int ret = msg_read("msg_no_such_message = hello\n", &config);
+	free_config(&config);
+	return ret == -1;
+});
+
+/* Comments and blank lines are handled by the shared line parser. */
+EXO_TEST(msg_ignores_comments, {
+	struct hub_config config;
+	int ok = msg_read("# a comment\n\nmsg_hub_disabled = Closed\n", &config) == 0
+	         && strcmp(config.msg_hub_disabled, "Closed") == 0;
+	free_config(&config);
+	return ok;
+});
+
+/* Values read from the messages file are applied last, so they win over the
+   same key set in the main configuration file. */
+EXO_TEST(msg_overrides_main_config, {
+	struct hub_config config;
+	int ok;
+	if (!cfg_write_file("msg_hub_full = from uhub.conf\n"))
+		return 0;
+	if (read_config(cfg_test_file, &config, 0) != 0)
+		return 0;
+	ok = strcmp(config.msg_hub_full, "from uhub.conf") == 0;
+
+	{
+		FILE* fh = fopen(msg_test_file, "w");
+		if (!fh) { free_config(&config); return 0; }
+		fwrite("msg_hub_full = from messages.conf\n", 1, 34, fh);
+		fclose(fh);
+	}
+	ok = ok && read_messages(msg_test_file, &config) == 0
+	        && strcmp(config.msg_hub_full, "from messages.conf") == 0;
+	free_config(&config);
+	return ok;
+});
+
+/* A missing messages file is not an error: the configured messages stand. */
+EXO_TEST(msg_missing_file_tolerated, {
+	struct hub_config config;
+	int ok;
+	if (read_config("test_config_does_not_exist.tmp", &config, 1) == -1)
+		return 0;
+	ok = read_messages("test_messages_does_not_exist.tmp", &config) == 0
+	     && strcmp(config.msg_hub_full, "Hub is full") == 0;
+	free_config(&config);
+	return ok;
+});
+
+EXO_TEST(cfg_teardown, { remove(cfg_test_file); remove(msg_test_file); net_destroy(); return 1; });

@@ -782,6 +782,7 @@ if (UNIX)
 	install( FILES
 		${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub.conf
 		${CMAKE_CURRENT_SOURCE_DIR}/doc/plugins.conf
+		${CMAKE_CURRENT_SOURCE_DIR}/doc/messages.conf
 		${CMAKE_CURRENT_SOURCE_DIR}/doc/users.conf
 		${CMAKE_CURRENT_SOURCE_DIR}/doc/rules.txt
 		${CMAKE_CURRENT_SOURCE_DIR}/doc/motd.txt

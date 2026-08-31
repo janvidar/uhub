@@ -24,6 +24,15 @@ Incompatible changes (action required beyond replacing the binaries):
 - Setting file_plugins now REPLACES the hub's built-in default plugin set
   rather than being the only way to get any plugins (see below). An existing
   plugins file keeps working unchanged; there is nothing to migrate.
+- Flood control is now on by default (flood_ctl_interval=5, chat=3, connect=20,
+  search=1, update=2, extras=5). Hubs that deliberately ran without it must set
+  the counts to 0 explicitly.
+- limit_max_hubs_user, _reg and _op now default to 0 (no limit) instead of 10,
+  and limit_max_hubs to 0 instead of 25. The old defaults rejected anyone
+  connected to more than ten hubs. Set them explicitly to enforce a limit.
+- The register_self and max_chat_history options were removed. Neither had had
+  any effect for some time: use mod_selfregister and mod_chat_history's
+  history_max= parameter respectively. A leftover line is a startup error.
 
 New features:
 - The hub loads a built-in default set of plugins when no plugins file is
@@ -34,7 +43,16 @@ New features:
   command was reachable. A default plugin that fails to load is reported and
   skipped; a plugin named in a plugins file is still fatal. Turn the set off
   with plugin_defaults = no.
-- "uhub -C" now also reports which plugins the configuration would load.
+- The msg_* status strings can be kept in their own file, named by the new
+  file_messages option, rather than in uhub.conf. Intended for translating or
+  rewording the hub's messages; see doc/messages.conf. They are still accepted
+  in uhub.conf, and the messages file is applied afterwards.
+- "uhub -C" now also reports which plugins the configuration would load, and
+  "uhub -s" / "-S" print the defaults when no configuration file exists instead
+  of printing nothing. Their output now also parses back in as a configuration
+  file: a quoted empty value ("") is accepted as the empty string, and
+  server_alt_ports, redirect_addr and tls_require_redirect_addr no longer carry
+  a validation pattern that rejected their own default.
 - New plugin mod_javascript: hub logic in JavaScript, embedding QuickJS. Scripts
   load with script=<file>, dir=<directory> or config=<list>; JavaScript versions
   of the welcome, chat-only and flood plugins ship as examples.
