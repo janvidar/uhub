@@ -41,7 +41,8 @@ Log messages to syslog.
 Specify configuration file (default: /etc/uhub/uhub.conf)
 .TP
 .BI \^\-C
-Check configuration files and return. Will print either \"OK\" or \"ERROR\".
+Check configuration files and return. Will print either \"OK\" or \"ERROR\",
+followed by the set of plugins the configuration would load.
 .TP
 .BI \^\-s
 Show all configuration parameters. In a format that is compatible with
@@ -58,6 +59,9 @@ Drop privileges and run as the given user.
 .TP
 .BI \^\-g " group"
 Drop privileges and run with the given group permissions.
+.TP
+.BI \^\-p " file"
+Write the process id to the given file.
 .TP
 .BI \^\-V
 Show the version number

@@ -21,17 +21,21 @@ Loading scripts
 ---------------
 
 mod_javascript is loaded once, like any other plugin, from the plugin config
-file (see doc/plugins.conf). Rather than listing every script on that line, you
+file (see doc/plugins.conf). Note that having a plugin config file at all
+replaces the hub's built-in default plugin set, so list the plugins you want
+alongside this one. Rather than naming every script on the mod_javascript line,
 point it at a directory or a secondary list file:
 
+    plugin_dir /usr/lib/uhub
+
     # Load every *.js in a directory (sorted, each validated):
-    plugin /usr/lib/uhub/mod_javascript.so "dir=/etc/uhub/js.d"
+    plugin mod_javascript "dir=/etc/uhub/js.d"
 
     # Or list scripts (with per-script options) in a secondary config file:
-    plugin /usr/lib/uhub/mod_javascript.so "config=/etc/uhub/javascript.conf"
+    plugin mod_javascript "config=/etc/uhub/javascript.conf"
 
     # A single script is also fine (convenience):
-    plugin /usr/lib/uhub/mod_javascript.so "script=/etc/uhub/welcome.js motd=Hi %n"
+    plugin mod_javascript "script=/etc/uhub/welcome.js motd=Hi %n"
 
 dir=, config= and script= may be combined and repeated. Every OTHER key=value on
 the plugin line is passed to all scripts as uhub.config (see below).

@@ -76,13 +76,19 @@ open, and one more address to get right.
 The seeder authenticates with a nick and a password, like any registered user.
 Credentials come from an auth plugin, not from the ACL file: bot, ubot, opbot
 and opubot are not accepted in users.conf, and a line using one is logged as
-obsolete and ignored. Load an auth plugin in plugins.conf, for example
+obsolete and ignored.
 
-  plugin /usr/lib/uhub/mod_auth_sqlite.so "file=/etc/uhub/users.db"
+A hub with no plugins configuration loads mod_auth_sqlite as part of its
+built-in default plugin set, on the database /var/lib/uhub/users.db, so there is
+usually nothing to configure here -- register the account with uhub-passwd(1):
 
-and register the account with uhub-passwd(1):
+  % uhub-passwd /var/lib/uhub/users.db add "[hub]files" "a-long-password" ubot
 
-  % uhub-passwd /etc/uhub/users.db add "[hub]files" "a-long-password" ubot
+If the hub does have a plugins.conf, it replaces those defaults, so make sure an
+auth plugin is among them and use whichever database it names:
+
+  plugin_dir /usr/lib/uhub
+  plugin mod_auth_sqlite "file=/var/lib/uhub/users.db"
 
 Use ubot rather than bot. The u stands for unrestricted, and the difference
 matters here: auth_cred_is_unrestricted exempts a user from flood control and

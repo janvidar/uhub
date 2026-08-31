@@ -3,9 +3,10 @@ Getting started guide
 
 Build uhub from source
 
-uhub is distributed as source code -- there are no prebuilt binaries.
-You will need a C compiler, CMake, SQLite3, and a TLS library
-(OpenSSL >= 3.0 or LibreSSL >= 3.4). TLS support is mandatory.
+Prebuilt packages are available for several platforms (see the README); this
+guide covers building from source. You will need a C compiler, CMake, SQLite3,
+and a TLS library (OpenSSL >= 3.0 or LibreSSL >= 3.4). TLS support is
+mandatory.
 
 On Debian/Ubuntu the build dependencies can be installed with:
 
@@ -58,15 +59,31 @@ Linux binary for ARM64 or a 64-bit Windows binary:
   % zig build -Dtarget=aarch64-linux-musl
   % zig build -Dtarget=x86_64-windows
 
-Create configuration files.
-If no configuration files are created, uhub will use the default parameters, so you can skip this step if you are in a hurry to see it run.
+Configuration.
 
-As root, or use sudo.
+"make install" already put the sample configuration files in /etc/uhub, so
+there is nothing to create by hand. uhub also runs with no configuration file
+at all: every option has a built-in default, and when no plugin configuration
+is given the hub loads a default set of plugins compiled into it --
+mod_auth_sqlite (registered users and persistent bans), mod_logging, mod_topic,
+mod_chat_history and mod_ucmd. That is enough for a working, administrable hub.
 
-  % mkdir /etc/uhub
-  % cp doc/uhub.conf /etc/uhub
-  % cp doc/users.conf /etc/uhub
-  % echo "welcome to uhub" > /etc/uhub/motd.txt
+Setting file_plugins in uhub.conf REPLACES that default set rather than adding
+to it, so a plugins.conf must list every plugin you want. See doc/plugins.conf,
+which documents them all.
+
+To see what a given configuration resolves to without starting the hub:
+
+  % uhub -C          # check the configuration, and list the plugins it would load
+  % uhub -s          # print the effective configuration
+  % uhub -S          # print only the settings that differ from the defaults
+
+Before anything else, give yourself an operator account -- credentials come
+from the authentication plugin, so without one nobody can administer the hub
+and every operator command is unreachable:
+
+  % sudo uhub-passwd /var/lib/uhub/users.db create
+  % sudo uhub-passwd /var/lib/uhub/users.db add <nick> <password> admin
 
 Start the hub in the foreground for the first time. Shut it down, by pressing CTRL+C.
 

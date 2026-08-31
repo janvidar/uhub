@@ -112,15 +112,8 @@ zig build test                   # run the test suite
 
 ## Running
 
-You can start uhub with no configuration at all — it will use sensible
-defaults. To customize it, install the sample config files first:
-
-```sh
-sudo mkdir -p /etc/uhub
-sudo cp doc/uhub.conf doc/users.conf /etc/uhub/
-echo "Welcome to my hub" | sudo tee /etc/uhub/motd.txt
-```
-
+`sudo make install` puts the sample configuration in `/etc/uhub` and the
+plugins where the hub looks for them, so there is nothing to set up first.
 Start the hub in the foreground (stop it with Ctrl+C):
 
 ```sh
@@ -128,8 +121,22 @@ uhub
 # INFO: Starting server, listening on :::1511...
 ```
 
-Then connect an ADC client to `adcs://localhost:1511` (use the `adcs://` prefix
-and the port number). To run as a background daemon under an unprivileged user:
+uhub runs with no configuration file at all, and with no plugin configuration
+it loads a built-in default set — SQLite authentication, logging, topic
+commands, chat history and user commands. `uhub -C` prints which plugins a
+given configuration would actually run.
+
+Give yourself an operator account, or nobody can administer the hub:
+
+```sh
+sudo uhub-passwd /var/lib/uhub/users.db create   # only needed once
+sudo uhub-passwd /var/lib/uhub/users.db add <nick> <password> admin
+```
+
+Then connect an ADC client to `adc://localhost:1511` (use the `adc://` prefix
+and the port number). TLS is off until you set `tls_enable` and point the hub
+at a certificate; once you do, clients connect to `adcs://` on the same port.
+To run as a background daemon under an unprivileged user:
 
 ```sh
 uhub -f -l /var/log/uhub.log -u nobody -g nogroup
@@ -150,15 +157,22 @@ killall -HUP uhub
 - **Configuration** — the hub is configured through `uhub.conf`; every option is
   documented inline in [`doc/uhub.conf`](doc/uhub.conf). Run `uhub -s` to print
   the effective configuration.
-- **Access control** — credentialed users and bans live in a separate ACL file
-  (`file_acl`, e.g. `users.conf`); see [`doc/users.conf`](doc/users.conf).
+- **Access control** — banned CIDs and denied nicks live in a separate ACL file
+  (`file_acl`, defaulting to `users.conf` in the configuration directory); see
+  [`doc/users.conf`](doc/users.conf). Registered users are *not* configured
+  there — they belong to an authentication plugin.
 - **In-hub commands** — operators and users can control the hub from main chat
   with `!` commands. Type `!help` to see what is available at your level.
 - **Registered users** — manage the SQLite user database with the `uhub-passwd`
-  tool (`man uhub-passwd`), or enable the `!regme` / `!passwd` self-service
-  commands in `mod_auth_sqlite`.
-- **Plugins** — enable and configure plugins in a plugins config file; a fully
-  commented example is in [`doc/plugins.conf`](doc/plugins.conf).
+  tool (`man uhub-passwd`), or load `mod_selfregister` for the `!regme` /
+  `!passwd` self-service commands.
+- **Plugins** — the built-in default set covers a working hub. To depart from
+  it, point `file_plugins` at a plugins config file; a fully commented example
+  is in [`doc/plugins.conf`](doc/plugins.conf). Note that setting it *replaces*
+  the defaults rather than adding to them.
+- **Status messages** — the `msg_*` strings the hub sends to clients can be
+  translated or reworded in a separate file; see
+  [`doc/messages.conf`](doc/messages.conf) and the `file_messages` option.
 - **Scaling** — for more than ~1024 users, raise the file-descriptor limit
   (`ulimit -n`) above the configured `max_users`. Use `workers=N` for
   multi-process mode, or link multiple hubs together for federation.
