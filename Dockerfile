@@ -10,21 +10,27 @@ FROM alpine:${ALPINE_VERSION}@${ALPINE_DIGEST} AS builder
 RUN apk update && apk upgrade && apk add --no-cache bash util-linux cmake make gcc git sqlite-dev openssl-dev git build-base
 WORKDIR /app
 COPY . .
-RUN cmake -S . -B build && cmake --build build -j
-RUN sed -i 's/\/usr\/lib\/uhub\//\/libs\//g' ./doc/*.conf && \
-sed -i 's/\/usr\/lib\/uhub\//\/libs\//g' ./doc/rules.txt && \
-sed -i 's/\/etc\/uhub\//\/conf\//g' ./doc/*.conf && \
-sed -i 's/\/etc\/uhub\//\/conf\//g' ./doc/rules.txt && \
-sed -i 's/\/var\/lib\/uhub\/seed/\/seed/g' ./doc/uhub-seeder.conf && \
-sed -i 's/^# seed_cache_dir = /seed_cache_dir = /' ./doc/uhub-seeder.conf && \
-echo 'Welcome to uhub' > ./doc/motd.txt
+# The install layout is derived from the prefix, so the image gets its paths by
+# configuring them rather than by rewriting the shipped configs afterwards.
+# The hub compiles these in, so it finds its plugins and default config with no
+# -c flag and no plugins.conf.
+RUN cmake -S . -B build \
+	-DCMAKE_INSTALL_PREFIX=/usr \
+	-DUHUB_PLUGIN_DIR=/libs \
+	-DUHUB_CONFIG_DIR=/conf \
+	-DUHUB_STATE_DIR=/state && \
+	cmake --build build -j && \
+	DESTDIR=/stage cmake --install build
+# The seeder is a separate daemon with its own config, and is not covered by the
+# hub's compiled-in paths.
+RUN sed -i 's|/var/lib/uhub/seed|/seed|g; s|^# seed_cache_dir = |seed_cache_dir = |' /stage/conf/uhub-seeder.conf
 
 FROM alpine:${ALPINE_VERSION}@${ALPINE_DIGEST}
 # Runtime shared libraries only -- the -dev packages and build tools belong to
 # the builder stage, not the shipped image.
 RUN apk update && apk upgrade && apk add --no-cache bash util-linux libssl3 libcrypto3 sqlite-libs
 WORKDIR /app
-COPY --from=builder /app/build/uhub .
+COPY --from=builder /stage/usr/bin/uhub .
 # uhub-seeder ships in the same image but is NOT what the image runs. It is a
 # separate process -- that separation is the reason the seed cache was split
 # out of the hub, and running both under one entrypoint would throw it away: a
@@ -40,9 +46,9 @@ COPY --from=builder /app/build/uhub .
 # volume at /seed to keep the cache across container restarts, and edit
 # /conf/uhub-seeder.conf -- the shipped one has a placeholder password and will
 # not log in.
-COPY --from=builder /app/build/uhub-seeder .
-COPY --from=builder /app/doc/plugins.conf /app/doc/uhub.conf /app/doc/users.conf /app/doc/rules.txt /app/doc/motd.txt /app/doc/uhub-seeder.conf /conf/
-COPY --from=builder /app/build/*.so /libs/
+COPY --from=builder /stage/usr/bin/uhub-seeder .
+COPY --from=builder /stage/conf/ /conf/
+COPY --from=builder /stage/libs/ /libs/
 
 # Run as an unprivileged user rather than root. The default server_port (1511)
 # is above 1024, so no privileged-port capability is required. If you configure
@@ -51,10 +57,9 @@ COPY --from=builder /app/build/*.so /libs/
 # /seed is the seed cache directory (see the note above); the seeder creates it
 # with mode 0700 but does not create parents, so it is made here.
 RUN addgroup -S uhub && adduser -S -G uhub -H -h /app uhub && \
-	mkdir -p /seed && \
-	chown -R uhub:uhub /app /conf /libs /seed
+	mkdir -p /seed /state && \
+	chown -R uhub:uhub /app /conf /libs /seed /state
 
 USER uhub
 
 ENTRYPOINT ["./uhub"]
-CMD ["-c","/conf/uhub.conf"]

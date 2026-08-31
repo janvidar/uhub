@@ -358,6 +358,16 @@ pub fn build(b: *std.Build) void {
     // ELF's size and nobody debugging a release build has the sources anyway.
     const strip = b.option(bool, "strip", "Strip debug info from the produced binaries");
     const tests = b.option(bool, "tests", "Build autotest-bin (needs the third_party/exotic submodule)") orelse exotic_present;
+
+    // Installation layout, mirroring CMakeLists.txt. These are compiled into
+    // the hub: UHUB_PLUGIN_DIR is where it looks for its built-in default
+    // plugin set, UHUB_CONFIG_DIR holds uhub.conf and users.conf, and
+    // UHUB_STATE_DIR is where it puts the default user database. The Zig build
+    // installs into zig-out rather than a system prefix, so these default to
+    // the same historical layout src/uhub_limits.h falls back to.
+    const plugin_dir = b.option([]const u8, "plugin-dir", "Directory the hub loads its default plugins from") orelse "/usr/lib/uhub";
+    const config_dir = b.option([]const u8, "config-dir", "Directory holding uhub.conf and the other example configs") orelse "/etc/uhub";
+    const state_dir = b.option([]const u8, "state-dir", "Directory for hub state (the default user database)") orelse "/var/lib/uhub";
     if (tests and !exotic_present) {
         std.debug.panic(
             "the exotic test framework is missing from third_party/exotic.\n" ++
@@ -406,6 +416,11 @@ pub fn build(b: *std.Build) void {
     // needs no bzip2 at all.
     if (fuse) flags.append("-DHAVE_BZLIB") catch @panic("OOM");
     if (target.result.cpu.arch.endian() == .big) flags.append("-DARCH_BIGENDIAN") catch @panic("OOM");
+    flags.appendSlice(&.{
+        b.fmt("-DUHUB_PLUGIN_DIR=\"{s}\"", .{plugin_dir}),
+        b.fmt("-DUHUB_CONFIG_DIR=\"{s}\"", .{config_dir}),
+        b.fmt("-DUHUB_STATE_DIR=\"{s}\"", .{state_dir}),
+    }) catch @panic("OOM");
     const cflags = flags.toOwnedSlice() catch @panic("OOM");
 
     // Generate version.h and system.h from the CMake templates, replacing

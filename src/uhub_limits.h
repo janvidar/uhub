@@ -30,12 +30,40 @@
 
 #include "system.h"
 
+/*
+ * Installation paths. The build system (CMakeLists.txt / build.zig) derives
+ * these from the install prefix and passes them in as -D definitions; the
+ * fallbacks below keep a bare compile working and match the historical
+ * hardcoded layout.
+ *
+ * UHUB_PLUGIN_DIR is where the hub looks for its built-in default plugin set
+ * (see plugin_load_defaults() in src/core/pluginloader.c), UHUB_CONFIG_DIR
+ * holds uhub.conf and friends, and UHUB_STATE_DIR is where the hub keeps
+ * state it creates itself -- the default user database.
+ */
 #ifndef WIN32
-#define SERVER_CONFIG    "/etc/uhub/uhub.conf"
-#define SERVER_ACL_FILE  "/etc/uhub/users.conf"
+#ifndef UHUB_CONFIG_DIR
+#define UHUB_CONFIG_DIR "/etc/uhub"
+#endif
+#ifndef UHUB_PLUGIN_DIR
+#define UHUB_PLUGIN_DIR "/usr/lib/uhub"
+#endif
+#ifndef UHUB_STATE_DIR
+#define UHUB_STATE_DIR "/var/lib/uhub"
+#endif
+#define SERVER_CONFIG UHUB_CONFIG_DIR "/uhub.conf"
 #else
+/* On Windows everything is relative to the working directory. */
+#ifndef UHUB_CONFIG_DIR
+#define UHUB_CONFIG_DIR "."
+#endif
+#ifndef UHUB_PLUGIN_DIR
+#define UHUB_PLUGIN_DIR "."
+#endif
+#ifndef UHUB_STATE_DIR
+#define UHUB_STATE_DIR "."
+#endif
 #define SERVER_CONFIG    "uhub.conf"
-#define SERVER_ACL_FILE  "users.conf"
 #ifndef stderr
 #define stderr stdout
 #endif

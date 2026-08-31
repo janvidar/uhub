@@ -24,6 +24,19 @@ set (UHUB_VERSION_PATCH ${PROJECT_VERSION_PATCH})
 # src/; use a dedicated variable instead of shadowing the built-in.
 set (UHUB_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# Installation layout. GNUInstallDirs gives the usual bin/lib/etc/share split
+# and honours CMAKE_INSTALL_PREFIX, multiarch libdirs and distro overrides.
+# The three UHUB_* directories below are compiled into the hub so that it can
+# find its plugins and default config without any path being configured by the
+# operator -- see plugin_load_defaults() in src/core/pluginloader.c.
+include (GNUInstallDirs)
+set (UHUB_PLUGIN_DIR "${CMAKE_INSTALL_FULL_LIBDIR}/uhub"
+	CACHE PATH "Directory the hub loads its default plugins from")
+set (UHUB_CONFIG_DIR "${CMAKE_INSTALL_FULL_SYSCONFDIR}/uhub"
+	CACHE PATH "Directory holding uhub.conf and the other example configs")
+set (UHUB_STATE_DIR "${CMAKE_INSTALL_FULL_LOCALSTATEDIR}/lib/uhub"
+	CACHE PATH "Directory for hub state (the default user database)")
+
 option(RELEASE "Release build, debug build if disabled" ON)
 option(LOWLEVEL_DEBUG "Enable low level debug messages." OFF)
 option(SYSTEMD_SUPPORT "Enable systemd notify and journal logging" OFF)
@@ -503,9 +516,20 @@ set_target_properties(
 # SQLite is linked into the hub itself (not only into the plugins) because the
 # BBS0 bulletin board index in src/core/bbs_index.c lives there.
 target_link_libraries(uhub ${CMAKE_DL_LIBS} adc network utils SQLite::SQLite3)
+
+# The hub resolves its default plugin set and default config path against these
+# at compile time. autotest-bin drives plugin_load_defaults() too, so it needs
+# the same values; src/uhub_limits.h supplies /usr/lib/uhub, /etc/uhub and
+# /var/lib/uhub as fallbacks for builds that do not define them at all.
+set (UHUB_PATH_DEFINITIONS
+	UHUB_PLUGIN_DIR="${UHUB_PLUGIN_DIR}"
+	UHUB_CONFIG_DIR="${UHUB_CONFIG_DIR}"
+	UHUB_STATE_DIR="${UHUB_STATE_DIR}")
+target_compile_definitions(uhub PRIVATE ${UHUB_PATH_DEFINITIONS})
 target_link_libraries(uhub-passwd SQLite::SQLite3 utils)
 if (UHUB_TESTS)
 	target_link_libraries(autotest-bin PRIVATE ${CMAKE_DL_LIBS} adc network utils SQLite::SQLite3)
+	target_compile_definitions(autotest-bin PRIVATE ${UHUB_PATH_DEFINITIONS})
 endif()
 target_link_libraries(mod_example utils)
 target_link_libraries(mod_welcome network utils)
@@ -742,22 +766,48 @@ if (LOWLEVEL_DEBUG)
 endif()
 
 if (UNIX)
-	install( TARGETS uhub uhub-passwd uhub-seeder RUNTIME DESTINATION bin )
+	install( TARGETS uhub uhub-passwd uhub-seeder RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} )
 	if (FUSE_SUPPORT)
-		install( TARGETS uhub-fuse RUNTIME DESTINATION bin )
+		install( TARGETS uhub-fuse RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} )
 	endif()
-	install( TARGETS mod_example mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_selfregister mod_chat_history mod_chat_history_sqlite mod_chat_only mod_chat_is_privileged mod_topic mod_no_guest_downloads mod_flood mod_ucmd DESTINATION /usr/lib/uhub/ OPTIONAL )
+
+	# mod_example is sample code, not a feature -- it is built (so it keeps
+	# compiling against the current plugin API) but deliberately not installed.
+	install( TARGETS mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_selfregister mod_chat_history mod_chat_history_sqlite mod_chat_only mod_chat_is_privileged mod_topic mod_no_guest_downloads mod_flood mod_ucmd DESTINATION ${UHUB_PLUGIN_DIR} OPTIONAL )
 	if(JAVASCRIPT_SUPPORT)
-		install( TARGETS mod_javascript DESTINATION /usr/lib/uhub/ OPTIONAL )
+		install( TARGETS mod_javascript DESTINATION ${UHUB_PLUGIN_DIR} OPTIONAL )
 	endif()
-	install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub.conf ${CMAKE_CURRENT_SOURCE_DIR}/doc/plugins.conf ${CMAKE_CURRENT_SOURCE_DIR}/doc/rules.txt ${CMAKE_CURRENT_SOURCE_DIR}/doc/motd.txt ${CMAKE_CURRENT_SOURCE_DIR}/doc/boards.conf DESTINATION /etc/uhub OPTIONAL )
+
+	install( FILES
+		${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub.conf
+		${CMAKE_CURRENT_SOURCE_DIR}/doc/plugins.conf
+		${CMAKE_CURRENT_SOURCE_DIR}/doc/users.conf
+		${CMAKE_CURRENT_SOURCE_DIR}/doc/rules.txt
+		${CMAKE_CURRENT_SOURCE_DIR}/doc/motd.txt
+		${CMAKE_CURRENT_SOURCE_DIR}/doc/boards.conf
+		DESTINATION ${UHUB_CONFIG_DIR} )
+
+	# The hub creates its default user database here when no plugins.conf
+	# overrides the built-in plugin set.
+	install( DIRECTORY DESTINATION ${UHUB_STATE_DIR} )
+
+	install( FILES
+		${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub.1
+		${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub-passwd.1
+		${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub-seeder.1
+		DESTINATION ${CMAKE_INSTALL_MANDIR}/man1 )
+	if (FUSE_SUPPORT)
+		install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub-fuse.1
+			DESTINATION ${CMAKE_INSTALL_MANDIR}/man1 )
+	endif()
+
 	# The seeder config carries a cleartext password for its bot account, so it
 	# is installed private rather than world readable like the hub's. The same
 	# goes for the mount's, for the same reason.
-	install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub-seeder.conf DESTINATION /etc/uhub
+	install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub-seeder.conf DESTINATION ${UHUB_CONFIG_DIR}
 		PERMISSIONS OWNER_READ OWNER_WRITE OPTIONAL )
 	if (FUSE_SUPPORT)
-		install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub-fuse.conf DESTINATION /etc/uhub
+		install( FILES ${CMAKE_CURRENT_SOURCE_DIR}/doc/uhub-fuse.conf DESTINATION ${UHUB_CONFIG_DIR}
 			PERMISSIONS OWNER_READ OWNER_WRITE OPTIONAL )
 	endif()
 endif()
