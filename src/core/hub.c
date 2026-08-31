@@ -18,6 +18,7 @@
  */
 
 #include "uhub_limits.h"
+#include <sys/stat.h> /* mkdir() for the state directory holding the TLS pair */
 #include <openssl/rand.h>
 #include "util/log.h"
 #include "util/memory.h"
@@ -1108,6 +1109,10 @@ static void server_alt_port_stop(struct hub_info* hub)
  * cue to generate: silently replacing a certificate an operator meant to use
  * would change the hub's advertised identity, which for ADC -- where clients
  * pin the key fingerprint -- is the one thing that must not happen by accident.
+ *
+ * Returns 1 when a pair is ready to load, 0 when the hub must not start, and
+ * -1 when TLS was only on by default and could not be set up -- the caller
+ * then runs without it.
  */
 static int resolve_ssl_certificates(struct hub_config* config, const char** cert, const char** key)
 {
@@ -1131,13 +1136,22 @@ static int resolve_ssl_certificates(struct hub_config* config, const char** cert
 	if (access(*key, F_OK) == 0)
 		return 1;
 
+	/* The state directory is created by the installation, but a hub run
+	   straight out of a build tree has never had one. */
+	if (mkdir(UHUB_STATE_DIR, 0750) == -1 && errno != EEXIST)
+		LOG_DEBUG("Unable to create %s: %s", UHUB_STATE_DIR, strerror(errno));
+
 	LOG_INFO("No TLS certificate yet, creating a self-signed one: %s", *cert);
 	if (!net_ssl_certificate_create(*cert, *key, PRODUCT))
 	{
-		LOG_FATAL("Unable to create a TLS certificate in %s. Set tls_certificate and "
-			"tls_private_key to use your own, or tls_enable=no to run without TLS.",
-			UHUB_STATE_DIR);
-		return 0;
+		/* Not fatal. TLS is on by default, so this is a hub that never asked
+		   for it by name -- the same rule as the built-in plugin set: a default
+		   that cannot be honoured is reported and skipped, and only something
+		   the operator configured explicitly stops the hub from starting. */
+		LOG_WARN("Unable to create a TLS certificate in %s -- continuing without TLS. "
+			"Set tls_certificate and tls_private_key to use your own, or "
+			"tls_enable=no to stop offering it.", UHUB_STATE_DIR);
+		return -1;
 	}
 	return 1;
 }
@@ -1148,9 +1162,19 @@ static int load_ssl_certificates(struct hub_info* hub, struct hub_config* config
 	{
 		const char* cert;
 		const char* key;
+		int resolved = resolve_ssl_certificates(config, &cert, &key);
 
-		if (!resolve_ssl_certificates(config, &cert, &key))
+		if (resolved == 0)
 			return 0;
+
+		if (resolved < 0)
+		{
+			/* Every other consumer -- the probe's TLS demultiplexing, the
+			   advertised address, the metrics warning -- reads tls_enable, so
+			   clear it rather than leave them disagreeing with reality. */
+			config->tls_enable = 0;
+			return 1;
+		}
 
 		hub->ctx = net_ssl_context_create(config->tls_version, config->tls_ciphersuite, config->tls_ciphersuites);
 

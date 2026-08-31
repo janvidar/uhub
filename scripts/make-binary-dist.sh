@@ -82,6 +82,8 @@ zig build \
 	-Drelease=true \
 	-Dtests=false \
 	-Dstrip=true \
+	-Dconfig-dir=etc \
+	-Dstate-dir=etc \
 	--prefix "$prefix"
 
 pkg="$stage/$P"
@@ -100,6 +102,12 @@ for f in "$prefix"/lib/*; do
 done
 [ -n "$(ls -A "$pkg/bin")" ] || die "no binaries were produced for $ZIG_TARGET"
 
+
+# The compiled-in configuration and state directories are package-relative for
+# the same reason the configs below are: an unpacked package is run from its own
+# root, and nothing here may point into /etc or /var. The state directory is
+# where the hub creates its TLS certificate on first start, so this is what
+# keeps that inside the package rather than failing on /var/lib/uhub.
 
 # Rewrite the shipped configs for a relocatable layout. Plugin names lose their
 # extension so the same file works on Windows: the loader appends the platform's

@@ -90,8 +90,16 @@ Start the hub in the foreground for the first time. Shut it down, by pressing CT
   % uhub
   Thu, 05 Feb 2009 00:48:04 +0000 INFO: Starting server, listening on :::1511...
 
-Connect to the hub using an ADC client, use the address adc://localhost:1511, or replace localhost with the correct hostname or IP address.
-NOTE: It is important to use the "adc://" prefix, and the port number when using DC++ and other ADC clients.
+Connect to the hub using an ADC client. The hub prints the address to use when
+it starts -- with TLS on, which is the default, that is an adcs:// address
+carrying the ?kp= fingerprint clients pin on first use:
+
+  INFO: Connect address: adcs://localhost:1511/?kp=SHA256/...
+
+Replace localhost with the correct hostname or IP address.
+NOTE: It is important to use the "adcs://" (or "adc://") prefix, and the port
+number, when using DC++ and other ADC clients. Plaintext adc:// works on the
+same port unless tls_require is set.
 
 If you modify the configuration files in /etc/uhub you will have to notify uhub by sending a HUP signal.
 

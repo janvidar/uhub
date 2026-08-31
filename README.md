@@ -133,9 +133,11 @@ sudo uhub-passwd /var/lib/uhub/users.db create   # only needed once
 sudo uhub-passwd /var/lib/uhub/users.db add <nick> <password> admin
 ```
 
-Then connect an ADC client to `adc://localhost:1511` (use the `adc://` prefix
-and the port number). TLS is off until you set `tls_enable` and point the hub
-at a certificate; once you do, clients connect to `adcs://` on the same port.
+Then connect an ADC client to `adcs://localhost:1511` (use the prefix and the
+port number). TLS is on by default: the hub creates a self-signed certificate
+for itself on first start, and prints the address to connect to, including the
+`?kp=` key fingerprint that ADC clients pin. Plaintext `adc://` works on the
+same port, and `tls_require=1` refuses it.
 To run as a background daemon under an unprivileged user:
 
 ```sh

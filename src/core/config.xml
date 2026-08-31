@@ -785,7 +785,7 @@
 		<since>0.3.1</since>
 	</option>
 
-	<option name="tls_enable" type="boolean" default="0">
+	<option name="tls_enable" type="boolean" default="1">
 		<short>Enable SSL/TLS support</short>
 		<description><![CDATA[
 			Enables/disables TLS/SSL support. tls_certificate and tls_private_key must be set if this is enabled.
