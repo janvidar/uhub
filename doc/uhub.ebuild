@@ -1,74 +1,133 @@
-# Copyright 1999-2010 Gentoo Foundation
+# Copyright 1999-2026 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
-# $Header: $
-inherit eutils
 
-if [ "$PV" != "9999" ]; then
-        SRC_URI="https://www.extatic.org/downloads/uhub/${P}-src.tar.bz2"
-        KEYWORDS="~amd64 ~x86"
+EAPI=8
+
+inherit cmake
+
+if [[ ${PV} == 9999 ]]; then
+	inherit git-r3
+	EGIT_REPO_URI="https://github.com/janvidar/uhub.git"
 else
-        inherit git
-        SRC_URI=""
-        EGIT_REPO_URI="git://github.com/janvidar/uhub.git"
-        KEYWORDS=""
+	# The release tarball, not GitHub's generated "Source code" asset: the
+	# latter has the submodules as empty gitlinks and does not build.
+	SRC_URI="https://github.com/janvidar/uhub/releases/download/${PV}/${PN}-${PV}-src.tar.gz"
+	S="${WORKDIR}/${PN}-${PV}-src"
+	KEYWORDS="~amd64 ~x86"
 fi
-
-EAPI="2"
 
 DESCRIPTION="High performance ADC hub"
 HOMEPAGE="https://www.uhub.org/"
 
+# GPLv3 with an OpenSSL linking exception; see COPYING and COPYING.OpenSSL.
 LICENSE="GPL-3"
 SLOT="0"
-IUSE="+ssl"
+# TLS is mandatory and is no longer a build option, so there is no ssl USE flag.
+# javascript embeds the bundled QuickJS submodule and needs nothing external.
+IUSE="fuse javascript systemd test"
+RESTRICT="!test? ( test )"
 
-DEPEND="=dev-lang/perl-5*
-ssl? ( >=dev-libs/openssl-0.9.8 )
+# Perl is no longer needed: the test suite is compiled directly, with no code
+# generation step. SQLite and a TLS library are both hard requirements.
+DEPEND="
+	dev-db/sqlite:3
+	dev-libs/openssl:0=
+	fuse? (
+		sys-fs/fuse:3
+		app-arch/bzip2
+	)
+	systemd? ( sys-apps/systemd )
 "
-RDEPEND="${DEPEND}"
-src_compile() {
-        $opts=""
-        use ssl && opts="USE_SSL=YES $opts"
-        emake $opts
+RDEPEND="
+	${DEPEND}
+	acct-user/uhub
+	acct-group/uhub
+"
+# Appended rather than assigned: the cmake eclass sets its own BDEPEND, and a
+# plain assignment here would discard it. CMakeLists.txt requires 3.21.
+BDEPEND="${BDEPEND} >=dev-build/cmake-3.21"
+
+src_configure() {
+	local mycmakeargs=(
+		# Where things are installed. GNUInstallDirs would put sysconfdir and
+		# localstatedir under the prefix for any prefix other than a literal
+		# /usr, which is what a Gentoo Prefix install has, so name all three
+		# rather than relying on that special case.
+		-DCMAKE_INSTALL_LIBDIR="$(get_libdir)"
+		-DCMAKE_INSTALL_SYSCONFDIR="${EPREFIX}/etc"
+		-DCMAKE_INSTALL_LOCALSTATEDIR="${EPREFIX}/var"
+		# The hub compiles these in so that it finds its plugins and its
+		# configuration without either being named in a config file. They have
+		# to agree with the install locations above.
+		-DUHUB_PLUGIN_DIR="${EPREFIX}/usr/$(get_libdir)/uhub"
+		-DUHUB_CONFIG_DIR="${EPREFIX}/etc/uhub"
+		-DUHUB_STATE_DIR="${EPREFIX}/var/lib/uhub"
+		-DSYSTEMD_SUPPORT=$(usex systemd ON OFF)
+		# uhub-fuse mounts a hub as a filesystem; file lists are bzip2'd XML.
+		-DFUSE_SUPPORT=$(usex fuse ON OFF)
+		-DJAVASCRIPT_SUPPORT=$(usex javascript ON OFF)
+		-DUHUB_TESTS=$(usex test ON OFF)
+	)
+	cmake_src_configure
 }
+
 src_install() {
-        dodir /usr/bin
-        dodir /etc/uhub
-        emake DESTDIR="${D}" UHUB_PREFIX="${D}/usr" install || die "install failed"
+	# Installs the binaries (uhub, uhub-passwd, uhub-seeder), the plugins, the
+	# sample configuration, the seeder configuration at 0600, the man pages and
+	# the state directory.
+	cmake_src_install
 
-        # uhub-seeder is a second daemon (the seed cache) and is not covered by
-        # the build system's install target, so install it and its sample
-        # configuration here. It does not read uhub.conf.
-        dobin uhub-seeder || die "uhub-seeder install failed"
-        insinto /etc/uhub
-        doins doc/uhub-seeder.conf
-        # It holds the bot account password in cleartext, and the seeder that
-        # has to read it does not run as root.
-        fowners uhub /etc/uhub/uhub-seeder.conf
-        fperms 0600 /etc/uhub/uhub-seeder.conf
+	dodoc doc/getstarted.txt doc/architecture.txt doc/linking.txt \
+		doc/prometheus.txt doc/bbs.txt doc/seedcache.txt
 
-        # None of the man pages are installed by the build system.
-        doman doc/uhub.1 doc/uhub-passwd.1 doc/uhub-seeder.1
-        dodoc doc/getstarted.txt doc/seedcache.txt
+	if use javascript; then
+		dodoc doc/javascript.txt
+	fi
 
-        # The seed cache directory; the seeder creates it at 0700 if missing.
-        keepdir /var/lib/uhub/seed
-        fowners uhub /var/lib/uhub/seed
-        fperms 0700 /var/lib/uhub/seed
+	if use fuse; then
+		dodoc doc/fuse.txt
+		# uhub-fuse.conf, like the seeder's, holds a password in cleartext.
+		fowners uhub:uhub /etc/uhub/uhub-fuse.conf
+		fperms 0600 /etc/uhub/uhub-fuse.conf
+	fi
 
-        # There is no OpenRC service file for the seeder in the tree (the hub's
-        # comes from the overlay's FILESDIR too), so none is installed here.
-        newinitd doc/uhub.gentoo.rc uhub || newinitd ${FILESDIR}/uhub.rc uhub
+	# uhub-seeder.conf holds the bot account password in cleartext, and the
+	# seeder that has to read it does not run as root.
+	fowners uhub:uhub /etc/uhub/uhub-seeder.conf
+	fperms 0600 /etc/uhub/uhub-seeder.conf
+
+	# The hub creates its default user database here when no plugins.conf
+	# overrides the built-in plugin set, so it must be writable by the hub.
+	fowners uhub:uhub /var/lib/uhub
+	fperms 0750 /var/lib/uhub
+
+	# The seed cache directory; the seeder creates it at 0700 if missing.
+	keepdir /var/lib/uhub/seed
+	fowners uhub:uhub /var/lib/uhub/seed
+	fperms 0700 /var/lib/uhub/seed
+
+	# There is no OpenRC or systemd service file for either daemon in the tree,
+	# so they come from the overlay's FILESDIR when it provides them.
+	if [[ -f ${FILESDIR}/uhub.rc ]]; then
+		newinitd "${FILESDIR}"/uhub.rc uhub
+	fi
+	if [[ -f ${FILESDIR}/uhub.confd ]]; then
+		newconfd "${FILESDIR}"/uhub.confd uhub
+	fi
 }
-# The user is created before src_install rather than after the merge, because
-# the seed cache directory is installed owned by it.
-pkg_setup() {
-        enewuser uhub
-}
+
 pkg_postinst() {
-        enewuser uhub
-        elog "uhub-seeder is a separate daemon and is not started by uhub."
-        elog "It needs a registered bot account on the hub and a reachable"
-        elog "listening port of its own. See /etc/uhub/uhub-seeder.conf and"
-        elog "uhub-seeder(1) before enabling it."
+	elog "uhub runs with no configuration file at all. When none configures"
+	elog "plugins it loads a default set (SQLite authentication, logging,"
+	elog "topic commands, chat history and user commands), so the hub is"
+	elog "usable as installed. 'uhub -C' reports what it would load."
+	elog ""
+	elog "Credentials come from the authentication plugin, so create an"
+	elog "operator account before anything else:"
+	elog "    uhub-passwd /var/lib/uhub/users.db add <nick> <password> admin"
+	elog ""
+	elog "uhub-seeder is a separate daemon and is not started by uhub."
+	elog "It needs a registered bot account on the hub and a reachable"
+	elog "listening port of its own. See /etc/uhub/uhub-seeder.conf and"
+	elog "uhub-seeder(1) before enabling it."
 }

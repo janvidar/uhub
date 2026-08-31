@@ -100,14 +100,21 @@ for f in "$prefix"/lib/*; do
 done
 [ -n "$(ls -A "$pkg/bin")" ] || die "no binaries were produced for $ZIG_TARGET"
 
+
 # Rewrite the shipped configs for a relocatable layout. Plugin names lose their
 # extension so the same file works on Windows: the loader appends the platform's
 # own (see plugin_add_extension in src/core/pluginloader.c).
 # -E throughout: BSD sed (macOS) has no \? or \+ in basic regexes, and this
 # script is meant to run on a developer's machine as well as in CI.
-sed -E -e 's|^([[:space:]]*#?[[:space:]]*plugin[[:space:]]+)/usr/lib/uhub/|\1|' \
+# doc/plugins.conf sets its own absolute plugin_dir for a system install. This
+# package supplies its own relative one below, and plugin_dir applies to the
+# lines that follow it, so the shipped one has to be dropped rather than left to
+# override ours further down the file.
+sed -E -e '/^[[:space:]]*plugin_dir[[:space:]]/d' \
+	-e 's|^([[:space:]]*#?[[:space:]]*plugin[[:space:]]+)/usr/lib/uhub/|\1|' \
 	-e 's|^([[:space:]]*#?[[:space:]]*plugin[[:space:]]+[A-Za-z0-9_]+)\.so|\1|' \
 	-e 's|/etc/uhub/|etc/|g' \
+	-e 's|/var/lib/uhub/|etc/|g' \
 	-e 's|/var/log/uhub\.log|uhub.log|g' \
 	doc/plugins.conf >"$pkg/etc/plugins.conf.body"
 {
@@ -120,7 +127,15 @@ sed -E -e 's|^([[:space:]]*#?[[:space:]]*plugin[[:space:]]+)/usr/lib/uhub/|\1|' 
 } >"$pkg/etc/plugins.conf"
 rm -f "$pkg/etc/plugins.conf.body"
 
-sed -e 's|/etc/uhub/|etc/|g' doc/uhub.conf >"$pkg/etc/uhub.conf"
+# file_acl and file_plugins are commented out in the shipped uhub.conf because a
+# system install resolves both from compiled-in absolute paths. Those paths mean
+# nothing in a relocatable package, so uncomment them and let them point at the
+# package-relative configs rewritten above -- otherwise the hub would look for
+# its plugins in /usr/lib/uhub and ignore the etc/plugins.conf shipped here.
+sed -E -e 's|/etc/uhub/|etc/|g' \
+	-e 's|^#[[:space:]]*(file_acl[[:space:]]*=)|\1|' \
+	-e 's|^#[[:space:]]*(file_plugins[[:space:]]*=)|\1|' \
+	doc/uhub.conf >"$pkg/etc/uhub.conf"
 
 # The seed cache daemon has its own configuration file, but only ship it where
 # the daemon itself was built. Its cache directory defaults to
@@ -204,6 +219,21 @@ if TS=$(date -u -r "$EPOCH" +%Y%m%d%H%M.%S 2>/dev/null); then
 else
 	TS=$(date -u -d "@$EPOCH" +%Y%m%d%H%M.%S)
 fi
+# Normalise the modes rather than inheriting the builder's umask. This is not
+# only about reproducibility: the plugin loader refuses to dlopen a plugin that
+# is group- or world-writable (it is loaded into the hub's address space, so a
+# writable .so is a local code-execution vector), and a umask of 002 -- the
+# default for a user's own group on Debian and Ubuntu -- would otherwise ship
+# plugins at 0775 that the hub then declines to load.
+find "$pkg" -type d -exec chmod 0755 {} +
+find "$pkg" -type f -exec chmod 0644 {} +
+find "$pkg/bin" "$pkg/lib" -type f -exec chmod 0755 {} +
+# These two carry a password once filled in, and are installed private by the
+# system packaging for the same reason.
+for f in "$pkg/etc/uhub-seeder.conf" "$pkg/etc/uhub-fuse.conf"; do
+	[ -f "$f" ] && chmod 0600 "$f"
+done
+
 find "$pkg" -depth -exec touch -h -t "$TS" {} +
 
 mkdir -p "$OUT"

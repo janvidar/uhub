@@ -78,6 +78,19 @@ New features:
   refusing one, into the spelling its recipient announced. Off by default.
 - New operator command !unban to lift a ban by nick, CID or IP/range. Runtime
   bans could previously only be cleared by restarting the hub.
+
+Packaging:
+- The install honours CMAKE_INSTALL_PREFIX and the GNUInstallDirs layout;
+  plugins and configuration no longer go to a hardcoded /usr/lib/uhub and
+  /etc/uhub. The directories the hub compiles in can be overridden with
+  -DUHUB_PLUGIN_DIR, -DUHUB_CONFIG_DIR and -DUHUB_STATE_DIR (and the matching
+  -Dplugin-dir / -Dconfig-dir / -Dstate-dir for build.zig).
+- users.conf and motd.txt are installed, and the man pages with them. A missing
+  motd.txt previously made the shipped plugins.conf fail mod_welcome's load,
+  so a hub installed from source and left as shipped refused to start.
+- The RPM spec and the Gentoo ebuild build with CMake. Both had been calling a
+  hand-written Makefile that no longer exists, and neither could be built.
+- mod_example is built but no longer installed; it is sample code.
 - !ban takes an optional duration ("!ban nick 30m", 12h, 7d) and a reason
   ("!ban nick 30m <reason>"). The reason is shown to the banned user on a
   refused reconnect, persisted by a storage plugin, and propagated to linked
