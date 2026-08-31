@@ -304,6 +304,17 @@ static void set_error_message(struct plugin_handle* plugin, const char* msg)
 	plugin->error_msg = msg;
 }
 
+/* Abandon a half-built configuration. A "file=" earlier on the line may already
+   have opened the database, so freeing the struct is not enough. */
+static struct chat_history_data* parse_config_failed(struct chat_history_data* data, struct plugin_handle* plugin, const char* msg)
+{
+	if (data->db)
+		sqlite3_close(data->db);
+	hub_free(data);
+	set_error_message(plugin, msg);
+	return 0;
+}
+
 static struct chat_history_data* parse_config(const char* line, struct plugin_handle* plugin)
 {
 	struct chat_history_data* data = (struct chat_history_data*) hub_malloc_zero(sizeof(struct chat_history_data));
@@ -329,10 +340,8 @@ static struct chat_history_data* parse_config(const char* line, struct plugin_ha
 
 		if (!setting)
 		{
-			set_error_message(plugin, "Unable to parse startup parameters");
 			cfg_tokens_free(tokens);
-			hub_free(data);
-			return 0;
+			return parse_config_failed(data, plugin, "Unable to parse startup parameters");
 		}
 
 		if (strcmp(cfg_settings_get_key(setting), "file") == 0)
@@ -343,9 +352,7 @@ static struct chat_history_data* parse_config(const char* line, struct plugin_ha
 				{
 					cfg_tokens_free(tokens);
 					cfg_settings_free(setting);
-					hub_free(data);
-					set_error_message(plugin, "Unable to open database file");
-					return 0;
+					return parse_config_failed(data, plugin, "Unable to open database file");
 				}
 			}
 		}
@@ -363,11 +370,9 @@ static struct chat_history_data* parse_config(const char* line, struct plugin_ha
 		}
 		else
 		{
-			set_error_message(plugin, "Unknown startup parameters given");
 			cfg_tokens_free(tokens);
 			cfg_settings_free(setting);
-			hub_free(data);
-			return 0;
+			return parse_config_failed(data, plugin, "Unknown startup parameters given");
 		}
 
 		cfg_settings_free(setting);
@@ -378,11 +383,7 @@ static struct chat_history_data* parse_config(const char* line, struct plugin_ha
 	/* No "file" given: keep the history for the lifetime of the hub only.
 	   This is what the separate in-memory version of this plugin used to do. */
 	if (!data->db && sqlite3_open(DEFAULT_DATABASE, &data->db))
-	{
-		hub_free(data);
-		set_error_message(plugin, "Unable to open in-memory database");
-		return 0;
-	}
+		return parse_config_failed(data, plugin, "Unable to open in-memory database");
 
 	return data;
 }
@@ -427,6 +428,7 @@ int plugin_unregister(struct plugin_handle* plugin)
 		hub_free(data->command_history_handle);
 		hub_free(data->command_historycleanup_handle);
 		hub_free(data);
+		plugin->ptr = 0;
 	}
 
 	return 0;

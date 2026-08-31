@@ -99,9 +99,13 @@ static void mch_wire(struct plugin_handle* plugin)
 	plugin->hub.command_arg_next = mch_command_arg_next;
 }
 
-/* Register a fresh instance of the plugin into mch_plugin. */
+/* Register a fresh instance of the plugin into mch_plugin, tearing down any
+   instance a previous test left there -- mch_wire() zeroes the handle, so an
+   instance not unregistered first can no longer be reached, let alone freed. */
 static int mch_start(const char* config)
 {
+	if (mch_plugin.ptr)
+		mod_chat_history_unregister(&mch_plugin);
 	mch_cmd_history = NULL;
 	mch_cmd_cleanup = NULL;
 	mch_wire(&mch_plugin);

@@ -167,12 +167,13 @@ struct plugin_handle* plugin_load(const char* filename, const char* config, stru
 	plugin_register_f register_f;
 	plugin_unregister_f unregister_f;
 	int ret;
-	struct plugin_handle* handle = (struct plugin_handle*) hub_malloc_zero(sizeof(struct plugin_handle));
+	struct plugin_handle* handle;
 	struct uhub_plugin* plugin = plugin_open(filename);
 
 	if (!plugin)
 		return NULL;
 
+	handle = (struct plugin_handle*) hub_malloc_zero(sizeof(struct plugin_handle));
 	if (!handle)
 	{
 		plugin_close(plugin);
