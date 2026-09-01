@@ -497,16 +497,22 @@ const char* fs_session_state_name(const struct fs_session* session)
 	}
 }
 
-/** Keep the once-a-second tick going while there is a hub to talk to. */
+/** How long until the timer is next wanted, given what there is to do. */
+static size_t session_tick_interval(struct fs_session* session)
+{
+	return session->transfer ? 1 : FS_TICK_IDLE;
+}
+
+/** Keep the tick going while there is a hub to talk to. */
 static void session_schedule_tick(struct fs_session* session)
 {
 	struct timeout_queue* queue = net_backend_get_timeout_queue();
 
-	if (!queue || !session->timer || !session->transfer)
+	if (!queue || !session->timer)
 		return;
 
 	if (!timeout_evt_is_scheduled(session->timer))
-		timeout_queue_insert(queue, session->timer, 1);
+		timeout_queue_insert(queue, session->timer, session_tick_interval(session));
 }
 
 /* ------------------------------------------------------------- reconnecting */
@@ -514,6 +520,7 @@ static void session_schedule_tick(struct fs_session* session)
 static void session_connect(struct fs_session* session)
 {
 	session->state = FS_SESSION_CONNECTING;
+	session->reconnect_pending = 0;
 
 	if (!ADC_client_connect(session->client, session->address))
 	{
@@ -527,32 +534,42 @@ static void session_connect(struct fs_session* session)
 
 /**
  * One timer for the whole session: the reconnect when offline, and the
- * transfer layer's deadlines and retries the rest of the time. It reschedules
- * itself for a second hence whenever anything is in flight, and stays quiet
- * when there is nothing to do.
+ * keepalive and the transfer layer's deadlines and retries the rest of the
+ * time. It reschedules itself for as long as there is a connection to look
+ * after, and stops once there is nothing left to do for it.
  */
 static void session_timer_cb(struct timeout_evt* evt)
 {
 	struct fs_session* session = (struct fs_session*) evt->ptr;
+	struct timeout_queue* queue;
 
 	if (!session->running)
 		return;
 
+	/* Offline is the reconnect's turn, and session_connect() schedules the
+	   next tick itself -- either a further backoff or, once the connection is
+	   up, the periodic one. */
 	if (session->state == FS_SESSION_OFFLINE)
 	{
 		session_connect(session);
 		return;
 	}
 
-	if (session->transfer)
-	{
-		struct timeout_queue* queue = net_backend_get_timeout_queue();
+	/* A pinned keyprint that did not match is not retried, so there is nothing
+	   left for the timer to come back for. */
+	if (session->state == FS_SESSION_FATAL)
+		return;
 
+	if (session->state == FS_SESSION_ONLINE)
+		ADC_client_keepalive(session->client, session->keepalive);
+
+	if (session->transfer)
 		fs_transfer_tick(session->transfer);
 
-		if (queue && !timeout_evt_is_scheduled(session->timer))
-			timeout_queue_insert(queue, session->timer, 1);
-	}
+	queue = net_backend_get_timeout_queue();
+
+	if (queue && !timeout_evt_is_scheduled(session->timer))
+		timeout_queue_insert(queue, session->timer, session_tick_interval(session));
 }
 
 static void session_schedule_reconnect(struct fs_session* session)
@@ -561,6 +578,15 @@ static void session_schedule_reconnect(struct fs_session* session)
 
 	if (!queue || !session->timer)
 		return;
+
+	/* A failed attempt can be reported twice -- ADC_client_connect() raises
+	   DISCONNECTED on its way out and then returns 0 -- and that is still one
+	   attempt, so the second report neither bumps the backoff nor pushes the
+	   deadline further out. */
+	if (session->reconnect_pending)
+		return;
+
+	session->reconnect_pending = 1;
 
 	/* Doubling, so a hub that is down does not get one connect per second for
 	   as long as the mount is up. */
@@ -679,6 +705,7 @@ struct fs_session* fs_session_create(const struct fs_config* config)
 	session->chat_main = fs_chatlog_create(0);
 	session->chat_private = fs_chatlog_create(0);
 	session->timer = (struct timeout_evt*) hub_malloc_zero(sizeof(struct timeout_evt));
+	session->keepalive = config->keepalive_interval;
 	session->mounted = time(NULL);
 
 	if (!session->address || !session->nick || !session->roster || !session->timer ||

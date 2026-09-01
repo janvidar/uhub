@@ -61,6 +61,7 @@ static const struct fs_cfg_key fs_config_keys[] = {
 	INT_KEY("transfer_port",      transfer_port,      1514, 1024, 65535),
 	STR_KEY("transfer_bind_addr", transfer_bind_addr, 0, "any",       NULL),
 	INT_KEY("download_timeout",   download_timeout,   60,   1,    3600),
+	INT_KEY("keepalive_interval", keepalive_interval, 120,  0,    3600),
 
 	STR_KEY("tls_certificate",    tls_certificate,    0, NULL,        NULL),
 	STR_KEY("tls_private_key",    tls_private_key,    0, NULL,        NULL),

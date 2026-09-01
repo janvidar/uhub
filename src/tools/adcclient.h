@@ -384,6 +384,33 @@ int ADC_client_connect(struct ADC_client* client, const char* address);
 void ADC_client_disconnect(struct ADC_client* client);
 void ADC_client_send(struct ADC_client* client, struct adc_message* msg);
 
+/**
+ * Send a keepalive if the connection has gone quiet for @p interval seconds.
+ *
+ * ADC's keepalive is an empty line, which a hub is required to accept and
+ * ignore. It is worth sending for two reasons. A NAT or a stateful firewall
+ * between the client and the hub drops the state behind an idle flow after a
+ * few minutes, and once it has, the connection is gone without either end
+ * being told. And a connection that has *already* been torn down behind our
+ * back looks exactly like an idle one: only a write draws out the RST, so
+ * without one a dead hub link reads as quiet for ever.
+ *
+ * Silence means silence in both directions -- anything received is proof the
+ * connection is alive, and the ACKs it draws keep the same middlebox state
+ * fresh -- so this only fires when nothing at all has crossed the socket.
+ *
+ * Only a logged-in connection with an empty send queue qualifies: a queue with
+ * bytes still in it is either activity of its own or a peer that is not
+ * reading, and adding a newline to it would prove nothing either way.
+ *
+ * The caller decides how often to ask; asking more often than @p interval is
+ * expected and cheap.
+ *
+ * @param interval Seconds of silence before a keepalive is due; 0 disables it.
+ * @return 1 if a keepalive was sent.
+ */
+int ADC_client_keepalive(struct ADC_client* client, int interval);
+
 #endif /* HAVE_UHUB_ADC_CLIENT_H */
 
 

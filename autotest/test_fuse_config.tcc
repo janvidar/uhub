@@ -34,6 +34,7 @@ EXO_TEST(fuse_config_defaults, {
 		&& cfg.nick && strcmp(cfg.nick, "uhub-fuse") == 0
 		&& cfg.transfer_port == 1514
 		&& cfg.download_timeout == 60
+		&& cfg.keepalive_interval == 120
 		&& cfg.cache_size == 512;
 });
 
@@ -173,6 +174,18 @@ EXO_TEST(fuse_config_int_trailing_garbage, {
 
 EXO_TEST(fuse_config_int_out_of_range, { return parse("transfer_port = 99999") == 0; });
 EXO_TEST(fuse_config_int_below_range, { return parse("transfer_port = 80") == 0; });
+
+/* Unlike the other intervals, 0 is in range here: it means "send none". */
+EXO_TEST(fuse_config_keepalive_zero_allowed, {
+	return parse("keepalive_interval = 0") == 1 && cfg.keepalive_interval == 0;
+});
+
+EXO_TEST(fuse_config_keepalive_set, {
+	return parse("keepalive_interval = 45") == 1 && cfg.keepalive_interval == 45;
+});
+
+EXO_TEST(fuse_config_keepalive_out_of_range, { return parse("keepalive_interval = 3601") == 0; });
+EXO_TEST(fuse_config_keepalive_below_range, { return parse("keepalive_interval = -1") == 0; });
 EXO_TEST(fuse_config_int_not_a_number, { return parse("transfer_port = nope") == 0; });
 EXO_TEST(fuse_config_int_empty, { return parse("transfer_port =") == 0; });
 

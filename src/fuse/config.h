@@ -54,6 +54,13 @@ struct fs_config
 	char* transfer_bind_addr;
 	int   download_timeout;   /** Seconds before a fetch is given up on. */
 
+	/**
+	 * Seconds of silence on the hub connection before a keepalive newline is
+	 * sent; 0 turns it off. Two minutes by default, comfortably under the idle
+	 * timeout of a typical NAT.
+	 */
+	int   keepalive_interval;
+
 	/* TLS on the transfer port. Both or neither; ADCS is advertised only when
 	   there is a certificate to complete a handshake with. */
 	char* tls_certificate;

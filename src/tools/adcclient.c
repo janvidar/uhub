@@ -759,6 +759,36 @@ void ADC_client_send(struct ADC_client* client, struct adc_message* msg)
 	}
 }
 
+int ADC_client_keepalive(struct ADC_client* client, int interval)
+{
+	struct adc_message* msg;
+	time_t now;
+
+	ADC_TRACE;
+
+	/* Anything short of a logged-in connection is either already exchanging
+	   handshake traffic or has nothing to keep alive. */
+	if (!client || interval <= 0 || client->state != ps_normal || !client->con)
+		return 0;
+
+	if (ioq_send_get_bytes(client->send_queue))
+		return 0;
+
+	now = net_get_time();
+
+	if (difftime(now, net_con_get_last_send(client->con)) < (double) interval ||
+	    difftime(now, net_con_get_last_recv(client->con)) < (double) interval)
+		return 0;
+
+	msg = adc_msg_construct_keepalive();
+	if (!msg)
+		return 0;
+
+	ADC_client_send(client, msg);
+	adc_msg_free(msg);
+	return 1;
+}
+
 struct adc_message* ADC_client_build_info(struct ADC_client* client)
 {
 	struct adc_message* info;

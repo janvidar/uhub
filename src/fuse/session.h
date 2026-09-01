@@ -52,6 +52,16 @@ struct timeout_evt;
 #define FS_RECONNECT_MIN 1
 #define FS_RECONNECT_MAX 60
 
+/**
+ * How often the session timer comes round when there is no transfer machinery
+ * to service. A mount with a transfer port ticks once a second because
+ * fs_transfer_tick() has deadlines to watch; without one the only periodic work
+ * is noticing that a keepalive has come due, which does not need that
+ * resolution. It does have to stay under TIMEOUT_QUEUE_MAX, since the timeout
+ * wheel aliases anything longer onto an earlier slot.
+ */
+#define FS_TICK_IDLE 10
+
 enum fs_session_state
 {
 	FS_SESSION_OFFLINE = 0,
@@ -91,6 +101,18 @@ struct fs_session
 
 	struct timeout_evt* timer;
 	size_t backoff;
+
+	/**
+	 * Seconds of silence on the hub connection before a keepalive is sent, or 0
+	 * to leave the connection alone. See ADC_client_keepalive().
+	 */
+	int keepalive;
+
+	/**
+	 * Set while the timer is counting down to a reconnect, so that one failed
+	 * attempt reported twice is still one step of backoff.
+	 */
+	int reconnect_pending;
 
 	/** Set when the ADC thread should leave its loop. */
 	int running;

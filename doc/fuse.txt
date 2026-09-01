@@ -212,6 +212,16 @@ looks live is worse than an empty one, so there is no last known state to read.
 The mount stays up and keeps answering throughout, and reconnects on its own
 with a widening delay of up to a minute.
 
+For that to happen the drop has to be noticed, and a connection nobody writes
+to is not. A hub can be sat on quietly for hours, and a NAT or a stateful
+firewall in the path will forget an idle flow long before that without telling
+either end; once it has, the connection is gone but still reads as merely
+quiet. So the mount sends a keepalive -- a single empty line, which ADC defines
+and every hub ignores -- after keepalive_interval seconds with nothing in
+either direction, two minutes by default. It keeps the middlebox state fresh,
+and where the connection is already dead the write is what draws out the error
+that starts the reconnect. keepalive_interval = 0 turns it off.
+
 The exception is a hub that was pinned with ?kp= and presented a different
 certificate. That is a configuration error or an interception, never a
 transient fault, so it is not retried: hub/state reads "failed" and stays there.
