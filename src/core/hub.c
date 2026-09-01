@@ -665,13 +665,6 @@ void hub_send_hubinfo(struct hub_info* hub, struct hub_user* u)
 
 	if (user_flag_get(u, feature_ping))
 	{
-/*
-		FIXME: These are missing:
-		HH - Hub Host address ( DNS or IP )
-		WS - Hub Website
-		NE - Hub Network
-		OW - Hub Owner name
-*/
 		adc_msg_add_named_argument(info, "UC", uhub_itoa(hub_get_user_count(hub)));
 		adc_msg_add_named_argument(info, "MC", uhub_itoa(hub_get_max_user_count(hub)));
 		adc_msg_add_named_argument(info, "SS", uhub_ulltoa(hub_get_shared_size(hub)));
