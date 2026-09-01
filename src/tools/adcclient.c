@@ -1275,14 +1275,36 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 	if (!end)
 		end = hub_address + strlen(hub_address);
 
-	split = NULL;
-	for (const char* p = end; p > hub_address; )
+	/*
+	 * An IPv6 literal is bracketed -- "adc://[::1]:1511" -- because its own
+	 * colons would otherwise be indistinguishable from the port separator.
+	 * The brackets delimit the host; the port separator is the colon that
+	 * follows them, and never one inside.
+	 */
+	const char* host_start = hub_address;
+	const char* host_end;
+
+	if (*hub_address == '[')
 	{
-		if (*--p == ':')
+		const char* rbracket = memchr(hub_address, ']', (size_t) (end - hub_address));
+		if (!rbracket || rbracket == hub_address + 1)
+			return 0;
+		host_start = hub_address + 1;
+		host_end = rbracket;
+		split = (rbracket + 1 < end && rbracket[1] == ':') ? rbracket + 1 : NULL;
+	}
+	else
+	{
+		split = NULL;
+		for (const char* p = end; p > hub_address; )
 		{
-			split = p;
-			break;
+			if (*--p == ':')
+			{
+				split = p;
+				break;
+			}
 		}
+		host_end = split;
 	}
 
 	if (split == 0 || (end - split) < 2 || (end - split) > 6)
@@ -1320,7 +1342,7 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg)
 
 	/* Re-parsed on every reconnect, so the previous hostname has to go. */
 	hub_free(client->address.hostname);
-	client->address.hostname = hub_strndup(hub_address, &split[0] - &hub_address[0]);
+	client->address.hostname = hub_strndup(host_start, (size_t) (host_end - host_start));
 
 	return 1;
 }
