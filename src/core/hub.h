@@ -283,11 +283,6 @@ extern void hub_redirect_user(struct hub_info* hub, struct hub_user* user, const
 extern void hub_send_flood_warning(struct hub_info*, struct hub_user* user, const char* message);
 
 /**
- * Inform a user that their chat message was denied (e.g. chat_is_privileged).
- */
-extern void hub_send_chat_denied(struct hub_info*, struct hub_user* user, const char* message);
-
-/**
  * Allocates memory, initializes the hub based on the configuration,
  * and returns a hub handle.
  * This hub handle must be passed to hub_shutdown_service() in order to cleanup before exiting.

@@ -19,19 +19,24 @@
 
 /*
  * Restrict who may write in main chat and who may send private messages,
- * based on a per-message credential threshold. This is the plugin counterpart
- * to the built-in chat_is_privileged option, adding private-message control
- * (the "pm_is_privileged" ask in issue #114) so a hub can defend against
- * private-message spam from guests.
+ * based on a per-message credential threshold. This replaces the built-in
+ * chat_is_privileged option (obsolete since 0.8.1) and adds private-message
+ * control (the "pm_is_privileged" ask in issue #114) so a hub can defend
+ * against private-message spam from guests.
  *
- * Parameters (each is a minimum credential: none/guest/reg/user/op/admin/...):
+ * Parameters (each allow_* is a minimum credential: none/guest/reg/user/op/...):
  *   allow_mainchat    minimum credential to write in main chat   (default: guest)
  *   allow_privchat    minimum credential to send a private msg   (default: guest)
  *   allow_op_contact  minimum credential to PM an operator/admin (default: guest)
+ *   msg_mainchat      notice sent when main chat is denied
+ *   msg_privchat      notice sent when a private message is denied
  *
  * allow_op_contact applies when the *recipient* is an operator or above, and is
  * normally left at (or below) allow_privchat so ordinary users can always reach
  * staff even while peer-to-peer private messaging is locked down.
+ *
+ * The equivalent of the old chat_is_privileged=yes is:
+ *   plugin mod_chat_is_privileged "allow_mainchat=op"
  */
 
 #include "plugin_api/handle.h"
@@ -56,7 +61,18 @@ struct chat_data
 	enum auth_credentials allow_privchat;	// minimum credentials to allow using private chat
 	enum auth_credentials allow_op_contact; // minimum credentials to allow private chat to operators (including super and admins).
 	enum auth_credentials allow_mainchat;	// minimum credentials to allow using main chat
+	char *msg_mainchat;			// notice sent when a main chat message is denied
+	char *msg_privchat;			// notice sent when a private message is denied
 };
+
+static void free_chat_data(struct chat_data *data)
+{
+	if (!data)
+		return;
+	hub_free(data->msg_mainchat);
+	hub_free(data->msg_privchat);
+	hub_free(data);
+}
 
 static void set_error_message(struct plugin_handle *plugin, const char *msg)
 {
@@ -71,6 +87,31 @@ static int parse_cred(struct plugin_handle *plugin, struct cfg_settings *setting
 		return 1;
 	set_error_message(plugin, "Invalid credential value for startup parameter");
 	return 0;
+}
+
+// Replace *out with a copy of the setting's value. Returns 1 on success, 0 if
+// the value is empty or cannot be copied.
+static int parse_msg(struct plugin_handle *plugin, struct cfg_settings *setting, char **out)
+{
+	const char *value = cfg_settings_get_value(setting);
+	char *copy;
+
+	if (!value || !*value)
+	{
+		set_error_message(plugin, "Empty message value for startup parameter");
+		return 0;
+	}
+
+	copy = hub_strdup(value);
+	if (!copy)
+	{
+		set_error_message(plugin, "Out of memory");
+		return 0;
+	}
+
+	hub_free(*out);
+	*out = copy;
+	return 1;
 }
 
 static struct chat_data *parse_config(struct plugin_handle *plugin, const char *line)
@@ -90,6 +131,16 @@ static struct chat_data *parse_config(struct plugin_handle *plugin, const char *
 	data->allow_mainchat = auth_cred_guest;
 	data->allow_op_contact = auth_cred_guest;
 	data->allow_privchat = auth_cred_guest;
+	data->msg_mainchat = hub_strdup("Main chat is reserved for privileged users.");
+	data->msg_privchat = hub_strdup("Private messaging is reserved for privileged users.");
+
+	if (!data->msg_mainchat || !data->msg_privchat)
+	{
+		cfg_tokens_free(tokens);
+		free_chat_data(data);
+		set_error_message(plugin, "Out of memory");
+		return 0;
+	}
 
 	while (token)
 	{
@@ -100,7 +151,7 @@ static struct chat_data *parse_config(struct plugin_handle *plugin, const char *
 		{
 			set_error_message(plugin, "Unable to parse startup parameters");
 			cfg_tokens_free(tokens);
-			hub_free(data);
+			free_chat_data(data);
 			return 0;
 		}
 
@@ -110,6 +161,10 @@ static struct chat_data *parse_config(struct plugin_handle *plugin, const char *
 			ok = parse_cred(plugin, setting, &data->allow_privchat);
 		else if (strcmp(cfg_settings_get_key(setting), "allow_op_contact") == 0)
 			ok = parse_cred(plugin, setting, &data->allow_op_contact);
+		else if (strcmp(cfg_settings_get_key(setting), "msg_mainchat") == 0)
+			ok = parse_msg(plugin, setting, &data->msg_mainchat);
+		else if (strcmp(cfg_settings_get_key(setting), "msg_privchat") == 0)
+			ok = parse_msg(plugin, setting, &data->msg_privchat);
 		else
 		{
 			set_error_message(plugin, "Unknown startup parameters given");
@@ -121,7 +176,7 @@ static struct chat_data *parse_config(struct plugin_handle *plugin, const char *
 		if (!ok)
 		{
 			cfg_tokens_free(tokens);
-			hub_free(data);
+			free_chat_data(data);
 			return 0;
 		}
 
@@ -169,7 +224,7 @@ plugin_st on_chat_msg(struct plugin_handle *plugin, struct plugin_user *from, co
 	(void) message;
 	if (plugin->hub.get_user_credentials(plugin, from) >= data->allow_mainchat)
 		return st_default;
-	warn_once(plugin, from, WARN_MAINCHAT, "Main chat is reserved for privileged users.");
+	warn_once(plugin, from, WARN_MAINCHAT, data->msg_mainchat);
 	return st_deny;
 }
 
@@ -186,7 +241,7 @@ plugin_st on_private_msg(struct plugin_handle *plugin, struct plugin_user *from,
 
 	if (plugin->hub.get_user_credentials(plugin, from) >= required)
 		return st_default;
-	warn_once(plugin, from, WARN_PRIVCHAT, "Private messaging is reserved for privileged users.");
+	warn_once(plugin, from, WARN_PRIVCHAT, data->msg_privchat);
 	return st_deny;
 }
 
@@ -205,7 +260,6 @@ int plugin_register(struct plugin_handle *plugin, const char *config)
 
 int plugin_unregister(struct plugin_handle *plugin)
 {
-	struct chat_data *data = (struct chat_data *)plugin->ptr;
-	hub_free(data);
+	free_chat_data((struct chat_data *)plugin->ptr);
 	return 0;
 }

@@ -22,12 +22,6 @@ since the 0.7.1 tag.
   still need real implementations.
 
 ## Cleanup
-- Stale FIXME at src/core/hub.c:642 claims HH/WS/NE/OW are missing. They are
-  implemented ~50 lines below (hub.c:694-701) and in regserver.c:230-237.
-- The long-standing "flood control should be a plugin" FIXME (hub.c:529) keeps
-  policy in core that the plugin ABI was built to host. Detection is already
-  split from action; the remaining bit is the privileged-chat check.
-- Raw ADC status codes are inlined as magic numbers in hub.c — name them.
 - Branch sprawl: 27 local and 34 remote branches, mostly unmerged historical
   topic branches (gnutls_work, libevent_work, visual_studio_2010_work, ...).
   Tag-then-delete historical work; delete locals that only mirror origin.
@@ -41,3 +35,11 @@ ASSESSMENT.md is pinned to 0.6.1 and is stale on these points:
   autotest/test_tls.tcc now exist.
 - HBRI was undocumented — now covered in doc/architecture.txt and
   doc/uhub.conf.
+- Stale FIXME at hub.c claiming HH/WS/NE/OW are missing — removed; they are
+  implemented in the same function and in regserver.c.
+- Raw ADC status codes in hub.c — already named (ADC_STATUS_*).
+- "Flood control should be a plugin" — the privileged-chat half is done.
+  chat_is_privileged / msg_chat_is_privileged are now obsolete options
+  (warn-and-ignore, via the new "obsolete" type in config.xml) and the policy
+  lives in mod_chat_is_privileged, which gained msg_mainchat / msg_privchat
+  parameters. Only mute is left in core, and that is hub state, not policy.

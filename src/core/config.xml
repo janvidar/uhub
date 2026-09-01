@@ -381,14 +381,6 @@
 		<since>0.3.1</since>
 	</option>
 
-	<option name="chat_is_privileged" type="boolean" default="0">
-		<short>Allow chat for operators and above only</short>
-		<description><![CDATA[
-			If enabled only operators and admins are allowed to chat in the main chat.
-		]]></description>
-		<since>0.2.4</since>
-	</option>
-
 	<option name="chat_rich_text" type="boolean" default="1">
 		<short>Allow rich text formatted chat messages</short>
 		<description><![CDATA[
@@ -1296,11 +1288,6 @@
 		<since>0.3.1</since>
 	</option>
 
-	<option name="msg_chat_is_privileged" type="message" default="Chat is reserved for operators and above.">
-		<description><![CDATA[This message is sent to unprivileged users who try to chat when chat_is_privileged is enabled.]]></description>
-		<since>0.5.1</since>
-	</option>
-
 	<option name="msg_proto_no_common_hash" type="message" default="No common hash algorithm.">
 		<description><![CDATA[This message is sent if a client connects that does support ADC/1.0 but not a hash algorithm that the hub supports.]]></description>
 		<since>0.3.1</since>
@@ -1309,6 +1296,32 @@
 	<option name="msg_proto_obsolete_adc0" type="message" default="Client is using an obsolete ADC protocol version.">
 		<description><![CDATA[This message is sent if a client connects that does not support ADC/1.0, but rather the obsolete ADC/0.1 version.]]></description>
 		<since>0.3.1</since>
+	</option>
+
+	<!--
+		Obsolete options. Each is warned about and ignored, so a configuration
+		written for an older uhub still loads. The <short> text is the migration
+		hint printed in that warning.
+	-->
+
+	<option name="chat_is_privileged" type="obsolete">
+		<short>load the mod_chat_is_privileged plugin instead</short>
+		<description><![CDATA[
+			Restricting main chat is now the job of the mod_chat_is_privileged
+			plugin, which also covers private messaging. The equivalent of
+			chat_is_privileged=yes is:
+			plugin mod_chat_is_privileged "allow_mainchat=op"
+		]]></description>
+		<since>0.8.1</since>
+	</option>
+
+	<option name="msg_chat_is_privileged" type="obsolete">
+		<short>use the msg_mainchat parameter of mod_chat_is_privileged instead</short>
+		<description><![CDATA[
+			The denial message is now a parameter of the mod_chat_is_privileged
+			plugin, alongside the threshold it belongs to.
+		]]></description>
+		<since>0.8.1</since>
 	</option>
 
 </config>

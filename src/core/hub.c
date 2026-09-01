@@ -404,7 +404,6 @@ int hub_handle_support(struct hub_info* hub, struct hub_user* u, struct adc_mess
 	return ret;
 }
 
-
 static int check_duplicate_logins_ok(struct hub_info* hub, struct hub_user* user);
 
 int hub_handle_password(struct hub_info* hub, struct hub_user* u, struct adc_message* cmd)
@@ -550,19 +549,11 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 		}
 	}
 
-	/* FIXME: Plugin should do this! */
-	if (relay && broadcast)
-	{
-		if (hub->config->chat_is_privileged && !user_is_protected(u))
-		{
-			relay = 0;
-			hub_send_chat_denied(hub, u, hub->config->msg_chat_is_privileged);
-		}
-		else if (user_flag_get(u, flag_muted))
-		{
-			relay = 0;
-		}
-	}
+	/* Mute is hub state, set by the !mute command, so it stays here. Chat
+	   privilege policy is the mod_chat_is_privileged plugin's job and reaches
+	   us through the on_chat_msg / on_private_msg hooks below. */
+	if (relay && broadcast && user_flag_get(u, flag_muted))
+		relay = 0;
 
 	if (relay)
 	{
@@ -790,27 +781,6 @@ void hub_send_flood_warning(struct hub_info* hub, struct hub_user* u, const char
 
 		route_to_user(hub, u, msg);
 		user_flag_set(u, flag_flood);
-		adc_msg_free(msg);
-	}
-}
-
-void hub_send_chat_denied(struct hub_info* hub, struct hub_user* u, const char* message)
-{
-	struct adc_message* msg;
-	char* tmp;
-	char code[4];
-
-	msg = adc_msg_construct(ADC_CMD_ISTA, 128);
-	if (msg)
-	{
-		tmp = adc_msg_escape(message);
-		/* recoverable error, registered/privileged users only */
-		set_status_code(status_level_error, ADC_STATUS_REGISTERED_ONLY, code);
-		adc_msg_add_argument(msg, code);
-		adc_msg_add_argument(msg, tmp);
-		hub_free(tmp);
-
-		route_to_user(hub, u, msg);
 		adc_msg_free(msg);
 	}
 }

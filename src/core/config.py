@@ -33,11 +33,16 @@ class Option(object):
 		self.otype = self._attr(node, 'type', True)
 
 		# Verify that the type is known
-		if not self.otype in ["int", "boolean", "string", "message", "file"]:
+		if not self.otype in ["int", "boolean", "string", "message", "file", "obsolete"]:
 			raise OptionParseError("Option %s has unknown type" % self.name)
 
+		# An obsolete option is warned about and ignored wherever it appears. It
+		# carries no struct field, no default and no dump line -- only the name
+		# to recognise and a <short> saying what replaced it.
+		self.obsolete = self.otype == "obsolete"
+
 		self.name = self._attr(node, 'name', True)
-		self.default = self._attr(node, 'default', True)
+		self.default = self._attr(node, 'default', not self.obsolete)
 		self.advanced = self._attr(node, 'advanced', False)
 		self.is_string = self.otype in ["string", "message", "file"]
 
@@ -114,7 +119,8 @@ class CHeaderGenerator(SourceGenerator):
 		self.write_header()
 		self.f.write("struct hub_config\n{\n")
 		for option in options:
-			self._write_declaration(option)
+			if not option.obsolete:
+				self._write_declaration(option)
 		self.f.write("};\n\n")
 
 class CSourceGenerator(SourceGenerator):
@@ -122,6 +128,8 @@ class CSourceGenerator(SourceGenerator):
 		super(CSourceGenerator, self).__init__(filename)
 
 	def _write_default_impl(self, option):
+		if option.obsolete:
+			return
 		s = "\tconfig->%s = " % option.name
 		if option.is_string:
 			s += "hub_strdup(%s);\n" % option.formatted_default()
@@ -131,6 +139,12 @@ class CSourceGenerator(SourceGenerator):
 
 	def _write_apply_impl(self, option):
 		s = "\tif (!strcmp(key, \"%s\"))\n\t{\n" % option.name
+		if option.obsolete:
+			hint = c_string_escape(option.short or "it no longer has any effect")
+			s += "\t\tLOG_WARN(\"Obsolete configuration option '%s' on line %d ignored: "
+			s += "%s\", key, line_count);\n\t\treturn 0;\n\t}\n\n" % hint
+			self.f.write(s)
+			return
 		if option.otype == "int":
 			s_min = "0"
 			s_max = "0"
@@ -157,6 +171,8 @@ class CSourceGenerator(SourceGenerator):
 			self.f.write("\thub_free(config->%s);\n\n" % option.name)
 
 	def _write_dump_impl(self, option):
+		if option.obsolete:
+			return
 		s = ""
 		fmt = "%s"
 		val = "config->%s" % option.name
@@ -191,7 +207,7 @@ class CSourceGenerator(SourceGenerator):
 		self.f.write("/* Applies only the msg_* status strings, for the file_messages file. */\n")
 		self.f.write("static int apply_message_config(struct hub_config* config, char* key, char* data, int line_count)\n{\n")
 		for option in options:
-			if option.otype == "message":
+			if option.otype == "message" or option.obsolete:
 				self._write_apply_impl(option)
 		self.f.write("\t/* Still here -- not a status message */\n\tLOG_ERROR(\"Not a status message directive: '%s'\", key);\n\treturn -1;\n}\n\n")
 		self.f.write("void free_config(struct hub_config* config)\n{\n")
@@ -230,6 +246,8 @@ class SqlWebsiteDocsGenerator(SourceGenerator):
 		self.f.write(s)
 
 		for option in options:
+			if option.obsolete:
+				continue
 			s = "INSERT INTO %(table)s VALUES(\"%(name)s\", \"%(default)s\", \"%(description)s\", \"%(type)s\", %(example)s, %(since)s, %(advanced)s);\n" % {
 					"table": table,
 					"name": self._sql_escape(option.name),
