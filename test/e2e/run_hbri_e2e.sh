@@ -66,6 +66,22 @@ start_hub() {
 
 stop_hub() { [ -n "$HUB_PID" ] && kill "$HUB_PID" 2>/dev/null; wait 2>/dev/null; HUB_PID=""; }
 
+# The token the hub put in the ITCP challenge recorded in a --dump log.
+hbri_token_of() { grep -oE "^LINE: ITCP .* TO[A-Z2-7]+" "$1" | sed "s/.*TO//"; }
+
+# Replay a validation reply over the IPv6 loopback and echo what the hub says.
+# A validation connection takes no HSUP -- the token is its first and only line
+# -- so this needs no client at all, which is the point: it can be sent long
+# after the session that was issued the token has gone.
+hbri_replay() {
+	local token=$1 out
+	exec 3<>"/dev/tcp/::1/$PORT" || return 1
+	printf "HTCP TO%s\n" "$token" >&3
+	out=$(timeout 2 head -c 200 <&3 | tr -d "\0")
+	exec 3>&- 3<&-
+	printf "%s" "$out"
+}
+
 echo "== uhub HBRI e2e (port $PORT, workdir $DIR) =="
 write_conf "tls_enable = 0"
 start_hub || exit 1
@@ -145,7 +161,65 @@ if grep -qE "^LINE: BINF .*NInatuser.*I4192\.0\.2\.66" "$DIR/5obs.log"; then
 if grep -qE "^LINE: BINF .*NInatuser.*I4127\.0\.0\.1" "$DIR/5.log"; then
 	ok "a peer inside the NAT still sees the observed LAN address"; else bad "LAN address not shown to a peer inside the NAT (see $DIR/5.log)"; fi
 
-# 6. The same over TLS. probe.c demuxes the validation connection exactly as it
+# 6. A validation that arrives after the user has gone. The token is stateless
+#    and the hub holds nothing for an outstanding challenge, so a reply can turn
+#    up at any time -- including for a session that no longer exists.
+stop_hub
+write_conf "tls_enable = 0"
+start_hub || exit 1
+
+"$ADC" "$HUB4" --nick gonea --sup ADHBRI --inf "I6::1" --dump \
+	--linger 1 --expect ok >"$DIR/6a.log" 2>&1
+GONE_TOKEN=$(hbri_token_of "$DIR/6a.log")
+if [ -n "$GONE_TOKEN" ]; then
+	ok "captured a challenge token"
+	REPLY=$(hbri_replay "$GONE_TOKEN")
+	case "$REPLY" in
+		*"ISTA 150"*) ok "a validation for a departed user is refused (150)" ;;
+		*)            bad "unexpected reply to a stale validation: '$REPLY'" ;;
+	esac
+	if "$ADC" "$HUB4" --nick afterwards --expect ok --linger 1 >"$DIR/6b.log" 2>&1; then
+		ok "the hub still serves after a stale validation"; else
+		bad "hub unhealthy after a stale validation (see $DIR/6b.log)"; fi
+else
+	bad "no challenge token to replay (see $DIR/6a.log)"
+fi
+
+# 7. The same, but with the departed user's SID already handed to someone else.
+#    A one-SID window (node_count = SID_MAX) forces the reuse that would
+#    otherwise need the allocator's cursor to wrap the whole space. The MAC
+#    binds the token to the connection time as well as the SID, so the stale
+#    token must not validate on the new holder's behalf.
+stop_hub
+write_conf "tls_enable = 0" "node_count = 1048576" "node_id = 1"
+start_hub || exit 1
+
+"$ADC" "$HUB4" --nick sida --sup ADHBRI --inf "I6::1" --dump \
+	--linger 1 --expect ok >"$DIR/7a.log" 2>&1
+SID_TOKEN=$(hbri_token_of "$DIR/7a.log")
+
+"$ADC" "$HUB4" --nick sidb --dump --linger 4 --expect ok >"$DIR/7b.log" 2>&1 &
+SIDB=$!
+sleep 1
+SIDA=$(printf "%s" "$SID_TOKEN" | cut -c1-4)
+SIDB_SID=$(grep -oE "^LINE: BINF [A-Z2-7]{4} NIsidb" "$DIR/7b.log" | head -1 | awk "{print \$3}")
+
+if [ -n "$SID_TOKEN" ] && [ "$SIDA" = "$SIDB_SID" ]; then
+	ok "the departed user's SID was handed to the next user ($SIDA)"
+	REPLY=$(hbri_replay "$SID_TOKEN")
+	case "$REPLY" in
+		*"ISTA 150"*) ok "a stale token does not validate for the SID's new holder" ;;
+		*)            bad "stale token was not refused on a recycled SID: '$REPLY'" ;;
+	esac
+else
+	bad "could not recycle the SID (token '$SIDA', new holder '$SIDB_SID')"
+fi
+wait "$SIDB"
+if grep -qE "^LINE: BINF .*NIsidb.*I6" "$DIR/7b.log"; then
+	bad "the replay put an address in the new holder's INF (see $DIR/7b.log)"; else
+	ok "the new holder's INF gained no address from the replay"; fi
+
+# 8. The same over TLS. probe.c demuxes the validation connection exactly as it
 #    demuxes a login, so on a TLS hub that second connection must be encrypted
 #    too -- a path nothing else in test/e2e covers, since every other script
 #    turns TLS off. tls_require makes the point sharp: a plaintext validation

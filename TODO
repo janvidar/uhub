@@ -9,8 +9,13 @@ since the 0.7.1 tag.
   must reconnect. Deliberate — one outstanding challenge per session bounds the
   ITCP-per-INF-update amplification — but revisit if it proves too strict.
 - HBRI e2e now exists (test/e2e/run_hbri_e2e.sh, wired into the CI coverage
-  job), including over TLS. Not covered there: a validation that arrives after
-  the user is gone.
+  job), covering TLS and stale validations (including onto a recycled SID).
+- The HBRI token MAC binds the SID and tm_connected, which is seconds granular.
+  A user that takes over a departed user's SID within the same second would
+  accept that user's token, and the replayer's address would land in its INF.
+  Hard to hit -- the SID allocator's cursor has to wrap the whole window first
+  -- but a per-session nonce in the MAC would close it outright. Not covered by
+  the e2e: forcing the collision needs a client that quits inside one second.
 
 ## Networking / platform
 - Windows socket support — src/network/network.c. uhub is meant to be portable

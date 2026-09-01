@@ -103,7 +103,15 @@ an in-process test cannot reach:
 4. a client that never offered `HBRI` is never challenged;
 5. `nat_override` clients are still challenged, get their validated IPv6, and
    keep the IPv4 claim the option exists to trust;
-6. all of it again on a TLS hub, where the validation connection must itself be
+6. a validation that turns up after the session it was issued to has gone is
+   refused (`150`) and leaves the hub healthy — the token is stateless and the
+   hub holds nothing for an outstanding challenge, so a reply can arrive at any
+   time;
+7. the same once the departed user's SID has been handed to someone else, which
+   a one-SID window (`node_count = 1048576`) forces: the MAC binds the token to
+   the connection time as well as the SID, so it must not validate for the new
+   holder;
+8. all of it again on a TLS hub, where the validation connection must itself be
    encrypted.
 
 ```sh
