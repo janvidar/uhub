@@ -11,9 +11,12 @@
 /*
  * Exercises the stateless HBRI validation-token primitives in src/core/hbri.c:
  * hbri_token_make() and hbri_token_check(). A token is the user's SID prefix
- * plus a Tiger MAC over a per-hub secret, the SID and the connection timestamp.
+ * plus a Tiger MAC over a per-hub secret, the SID and the connection id.
  * The security property under test: a token verifies only for the exact user
  * (SID + session) and hub secret it was minted for, and any tampering fails.
+ *
+ * The connection id is what names the session. The SID cannot: it is drawn
+ * from a pool and handed to the next user once this one leaves.
  */
 
 static struct hub_info hbri_hub;
@@ -24,17 +27,18 @@ static void hbri_set_secret(struct hub_info* hub, unsigned char fill)
 	memset(hub->hub_secret, fill, sizeof(hub->hub_secret));
 }
 
-static void hbri_make_user(struct hub_user* user, sid_t sid, time_t tm)
+static void hbri_make_user(struct hub_user* user, sid_t sid, uint64_t conn_id, time_t tm)
 {
 	memset(user, 0, sizeof(*user));
 	user->id.sid = sid;
+	user->connection_id = conn_id;
 	user->tm_connected = tm;
 }
 
 EXO_TEST(hbri_setup, {
 	memset(&hbri_hub, 0, sizeof(hbri_hub));
 	hbri_set_secret(&hbri_hub, 0xA5);
-	hbri_make_user(&hbri_user, 5, 1000);
+	hbri_make_user(&hbri_user, 5, 1, 1000);
 	return 1;
 });
 
@@ -65,16 +69,31 @@ EXO_TEST(hbri_token_wrong_user, {
 	char token[HBRI_TOKEN_LEN + 1];
 	struct hub_user other;
 	hbri_token_make(&hbri_hub, &hbri_user, token);
-	hbri_make_user(&other, 6, 1000);
+	hbri_make_user(&other, 6, 1, 1000);
 	return hbri_token_check(&hbri_hub, &other, token) == 0;
 });
 
-/* A token is bound to the session timestamp, not just the SID. */
+/* A token is bound to the session, not just the SID. */
 EXO_TEST(hbri_token_wrong_session, {
 	char token[HBRI_TOKEN_LEN + 1];
 	struct hub_user reused;
 	hbri_token_make(&hbri_hub, &hbri_user, token);
-	hbri_make_user(&reused, 5, 2000); /* same SID, later session */
+	hbri_make_user(&reused, 5, 2, 2000); /* same SID, later session */
+	return hbri_token_check(&hbri_hub, &reused, token) == 0;
+});
+
+/*
+ * The same, for a takeover that happens inside one second. The MAC used to
+ * cover tm_connected, which is only granular to the second, so a user handed
+ * the SID quickly enough matched the departed user's token -- and the address
+ * on a replayed validation connection landed in its INF. The connection id is
+ * never reused, so the second here being identical changes nothing.
+ */
+EXO_TEST(hbri_token_same_second_takeover, {
+	char token[HBRI_TOKEN_LEN + 1];
+	struct hub_user reused;
+	hbri_token_make(&hbri_hub, &hbri_user, token);
+	hbri_make_user(&reused, 5, 2, 1000); /* same SID, same second, new session */
 	return hbri_token_check(&hbri_hub, &reused, token) == 0;
 });
 

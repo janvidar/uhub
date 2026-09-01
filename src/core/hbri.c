@@ -55,10 +55,17 @@ static void hbri_compute_mac(struct hub_info* hub, struct hub_user* user, char* 
 	memcpy(buf + offset, &sid, sizeof(sid));
 	offset += sizeof(sid);
 
-	/* Add time connected (8 bytes) */
-	uint64_t time_connected = (uint64_t) user->tm_connected;
-	memcpy(buf + offset, &time_connected, sizeof(time_connected));
-	offset += sizeof(time_connected);
+	/*
+	 * Add the connection id (8 bytes). The SID alone is not enough to name a
+	 * session: it is drawn from a pool and handed to the next user once this
+	 * one leaves, so a token outliving its session could otherwise validate on
+	 * whoever holds the SID next. connection_id is a monotonic counter that is
+	 * never reused, which tm_connected -- only granular to the second -- could
+	 * not guarantee for a takeover happening inside the same second.
+	 */
+	uint64_t conn_id = user->connection_id;
+	memcpy(buf + offset, &conn_id, sizeof(conn_id));
+	offset += sizeof(conn_id);
 
 	tiger((uint64_t*) buf, offset, mac);
 	base32_encode((unsigned char*) mac, TIGERSIZE, out);
