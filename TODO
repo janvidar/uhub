@@ -8,9 +8,9 @@ since the 0.7.1 tag.
 - A failed or lost ITCP challenge is not retried within a session; the client
   must reconnect. Deliberate — one outstanding challenge per session bounds the
   ITCP-per-INF-update amplification — but revisit if it proves too strict.
-- No e2e coverage (test/e2e/); the unit tests in autotest/test_hbri.tcc and
-  autotest/test_inf.tcc cover the token primitives, the INF merge and the
-  nat_override interaction, but nothing end to end.
+- HBRI e2e now exists (test/e2e/run_hbri_e2e.sh, wired into the CI coverage
+  job). Not covered there: a validation that arrives after the user is gone,
+  and HBRI over TLS -- the script runs a plaintext hub.
 
 ## Networking / platform
 - Windows socket support — src/network/network.c. uhub is meant to be portable

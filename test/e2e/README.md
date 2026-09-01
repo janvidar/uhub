@@ -14,8 +14,16 @@ expected to succeed or be refused.
 
 ```
 adc_cmd <adc://host:port> --nick N [--password P] [--send "text"]...
+        [--inf FIELD]... [--hbri]
         [--linger SECONDS] [--timeout SECONDS] [--expect ok|fail]
 ```
+
+`--inf` adds a named argument to the *login* INF (`--inf I6::1`), which is how a
+test states something this client does not model and, unlike `--raw`, reaches
+the hub before the login checks run. `--hbri` answers an HBRI challenge: on
+`ITCP` it connects to the address the hub named and sends the token back as the
+first line of that second connection. An IPv6 hub address is written bracketed,
+`adc://[::1]:1511`.
 
 It is built automatically (UNIX, alongside `uhub-admin`).
 
@@ -76,6 +84,34 @@ BUILD=/path/to/build test/e2e/run_plugin_e2e.sh [port]
 The CID test relies on `ADC_client_set_pid()` (added to `libadcclient`): a fixed
 PID yields a fixed CID (`CID = base32(tiger(PID))`), so `adc_cmd --pid P --show-cid`
 prints the CID to configure the plugin's `deny_cid`.
+
+## run_hbri_e2e.sh
+
+Drives HBRI — the extension that gets a dual-stack client's *other* address
+family published, but only after the client proves it over a second connection
+the hub opens the address from itself. The point is that the advertised `I4`/`I6`
+is a trigger and never the published value, so every scenario turns on the gap
+between what the client claims and what the hub observes — which is exactly what
+an in-process test cannot reach:
+
+1. a client offering `HBRI` and signalling IPv6 is challenged (`ITCP`), answers
+   on the second family, and has the address published;
+2. a client that advertises a bogus `I6` and answers from `::1` gets `::1`
+   published — the claim is never what lands in the INF;
+3. a client that is challenged and never answers stays primary-only;
+4. a client that never offered `HBRI` is never challenged;
+5. `nat_override` clients are still challenged, get their validated IPv6, and
+   keep the IPv4 claim the option exists to trust.
+
+```sh
+BUILD=/path/to/build test/e2e/run_hbri_e2e.sh [port]
+```
+
+Needs an IPv6 loopback; it skips (exit 0) without one. Scenario 5 checks the
+IPv4 claim from a *second* client that joined over IPv6, because
+`route_info_message()` deliberately shows peers inside the same NAT the observed
+LAN address instead — a LAN peer cannot rely on NAT hairpinning — so a client
+inside the range never sees the claim at all.
 
 ## run_bbs_e2e.sh
 
