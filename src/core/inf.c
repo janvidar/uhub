@@ -324,6 +324,12 @@ static void check_hbri_update(struct hub_info* hub, struct hub_user* user, struc
 	if (!check_network_secondary_ok(cmd, sec_af))
 		return;
 
+	/* Never validate the IPv4 address of a nat_override user: it is a trusted
+	   claim precisely because the hub cannot observe a useful one, and a
+	   validation would replace it with the observed address (see check_network). */
+	if (sec_af == AF_INET && user_is_nat_override(user))
+		return;
+
 	if (user_flag_get(user, flag_hbri_want))
 		return; /* a challenge is already outstanding */
 
@@ -354,6 +360,30 @@ static int check_network(struct hub_info* hub, struct hub_user* user, struct adc
 		if (client_given_ip && strcmp(client_given_ip, "0.0.0.0") != 0 && ip_is_valid_ipv4(client_given_ip))
 		{
 			user_set_nat_override(user);
+
+			/*
+			 * nat_override trusts the client's IPv4 claim because the hub cannot
+			 * observe anything better -- behind the same NAT it only ever sees the
+			 * client's LAN address. That is a property of IPv4 behind NAT, not of
+			 * the client, and it does not carry over to IPv6: there is no NAT
+			 * there, and HBRI can observe the address on a validation connection.
+			 * So still record the HBRI intent, and stash the secondary UDP port
+			 * for the validation to pick up, exactly as the normal path below.
+			 *
+			 * Only ever for an IPv6 secondary. If the user reached us over IPv6,
+			 * the secondary family is the very IPv4 address nat_override was
+			 * configured to trust, and a validation would overwrite that claim
+			 * with the observed address -- defeating the option.
+			 */
+			user->hbri_udp_port[0] = 0;
+			if (user->id.addr.af == AF_INET && hbri_is_enabled(hub)
+				&& user_flag_get(user, feature_hbri)
+				&& check_network_secondary_ok(cmd, AF_INET6))
+			{
+				user_flag_set(user, flag_hbri_want);
+				hbri_remember_udp_port(user, cmd, AF_INET6);
+			}
+
 			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
 			adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_IPV6_UDP_PORT);
 			hub_free(client_given_ip);

@@ -5,15 +5,12 @@ tagged 0.8.0. The ChangeLog 0.8.0 section is reconciled against the commits
 since the 0.7.1 tag.
 
 ## HBRI
-- A NAT-override user cannot use HBRI at all: check_network() (src/core/inf.c)
-  returns early on the nat_override path, before the HBRI intent check, so the
-  flag is never set. NAT'd IPv4 plus native IPv6 is exactly the dual-stack case
-  HBRI targets, so this is worth revisiting.
 - A failed or lost ITCP challenge is not retried within a session; the client
   must reconnect. Deliberate — one outstanding challenge per session bounds the
   ITCP-per-INF-update amplification — but revisit if it proves too strict.
 - No e2e coverage (test/e2e/); the unit tests in autotest/test_hbri.tcc and
-  autotest/test_inf.tcc cover the token primitives and the INF merge only.
+  autotest/test_inf.tcc cover the token primitives, the INF merge and the
+  nat_override interaction, but nothing end to end.
 
 ## Networking / platform
 - Windows socket support — src/network/network.c. uhub is meant to be portable
@@ -35,6 +32,10 @@ ASSESSMENT.md is pinned to 0.6.1 and is stale on these points:
   autotest/test_tls.tcc now exist.
 - HBRI was undocumented — now covered in doc/architecture.txt and
   doc/uhub.conf.
+- HBRI was unreachable at login for nat_override users — check_network() now
+  records the intent before returning. Only for an IPv6 secondary: over IPv6
+  the secondary family is the IPv4 address nat_override exists to trust, and
+  check_hbri_update() carries the same guard.
 - Stale FIXME at hub.c claiming HH/WS/NE/OW are missing — removed; they are
   implemented in the same function and in regserver.c.
 - Raw ADC status codes in hub.c — already named (ADC_STATUS_*).

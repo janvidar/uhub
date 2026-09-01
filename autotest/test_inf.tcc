@@ -528,6 +528,100 @@ EXO_TEST(inf_hbri_does_not_mutate_shared_info, {
 	return ok;
 });
 
+/*
+ * nat_override + HBRI.
+ *
+ * nat_override trusts the client's IPv4 claim because the hub cannot observe a
+ * useful one: behind the same NAT it only ever sees the client's LAN address.
+ * That is a property of IPv4 behind NAT, not of the client, and it does not
+ * extend to IPv6 -- there is no NAT there, and HBRI can observe the address on
+ * a validation connection. So these users must still be challenged for their
+ * secondary family, while the IPv4 claim the option exists to trust is left
+ * alone.
+ */
+
+static int inf_nat_override_set(const char* csv)
+{
+	acl_shutdown(inf_hub->acl);
+	hub_free(inf_hub->config->nat_override);
+	inf_hub->config->nat_override = hub_strdup(csv);
+	return acl_initialize(inf_hub->config, inf_hub->acl) == 0;
+}
+
+static int inf_nat_hbri_begin(void)
+{
+	inf_hub->config->hbri_enable = 1;
+	hub_free(inf_hub->config->hbri_address4);
+	hub_free(inf_hub->config->hbri_address6);
+	inf_hub->config->hbri_address4 = hub_strdup("192.0.2.1");
+	inf_hub->config->hbri_address6 = hub_strdup("2001:db8::1");
+	user_flag_set(inf_user, feature_hbri);
+	user_flag_unset(inf_user, flag_hbri_want);
+	inf_user->hbri_udp_port[0] = 0;
+	return inf_nat_override_set("10.20.30.0/24,2001:db8:1::/64");
+}
+
+static void inf_nat_hbri_end(void)
+{
+	user_flag_unset(inf_user, feature_hbri);
+	user_flag_unset(inf_user, flag_hbri_want);
+	inf_hub->config->hbri_enable = 0;
+	inf_nat_override_set("");
+}
+
+/* Log in from inside the NAT range: the claimed IPv4 is kept, the IPv6 address
+   is still discarded, but the HBRI intent and the secondary UDP port survive.
+   Before the fix check_network() returned before ever reaching that check. */
+EXO_TEST(inf_nat_hbri_login_sets_want, {
+	int ok = inf_nat_hbri_begin()
+	  && check_network_override("10.20.30.40",
+			INF_LOGIN("I4192.0.2.66 I62001:db8::99 U612345"), "192.0.2.66", NULL)
+	  && user_flag_get(inf_user, flag_hbri_want)
+	  && strcmp(inf_user->hbri_udp_port, "12345") == 0;
+	inf_nat_hbri_end();
+	return ok;
+});
+
+/* ...and the validation then publishes the observed IPv6 with that port, while
+   the trusted IPv4 claim stays exactly as the client stated it. */
+EXO_TEST(inf_nat_hbri_validation_publishes_ipv6, {
+	char* got4;
+	int ok = inf_nat_hbri_begin()
+	  && check_network_override("10.20.30.40",
+			INF_LOGIN("I4192.0.2.66 I62001:db8::99 U612345"), "192.0.2.66", NULL);
+
+	if (ok)
+	{
+		user_set_state(inf_user, state_normal);
+		ok = sid_pool_insert(inf_hub->users->sids, inf_user->id.sid, inf_user) == 1
+		  && inf_hbri_validate("2001:db8::5", "")
+		  && inf_hbri_check_info("2001:db8::5", "12345");
+
+		got4 = adc_msg_get_named_argument(inf_user->info, "I4");
+		ok = ok && got4 && strcmp(got4, "192.0.2.66") == 0;
+		hub_free(got4);
+
+		sid_free(inf_hub->users->sids, inf_user->id.sid);
+		user_set_state(inf_user, state_protocol);
+	}
+
+	inf_nat_hbri_end();
+	return ok;
+});
+
+/* A nat_override user that reached us over IPv6 must NOT be challenged: there
+   the secondary family is the very IPv4 address the option was configured to
+   trust, and a validation would replace that claim with the observed one. */
+EXO_TEST(inf_nat_hbri_ipv6_primary_not_challenged, {
+	int ok;
+	if (!net_is_ipv6_supported()) return 1;
+	ok = inf_nat_hbri_begin()
+	  && check_network_override("2001:db8:1::5", INF_LOGIN("I4192.0.2.66"), "192.0.2.66", NULL)
+	  && !user_flag_get(inf_user, flag_hbri_want);
+	inf_nat_hbri_end();
+	return ok;
+});
+
 EXO_TEST(inf_destroy_setup,
 {
 	inf_destroy_user();
