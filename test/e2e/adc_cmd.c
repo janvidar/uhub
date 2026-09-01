@@ -29,7 +29,8 @@
  * Usage:
  *   adc_cmd <adc://host:port> --nick N [--password P]
  *           [--send "text"]... [--raw "LINE"]... [--sup ADXXXX]...
- *           [--inf FIELD]... [--hbri] [--expect-line GLOB]... [--dump]
+ *           [--inf FIELD]... [--hbri] [--hbri-abandon]
+ *           [--expect-line GLOB]... [--dump]
  *           [--linger SECONDS] [--timeout SECONDS] [--expect ok|fail]
  *
  * --raw sends a line verbatim after login, for driving extensions this client
@@ -37,6 +38,9 @@
  * login INF ("--inf I6::1"). --expect-line matches received lines against a
  * glob and fails the run if any pattern goes unmatched, which is how a test
  * asserts on what the hub sent back.
+ *
+ * --hbri-abandon leaves as soon as the challenge arrives, without answering it,
+ * so the session lasts milliseconds rather than --linger seconds.
  *
  * --hbri answers an HBRI challenge: when the hub sends ITCP, connect to the
  * address and port it names and send the token back as the first line of that
@@ -78,6 +82,7 @@ static const char* opt_inf[MAX_INF];
 static int opt_inf_n = 0;
 static int opt_hbri = 0;
 static int opt_hbri_tls = 0;   /* set when the hub URL is adcs:// */
+static int opt_hbri_abandon = 0;
 static int hbri_answered = 0;
 static const char* opt_expect_line[MAX_EXPECT];
 static int opt_expect_line_seen[MAX_EXPECT];
@@ -306,6 +311,11 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 				   time, and answering twice would say nothing extra. */
 				if (opt_hbri && !hbri_answered && !strncmp(data->line, "ITCP ", 5))
 					hbri_respond(data->line);
+				/* Leave the moment the challenge lands, so the session is over
+				   in milliseconds. A test that needs the next user to take this
+				   SID within the same second cannot wait out --linger. */
+				if (opt_hbri_abandon && !strncmp(data->line, "ITCP ", 5))
+					running = 0;
 			}
 			break;
 		default:
@@ -339,6 +349,7 @@ int main(int argc, char** argv)
 		else if (!strcmp(argv[i], "--sup") && i + 1 < argc && opt_sup_n < MAX_SUP) opt_sup[opt_sup_n++] = argv[++i];
 		else if (!strcmp(argv[i], "--inf") && i + 1 < argc && opt_inf_n < MAX_INF) opt_inf[opt_inf_n++] = argv[++i];
 		else if (!strcmp(argv[i], "--hbri")) opt_hbri = 1;
+		else if (!strcmp(argv[i], "--hbri-abandon")) opt_hbri_abandon = 1;
 		else if (!strcmp(argv[i], "--expect-line") && i + 1 < argc && opt_expect_line_n < MAX_EXPECT) opt_expect_line[opt_expect_line_n++] = argv[++i];
 		else if (!strcmp(argv[i], "--dump")) opt_dump = 1;
 		else if (!strcmp(argv[i], "--linger") && i + 1 < argc) opt_linger = atoi(argv[++i]);

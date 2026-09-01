@@ -20,7 +20,8 @@ adc_cmd <adc://host:port> --nick N [--password P] [--send "text"]...
 
 `--inf` adds a named argument to the *login* INF (`--inf I6::1`), which is how a
 test states something this client does not model and, unlike `--raw`, reaches
-the hub before the login checks run. `--hbri` answers an HBRI challenge: on
+the hub before the login checks run. `--hbri-abandon` leaves as soon as the
+challenge arrives without answering it. `--hbri` answers an HBRI challenge: on
 `ITCP` it connects to the address the hub named and sends the token back as the
 first line of that second connection — over TLS when the hub address is
 `adcs://`, since the hub demuxes that connection exactly as it demuxes a login.
@@ -109,9 +110,12 @@ an in-process test cannot reach:
    time;
 7. the same once the departed user's SID has been handed to someone else, which
    a one-SID window (`node_count = 1048576`) forces: the MAC binds the token to
-   the connection time as well as the SID, so it must not validate for the new
+   the connection id as well as the SID, so it must not validate for the new
    holder;
-8. all of it again on a TLS hub, where the validation connection must itself be
+8. the same takeover squeezed into a single second — `--hbri-abandon` makes the
+   first session last milliseconds, which is what turns a timing window nobody
+   could hit on purpose into a reproducible scenario;
+9. all of it again on a TLS hub, where the validation connection must itself be
    encrypted.
 
 ```sh

@@ -33,6 +33,7 @@ pass=0; fail=0
 cleanup() { [ -n "$HUB_PID" ] && kill "$HUB_PID" 2>/dev/null; wait 2>/dev/null; rm -rf "$DIR"; }
 trap cleanup EXIT
 ok()  { echo "  PASS: $1"; pass=$((pass+1)); }
+wait_for() { local pat=$1 file=$2 n=${3:-60} i; for i in $(seq 1 "$n"); do grep -q "$pat" "$file" 2>/dev/null && return 0; sleep 0.1; done; return 1; }
 bad() { echo "  FAIL: $1"; fail=$((fail+1)); }
 
 # No plugins: an explicitly named (empty) file replaces the built-in default
@@ -66,8 +67,13 @@ start_hub() {
 
 stop_hub() { [ -n "$HUB_PID" ] && kill "$HUB_PID" 2>/dev/null; wait 2>/dev/null; HUB_PID=""; }
 
-# The token the hub put in the ITCP challenge recorded in a --dump log.
-hbri_token_of() { grep -oE "^LINE: ITCP .* TO[A-Z2-7]+" "$1" | sed "s/.*TO//"; }
+# The token the hub put in the ITCP challenge recorded in a --dump log. Split
+# into fields and take the TO one: the token is base32 and can itself contain
+# "TO", so anything that searches the whole line for it truncates at random.
+hbri_token_of() {
+	grep -E "^LINE: ITCP " "$1" | head -1 | tr " " "\n" \
+		| grep -E "^TO[A-Z2-7]+$" | head -1 | cut -c3-
+}
 
 # Replay a validation reply over the IPv6 loopback and echo what the hub says.
 # A validation connection takes no HSUP -- the token is its first and only line
@@ -97,22 +103,25 @@ exec 3>&- 3<&-
 
 # 1. A client that supports HBRI and signals IPv6 connectivity is challenged,
 #    answers on the second family, and gets the *observed* address published.
+#    Every INF assertion below matches " I6"/" I4" with the leading space: an
+#    INF field is space-delimited, and the CID is base32 over [A-Z2-7], so it
+#    can contain the literal "I6" and match an unanchored pattern by accident.
 "$ADC" "$HUB4" --nick hbriuser --sup ADHBRI --inf "I6::1" --hbri --dump \
 	--linger 3 --expect ok >"$DIR/1.log" 2>&1
 if grep -q "^LINE: ITCP " "$DIR/1.log"; then
 	ok "hub challenges a dual-stack client (ITCP)"; else bad "no ITCP challenge (see $DIR/1.log)"; fi
 if grep -q "HBRI-VALIDATED" "$DIR/1.log"; then
 	ok "client answers the challenge on the second family"; else bad "validation connection failed (see $DIR/1.log)"; fi
-if grep -qE "^LINE: BINF .*I6::1" "$DIR/1.log"; then
+if grep -qE "^LINE: BINF .* I6::1" "$DIR/1.log"; then
 	ok "validated IPv6 address is published in the INF"; else bad "I6 never published (see $DIR/1.log)"; fi
 
 # 2. The claimed address is only a trigger: a client that advertises a bogus I6
 #    and answers from ::1 has the observed address published, not its claim.
 "$ADC" "$HUB4" --nick hbrilie --sup ADHBRI --inf "I62001:db8::99" --hbri --dump \
 	--linger 3 --expect ok >"$DIR/2.log" 2>&1
-if grep -qE "^LINE: BINF .*I6::1" "$DIR/2.log"; then
+if grep -qE "^LINE: BINF .* I6::1" "$DIR/2.log"; then
 	ok "observed address wins over the advertised one"; else bad "observed address not published (see $DIR/2.log)"; fi
-if grep -qE "^LINE: BINF .*I62001:db8::99" "$DIR/2.log"; then
+if grep -qE "^LINE: BINF .* I62001:db8::99" "$DIR/2.log"; then
 	bad "the client's claimed I6 was published (see $DIR/2.log)"; else
 	ok "the client's claimed I6 is never published"; fi
 
@@ -122,7 +131,7 @@ if grep -qE "^LINE: BINF .*I62001:db8::99" "$DIR/2.log"; then
 	--linger 3 --expect ok >"$DIR/3.log" 2>&1
 if grep -q "^LINE: ITCP " "$DIR/3.log"; then
 	ok "an unanswered challenge is still issued"; else bad "no challenge issued (see $DIR/3.log)"; fi
-if grep -qE "^LINE: BINF .*I6" "$DIR/3.log"; then
+if grep -qE "^LINE: BINF .* I6" "$DIR/3.log"; then
 	bad "an I6 was published without validation (see $DIR/3.log)"; else
 	ok "no I6 is published without validation"; fi
 
@@ -147,18 +156,18 @@ start_hub || exit 1
 #    the observer joins over IPv6, which the nat_override range does not cover.
 "$ADC" "adc://[::1]:$PORT" --nick v6observer --dump --linger 6 --expect ok >"$DIR/5obs.log" 2>&1 &
 OBS=$!
-sleep 1
+wait_for "LOGGED_IN" "$DIR/5obs.log"
 "$ADC" "$HUB4" --nick natuser --sup ADHBRI --inf "I4192.0.2.66" --inf "I6::1" --hbri --dump \
 	--linger 3 --expect ok >"$DIR/5.log" 2>&1
 wait "$OBS"
 
 if grep -q "^LINE: ITCP " "$DIR/5.log"; then
 	ok "a nat_override client is still challenged"; else bad "nat_override client never challenged (see $DIR/5.log)"; fi
-if grep -qE "^LINE: BINF .*NInatuser.*I6::1" "$DIR/5obs.log"; then
+if grep -qE "^LINE: BINF .*NInatuser.* I6::1" "$DIR/5obs.log"; then
 	ok "nat_override client gets its validated IPv6 published"; else bad "no validated I6 for nat_override client (see $DIR/5obs.log)"; fi
-if grep -qE "^LINE: BINF .*NInatuser.*I4192\.0\.2\.66" "$DIR/5obs.log"; then
+if grep -qE "^LINE: BINF .*NInatuser.* I4192\.0\.2\.66" "$DIR/5obs.log"; then
 	ok "the trusted IPv4 claim survives validation"; else bad "nat_override IPv4 claim was lost (see $DIR/5obs.log)"; fi
-if grep -qE "^LINE: BINF .*NInatuser.*I4127\.0\.0\.1" "$DIR/5.log"; then
+if grep -qE "^LINE: BINF .*NInatuser.* I4127\.0\.0\.1" "$DIR/5.log"; then
 	ok "a peer inside the NAT still sees the observed LAN address"; else bad "LAN address not shown to a peer inside the NAT (see $DIR/5.log)"; fi
 
 # 6. A validation that arrives after the user has gone. The token is stateless
@@ -200,7 +209,7 @@ SID_TOKEN=$(hbri_token_of "$DIR/7a.log")
 
 "$ADC" "$HUB4" --nick sidb --dump --linger 4 --expect ok >"$DIR/7b.log" 2>&1 &
 SIDB=$!
-sleep 1
+wait_for "NIsidb" "$DIR/7b.log"
 SIDA=$(printf "%s" "$SID_TOKEN" | cut -c1-4)
 SIDB_SID=$(grep -oE "^LINE: BINF [A-Z2-7]{4} NIsidb" "$DIR/7b.log" | head -1 | awk "{print \$3}")
 
@@ -215,11 +224,64 @@ else
 	bad "could not recycle the SID (token '$SIDA', new holder '$SIDB_SID')"
 fi
 wait "$SIDB"
-if grep -qE "^LINE: BINF .*NIsidb.*I6" "$DIR/7b.log"; then
+if grep -qE "^LINE: BINF .*NIsidb.* I6" "$DIR/7b.log"; then
 	bad "the replay put an address in the new holder's INF (see $DIR/7b.log)"; else
 	ok "the new holder's INF gained no address from the replay"; fi
 
-# 8. The same over TLS. probe.c demuxes the validation connection exactly as it
+# 8. The takeover forced into a single second. Until the token bound the
+#    connection id, the MAC covered the SID and tm_connected -- and tm_connected
+#    is only granular to the second, so a user taking over the SID within the
+#    same second matched the departed user's MAC and the replayer's address
+#    landed in its INF. --hbri-abandon makes the first session last
+#    milliseconds, which is what makes that collision reproducible rather than a
+#    race nobody can hit on purpose.
+stop_hub
+write_conf "tls_enable = 0" "node_count = 1048576" "node_id = 1"
+start_hub || exit 1
+
+SAME_SECOND=0
+FAST_REPLY=""
+for attempt in 1 2 3 4 5; do
+	TA=$(date +%s)
+	"$ADC" "$HUB4" --nick fasta --sup ADHBRI --inf "I6::1" --hbri-abandon --dump \
+		--linger 5 --expect ok >"$DIR/8a.log" 2>&1
+	TB=$(date +%s)
+	[ "$TA" = "$TB" ] || continue
+
+	FAST_TOKEN=$(hbri_token_of "$DIR/8a.log")
+	[ -n "$FAST_TOKEN" ] || continue
+
+	"$ADC" "$HUB4" --nick fastb --dump --linger 3 --expect ok >"$DIR/8b.log" 2>&1 &
+	FASTB=$!
+	wait_for "NIfastb" "$DIR/8b.log"
+	# The one-SID window means a "logged in" fastb necessarily holds fasta's
+	# SID; if the hub had not yet reaped fasta, fastb never got in at all.
+	if [ "$(printf "%s" "$FAST_TOKEN" | cut -c1-4)" != \
+	     "$(grep -oE "^LINE: BINF [A-Z2-7]{4} NIfastb" "$DIR/8b.log" | head -1 | awk "{print \$3}")" ]; then
+		wait "$FASTB"
+		continue
+	fi
+
+	SAME_SECOND=1
+	FAST_REPLY=$(hbri_replay "$FAST_TOKEN")
+	wait "$FASTB"
+	break
+done
+
+if [ "$SAME_SECOND" -eq 1 ]; then
+	ok "forced a same-second SID takeover"
+	case "$FAST_REPLY" in
+		*"ISTA 150"*) ok "a stale token is refused even on a same-second takeover" ;;
+		*)            bad "same-second takeover accepted a stale token: '$FAST_REPLY'" ;;
+	esac
+	if grep -qE "^LINE: BINF .*NIfastb.* I6" "$DIR/8b.log"; then
+		bad "the replay put an address in the same-second holder's INF (see $DIR/8b.log)"; else
+		ok "no address reached the same-second holder's INF"; fi
+else
+	bad "could not force a same-second SID takeover in 5 attempts"
+fi
+
+# 9. The same over TLS. probe.c demuxes the validation connection exactly as it
 #    demuxes a login, so on a TLS hub that second connection must be encrypted
 #    too -- a path nothing else in test/e2e covers, since every other script
 #    turns TLS off. tls_require makes the point sharp: a plaintext validation
@@ -250,7 +312,7 @@ else
 			ok "hub challenges a client over TLS"; else bad "no ITCP on the TLS hub (see $DIR/6.log)"; fi
 		if grep -q "HBRI-VALIDATED.*(TLS)" "$DIR/6.log"; then
 			ok "the validation connection completes over TLS"; else bad "TLS validation failed (see $DIR/6.log)"; fi
-		if grep -qE "^LINE: BINF .*I6::1" "$DIR/6.log"; then
+		if grep -qE "^LINE: BINF .* I6::1" "$DIR/6.log"; then
 			ok "validated IPv6 is published on a TLS hub"; else bad "no I6 published on the TLS hub (see $DIR/6.log)"; fi
 	fi
 fi
