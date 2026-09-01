@@ -44,7 +44,6 @@ write_conf() {  # write_conf [extra config lines...]
 server_port = $PORT
 server_bind_addr = any
 file_plugins = $DIR/plugins.conf
-tls_enable = 0
 hbri_enable = 1
 hbri_address4 = 127.0.0.1
 hbri_address6 = ::1
@@ -68,7 +67,7 @@ start_hub() {
 stop_hub() { [ -n "$HUB_PID" ] && kill "$HUB_PID" 2>/dev/null; wait 2>/dev/null; HUB_PID=""; }
 
 echo "== uhub HBRI e2e (port $PORT, workdir $DIR) =="
-write_conf
+write_conf "tls_enable = 0"
 start_hub || exit 1
 
 # HBRI needs both families. Test the precondition the scenarios actually rely
@@ -123,7 +122,7 @@ if grep -q "^LINE: ITCP " "$DIR/4.log"; then
 #    still verify. The challenge must be issued, the validated IPv6 published,
 #    and the trusted IPv4 claim left exactly as stated.
 stop_hub
-write_conf "nat_override = 127.0.0.0/8"
+write_conf "tls_enable = 0" "nat_override = 127.0.0.0/8"
 start_hub || exit 1
 
 #    The claim has to be checked from *outside* the NAT: route_info_message()
@@ -145,6 +144,42 @@ if grep -qE "^LINE: BINF .*NInatuser.*I4192\.0\.2\.66" "$DIR/5obs.log"; then
 	ok "the trusted IPv4 claim survives validation"; else bad "nat_override IPv4 claim was lost (see $DIR/5obs.log)"; fi
 if grep -qE "^LINE: BINF .*NInatuser.*I4127\.0\.0\.1" "$DIR/5.log"; then
 	ok "a peer inside the NAT still sees the observed LAN address"; else bad "LAN address not shown to a peer inside the NAT (see $DIR/5.log)"; fi
+
+# 6. The same over TLS. probe.c demuxes the validation connection exactly as it
+#    demuxes a login, so on a TLS hub that second connection must be encrypted
+#    too -- a path nothing else in test/e2e covers, since every other script
+#    turns TLS off. tls_require makes the point sharp: a plaintext validation
+#    would be refused, so a validation that succeeds here was TLS.
+stop_hub
+if ! command -v openssl >/dev/null 2>&1; then
+	echo "  SKIP: no openssl utility, not testing HBRI over TLS"
+else
+	openssl req -x509 -newkey ed25519 -keyout "$DIR/hub.key" -out "$DIR/hub.crt" \
+		-days 3650 -nodes -subj "/CN=uhub" >/dev/null 2>&1
+	if [ ! -s "$DIR/hub.key" ] || [ ! -s "$DIR/hub.crt" ]; then
+		echo "  SKIP: could not create a test certificate, not testing HBRI over TLS"
+	else
+		write_conf "tls_enable = 1" "tls_require = 1" \
+			"tls_certificate = $DIR/hub.crt" "tls_private_key = $DIR/hub.key"
+		start_hub || exit 1
+
+		# Control: the hub really is TLS-only, so anything that got through did so
+		# over TLS.
+		"$ADC" "$HUB4" --nick plaintls --linger 2 >"$DIR/6ctl.log" 2>&1
+		if grep -q "logged_in=0" "$DIR/6ctl.log"; then
+			ok "a plaintext client is refused by the TLS hub (control)"; else
+			bad "plaintext login was not refused (see $DIR/6ctl.log)"; fi
+
+		"$ADC" "adcs://127.0.0.1:$PORT" --nick tlsuser --sup ADHBRI --inf "I6::1" --hbri --dump \
+			--linger 3 --expect ok >"$DIR/6.log" 2>&1
+		if grep -q "^LINE: ITCP " "$DIR/6.log"; then
+			ok "hub challenges a client over TLS"; else bad "no ITCP on the TLS hub (see $DIR/6.log)"; fi
+		if grep -q "HBRI-VALIDATED.*(TLS)" "$DIR/6.log"; then
+			ok "the validation connection completes over TLS"; else bad "TLS validation failed (see $DIR/6.log)"; fi
+		if grep -qE "^LINE: BINF .*I6::1" "$DIR/6.log"; then
+			ok "validated IPv6 is published on a TLS hub"; else bad "no I6 published on the TLS hub (see $DIR/6.log)"; fi
+	fi
+fi
 
 echo "== result: $pass passed, $fail failed =="
 [ "$fail" -eq 0 ]

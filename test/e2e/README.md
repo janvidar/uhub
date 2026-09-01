@@ -22,8 +22,9 @@ adc_cmd <adc://host:port> --nick N [--password P] [--send "text"]...
 test states something this client does not model and, unlike `--raw`, reaches
 the hub before the login checks run. `--hbri` answers an HBRI challenge: on
 `ITCP` it connects to the address the hub named and sends the token back as the
-first line of that second connection. An IPv6 hub address is written bracketed,
-`adc://[::1]:1511`.
+first line of that second connection — over TLS when the hub address is
+`adcs://`, since the hub demuxes that connection exactly as it demuxes a login.
+An IPv6 hub address is written bracketed, `adc://[::1]:1511`.
 
 It is built automatically (UNIX, alongside `uhub-admin`).
 
@@ -101,11 +102,19 @@ an in-process test cannot reach:
 3. a client that is challenged and never answers stays primary-only;
 4. a client that never offered `HBRI` is never challenged;
 5. `nat_override` clients are still challenged, get their validated IPv6, and
-   keep the IPv4 claim the option exists to trust.
+   keep the IPv4 claim the option exists to trust;
+6. all of it again on a TLS hub, where the validation connection must itself be
+   encrypted.
 
 ```sh
 BUILD=/path/to/build test/e2e/run_hbri_e2e.sh [port]
 ```
+
+The TLS phase runs against a `tls_require` hub with a throwaway self-signed
+certificate, which is what makes it conclusive: a plaintext validation would be
+refused, so one that succeeds was encrypted. It is the only e2e script that
+exercises TLS at all — every other one sets `tls_enable = 0` — and it skips that
+phase if the `openssl` utility is unavailable.
 
 Needs an IPv6 loopback; it skips (exit 0) without one. Scenario 5 checks the
 IPv4 claim from a *second* client that joined over IPv6, because

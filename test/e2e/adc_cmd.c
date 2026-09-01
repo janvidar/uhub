@@ -40,7 +40,8 @@
  *
  * --hbri answers an HBRI challenge: when the hub sends ITCP, connect to the
  * address and port it names and send the token back as the first line of that
- * connection. That second connection is the whole point of HBRI -- it is how
+ * connection -- over TLS when the hub address is adcs://, since the hub demuxes
+ * that connection exactly as it demuxes a login. That second connection is the whole point of HBRI -- it is how
  * the hub observes an address on the other protocol family instead of taking
  * the client's word for it -- so a test cannot fake it in the primary session.
  *
@@ -54,6 +55,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <openssl/ssl.h>
 
 #define MAX_SEND 8
 #define MAX_RAW 16
@@ -75,6 +77,7 @@ static int opt_sup_n = 0;
 static const char* opt_inf[MAX_INF];
 static int opt_inf_n = 0;
 static int opt_hbri = 0;
+static int opt_hbri_tls = 0;   /* set when the hub URL is adcs:// */
 static int hbri_answered = 0;
 static const char* opt_expect_line[MAX_EXPECT];
 static int opt_expect_line_seen[MAX_EXPECT];
@@ -99,6 +102,47 @@ static void send_raw(struct ADC_client* client, const char* line)
 	ADC_client_send(client, cmd);
 	adc_msg_free(cmd);
 	printf("RAW: %s\n", line);
+}
+
+/*
+ * Write the validation reply, over TLS when the hub is a TLS hub. probe.c
+ * demuxes the validation connection the same way it demuxes a login, so on a
+ * TLS hub this one must be encrypted too -- and on a tls_require hub a
+ * plaintext one is refused outright.
+ *
+ * No certificate check: the hub under test signs its own, and what is being
+ * tested is the hub's side. A real client pins the keyprint instead.
+ */
+static int hbri_write_reply(int fd, const char* reply)
+{
+	size_t len = strlen(reply);
+	SSL_CTX* ctx;
+	SSL* ssl;
+	int ok;
+
+	if (!opt_hbri_tls)
+		return write(fd, reply, len) == (ssize_t) len;
+
+	ctx = SSL_CTX_new(TLS_client_method());
+	if (!ctx)
+		return 0;
+
+	ssl = SSL_new(ctx);
+	if (!ssl)
+	{
+		SSL_CTX_free(ctx);
+		return 0;
+	}
+
+	ok = SSL_set_fd(ssl, fd) == 1
+	  && SSL_connect(ssl) == 1
+	  && SSL_write(ssl, reply, (int) len) == (int) len;
+
+	if (ok)
+		SSL_shutdown(ssl);
+	SSL_free(ssl);
+	SSL_CTX_free(ctx);
+	return ok;
 }
 
 /*
@@ -171,12 +215,12 @@ static void hbri_respond(const char* line)
 	}
 
 	snprintf(reply, sizeof(reply), "HTCP TO%s\n", token);
-	if (write(fd, reply, strlen(reply)) != (ssize_t) strlen(reply))
+	if (!hbri_write_reply(fd, reply))
 		printf("HBRI-WRITE-FAILED\n");
 	else
 	{
 		hbri_answered = 1;
-		printf("HBRI-VALIDATED via %s:%s\n", addr, port);
+		printf("HBRI-VALIDATED via %s:%s (%s)\n", addr, port, opt_hbri_tls ? "TLS" : "plain");
 	}
 	close(fd);
 }
@@ -339,6 +383,9 @@ int main(int argc, char** argv)
 	ADC_client_set_callback(client, handle);
 	if (password)
 		ADC_client_set_password(client, password);
+	/* The validation connection has to match the hub's transport. */
+	opt_hbri_tls = !strncmp(address, "adcs://", 7);
+
 	if (pid)
 		ADC_client_set_pid(client, pid);
 	for (i = 0; i < opt_sup_n; i++)

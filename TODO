@@ -9,8 +9,8 @@ since the 0.7.1 tag.
   must reconnect. Deliberate — one outstanding challenge per session bounds the
   ITCP-per-INF-update amplification — but revisit if it proves too strict.
 - HBRI e2e now exists (test/e2e/run_hbri_e2e.sh, wired into the CI coverage
-  job). Not covered there: a validation that arrives after the user is gone,
-  and HBRI over TLS -- the script runs a plaintext hub.
+  job), including over TLS. Not covered there: a validation that arrives after
+  the user is gone.
 
 ## Networking / platform
 - Windows socket support — src/network/network.c. uhub is meant to be portable
