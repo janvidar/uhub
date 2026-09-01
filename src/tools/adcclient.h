@@ -374,6 +374,16 @@ struct adc_message* ADC_client_build_info(struct ADC_client* client);
  * each feature is appended to the handshake in the order given.
  */
 void ADC_client_add_support(struct ADC_client* client, const char* feature);
+
+/**
+ * Add a named argument to the login INF, e.g. "I6::1" or "U612345".
+ *
+ * Must be called before ADC_client_connect(). May be called more than once.
+ * The field is appended after everything this client builds itself, so it can
+ * state what the client does not model -- a second-family address for HBRI.
+ * A field containing a space is rejected (INF arguments are space separated).
+ */
+void ADC_client_add_inf(struct ADC_client* client, const char* field);
 void ADC_client_destroy(struct ADC_client* client);
 /**
  * Connect to @p address ("adc://host:port" or "adcs://host:port[/?kp=...]").

@@ -85,6 +85,7 @@ struct ADC_client
 	char* password;
 	char* fixed_pid;             /* caller-supplied PID (base32); NULL = generate a random one */
 	char* extra_support;         /* extra HSUP features, e.g. " ADBBS0"; NULL for none */
+	char* extra_inf;             /* extra login INF fields, e.g. " I6::1"; NULL for none */
 	char cid[MAX_CID_LEN + 1];   /* CID for the current identity (set by adc_cid_pid / set_pid) */
 	char support[ADC_SUPPORT_MAX]; /* SU field, or "" to send none */
 
@@ -833,6 +834,25 @@ struct adc_message* ADC_client_build_info(struct ADC_client* client)
 
 	adc_cid_pid(client, info);
 
+	/* Caller-supplied fields go on last, so a test can state things this client
+	   does not model -- an I6 for HBRI, say. */
+	if (client->extra_inf)
+	{
+		char* p = client->extra_inf;
+		while (*p)
+		{
+			char* end = strchr(p, ' ');
+			if (end)
+				*end = 0;
+			if (*p)
+				adc_msg_add_argument(info, p);
+			if (!end)
+				break;
+			*end = ' ';
+			p = end + 1;
+		}
+	}
+
 	return info;
 }
 
@@ -936,6 +956,7 @@ void ADC_client_destroy(struct ADC_client* client)
 	hub_free(client->password);
 	hub_free(client->fixed_pid);
 	hub_free(client->extra_support);
+	hub_free(client->extra_inf);
 	hub_free(client->address.hostname);
 	hub_free(client);
 
@@ -1398,6 +1419,28 @@ void ADC_client_add_support(struct ADC_client* client, const char* feature)
 	snprintf(buf, length, "%s %s", client->extra_support ? client->extra_support : "", feature);
 	hub_free(client->extra_support);
 	client->extra_support = buf;
+}
+
+void ADC_client_add_inf(struct ADC_client* client, const char* field)
+{
+	size_t length;
+	char* buf;
+
+	ADC_TRACE;
+	if (!field || !*field || strchr(field, ' '))
+		return;
+
+	length = (client->extra_inf ? strlen(client->extra_inf) + 1 : 0) + strlen(field) + 1;
+	buf = hub_malloc_zero(length);
+	if (!buf)
+		return;
+
+	if (client->extra_inf)
+		snprintf(buf, length, "%s %s", client->extra_inf, field);
+	else
+		snprintf(buf, length, "%s", field);
+	hub_free(client->extra_inf);
+	client->extra_inf = buf;
 }
 
 void ADC_client_set_pid(struct ADC_client* client, const char* pid)

@@ -29,13 +29,20 @@
  * Usage:
  *   adc_cmd <adc://host:port> --nick N [--password P]
  *           [--send "text"]... [--raw "LINE"]... [--sup ADXXXX]...
- *           [--expect-line GLOB]... [--dump]
+ *           [--inf FIELD]... [--hbri] [--expect-line GLOB]... [--dump]
  *           [--linger SECONDS] [--timeout SECONDS] [--expect ok|fail]
  *
  * --raw sends a line verbatim after login, for driving extensions this client
- * does not model (BBS0's HBBL and HBBP, say). --expect-line matches received
- * lines against a glob and fails the run if any pattern goes unmatched, which
- * is how a test asserts on what the hub sent back.
+ * does not model (BBS0's HBBL and HBBP, say). --inf does the same for the
+ * login INF ("--inf I6::1"). --expect-line matches received lines against a
+ * glob and fails the run if any pattern goes unmatched, which is how a test
+ * asserts on what the hub sent back.
+ *
+ * --hbri answers an HBRI challenge: when the hub sends ITCP, connect to the
+ * address and port it names and send the token back as the first line of that
+ * connection. That second connection is the whole point of HBRI -- it is how
+ * the hub observes an address on the other protocol family instead of taking
+ * the client's word for it -- so a test cannot fake it in the primary session.
  *
  * Exit codes: 0 = expectation met, 1 = expectation not met, 2 = usage/timeout.
  */
@@ -44,10 +51,14 @@
 #include <fnmatch.h>
 #include <signal.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 #define MAX_SEND 8
 #define MAX_RAW 16
 #define MAX_SUP 8
+#define MAX_INF 8
 #define MAX_EXPECT 16
 
 static int running = 1;
@@ -61,6 +72,10 @@ static const char* opt_raw[MAX_RAW];
 static int opt_raw_n = 0;
 static const char* opt_sup[MAX_SUP];
 static int opt_sup_n = 0;
+static const char* opt_inf[MAX_INF];
+static int opt_inf_n = 0;
+static int opt_hbri = 0;
+static int hbri_answered = 0;
 static const char* opt_expect_line[MAX_EXPECT];
 static int opt_expect_line_seen[MAX_EXPECT];
 static int opt_expect_line_n = 0;
@@ -84,6 +99,86 @@ static void send_raw(struct ADC_client* client, const char* line)
 	ADC_client_send(client, cmd);
 	adc_msg_free(cmd);
 	printf("RAW: %s\n", line);
+}
+
+/*
+ * Answer an HBRI challenge.
+ *
+ * ITCP names where to reach the hub on the other protocol family (I4/I6 plus
+ * P4/P6) and carries the token. The reply goes on a fresh connection to that
+ * address, as its very first line and with no HSUP before it -- the hub takes
+ * the peer address it sees there as the proven one. The connection is closed
+ * from the hub's side either way, so nothing is read back.
+ *
+ * Blocking sockets are fine here: this is a test client, and the alarm() that
+ * bounds the whole run still applies.
+ */
+static void hbri_respond(const char* line)
+{
+	char addr[128] = "";
+	char port[16] = "";
+	char token[128] = "";
+	char reply[256];
+	struct addrinfo hints;
+	struct addrinfo* res = NULL;
+	struct addrinfo* ai;
+	const char* p = line;
+	int fd = -1;
+
+	/* Fields are space separated; take the ones we need whichever family. */
+	while ((p = strchr(p, ' ')) != NULL)
+	{
+		p++;
+		if ((!strncmp(p, "I4", 2) || !strncmp(p, "I6", 2)) && !*addr)
+			sscanf(p + 2, "%127[^ ]", addr);
+		else if ((!strncmp(p, "P4", 2) || !strncmp(p, "P6", 2)) && !*port)
+			sscanf(p + 2, "%15[^ ]", port);
+		else if (!strncmp(p, "TO", 2) && !*token)
+			sscanf(p + 2, "%127[^ ]", token);
+	}
+
+	if (!*addr || !*port || !*token)
+	{
+		printf("HBRI-BAD-CHALLENGE: %s\n", line);
+		return;
+	}
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	if (getaddrinfo(addr, port, &hints, &res) != 0)
+	{
+		printf("HBRI-RESOLVE-FAILED: %s:%s\n", addr, port);
+		return;
+	}
+
+	for (ai = res; ai; ai = ai->ai_next)
+	{
+		fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+		if (fd < 0)
+			continue;
+		if (connect(fd, ai->ai_addr, ai->ai_addrlen) == 0)
+			break;
+		close(fd);
+		fd = -1;
+	}
+	freeaddrinfo(res);
+
+	if (fd < 0)
+	{
+		printf("HBRI-CONNECT-FAILED: %s:%s\n", addr, port);
+		return;
+	}
+
+	snprintf(reply, sizeof(reply), "HTCP TO%s\n", token);
+	if (write(fd, reply, strlen(reply)) != (ssize_t) strlen(reply))
+		printf("HBRI-WRITE-FAILED\n");
+	else
+	{
+		hbri_answered = 1;
+		printf("HBRI-VALIDATED via %s:%s\n", addr, port);
+	}
+	close(fd);
 }
 
 /* Match a received line against the --expect-line globs. */
@@ -163,6 +258,10 @@ static int handle(struct ADC_client* client, enum ADC_client_callback_type type,
 				if (opt_dump)
 					printf("LINE: %s\n", data->line);
 				check_expected(data->line);
+				/* One challenge per run: the hub allows one outstanding at a
+				   time, and answering twice would say nothing extra. */
+				if (opt_hbri && !hbri_answered && !strncmp(data->line, "ITCP ", 5))
+					hbri_respond(data->line);
 			}
 			break;
 		default:
@@ -194,6 +293,8 @@ int main(int argc, char** argv)
 		else if (!strcmp(argv[i], "--send") && i + 1 < argc && opt_send_n < MAX_SEND) opt_send[opt_send_n++] = argv[++i];
 		else if (!strcmp(argv[i], "--raw") && i + 1 < argc && opt_raw_n < MAX_RAW) opt_raw[opt_raw_n++] = argv[++i];
 		else if (!strcmp(argv[i], "--sup") && i + 1 < argc && opt_sup_n < MAX_SUP) opt_sup[opt_sup_n++] = argv[++i];
+		else if (!strcmp(argv[i], "--inf") && i + 1 < argc && opt_inf_n < MAX_INF) opt_inf[opt_inf_n++] = argv[++i];
+		else if (!strcmp(argv[i], "--hbri")) opt_hbri = 1;
 		else if (!strcmp(argv[i], "--expect-line") && i + 1 < argc && opt_expect_line_n < MAX_EXPECT) opt_expect_line[opt_expect_line_n++] = argv[++i];
 		else if (!strcmp(argv[i], "--dump")) opt_dump = 1;
 		else if (!strcmp(argv[i], "--linger") && i + 1 < argc) opt_linger = atoi(argv[++i]);
@@ -242,6 +343,8 @@ int main(int argc, char** argv)
 		ADC_client_set_pid(client, pid);
 	for (i = 0; i < opt_sup_n; i++)
 		ADC_client_add_support(client, opt_sup[i]);
+	for (i = 0; i < opt_inf_n; i++)
+		ADC_client_add_inf(client, opt_inf[i]);
 	ADC_client_connect(client, address);
 
 	while (running && net_backend_process()) { }
