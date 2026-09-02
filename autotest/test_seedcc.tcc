@@ -907,6 +907,34 @@ EXO_TEST(seedcc_protocol_for_peer_plain_without_a_certificate, {
 	return strcmp(seed_cc_protocol_for_peer(NULL, "TCP4,ADCS", NULL), "ADC/1.0") == 0;
 });
 
+/*
+ * Dialling out is the other direction, and there the seeder is the TLS client:
+ * the context is built on the spot from the policy's TLS parameters, so a
+ * certificate it does not have cannot be the reason to dial in the clear. A
+ * seeder with no certificate on an ADCS hub used to answer every CTM by
+ * connecting in plain ADC/1.0, which an ADCS client drops.
+ */
+EXO_TEST(seedcc_protocol_for_dial_needs_no_certificate, {
+	struct seed_cc_policy policy;
+	memset(&policy, 0, sizeof(policy));
+	if (strcmp(seed_cc_protocol_for_dial(&policy, "TCP4,ADCS", "ADCS/1.0"), "ADCS/1.0") != 0) return 0;
+	if (strcmp(seed_cc_protocol_for_dial(&policy, "TCP4,ADC0", "ADCS/0.10"), "ADCS/0.10") != 0) return 0;
+	/* And the claim still outranks a request for plain. */
+	return strcmp(seed_cc_protocol_for_dial(&policy, "TCP4,ADCS", "ADC/1.0"), "ADCS/1.0") == 0;
+});
+
+/* Everything else about the choice is the same in both directions. */
+EXO_TEST(seedcc_protocol_for_dial_matches_the_ctm_choice, {
+	struct seed_cc_policy policy = scc_tls_policy();
+	if (strcmp(seed_cc_protocol_for_dial(&policy, "TCP4,ADCS", NULL), "ADCS/1.0") != 0) return 0;
+	if (strcmp(seed_cc_protocol_for_dial(&policy, "TCP4,ADC0", NULL), "ADCS/0.10") != 0) return 0;
+	if (strcmp(seed_cc_protocol_for_dial(&policy, "TCP4", NULL), "ADC/1.0") != 0) return 0;
+	if (strcmp(seed_cc_protocol_for_dial(&policy, "", "ADC/1.0"), "ADC/1.0") != 0) return 0;
+	/* No policy at all is the one case that cannot dial: there are no TLS
+	   parameters to build a client context from. */
+	return strcmp(seed_cc_protocol_for_dial(NULL, "TCP4,ADCS", "ADCS/1.0"), "ADC/1.0") == 0;
+});
+
 EXO_TEST(seedcc_port_rejects_privileged, {
 	if (seed_cc_port_ok(0)) return 0;
 	if (seed_cc_port_ok(22)) return 0;

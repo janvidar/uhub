@@ -1111,6 +1111,7 @@ void fs_transfer_on_connect_req(struct fs_transfer* t, sid_t from, const char* p
 {
 	struct fs_peer peer;
 	struct seed_cc_peer target;
+	const char* speak;
 
 	if (!t || !fs_session_peer_by_sid(t->session, from, &peer))
 		return;
@@ -1122,7 +1123,12 @@ void fs_transfer_on_connect_req(struct fs_transfer* t, sid_t from, const char* p
 	if (!seed_cc_may_dial(&t->policy, &target))
 		return;
 
-	seed_cc_connect_to_peer(&t->policy, &target, protocol, port, token);
+	/* What the peer's INF justifies, not necessarily what its CTM named: a
+	   client advertising ADCS or ADC0 expects TLS on every connection with it.
+	   No certificate is needed to dial -- this end is the TLS client. */
+	speak = seed_cc_protocol_for_dial(&t->policy, peer.support, protocol);
+
+	seed_cc_connect_to_peer(&t->policy, &target, speak, port, token);
 }
 
 void fs_transfer_tick(struct fs_transfer* t)

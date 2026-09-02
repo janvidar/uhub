@@ -389,8 +389,8 @@ struct seed_cc_peer
 extern int seed_cc_protocol_ok(const char* protocol, int* use_tls);
 
 /**
- * Pick the protocol for a transfer with a peer, from what that peer advertised
- * and what (if anything) it asked for.
+ * Pick the protocol for a connection the *peer* will make to the seeder: the
+ * one named in a CTM the seeder sends, or in its answer to an RCM.
  *
  * The decision is driven by capability, not by the request. A client that
  * advertises ADCS or ADC0 has said it does encrypted transfers, and real ones
@@ -412,6 +412,20 @@ extern int seed_cc_protocol_ok(const char* protocol, int* use_tls);
  *                  the one initiating and nothing has been requested.
  */
 extern const char* seed_cc_protocol_for_peer(const struct seed_cc_policy* policy,
+                                             const char* support, const char* requested);
+
+/**
+ * The same choice for the other direction: a connection the *seeder* dials,
+ * answering a peer's CTM.
+ *
+ * Identical in every respect but one -- it does not require the seeder to have
+ * a certificate. Dialling out puts the seeder at the client end of the
+ * handshake, and seed_cc_connect_to_peer() builds that context from the
+ * policy's TLS parameters on the spot. Deciding this direction with
+ * seed_cc_protocol_for_peer() is what made a certificate-less seeder dial an
+ * ADCS-only client in plain ADC/1.0 and have every transfer refused.
+ */
+extern const char* seed_cc_protocol_for_dial(const struct seed_cc_policy* policy,
                                              const char* support, const char* requested);
 
 /**

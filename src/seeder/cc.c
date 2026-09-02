@@ -602,12 +602,15 @@ int seed_cc_support_has(const char* support, const char* feature)
 	return 0;
 }
 
-const char* seed_cc_protocol_for_peer(const struct seed_cc_policy* policy,
-	const char* support, const char* requested)
+/*
+ * The shared half of the two protocol choices below. @p can_tls says whether a
+ * TLS connection could actually be established in the direction being decided;
+ * everything after that is the same question either way -- what the peer can
+ * do, and which revision of it the peer knows.
+ */
+static const char* cc_protocol_choose(int can_tls, const char* support, const char* requested)
 {
-	/* No certificate here means no handshake to answer, whatever the peer can
-	   do; naming TLS would hang it waiting for one that never comes. */
-	if (!policy || !policy->ssl_ctx)
+	if (!can_tls)
 		return ADC_CC_PROTOCOL_PLAIN;
 
 	/*
@@ -640,6 +643,24 @@ const char* seed_cc_protocol_for_peer(const struct seed_cc_policy* policy,
 	/* Neither token: the peer has not said it can do an encrypted transfer, so
 	   asking it for one is a guess that costs the transfer when it is wrong. */
 	return ADC_CC_PROTOCOL_PLAIN;
+}
+
+const char* seed_cc_protocol_for_peer(const struct seed_cc_policy* policy,
+	const char* support, const char* requested)
+{
+	/* No certificate here means no handshake to answer, whatever the peer can
+	   do; naming TLS would hang it waiting for one that never comes. */
+	return cc_protocol_choose(policy && policy->ssl_ctx, support, requested);
+}
+
+const char* seed_cc_protocol_for_dial(const struct seed_cc_policy* policy,
+	const char* support, const char* requested)
+{
+	/* Dialling out is the client end of the handshake, and a client needs no
+	   certificate: seed_cc_connect_to_peer() builds a throwaway context from
+	   the policy's TLS parameters. So the seeder's own certificate -- the thing
+	   the *inbound* direction cannot do without -- says nothing here. */
+	return cc_protocol_choose(policy != NULL, support, requested);
 }
 
 int seed_cc_quota_allow(const struct seed_cc_policy* policy, const char* cid, uint64_t size, time_t now)

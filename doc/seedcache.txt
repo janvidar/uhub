@@ -406,6 +406,14 @@ never at anything named in the CTM -- and this time it is the one that dialled:
   seeder -> client   CSND file TTH/<tth> 0 <size>
   seeder -> client   <size bytes of file>
 
+The protocol dialled is the one the client's own INF justifies, which need not
+be the one its CTM named: a client advertising ADCS or ADC0 expects TLS on every
+connection with it. seed_tls_certificate does not enter into this direction --
+the seeder is the TLS client here and builds that context on the spot -- so a
+seeder with no certificate of its own still dials an ADCS client over TLS. Only
+the two directions where the *client* connects to the seeder (5.2 and 5.4) need
+a certificate.
+
 Note that the CINF ordering is the mirror image of 5.2 while the rule is the
 same one. The peer is identified by the CID in its CINF, and that CID must
 match the user who sent the CTM. On a TLS connection the certificate is not
@@ -427,7 +435,8 @@ echoing the client's token back:
       DCTM <seederSID> <clientSID> ADCS/0.10 1512 <token>
 
 The protocol in that answer is the one the client asked for, downgraded to
-ADC/1.0 only when the seeder has no certificate to answer a handshake with. A
+ADC/1.0 only when the seeder has no certificate to answer a handshake with --
+the client is the one dialling in, so here the certificate is unavoidable. A
 client that asks for ADCS and is told ADC/1.0 will usually give up, which is
 what makes seed_tls_certificate (section 3.3) worth setting.
 

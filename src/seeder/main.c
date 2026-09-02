@@ -376,8 +376,12 @@ static void seeder_on_connect_req(void* ptr, const struct seed_user* from, const
 	 * necessarily the one its CTM named: a client that advertises ADCS or ADC0
 	 * expects TLS on every connection with it, and would refuse the plaintext
 	 * one its own request literally asked for.
+	 *
+	 * The dial variant, not the one used for a CTM: this end is the TLS client,
+	 * so the seeder's own certificate -- which it may well not have -- has no
+	 * say in it.
 	 */
-	speak = seed_cc_protocol_for_peer(&ctx->cc_policy, from->support, protocol);
+	speak = seed_cc_protocol_for_dial(&ctx->cc_policy, from->support, protocol);
 
 	LOG_INFO("seed: %s asked us to connect to %s port %u speaking \"%s\"; dialling with %s",
 		from->nick, from->address, (unsigned) port, protocol ? protocol : "", speak);
@@ -464,8 +468,9 @@ static int seeder_setup_tls(struct seeder_context* ctx)
 
 	if (!*cert && !*key)
 	{
-		LOG_WARN("No seed_tls_certificate configured: transfers are offered as plain ADC/1.0 "
-			"only, and most clients refuse those. Set seed_tls_certificate and "
+		LOG_WARN("No seed_tls_certificate configured: connections made *to* the seeder are "
+			"offered as plain ADC/1.0 only, and most clients refuse those. Outbound "
+			"dials are unaffected and still use ADCS. Set seed_tls_certificate and "
 			"seed_tls_private_key to serve ADCS.");
 		return 0;
 	}
