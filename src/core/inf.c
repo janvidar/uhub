@@ -1047,11 +1047,20 @@ int hub_handle_info_common(struct hub_user* user, struct adc_message* cmd)
 		int stripped = remove_support_feature(cmd, "ADCS");
 		stripped |= remove_support_feature(cmd, "ADC0");
 
-		/* Worth saying: from here on no other client can tell this one does
-		   encrypted transfers, and clients that insist on them will refuse it. */
+		/*
+		 * Worth saying out loud, and at a level a release build prints: from
+		 * here on no other client can tell this one does encrypted transfers,
+		 * so peers that insist on them refuse it and peers that do not will
+		 * offer it plain ADC/1.0. A client connecting over adc:// to a hub that
+		 * also serves adcs:// is the common way into this, and the resulting
+		 * "why can I not download from that user" is otherwise unanswerable
+		 * from either end.
+		 */
 		if (stripped)
-			LOG_DEBUG("%s advertised encrypted client connections over a plaintext hub connection; stripped",
-				user->id.nick);
+			LOG_INFO("%s advertised encrypted client connections (ADCS/ADC0) over a plaintext "
+				"hub connection; stripped. Transfers with this user will be arranged as "
+				"plain ADC/1.0.",
+				user->id.nick[0] ? user->id.nick : "a user still logging in");
 	}
 
 	/* Update/set the feature cast flags. */

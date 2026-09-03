@@ -280,6 +280,41 @@ static int session_callback(struct ADC_client* client, enum ADC_client_callback_
 			}
 			break;
 
+		/*
+		 * A status from a peer (DSTA) is how a client refuses a connect
+		 * request: "141 Protocol unsupported" and the protocol it objected to.
+		 * Without this line a refused transfer looks from here exactly like a
+		 * CTM nobody answered, which is a different fault with a different fix.
+		 */
+		case ADC_CLIENT_PROTOCOL_STATUS:
+			if (data && data->status && data->status->from)
+			{
+				struct fs_roster_user* user = fs_roster_by_sid(session->roster, data->status->from);
+				char nick[MAX_NICK_LEN + 1] = "?";
+
+				if (user)
+					fs_roster_nick(user, nick, sizeof(nick));
+
+				/* PR or TO present means it is answering a connect request --
+				   ours, since nobody else's would be addressed here. */
+				if (data->status->protocol || data->status->token)
+					LOG_INFO("fuse: %s refused our connect request with status %d: %s "
+						"(protocol \"%s\", token \"%s\")",
+						nick, data->status->code,
+						data->status->message ? data->status->message : "",
+						data->status->protocol ? data->status->protocol : "-",
+						data->status->token ? data->status->token : "-");
+				else
+					LOG_INFO("fuse: %s sent status %d: %s", nick, data->status->code,
+						data->status->message ? data->status->message : "");
+			}
+			else if (data && data->status && data->status->severity > 0)
+			{
+				LOG_WARN("fuse: hub status %d: %s", data->status->code,
+					data->status->message ? data->status->message : "");
+			}
+			break;
+
 		case ADC_CLIENT_USER_QUIT:
 			if (data && data->quit)
 				fs_roster_remove(session->roster, data->quit->sid);

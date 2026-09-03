@@ -263,6 +263,28 @@ end of its line and is not interpreted further, so a password may contain '#',
 '=' and spaces.
 
 
+7.1 When a file will not download
+
+A read that hangs and then fails is one of a few things, and the log says which
+-- but only if there is a log. A mount that is not run with -f has no stderr,
+so pass --log:
+
+    $ uhub-fuse --config=/etc/uhub/uhub-fuse.conf --log=/tmp/fuse.log \
+        --trace /mnt/hub
+
+--trace raises the verbosity to the protocol level: every line exchanged with
+the hub (the connect request, and any status the peer sent back refusing it),
+every line on the transfer connection in both directions, what each TLS
+handshake settled on or the OpenSSL error if it did not, body progress, and the
+reason each connection closed. Both can also be set in the configuration file,
+as log_file and log_level.
+
+The transfer machinery is uhub-seeder's, so the lines are the seeder's too and
+doc/seedcache.txt section 7.3 reads them: a status back from the peer, a TLS
+handshake that will not complete against an old client, or a connection that
+goes quiet in a particular state. The trace names nicks, CIDs and addresses.
+
+
 8. What is not there yet
 ------------------------
 

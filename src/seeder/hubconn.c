@@ -1378,6 +1378,46 @@ static void seed_hub_on_revconnect_req(struct seed_hub* hub, struct adc_message*
 	hub->cb.on_revconnect_req(hub->ptr, from, req.protocol, req.token);
 }
 
+/*
+ * A status message, from the hub or from a peer.
+ *
+ * A peer's status (DSTA) is the answer to a connect request it will not take,
+ * and it is the single most useful line there is when a transfer does not
+ * happen: it names the peer, the code, and the protocol it objected to. Logged
+ * at INFO -- it is not the seeder's fault, but it is the seeder's operator who
+ * has to explain it.
+ */
+static void seed_hub_on_status(struct seed_hub* hub, const struct ADC_client_status* status)
+{
+	struct seed_user fallback;
+	const struct seed_user* from;
+
+	if (!status->from)
+	{
+		if (status->severity > 0)
+			LOG_WARN("seeder: hub status %d: %s", status->code,
+				status->message ? status->message : "");
+		return;
+	}
+
+	from = seed_hub_sender(hub, status->from, &fallback);
+
+	/* PR or TO present means it is answering a connect request -- ours, since
+	   nobody else's would be addressed here. Without them it is some other
+	   status the peer chose to send, and calling it a refusal would be a
+	   guess. */
+	if (status->protocol || status->token)
+		LOG_INFO("seeder: %s refused our connect request with status %d: %s "
+			"(protocol \"%s\", token \"%s\")",
+			from->nick, status->code,
+			status->message ? status->message : "",
+			status->protocol ? status->protocol : "-",
+			status->token ? status->token : "-");
+	else
+		LOG_INFO("seeder: %s sent status %d: %s", from->nick, status->code,
+			status->message ? status->message : "");
+}
+
 static int seed_hub_client_callback(struct ADC_client* client, enum ADC_client_callback_type type,
 	struct ADC_client_callback_data* data)
 {
@@ -1435,9 +1475,8 @@ static int seed_hub_client_callback(struct ADC_client* client, enum ADC_client_c
 			break;
 
 		case ADC_CLIENT_PROTOCOL_STATUS:
-			if (data && data->status && data->status->severity > 0)
-				LOG_WARN("seeder: hub status %d: %s", data->status->code,
-					data->status->message ? data->status->message : "");
+			if (data && data->status)
+				seed_hub_on_status(hub, data->status);
 			break;
 
 		case ADC_CLIENT_MESSAGE:

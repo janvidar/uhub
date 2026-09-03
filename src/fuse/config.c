@@ -71,6 +71,9 @@ static const struct fs_cfg_key fs_config_keys[] = {
 	STR_KEY("tls_ciphersuites",   tls_ciphersuites,   0,
 		"TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256", NULL),
 
+	STR_KEY("log_file",           log_file,           0, NULL,        NULL),
+	INT_KEY("log_level",          log_level,          -1,   -1,   11),
+
 	STR_KEY("cache_dir",          cache_dir,          0, NULL,        NULL),
 	INT_KEY("cache_size",         cache_size,         512,  1,    1048576),
 	INT_KEY("max_file_size",      max_file_size,      1024, 1,    1048576),

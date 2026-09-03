@@ -50,6 +50,23 @@ enum log_verbosity {
 # define LOG_PLUGIN(format, ...) do { } while(0)
 #endif
 
+/*
+ * A wire-level protocol trace that survives a release build.
+ *
+ * LOG_DEBUG and LOG_TRACE compile to nothing unless DEBUG is defined, and
+ * LOG_PROTO needs LOWLEVEL_DEBUG on top of that, so on a packaged binary there
+ * is no way to see what was actually said on a connection -- which is precisely
+ * what diagnosing a transfer against somebody else's client needs, and
+ * rebuilding the daemon is rarely an option at the point the question is asked.
+ *
+ * LOG_WIRE is compiled in unconditionally and gated at runtime instead: it
+ * prints only once the verbosity has been raised to log_protocol (uhub-seeder
+ * -vvvvvv, uhub-fuse --trace). Keep it to per-line and per-event protocol
+ * detail; anything an operator would want in an ordinary log belongs in
+ * LOG_INFO.
+ */
+#define LOG_WIRE(format, ...)   hub_log(log_protocol, format __VA_OPT__(,) __VA_ARGS__)
+
 #ifdef LOWLEVEL_DEBUG
 # define LOG_DUMP(format, ...)   hub_log(log_dump,     format __VA_OPT__(,) __VA_ARGS__)
 # define LOG_MEMORY(format, ...) hub_log(log_memory,   format __VA_OPT__(,) __VA_ARGS__)
@@ -66,6 +83,14 @@ enum log_verbosity {
  * be printed in the log.
  */
 extern void hub_set_log_verbosity(int log_verbosity);
+
+/**
+ * @return 1 when a message logged at @p log_verbosity would be printed.
+ *
+ * For callers that would otherwise pay to format a message nobody will see --
+ * a hex dump of a chunk of body, most of all.
+ */
+extern int hub_log_enabled(int log_verbosity);
 
 /**
  * Print a message in the log.

@@ -730,6 +730,77 @@ int net_ssl_keyprint_equal(const char* a, const char* b)
 	return diff == 0;
 }
 
+/*
+ * Say what OpenSSL actually objected to.
+ *
+ * Without this a refused handshake is invisible: handle_openssl_error() below
+ * returns -2, the caller closes the socket, and the log says only that a
+ * connection went away. The reason matters most against clients too old to
+ * negotiate what a current OpenSSL offers by default -- "no shared cipher",
+ * "unsupported protocol", "version too low" are all one line here and
+ * guesswork without it.
+ *
+ * INFO, not WARN: a hub on a public port fails handshakes all day (scanners,
+ * probes, wrong-port browsers) and none of it is the operator's problem. The
+ * daemons that need it -- uhub-seeder and uhub-fuse -- print INFO by default,
+ * the hub shows it with -v.
+ */
+static void log_openssl_error(struct net_connection* con, const char* call, int ret, int err)
+{
+	unsigned long e;
+	char buf[256];
+	int fd = net_con_get_sd(con);
+	int any = 0;
+
+	while ((e = ERR_get_error()) != 0)
+	{
+		ERR_error_string_n(e, buf, sizeof(buf));
+		LOG_INFO("TLS[fd=%d] %s: %s", fd, call, buf);
+		any = 1;
+	}
+
+	if (any)
+		return;
+
+	/*
+	 * SSL_ERROR_SYSCALL with an empty queue is the common shape of "the peer
+	 * hung up in the middle of the handshake", which an old client does when it
+	 * dislikes what it was offered and has nothing polite to say about it.
+	 */
+	if (err == SSL_ERROR_SYSCALL)
+	{
+		if (ret == 0)
+			LOG_INFO("TLS[fd=%d] %s: the peer closed the connection", fd, call);
+		else
+			LOG_INFO("TLS[fd=%d] %s: %s", fd, call, strerror(errno));
+		return;
+	}
+
+	LOG_INFO("TLS[fd=%d] %s: SSL_get_error() = %d, nothing in the error queue", fd, call, err);
+}
+
+/*
+ * The other half of the same question: what a handshake that *did* complete
+ * settled on. "TLSv1.0 / DES-CBC3-SHA" in the log answers a whole class of
+ * complaint about old clients before anyone has to reproduce anything.
+ */
+static void log_openssl_established(struct net_connection* con, const char* how)
+{
+	LOG_INFO("TLS[fd=%d] %s: %s, cipher %s", net_con_get_sd(con), how,
+		net_ssl_get_tls_version(con), net_ssl_get_tls_cipher(con));
+}
+
+/** Which call is being reported, for the log line above. */
+static const char* ssl_state_call(struct net_ssl_openssl* handle)
+{
+	switch (handle->state)
+	{
+		case tls_st_accepting:  return "SSL_accept()";
+		case tls_st_connecting: return "SSL_connect()";
+		default:                return "SSL_read()/SSL_write()";
+	}
+}
+
 static int handle_openssl_error(struct net_connection* con, int ret, int read)
 {
 	struct net_ssl_openssl* handle = get_handle(con);
@@ -755,16 +826,14 @@ static int handle_openssl_error(struct net_connection* con, int ret, int read)
 			return 0;
 
 		case SSL_ERROR_SSL:
-			net_ssl_set_state(handle, tls_st_error);
-			net_stats_tls_add_error();
-			return -2;
-
 		case SSL_ERROR_SYSCALL:
+			log_openssl_error(con, ssl_state_call(handle), ret, err);
 			net_ssl_set_state(handle, tls_st_error);
 			net_stats_tls_add_error();
 			return -2;
 	}
 
+	log_openssl_error(con, ssl_state_call(handle), ret, err);
 	net_stats_tls_add_error();
 	return -2;
 }
@@ -786,6 +855,7 @@ ssize_t net_con_ssl_accept(struct net_connection* con)
 		net_con_update(con, NET_EVENT_READ);
 		net_ssl_set_state(handle, tls_st_connected);
                 net_stats_tls_add_accept();
+		log_openssl_established(con, "accepted");
 		return ret;
 	}
 	return handle_openssl_error(con, ret, 1);
@@ -807,6 +877,7 @@ ssize_t net_con_ssl_connect(struct net_connection* con)
 		net_con_update(con, NET_EVENT_READ);
 		net_ssl_set_state(handle, tls_st_connected);
                 net_stats_tls_add_connect();
+		log_openssl_established(con, "dialled");
 		return ret;
 	}
 	

@@ -159,6 +159,21 @@ void hub_set_log_verbosity(int verb)
 	verbosity = verb;
 }
 
+int hub_log_enabled(int log_verbosity)
+{
+	/* These two are written to a file of their own whatever the verbosity is,
+	   so a caller asking whether to bother formatting must hear yes. */
+#ifdef MEMORY_DEBUG
+	if (memfile && log_verbosity == log_memory)
+		return 1;
+#endif
+#ifdef NETWORK_DUMP_DEBUG
+	if (netdump && log_verbosity == log_protocol)
+		return 1;
+#endif
+	return log_verbosity < verbosity;
+}
+
 /*
  * Replace control characters in a formatted log line with '?'. Log messages
  * embed attacker-controlled fields (nick, CID, user agent); without this a

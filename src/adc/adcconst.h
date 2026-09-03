@@ -90,6 +90,9 @@ typedef uint32_t fourcc_t;
 /* Status/error messages */
 #define ADC_CMD_HSTA FOURCC('H', 'S', 'T', 'A')
 #define ADC_CMD_DSTA FOURCC('D', 'S', 'T', 'A')
+/* The echo spelling of DSTA: a client that refuses a CTM it received as ECTM
+   answers in kind, so a reader of one must know the other. */
+#define ADC_CMD_ESTA FOURCC('E', 'S', 'T', 'A')
 
 /* searches */
 #define ADC_CMD_BSCH FOURCC('B', 'S', 'C', 'H')

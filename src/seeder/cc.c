@@ -464,10 +464,28 @@ int seed_cc_parse(const char* line, size_t length, struct seed_cc_request* out)
 		case ADC_CMD_CSTA:
 		{
 			char* code = adc_msg_get_argument(msg, 0);
+			char* text = adc_msg_get_argument(msg, 1);
 			uint64_t value = 0;
 			if (code && cc_parse_u64(code, &value) && value <= INT32_MAX)
 				req.status = (int) value;
+
+			/* Unescaped here rather than at the log line: this is display text
+			   from the peer and nothing downstream should have to remember that
+			   it arrived escaped. Over-long text is truncated, not refused --
+			   the code is the part that matters, and losing the whole status
+			   because its description was wordy helps nobody. */
+			if (text)
+			{
+				char* plain = adc_msg_unescape(text);
+				if (plain)
+				{
+					uhub_strlcpy(req.description, plain, sizeof(req.description));
+					hub_free(plain);
+				}
+			}
+
 			hub_free(code);
+			hub_free(text);
 			req.type = SEED_CC_STA;
 			break;
 		}
@@ -717,6 +735,29 @@ int seed_cc_quota_allow(const struct seed_cc_policy* policy, const char* cid, ui
 /* -- connection plumbing --------------------------------------------------- */
 
 /*
+ * How one connection is named in the log: which way it was made, who is on the
+ * other end, the descriptor, and where in the exchange it had got to.
+ *
+ * The descriptor is in there so these lines can be lined up with the TLS ones,
+ * which are emitted a layer down and know a file descriptor and nothing else --
+ * "TLS[fd=12] accepted: TLSv1.0, cipher ..." and "seed_cc[accepted 10.0.0.5
+ * fd=12 SUP] <-- CSUP ..." are then obviously the same connection.
+ *
+ * Returns a static buffer: one call per log statement.
+ */
+static const char* cc_tag(struct seed_cc_connection* b)
+{
+	static char buf[128];
+
+	snprintf(buf, sizeof(buf), "%s %s fd=%d %s",
+		b->initiator ? "dialled" : "accepted",
+		ip_convert_to_string(&b->addr),
+		b->connection ? net_con_get_sd(b->connection) : -1,
+		cc_state_name(b->state));
+	return buf;
+}
+
+/*
  * The one and only teardown. Every error and completion path funnels through
  * here, which is what makes "the pin is released exactly once" checkable by
  * inspection: the pin is taken in exactly one place, recorded in b->pinned
@@ -727,28 +768,30 @@ int seed_cc_quota_allow(const struct seed_cc_policy* policy, const char* cid, ui
  * The connection grant is deliberately *not* released here: it is consumed the
  * moment the CINF that quoted it is accepted, so a grant is good for exactly
  * one connection whatever happens to that connection afterwards.
+ *
+ * @p reason is what the closing line says, and every caller passes one: a
+ * connection that ends is the only record there is of a transfer that did not
+ * happen, and "closed" without a why is not a record of anything.
  */
-static void seed_cc_destroy(struct seed_cc_connection* b)
+static void seed_cc_destroy(struct seed_cc_connection* b, const char* reason)
 {
 	/* An unfinished download says how far it got. "Stalled after 0 bytes" and
 	   "stalled with 12 KB to go" are different faults with different owners, and
 	   the closing line is the only place either is visible. */
 	if (b->state == CC_STATE_DL_BODY && b->in_remaining)
 	{
-		LOG_INFO("seed_cc[%s %s %s] closing with %" PRIu64 " of %" PRIu64 " bytes still to come (peer cid=%s)",
-			b->initiator ? "dialled" : "accepted",
-			ip_convert_to_string(&b->addr),
-			cc_state_name(b->state),
+		LOG_INFO("seed_cc[%s] closing with %" PRIu64 " of %" PRIu64 " bytes still to come (peer cid=%s): %s",
+			cc_tag(b),
 			b->in_remaining, b->in_total,
-			b->cid[0] ? b->cid : "-");
+			b->cid[0] ? b->cid : "-",
+			reason ? reason : "no reason given");
 	}
 	else
 	{
-		LOG_INFO("seed_cc[%s %s %s] closing (peer cid=%s)",
-			b->initiator ? "dialled" : "accepted",
-			ip_convert_to_string(&b->addr),
-			cc_state_name(b->state),
-			b->cid[0] ? b->cid : "-");
+		LOG_INFO("seed_cc[%s] closing (peer cid=%s): %s",
+			cc_tag(b),
+			b->cid[0] ? b->cid : "-",
+			reason ? reason : "no reason given");
 	}
 
 	if (b->ingest)
@@ -851,10 +894,35 @@ static void cc_log_wire(struct seed_cc_connection* b, const char* dir, const cha
 	}
 	buf[out] = '\0';
 
-	LOG_INFO("seed_cc[%s %s %s] %s %s",
-		b->initiator ? "dialled" : "accepted",
-		ip_convert_to_string(&b->addr),
-		cc_state_name(b->state), dir, buf);
+	LOG_INFO("seed_cc[%s] %s %s", cc_tag(b), dir, buf);
+}
+
+/*
+ * A bounded hex dump of bytes that could not be read as ADC at all.
+ *
+ * The line trace above prints unprintable bytes as '.', which is the right
+ * thing for reading an exchange and the wrong thing for the one case where the
+ * exact bytes are the question: a peer whose framing or escaping this parser
+ * rejects. Emitted only on that failure, so it is at most one per connection.
+ */
+static void cc_log_bytes(struct seed_cc_connection* b, const char* what, const char* data, size_t len)
+{
+	char hex[3 * 32 + 1];
+	char txt[32 + 1];
+	size_t shown = (len > 32) ? 32 : len;
+	size_t i;
+
+	for (i = 0; i < shown; i++)
+	{
+		unsigned char c = (unsigned char) data[i];
+		snprintf(hex + (i * 3), 4, "%02x ", c);
+		txt[i] = (c >= 0x20 && c < 0x7f) ? (char) c : '.';
+	}
+	hex[shown ? (shown * 3) - 1 : 0] = '\0';
+	txt[shown] = '\0';
+
+	LOG_INFO("seed_cc[%s] %s (" PRINTF_SIZE_T " bytes, first " PRINTF_SIZE_T " shown): %s |%s|",
+		cc_tag(b), what, len, shown, hex, txt);
 }
 
 /* Queue a protocol line. @return 0 when the peer is queueing faster than it
@@ -873,8 +941,7 @@ static int cc_queue(struct seed_cc_connection* b, const char* line)
 
 	if (cbuf_size(b->out) > SEED_CC_OUT_MAX)
 	{
-		LOG_DEBUG("seed_cc: reply backlog exceeded for %s", ip_convert_to_string(&b->addr));
-		seed_cc_destroy(b);
+		seed_cc_destroy(b, "the reply backlog was exceeded");
 		return 0;
 	}
 	return 1;
@@ -914,7 +981,7 @@ static int cc_send_status(struct seed_cc_connection* b, int code, const char* de
 
 	if (!seed_cc_format_status(line, sizeof(line), code, description))
 	{
-		seed_cc_destroy(b);
+		seed_cc_destroy(b, "a status message could not be formatted");
 		return 0;
 	}
 
@@ -1049,10 +1116,6 @@ static void cc_finish_ingest(struct seed_cc_connection* b)
 	memset(&entry, 0, sizeof(entry));
 	published = seed_ingest_finish(job, &entry, &error);
 
-	if (!published)
-		LOG_DEBUG("seed_cc: ingest of TTH=%s from %s failed (%s)",
-			b->want_tth, ip_convert_to_string(&b->addr), seed_error_string(error));
-
 	/*
 	 * Reported before the connection is torn down, so a caller waiting on this
 	 * TTH hears about it on the same turn of the loop. The TTH comes from
@@ -1065,7 +1128,18 @@ static void cc_finish_ingest(struct seed_cc_connection* b)
 			published ? SEED_OK : error, published ? &entry : NULL);
 	}
 
-	seed_cc_destroy(b);
+	if (published)
+	{
+		seed_cc_destroy(b, "the download is complete");
+	}
+	else
+	{
+		char reason[SEED_TTH_STR_LEN + 96];
+
+		snprintf(reason, sizeof(reason), "TTH=%s was received but not published (%s)",
+			b->want_tth, seed_error_string(error));
+		seed_cc_destroy(b, reason);
+	}
 }
 
 /* Feed received body bytes to the ingest. @return 0 if the connection is gone. */
@@ -1074,12 +1148,18 @@ static int cc_ingest_bytes(struct seed_cc_connection* b, const char* data, size_
 	if ((uint64_t) len > b->in_remaining)
 		len = (size_t) b->in_remaining; /* the peer overran its own announcement */
 
+	/* Body progress, one line per read. A transfer that dies part-way and one
+	   that never starts look identical from the closing line alone; this is
+	   what separates them. */
+	LOG_WIRE("seed_cc[%s] <-- %" PRIu64 " body bytes, %" PRIu64 " of %" PRIu64 " still to come",
+		cc_tag(b), (uint64_t) len, b->in_remaining - (uint64_t) len, b->in_total);
+
 	if (b->want_range)
 	{
 		if (len && b->policy->on_body &&
 		    !b->policy->on_body(b->policy->on_body_ptr, b->token, b->in_offset, data, len))
 		{
-			seed_cc_destroy(b);
+			seed_cc_destroy(b, "the caller stopped the range transfer");
 			return 0;
 		}
 
@@ -1087,7 +1167,7 @@ static int cc_ingest_bytes(struct seed_cc_connection* b, const char* data, size_
 	}
 	else if (len && seed_ingest_write(b->ingest, data, len) != 0)
 	{
-		seed_cc_destroy(b);
+		seed_cc_destroy(b, "the ingest could not be written");
 		return 0;
 	}
 
@@ -1102,7 +1182,7 @@ static int cc_ingest_bytes(struct seed_cc_connection* b, const char* data, size_
 			if (b->policy->on_body_done)
 				b->policy->on_body_done(b->policy->on_body_ptr, b->token, 1);
 
-			seed_cc_destroy(b);
+			seed_cc_destroy(b, "the requested range is complete");
 			return 0;
 		}
 
@@ -1128,8 +1208,7 @@ static int cc_handle_snd(struct seed_cc_connection* b, const struct seed_cc_requ
 		(b->want_size && (uint64_t) req->bytes > b->want_size) ||
 		(b->want_range && (uint64_t) req->bytes != b->want_range))
 	{
-		LOG_DEBUG("seed_cc: unexpected CSND from %s", ip_convert_to_string(&b->addr));
-		seed_cc_destroy(b);
+		seed_cc_destroy(b, "the peer's CSND does not match what we asked for");
 		return 0;
 	}
 
@@ -1160,8 +1239,11 @@ static int cc_handle_snd(struct seed_cc_connection* b, const struct seed_cc_requ
 	b->ingest = seed_ingest_begin(b->policy->cache, &ireq, &error);
 	if (!b->ingest)
 	{
-		LOG_DEBUG("seed_cc: refusing ingest of TTH=%s (%s)", b->want_tth, seed_error_string(error));
-		seed_cc_destroy(b);
+		char reason[SEED_TTH_STR_LEN + 96];
+
+		snprintf(reason, sizeof(reason), "the ingest of TTH=%s was refused (%s)",
+			b->want_tth, seed_error_string(error));
+		seed_cc_destroy(b, reason);
 		return 0;
 	}
 
@@ -1335,8 +1417,8 @@ static int cc_handle_line(struct seed_cc_connection* b, const char* line, size_t
 
 	if (!seed_cc_parse(line, length, &req))
 	{
-		LOG_DEBUG("seed_cc: malformed client command from %s", ip_convert_to_string(&b->addr));
-		seed_cc_destroy(b);
+		cc_log_bytes(b, "this could not be parsed as a client command", line, length);
+		seed_cc_destroy(b, "a malformed command");
 		return 0;
 	}
 
@@ -1351,15 +1433,21 @@ static int cc_handle_line(struct seed_cc_connection* b, const char* line, size_t
 	 */
 	if (req.type == SEED_CC_STA)
 	{
+		char reason[SEED_CC_STATUS_MAX + 64];
+
 		if (req.status / 100 == 0)
 		{
-			LOG_DEBUG("seed_cc: peer %s sent informational status %d; continuing",
-				ip_convert_to_string(&b->addr), req.status);
+			LOG_INFO("seed_cc[%s] informational status %d from the peer; continuing",
+				cc_tag(b), req.status);
 			return 1;
 		}
 
-		LOG_DEBUG("seed_cc: peer %s reported status %d", ip_convert_to_string(&b->addr), req.status);
-		seed_cc_destroy(b);
+		/* The peer's own words for why there will be no transfer. This is the
+		   one line that says whose fault it is, so it carries the description
+		   the peer sent and not a summary of it. */
+		snprintf(reason, sizeof(reason), "the peer refused with status %d: %s",
+			req.status, *req.description ? req.description : "(no description)");
+		seed_cc_destroy(b, reason);
 		return 0;
 	}
 
@@ -1429,7 +1517,7 @@ static void cc_read_body(struct seed_cc_connection* b, struct net_connection* co
 		got = net_con_recv(con, b->chunk, want);
 		if (got < 0)
 		{
-			seed_cc_destroy(b);
+			seed_cc_destroy(b, "the connection failed while reading the body");
 			return;
 		}
 		if (got == 0)
@@ -1467,7 +1555,7 @@ static int cc_probe_event(struct seed_cc_connection* b, struct net_connection* c
 	bytes = net_con_peek(con, peeked, sizeof(peeked));
 	if (bytes < 0)
 	{
-		seed_cc_destroy(b);
+		seed_cc_destroy(b, "the connection failed before the first byte");
 		return 0;
 	}
 
@@ -1480,7 +1568,7 @@ static int cc_probe_event(struct seed_cc_connection* b, struct net_connection* c
 
 		case SEED_CC_PROBE_PLAIN:
 			b->probing = 0;
-			LOG_DEBUG("seed_cc[accepted %s] plain ADC connection", ip_convert_to_string(&b->addr));
+			LOG_INFO("seed_cc[%s] the peer connected in plain ADC", cc_tag(b));
 			return 1;
 
 		case SEED_CC_PROBE_TLS:
@@ -1490,15 +1578,15 @@ static int cc_probe_event(struct seed_cc_connection* b, struct net_connection* c
 	b->probing = 0;
 	b->use_tls = 1;
 
-	LOG_DEBUG("seed_cc[accepted %s] TLS %d.%d connection; starting the handshake",
-		ip_convert_to_string(&b->addr), (int) (unsigned char) peeked[9],
-		(int) (unsigned char) peeked[10]);
+	/* The version in the ClientHello record, which is what an old client leads
+	   with; what the handshake actually settles on is logged by the TLS layer. */
+	LOG_INFO("seed_cc[%s] the peer offered TLS (record version %d.%d); starting the handshake",
+		cc_tag(b), (int) (unsigned char) peeked[9], (int) (unsigned char) peeked[10]);
 
 	handshake = net_con_ssl_handshake(con, net_con_ssl_mode_server, b->policy->ssl_ctx);
 	if (handshake < 0)
 	{
-		LOG_DEBUG("seed_cc[accepted %s] TLS handshake failed", ip_convert_to_string(&b->addr));
-		seed_cc_destroy(b);
+		seed_cc_destroy(b, "the TLS handshake failed");
 		return 0;
 	}
 
@@ -1524,7 +1612,7 @@ static void cc_read_event(struct seed_cc_connection* b, struct net_connection* c
 	bytes = net_con_recv(con, b->line + b->line_len, (sizeof(b->line) - 1) - b->line_len);
 	if (bytes < 0)
 	{
-		seed_cc_destroy(b);
+		seed_cc_destroy(b, "the connection failed while reading");
 		return;
 	}
 	if (bytes == 0)
@@ -1540,8 +1628,8 @@ static void cc_read_event(struct seed_cc_connection* b, struct net_connection* c
 
 		if (framed < 0)
 		{
-			LOG_DEBUG("seed_cc: oversized or malformed line from %s", ip_convert_to_string(&b->addr));
-			seed_cc_destroy(b);
+			cc_log_bytes(b, "this is not a line we can frame", b->line, b->line_len);
+			seed_cc_destroy(b, "an oversized or malformed line");
 			return;
 		}
 		if (framed == 0)
@@ -1595,7 +1683,7 @@ static void cc_write_event(struct seed_cc_connection* b, struct net_connection* 
 
 		if (sent < 0)
 		{
-			seed_cc_destroy(b);
+			seed_cc_destroy(b, "the connection failed while writing");
 			return;
 		}
 		if (sent == 0)
@@ -1614,7 +1702,7 @@ static void cc_write_event(struct seed_cc_connection* b, struct net_connection* 
 
 	if (b->close_after_flush)
 	{
-		seed_cc_destroy(b);
+		seed_cc_destroy(b, "the reply has been sent");
 		return;
 	}
 
@@ -1644,7 +1732,7 @@ static void cc_write_event(struct seed_cc_connection* b, struct net_connection* 
 				   out, so there is no way to report this other than by cutting
 				   the connection short. */
 				LOG_WARN("seed_cc: read failed for TTH=%s at offset %" PRIu64, b->pin_tth, b->offset);
-				seed_cc_destroy(b);
+				seed_cc_destroy(b, "the file could not be read");
 				return;
 			}
 
@@ -1659,7 +1747,7 @@ static void cc_write_event(struct seed_cc_connection* b, struct net_connection* 
 			ssize_t sent = net_con_send(con, b->chunk + b->chunk_sent, b->chunk_len - b->chunk_sent);
 			if (sent < 0)
 			{
-				seed_cc_destroy(b);
+				seed_cc_destroy(b, "the connection failed while sending the body");
 				return;
 			}
 			if (sent == 0)
@@ -1668,13 +1756,16 @@ static void cc_write_event(struct seed_cc_connection* b, struct net_connection* 
 			b->chunk_sent += (size_t) sent;
 			net_con_set_timeout(con, SEED_CC_TIMEOUT);
 			budget = ((size_t) sent >= budget) ? 0 : budget - (size_t) sent;
+
+			LOG_WIRE("seed_cc[%s] --> %" PRIu64 " body bytes, %" PRIu64 " still to send",
+				cc_tag(b), (uint64_t) sent, b->remaining + (b->chunk_len - b->chunk_sent));
 		}
 	}
 
 	/* One transfer per connection: the peer gets what it asked for and the
 	   socket goes away with it, which is also what releases the pin and the
 	   descriptor. */
-	seed_cc_destroy(b);
+	seed_cc_destroy(b, "the upload is complete");
 }
 
 static void seed_cc_net_event(struct net_connection* con, int events, void* arg)
@@ -1686,7 +1777,9 @@ static void seed_cc_net_event(struct net_connection* con, int events, void* arg)
 	   idle until its timeout. */
 	if (events & (NET_EVENT_TIMEOUT | NET_EVENT_ERROR))
 	{
-		seed_cc_destroy(b);
+		seed_cc_destroy(b, (events & NET_EVENT_TIMEOUT)
+			? "the idle timeout expired with nothing further from the peer"
+			: "the connection reported an error (a TLS handshake that failed arrives this way)");
 		return;
 	}
 
@@ -1740,8 +1833,7 @@ int seed_cc_accept(const struct seed_cc_policy* policy, struct net_connection* c
 
 	net_con_reinitialize(con, seed_cc_net_event, b, NET_EVENT_READ);
 	net_con_set_timeout(con, SEED_CC_TIMEOUT);
-	LOG_INFO("seed_cc[accepted %s] inbound connection; waiting for %s",
-		ip_convert_to_string(addr),
+	LOG_INFO("seed_cc[%s] inbound connection; waiting for %s", cc_tag(b),
 		b->probing ? "a TLS ClientHello or the peer's CSUP" : "the peer's CSUP");
 	return 1;
 }
@@ -1816,7 +1908,7 @@ static void cc_connect_cb(struct net_connect_handle* handle, enum net_connect_st
 	{
 		LOG_INFO("seed_cc[dialled %s] connect failed (status %d)",
 			ip_convert_to_string(&b->addr), (int) status);
-		seed_cc_destroy(b);
+		seed_cc_destroy(b, "the connection could not be made");
 		return;
 	}
 
@@ -1899,7 +1991,7 @@ int seed_cc_connect_to_peer(const struct seed_cc_policy* policy, const struct se
 			policy->tls_ciphersuite, policy->tls_ciphersuites);
 		if (!b->ssl_ctx)
 		{
-			seed_cc_destroy(b);
+			seed_cc_destroy(b, "no TLS context could be created");
 			return 0;
 		}
 	}
@@ -1909,7 +2001,7 @@ int seed_cc_connect_to_peer(const struct seed_cc_policy* policy, const struct se
 	if (!b->connect_job)
 	{
 		seed_cc_connecting--;
-		seed_cc_destroy(b);
+		seed_cc_destroy(b, "the dial could not be started");
 		return 0;
 	}
 

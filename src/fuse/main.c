@@ -46,6 +46,8 @@ struct fs_options
 	char* address;
 	char* nick;
 	char* password;
+	char* log;
+	int   trace;
 };
 
 static struct fs_options options;
@@ -57,6 +59,8 @@ static const struct fuse_opt option_spec[] = {
 	FS_OPT("--hub=%s",      address),
 	FS_OPT("--nick=%s",     nick),
 	FS_OPT("--password=%s", password),
+	FS_OPT("--log=%s",      log),
+	FS_OPT("--trace",       trace),
 	FUSE_OPT_END
 };
 
@@ -74,6 +78,14 @@ static void usage(const char* program)
 	printf("    --password=SECRET      the password, for a registered account. Every\n");
 	printf("                           user on this machine can read it out of ps;\n");
 	printf("                           prefer --config\n");
+	printf("    --log=FILE             append messages to FILE. A mount that is not\n");
+	printf("                           run with -f has no stderr, so without this it\n");
+	printf("                           has nowhere to report anything\n");
+	printf("    --trace                log the ADC protocol: every line exchanged with\n");
+	printf("                           the hub and on every transfer connection, plus\n");
+	printf("                           body progress. Use with --log when not in the\n");
+	printf("                           foreground. Very verbose, and it prints who is\n");
+	printf("                           talking to whom\n");
 	printf("\n");
 	printf("The mount holds hub/ (what the hub says about itself), me/, users/ (one\n");
 	printf("directory per user, named by CID) and by-nick/ (symlinks into users/).\n");
@@ -164,6 +176,12 @@ int main(int argc, char** argv)
 	if (options.nick && !fs_config_set(&config, "nick", options.nick))
 		goto cleanup;
 
+	if (options.log && !fs_config_set(&config, "log_file", options.log))
+		goto cleanup;
+
+	if (options.trace && !fs_config_set(&config, "log_level", "10"))
+		goto cleanup;
+
 	if (options.password)
 	{
 		if (!fs_config_set(&config, "password", options.password))
@@ -205,9 +223,17 @@ int main(int argc, char** argv)
 	 * In the foreground, say what is happening: a mount that is fetching a
 	 * file from somebody has nowhere else to report progress, and INFO is
 	 * where those messages are. Daemonized, keep to what an operator would
-	 * want in a log.
+	 * want in a log -- and note that without log_file there is no log at all
+	 * once fuse_daemonize() has closed stderr, which is why --trace says to
+	 * pass --log with it.
+	 *
+	 * Initialized here, after the fork: the file is opened in the process that
+	 * will do the writing.
 	 */
-	hub_set_log_verbosity(opts.foreground ? 5 : 4);
+	if (config.log_file && *config.log_file)
+		hub_log_initialize(config.log_file, 0);
+
+	hub_set_log_verbosity(config.log_level >= 0 ? config.log_level : (opts.foreground ? 5 : 4));
 	net_initialize();
 
 	session = fs_session_create(&config);

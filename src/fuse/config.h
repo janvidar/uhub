@@ -69,6 +69,16 @@ struct fs_config
 	char* tls_ciphersuite;
 	char* tls_ciphersuites;
 
+	/*
+	 * Diagnostics. A daemonized mount has no stderr, so without log_file
+	 * nothing it says survives the fork -- which is exactly when a transfer
+	 * that will not start needs explaining. log_level is uhub's scale
+	 * (4 = INFO, 9 = the ADC/transfer wire trace); -1 leaves it at the default
+	 * for how the mount was started.
+	 */
+	char* log_file;
+	int   log_level;
+
 	/* The content cache downloaded files land in. */
 	char* cache_dir;          /** Empty means $XDG_CACHE_HOME/uhub-fuse. */
 	int   cache_size;         /** MiB */

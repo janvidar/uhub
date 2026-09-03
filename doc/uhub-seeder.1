@@ -47,6 +47,14 @@ security considerations.
 .BI \^\-v
 Verbose mode, add more \-v's for higher verbosity.
 .TP
+.BI \^\-t
+Trace the ADC protocol: every line exchanged with the hub, every line on every
+transfer connection, the TLS version and cipher each handshake settled on, body
+progress, and the reason each connection closed. This is what to turn on when a
+transfer with a particular client does not happen; see
+.B doc/seedcache.txt
+for how to read it. Very verbose, and it records who is talking to whom.
+.TP
 .BI \^\-q
 Quiet mode, if quiet mode is enabled no output or logs are made.
 .TP
@@ -74,6 +82,10 @@ Show the version number
 To run uhub\-seeder as a daemon, logging to a file and writing a pid file:
 .TP
 .B uhub\-seeder " -f -l /var/log/uhub/seeder.log -p /run/uhub/seeder.pid"
+.PP
+To work out why a transfer with one client never happens:
+.TP
+.B uhub\-seeder " -t -l /tmp/seeder-trace.log"
 .SH FILES
 .TP
 .I /etc/uhub/uhub\-seeder.conf

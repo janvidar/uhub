@@ -601,7 +601,10 @@ logged the same way with the reason: a hash mismatch logs both the announced
 and the computed TTH, a refused media type logs the type that was detected.
 Client-to-client protocol lines are logged as they go over the wire, because
 the ordering of those lines is the only practical way to tell which side was
-supposed to speak first when a transfer misbehaves.
+supposed to speak first when a transfer misbehaves. Each of them carries the
+peer's address, the file descriptor and the state the exchange had reached, and
+every connection logs the reason it closed. Section 7.3 is how to read all of
+that, and what -t adds to it.
 
 The durable record is the row in the database, which is the only place where
 the TTH, the nick, the CID, the address the poster connected from and the time
@@ -613,7 +616,59 @@ for seed_entry_ttl, and when the entry expires the provenance goes with it.
 If you expect to answer that kind of question, set seed_entry_ttl accordingly
 and back the database up. There is no other copy.
 
-7.3 What you are taking on
+7.3 When a transfer with one client does not happen
+
+Run the seeder with -t (uhub-fuse: --trace, and --log unless it is in the
+foreground). That raises the verbosity to the protocol level and prints:
+
+  * every line exchanged with the hub, which is where a transfer is arranged --
+    the CTM or RCM, and any status message the peer sent back refusing it;
+  * every line on every transfer connection, in both directions, tagged with
+    the peer's address, the file descriptor, and which state the exchange had
+    reached;
+  * what each TLS handshake settled on, or the OpenSSL error if it did not;
+  * body progress, in bytes;
+  * the reason each connection closed.
+
+The ordinary log (no -t) already carries the transfer lines and the closing
+reasons; -t adds the hub side, the body progress and the byte dumps.
+
+The four things worth looking for, in the order they go wrong:
+
+  1. No CTM at all. The peer never asked, or the hub did not relay it. Check
+     that the seeder is where you think it is in the user list.
+
+  2. A status back from the peer. "seeder: <nick> answered our connect request
+     with status 141: Protocol unsupported (protocol "ADC/1.0", ...)" is the
+     peer saying it will not take the connection that was offered. Almost
+     always a protocol mismatch: see section 5.3 and 5.4 for who needs a
+     certificate in which direction.
+
+  3. A TLS handshake that fails. The line to look for is
+
+       TLS[fd=12] SSL_accept(): error:0A000102:SSL routines::unsupported protocol
+
+     Old clients are the usual cause: they offer a version or a cipher suite
+     that a current OpenSSL will not agree to. seed_tls_version and
+     seed_tls_ciphersuite are what to relax if you decide that is acceptable --
+     and the fact that it is a decision is why the hub does not relax it for
+     you. A handshake that succeeds says so, with the version and cipher it
+     settled on, which is the other half of the same question.
+
+  4. A connection that goes quiet. "closing (peer cid=...): the idle timeout
+     expired with nothing further from the peer" in state INF means the peer
+     connected and then never sent its CINF; in DL_BODY it means the body
+     stopped part-way, and the line says how much never arrived.
+
+Bytes that cannot be read as ADC at all are dumped in hex, bounded to the first
+32. A dump beginning "15 03 01" is a TLS alert record: the peer tried to speak
+TLS to a port that answered in plain, or gave up on the handshake before it
+started.
+
+The trace names nicks, CIDs and addresses, and is written wherever -l points.
+Treat it as you would any other record of who was connected to what.
+
+7.4 What you are taking on
 
 Running a seeder means content that other people chose gets stored on your
 disk, on your machine, and is served to other people from your address. That is

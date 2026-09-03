@@ -515,6 +515,39 @@ EXO_TEST(seedcc_sta_extracts_code, {
 	return scc_req.status == 151;
 });
 
+/*
+ * The description is kept, and unescaped. It is the only place a peer says why
+ * it will not do the transfer, and "File not available" and "Transfer denied"
+ * are different problems with different owners behind the same 1xx severity.
+ */
+EXO_TEST(seedcc_sta_extracts_description, {
+	scc_parse("CSTA 151 File\\snot\\savailable\n");
+	return strcmp(scc_req.description, "File not available") == 0;
+});
+
+EXO_TEST(seedcc_sta_without_description, {
+	scc_parse("CSTA 151\n");
+	return scc_req.status == 151 && scc_req.description[0] == '\0';
+});
+
+/* Over-long text is truncated rather than refused: the code is the part that
+   matters, and losing the status because its description was wordy helps
+   nobody. */
+EXO_TEST(seedcc_sta_long_description_truncates, {
+	char line[SEED_CC_LINE_MAX];
+	size_t n = SEED_CC_STATUS_MAX + 40;
+	size_t i;
+
+	memcpy(line, "CSTA 151 ", 9);
+	for (i = 0; i < n; i++)
+		line[9 + i] = 'x';
+	line[9 + n] = '\n';
+
+	if (!seed_cc_parse(line, 9 + n + 1, &scc_req)) return 0;
+	if (scc_req.status != 151) return 0;
+	return strlen(scc_req.description) == SEED_CC_STATUS_MAX;
+});
+
 EXO_TEST(seedcc_unknown_command_is_unsupported, {
 	return scc_type("CZZZ whatever\n") == SEED_CC_UNSUPPORTED;
 });

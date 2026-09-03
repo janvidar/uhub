@@ -694,6 +694,9 @@ static void print_usage(const char* program)
 	fprintf(stderr,
 		"Options:\n"
 		"   -v          Verbose mode. Add more -v's for higher verbosity.\n"
+		"   -t          Trace the ADC protocol: every line exchanged with the hub and\n"
+		"               on every transfer connection, plus body progress. Very verbose,\n"
+		"               and it names who is talking to whom.\n"
 		"   -q          Quiet mode - no output\n"
 		"   -f          Fork to background\n"
 		"   -l <file>   Log messages to given file (default: stderr)\n"
@@ -713,7 +716,7 @@ static void parse_command_line(int argc, char** argv)
 {
 	int opt;
 
-	while ((opt = getopt(argc, argv, "vqfc:l:p:hVC")) != -1)
+	while ((opt = getopt(argc, argv, "vtqfc:l:p:hVC")) != -1)
 	{
 		switch (opt)
 		{
@@ -723,6 +726,16 @@ static void parse_command_line(int argc, char** argv)
 
 			case 'v':
 				arg_verbose++;
+				break;
+
+			/*
+			 * Straight to the wire trace. It sits above every other level, so
+			 * six -v's would get here too -- but nobody counts to six, and this
+			 * is the flag an operator is told to add when a transfer will not
+			 * start.
+			 */
+			case 't':
+				arg_verbose = log_protocol + 1;
 				break;
 
 			case 'q':

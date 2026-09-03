@@ -105,6 +105,9 @@ enum seed_cc_type
 };
 
 /** Everything the connection handler needs out of one parsed line. */
+/** Longest CSTA description kept; the rest is dropped. */
+#define SEED_CC_STATUS_MAX 128
+
 struct seed_cc_request
 {
 	enum seed_cc_type type;
@@ -128,6 +131,16 @@ struct seed_cc_request
 	uint64_t start;                      /** GET/SND first byte. */
 	int64_t  bytes;                      /** GET/SND length, or SEED_CC_TO_EOF. */
 	int      status;                     /** CSTA code, 0 if not a CSTA. */
+
+	/**
+	 * The CSTA description, unescaped and bounded, "" if there was none.
+	 *
+	 * Kept because it is the only place a peer says *why* it will not do the
+	 * transfer -- "Transfer\sdenied", "File\snot\savailable", "TLS\srequired"
+	 * are three different problems with three different owners, and the code
+	 * alone tells them apart for none of them.
+	 */
+	char     description[SEED_CC_STATUS_MAX + 1];
 };
 
 /**

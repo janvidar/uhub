@@ -106,6 +106,22 @@ machine can read this out of
 prefer
 .BR \-\-config .
 .TP
+.BI \-\-log= FILE
+Append log messages to
+.IR FILE .
+A mount that is not run with
+.B \-f
+has no stderr, so without this it has nowhere to report anything.
+.TP
+.B \-\-trace
+Trace the ADC protocol: every line exchanged with the hub, every line on every
+transfer connection, the TLS version and cipher each handshake settled on, body
+progress, and the reason each connection closed. This is what to turn on when a
+transfer with a particular client does not happen. Pass
+.B \-\-log
+with it unless the mount is in the foreground. Very verbose, and it records who
+is talking to whom.
+.TP
 .B \-f
 Stay in the foreground.
 .TP

@@ -113,14 +113,53 @@ static int ADC_client_parse_address(struct ADC_client* client, const char* arg);
 static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, size_t length);
 static int ADC_client_send_queue(struct ADC_client* client);
 
-static void ADC_client_debug(struct ADC_client* client, const char* format, ...)
+/** The hub this client is talking to, for a log line. */
+static const char* ADC_client_host(struct ADC_client* client)
 {
-	char logmsg[1024];
-	va_list args;
-	va_start(args, format);
-	vsnprintf(logmsg, 1024, format, args);
-	va_end(args);
-	fprintf(stdout, "* [%p] %s\n", client, logmsg);
+	return client->address.hostname ? client->address.hostname : "?";
+}
+
+/*
+ * The hub-side wire trace: every line this client sends or receives, verbatim.
+ *
+ * This is the counterpart to seed_cc's transfer trace, and the two are meant to
+ * be read together -- a transfer that never happens usually failed here, in a
+ * CTM that was refused or answered with a status nobody looked at, rather than
+ * on the transfer connection that was consequently never made.
+ *
+ * LOG_WIRE, so it costs nothing until the verbosity is raised to log_protocol.
+ */
+static void ADC_client_log_wire(struct ADC_client* client, const char* dir, const char* line, size_t length)
+{
+	char buf[512];
+	size_t out = 0;
+	size_t i;
+
+	if (!hub_log_enabled(log_protocol))
+		return;
+
+	/*
+	 * HPAS carries the answer to the hub's password challenge. It is a hash
+	 * over a nonce rather than the password itself, but it is the credential
+	 * for that login, and traces like this one end up pasted into bug reports.
+	 */
+	if (length >= 4 && memcmp(line, "HPAS", 4) == 0)
+	{
+		LOG_WIRE("adc[%s] %s HPAS <redacted>",
+			ADC_client_host(client), dir);
+		return;
+	}
+
+	for (i = 0; i < length && out < sizeof(buf) - 1; i++)
+	{
+		unsigned char c = (unsigned char) line[i];
+		if (c == '\n' || c == '\r')
+			break;
+		buf[out++] = (c >= 0x20 && c < 0x7f) ? (char) c : '.';
+	}
+	buf[out] = '\0';
+
+	LOG_WIRE("adc[%s] %s %s", ADC_client_host(client), dir, buf);
 }
 
 #ifdef ADCC_DEBUG
@@ -129,7 +168,8 @@ static void ADC_client_debug(struct ADC_client* client, const char* format, ...)
 #define ADC_TRACE do { } while(0)
 #endif
 
-#ifdef ADCC_DEBUG
+/* Not under a debug ifdef any more: where the login had got to is exactly what
+   a trace of a session that goes wrong has to say. */
 static const char* ADC_client_state_string[] =
 {
 	"ps_none",
@@ -141,16 +181,15 @@ static const char* ADC_client_state_string[] =
 	"ps_normal",
 	0
 };
-#endif
 
 static void ADC_client_set_state(struct ADC_client* client, enum ADC_client_state state)
 {
 	ADC_TRACE;
 	if (client->state != state)
 	{
-#ifdef ADCC_DEBUG
-		ADC_client_debug(client, "Set state %s (was %s)", ADC_client_state_string[(int) state], ADC_client_state_string[(int) client->state]);
-#endif
+		LOG_WIRE("adc[%s] state %s (was %s)", ADC_client_host(client),
+			ADC_client_state_string[(int) state],
+			ADC_client_state_string[(int) client->state]);
 		client->state = state;
 	}
 }
@@ -404,9 +443,7 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 	struct ADC_client_callback_data data;
 
 	ADC_TRACE;
-#ifdef ADC_CLIENT_DEBUG_PROTO
-	ADC_client_debug(client, "- LINE: '%s'", line);
-#endif
+	ADC_client_log_wire(client, "<--", line, length);
 
 	/* Hand the raw line over before anything is parsed, so a caller can see
 	   commands the switch below does not model. */
@@ -418,7 +455,8 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 
 	if (length < 4)
 	{
-		ADC_client_debug(client, "Unexpected response from hub: '%s'", line);
+		LOG_WARN("adc[%s] unexpected response from the hub: \"%s\"",
+			ADC_client_host(client), line);
 		return -1;
 	}
 
@@ -426,7 +464,8 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 	struct adc_message* msg = adc_msg_parse(line, length);
 	if (!msg)
 	{
-		ADC_client_debug(client, "WARNING: Message cannot be decoded: \"%s\"", line);
+		LOG_WARN("adc[%s] a line from the hub cannot be decoded: \"%s\"",
+			ADC_client_host(client), line);
 		return -1;
 	}
 
@@ -614,7 +653,17 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 			break;
 		}
 
+		/*
+		 * DSTA and ESTA are how a *peer* answers a connect request it will not
+		 * take: "141 Protocol unsupported", naming the protocol in PR and the
+		 * token in TO. They were dropped on the floor here, which is what made
+		 * a transfer that never happened indistinguishable from one nobody ever
+		 * replied to. They reach the caller through the same event as a hub
+		 * status, told apart by status->from.
+		 */
 		case ADC_CMD_ISTA:
+		case ADC_CMD_DSTA:
+		case ADC_CMD_ESTA:
 		{
 			struct ADC_client_status status;
 			char* code = adc_msg_get_argument(msg, 0);
@@ -627,13 +676,24 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 			}
 			EXTRACT_POS_ARG(msg, 1, status.message);
 
+			if (msg->cmd != ADC_CMD_ISTA)
+			{
+				status.from = msg->source;
+				status.protocol = adc_msg_get_named_argument(msg, ADC_STA_FLAG_PROTOCOL);
+				status.token = adc_msg_get_named_argument(msg, ADC_INF_FLAG_TOKEN);
+			}
+
 			data.status = &status;
-			if (status.severity == 2 && client->state != ps_normal)
+			/* A peer's refusal is never a login failure, whatever its severity:
+			   the session with the hub is unaffected by it. */
+			if (status.severity == 2 && client->state != ps_normal && !status.from)
 				client->callback(client, ADC_CLIENT_LOGIN_ERROR, &data);
 			else
 				client->callback(client, ADC_CLIENT_PROTOCOL_STATUS, &data);
 
 			hub_free(status.message);
+			hub_free(status.protocol);
+			hub_free(status.token);
 			break;
 		}
 
@@ -745,6 +805,8 @@ void ADC_client_send(struct ADC_client* client, struct adc_message* msg)
 
 	uhub_assert(client->con != NULL);
 	uhub_assert(msg->cache && *msg->cache);
+
+	ADC_client_log_wire(client, "-->", msg->cache, msg->length);
 
 	if (ioq_send_is_empty(client->send_queue) && !(client->flags & cflag_pipe))
 	{
@@ -887,7 +949,11 @@ static void ADC_client_send_password(struct ADC_client* client, const char* chal
 
 	if (!client->password)
 	{
-		ADC_client_debug(client, "Password required but none configured.");
+		/* The hub asked for a password and there is none. Nothing else will
+		   happen on this connection, so it is said plainly rather than as a
+		   debug aside. */
+		LOG_ERROR("adc[%s] the hub asked for a password and none is configured.",
+			ADC_client_host(client));
 		client->callback(client, ADC_CLIENT_LOGIN_ERROR, 0);
 		return;
 	}
@@ -895,7 +961,8 @@ static void ADC_client_send_password(struct ADC_client* client, const char* chal
 	/* The challenge is a base32-encoded TIGER hash (MAX_CID_LEN chars). */
 	if (strlen(challenge) != MAX_CID_LEN)
 	{
-		ADC_client_debug(client, "Malformed password challenge: \"%s\"", challenge);
+		LOG_ERROR("adc[%s] the hub sent a password challenge that cannot be used: \"%s\"",
+			ADC_client_host(client), challenge);
 		return;
 	}
 

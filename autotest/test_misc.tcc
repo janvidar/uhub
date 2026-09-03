@@ -1,4 +1,5 @@
 #include "system.h"
+#include "util/log.h"
 #include "util/misc.h"
 
 EXO_TEST(is_num_0,  { return is_num('0'); });
@@ -270,4 +271,32 @@ EXO_TEST(strlcpy_zero_size,  {
 	char buf[4];
 	memset(buf, 'x', sizeof(buf));
 	return uhub_strlcpy(buf, "abc", 0) == 3 && buf[0] == 'x';
+});
+
+/* --- the log verbosity gate ---------------------------------------------- */
+
+/*
+ * hub_log_enabled() is what lets a caller skip formatting a message nobody
+ * will see -- a hex dump of a chunk of transfer body, in particular. It must
+ * agree exactly with what hub_log() would decide to print, which is a strict
+ * "level below the threshold".
+ */
+EXO_TEST(log_enabled_matches_the_threshold, {
+	int restore = 4; /* the library default, and what the suite runs at */
+	int ok = 1;
+
+	hub_set_log_verbosity(log_info);
+	ok = ok && hub_log_enabled(log_user);       /* 3 < 4 */
+	ok = ok && !hub_log_enabled(log_info);      /* 4 < 4 is false */
+	ok = ok && !hub_log_enabled(log_protocol);
+
+	hub_set_log_verbosity(log_protocol + 1);
+	ok = ok && hub_log_enabled(log_protocol);   /* what -t turns on */
+	ok = ok && hub_log_enabled(log_fatal);
+
+	hub_set_log_verbosity(0);
+	ok = ok && !hub_log_enabled(log_fatal);     /* -q silences everything */
+
+	hub_set_log_verbosity(restore);
+	return ok;
 });

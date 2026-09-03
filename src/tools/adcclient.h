@@ -233,6 +233,17 @@ struct ADC_client_status
 	int code;       /* full 3-digit ADC status code */
 	int severity;   /* 0 = success, 1 = recoverable, 2 = fatal */
 	char* message;
+
+	/*
+	 * Set when the status came from another user rather than from the hub
+	 * (DSTA/ESTA), which is how a peer refuses a connect request: 0 for a hub
+	 * status. A refusal names what it refused, so the two fields it carries are
+	 * broken out here -- without them a failed transfer looks, from this end,
+	 * exactly like a CTM that was never answered at all.
+	 */
+	sid_t from;
+	char* protocol; /* the "PR" flag: the protocol of the refused CTM/RCM */
+	char* token;    /* the "TO" flag: the token it named */
 };
 
 /**
