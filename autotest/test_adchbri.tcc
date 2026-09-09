@@ -5,6 +5,9 @@
 #include "network/ipcalc.h"
 #include "network/backend.h"
 #include "network/dnsresolver.h"
+#include "network/timeout.h"
+
+#include <poll.h>
 #include "tools/adcclient.h"
 
 /*
@@ -370,6 +373,370 @@ EXO_TEST(adchbri_client_destroy, {
 	if (ah_listener != -1)
 		close(ah_listener);
 	ah_listener = -1;
+	return 1;
+});
+
+/* ---------------------------------------------------------------------------
+ * The validation connection: ITCP -> connect -> HTCP -> ISTA
+ *
+ * Driven against a fake hub rather than a mocked transport, because what is
+ * under test is a real second connection: the client has to dial it over the
+ * protocol the session did not use, put its token on it, and let go of it
+ * afterwards. Two loopback listeners stand in for the hub -- one on 127.0.0.1
+ * for the session, one on ::1 for the validation it is asked to make.
+ * ------------------------------------------------------------------------- */
+
+#define VH_TOKEN "AAABVALIDATIONTOKEN"
+
+static struct ADC_client* vh_client = NULL;
+static int vh_listen4 = -1;      /* the fake hub */
+static int vh_listen6 = -1;      /* where it asks to be reached over IPv6 */
+static int vh_hub = -1;          /* the hub's end of the session */
+static int vh_val = -1;          /* the hub's end of the validation connection */
+static uint16_t vh_port4 = 0;
+static uint16_t vh_port6 = 0;
+static uint16_t vh_dead6 = 0;    /* an IPv6 port with nothing listening */
+static int vh_connected = 0;
+static int vh_lines = 0;         /* lines the client has taken off the socket */
+static int vh_skip = 0;
+static struct timeout_evt vh_tick;
+
+static void vh_tick_cb(struct timeout_evt* evt)
+{
+	(void) evt;
+}
+
+static int vh_callback(struct ADC_client* client, enum ADC_client_callback_type type,
+	struct ADC_client_callback_data* data)
+{
+	(void) client;
+	(void) data;
+	if (type == ADC_CLIENT_CONNECTED)
+		vh_connected = 1;
+	else if (type == ADC_CLIENT_RAW_LINE)
+		vh_lines++;
+	return 1;
+}
+
+/* A loopback listener on ::1, so a connection to it can only be IPv6. */
+static int vh_make_listener6(uint16_t* out_port, int do_listen)
+{
+	struct sockaddr_in6 addr;
+	socklen_t len = sizeof(addr);
+	int on = 1;
+	int sd = socket(AF_INET6, SOCK_STREAM, 0);
+
+	if (sd == -1)
+		return -1;
+
+	/* v6-only, so that reaching it is proof of IPv6 and not of a dual-stack
+	   socket quietly accepting an IPv4 connection. */
+	if (setsockopt(sd, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(on)) != 0)
+	{
+		close(sd);
+		return -1;
+	}
+
+	memset(&addr, 0, sizeof(addr));
+	addr.sin6_family = AF_INET6;
+	addr.sin6_addr = in6addr_loopback;
+	addr.sin6_port = 0;
+
+	if (bind(sd, (struct sockaddr*) &addr, sizeof(addr)) != 0
+		|| getsockname(sd, (struct sockaddr*) &addr, &len) != 0
+		|| (do_listen && listen(sd, 4) != 0))
+	{
+		close(sd);
+		return -1;
+	}
+
+	*out_port = ntohs(addr.sin6_port);
+	return sd;
+}
+
+static int vh_ready(int fd, int msec)
+{
+	struct pollfd p;
+
+	if (fd == -1)
+		return 0;
+
+	p.fd = fd;
+	p.events = POLLIN;
+	p.revents = 0;
+	return poll(&p, 1, msec) == 1 && (p.revents & POLLIN) != 0;
+}
+
+/*
+ * One turn of the client's event loop.
+ *
+ * A one second tick is kept in the timeout queue while these tests run: with
+ * nothing else due, the poll inside net_backend_process() would otherwise wait
+ * out the validation connection's own 30 second timeout, so a test that is
+ * going to fail would take half an hour to say so.
+ */
+static void vh_turn(void)
+{
+	if (!timeout_evt_is_scheduled(&vh_tick))
+		timeout_queue_insert(net_backend_get_timeout_queue(), &vh_tick, 1);
+	net_backend_process();
+}
+
+/* Run the loop until the client has taken another line off the socket. */
+static int vh_wait_line(int seconds)
+{
+	int before = vh_lines;
+	time_t deadline = time(NULL) + seconds;
+
+	while (vh_lines == before && time(NULL) <= deadline)
+		vh_turn();
+
+	return vh_lines != before;
+}
+
+/*
+ * Turn the loop a few times, to let something finish that has no observable
+ * result at this end -- a refused connect being noticed and cleaned up.
+ */
+static void vh_turn_a_few(void)
+{
+	int i;
+
+	for (i = 0; i < 5; i++)
+		vh_turn();
+}
+
+/* Run the loop until @p fd has something to read (or has reached EOF). */
+static int vh_wait_readable(int fd, int seconds)
+{
+	time_t deadline = time(NULL) + seconds;
+
+	while (!vh_ready(fd, 0) && time(NULL) <= deadline)
+		vh_turn();
+
+	return vh_ready(fd, 0);
+}
+
+/*
+ * Let a connection the client decided to make actually get made.
+ *
+ * The address is a literal, but it still goes through the resolver, and the
+ * connect is only issued from that callback -- so draining the resolver by hand
+ * is what turns "the client wants to connect" into a SYN the listener can see.
+ */
+static void vh_settle(void)
+{
+	net_dns_wait_idle();
+	net_dns_process();
+}
+
+/* Hand the client an ITCP, and let it read and act on it. */
+static int vh_send_itcp(const char* body)
+{
+	char line[256];
+	int len = snprintf(line, sizeof(line), "ITCP %s\n", body);
+
+	if (len <= 0 || (size_t) len >= sizeof(line))
+		return 0;
+	if (send(vh_hub, line, (size_t) len, 0) != len)
+		return 0;
+	if (!vh_wait_line(5))
+		return 0;
+
+	vh_settle();
+	return 1;
+}
+
+EXO_TEST(adchbri_val_setup, {
+	int dead;
+
+	memset(&vh_tick, 0, sizeof(vh_tick));
+	timeout_evt_initialize(&vh_tick, vh_tick_cb, NULL);
+
+	vh_listen4 = ah_make_listener(&vh_port4);
+	vh_listen6 = net_is_ipv6_supported() ? vh_make_listener6(&vh_port6, 1) : -1;
+
+	/* A port that was bound and released: connecting to it is refused at once
+	   rather than left to time out. */
+	dead = net_is_ipv6_supported() ? vh_make_listener6(&vh_dead6, 0) : -1;
+	if (dead != -1)
+		close(dead);
+
+	vh_skip = (vh_listen4 == -1 || vh_listen6 == -1 || dead == -1);
+	return 1;
+});
+
+EXO_TEST(adchbri_val_connect, {
+	char url[64];
+	time_t deadline;
+
+	if (vh_skip)
+		EXO_SKIP("no IPv6 loopback listener on this host");
+
+	vh_client = ADC_client_create("hbrival", "", NULL);
+	if (!vh_client)
+		return 0;
+
+	ADC_client_set_callback(vh_client, vh_callback);
+	ADC_client_set_hbri(vh_client, 1);
+
+	snprintf(url, sizeof(url), "adc://127.0.0.1:%u", (unsigned) vh_port4);
+	vh_connected = 0;
+	if (!ADC_client_connect(vh_client, url))
+		return 0;
+
+	deadline = time(NULL) + 10;
+	while (!vh_connected && time(NULL) <= deadline)
+		vh_turn();
+
+	if (!vh_ready(vh_listen4, 1000))
+		return 0;
+
+	vh_hub = accept(vh_listen4, NULL, NULL);
+
+	/* The session is over IPv4, so IPv6 is the protocol left to prove. */
+	return vh_connected == 1 && vh_hub != -1
+		&& strcmp(ADC_client_get_local_address(vh_client, AF_INET), "127.0.0.1") == 0;
+});
+
+/*
+ * A request naming the protocol the session already runs over proves nothing
+ * the hub has not seen, so nothing is dialled -- in particular not the hub's
+ * own listener, which is what such a request points at.
+ */
+EXO_TEST(adchbri_val_ignores_same_family, {
+	char body[128];
+
+	if (vh_skip)
+		EXO_SKIP("no IPv6 loopback listener on this host");
+
+	snprintf(body, sizeof(body), "I4127.0.0.1 P4%u TO" VH_TOKEN, (unsigned) vh_port4);
+	if (!vh_send_itcp(body))
+		return 0;
+
+	return !vh_ready(vh_listen4, 200) && !vh_ready(vh_listen6, 0);
+});
+
+/* A request that cannot be read is dropped, not guessed at. */
+EXO_TEST(adchbri_val_ignores_malformed, {
+	char body[128];
+
+	if (vh_skip)
+		EXO_SKIP("no IPv6 loopback listener on this host");
+
+	/* A valid address and token, but no port to dial. */
+	snprintf(body, sizeof(body), "I6::1 TO" VH_TOKEN);
+	if (!vh_send_itcp(body))
+		return 0;
+
+	return !vh_ready(vh_listen6, 200);
+});
+
+/* The real thing: the client dials the address it was given, over IPv6. */
+EXO_TEST(adchbri_val_opens_connection, {
+	char body[128];
+
+	if (vh_skip)
+		EXO_SKIP("no IPv6 loopback listener on this host");
+
+	snprintf(body, sizeof(body), "I6::1 P6%u TO" VH_TOKEN, (unsigned) vh_port6);
+	if (!vh_send_itcp(body))
+		return 0;
+
+	if (!vh_ready(vh_listen6, 2000))
+		return 0;
+
+	vh_val = accept(vh_listen6, NULL, NULL);
+	return vh_val != -1;
+});
+
+/*
+ * HTCP is its first and only command -- there is no HSUP on this connection --
+ * and it carries the hub's token back exactly as it arrived.
+ */
+EXO_TEST(adchbri_val_sends_token, {
+	char buf[256];
+	ssize_t n;
+
+	if (vh_skip)
+		EXO_SKIP("no IPv6 loopback listener on this host");
+
+	if (!vh_wait_readable(vh_val, 5))
+		return 0;
+
+	n = recv(vh_val, buf, sizeof(buf) - 1, 0);
+	if (n <= 0)
+		return 0;
+	buf[n] = '\0';
+
+	return strcmp(buf, "HTCP TO" VH_TOKEN "\n") == 0;
+});
+
+/* One command, one answer: the client lets the connection go afterwards. */
+EXO_TEST(adchbri_val_closes_after_reply, {
+	const char* reply = "ISTA 000 Validation\\ssucceeded\n";
+	char buf[64];
+
+	if (vh_skip)
+		EXO_SKIP("no IPv6 loopback listener on this host");
+
+	if (send(vh_val, reply, strlen(reply), 0) != (ssize_t) strlen(reply))
+		return 0;
+
+	/* The close reaches this end as readable-then-EOF. */
+	if (!vh_wait_readable(vh_val, 5))
+		return 0;
+
+	return recv(vh_val, buf, sizeof(buf), 0) == 0;
+});
+
+/*
+ * A validation that cannot be made costs the session nothing, and must not
+ * leave the client unable to make the next one: the hub re-challenges, and a
+ * client still holding the wreck of the last attempt would ignore it.
+ */
+EXO_TEST(adchbri_val_survives_refusal, {
+	char body[128];
+
+	if (vh_skip)
+		EXO_SKIP("no IPv6 loopback listener on this host");
+
+	close(vh_val);
+	vh_val = -1;
+
+	snprintf(body, sizeof(body), "I6::1 P6%u TO" VH_TOKEN, (unsigned) vh_dead6);
+	if (!vh_send_itcp(body))
+		return 0;
+
+	/* Let the refusal be noticed and cleaned up before the next challenge, so
+	   that what is under test is recovery from a failure and not the tearing
+	   down of an attempt still in flight. */
+	vh_turn_a_few();
+
+	snprintf(body, sizeof(body), "I6::1 P6%u TO" VH_TOKEN, (unsigned) vh_port6);
+	if (!vh_send_itcp(body))
+		return 0;
+
+	if (!vh_ready(vh_listen6, 2000))
+		return 0;
+
+	vh_val = accept(vh_listen6, NULL, NULL);
+	return vh_val != -1 && vh_wait_readable(vh_val, 5);
+});
+
+EXO_TEST(adchbri_val_teardown, {
+	if (vh_client)
+		ADC_client_destroy(vh_client);
+	vh_client = NULL;
+
+	if (timeout_evt_is_scheduled(&vh_tick))
+		timeout_queue_remove(net_backend_get_timeout_queue(), &vh_tick);
+
+	if (vh_val != -1) close(vh_val);
+	if (vh_hub != -1) close(vh_hub);
+	if (vh_listen4 != -1) close(vh_listen4);
+	if (vh_listen6 != -1) close(vh_listen6);
+	vh_val = vh_hub = vh_listen4 = vh_listen6 = -1;
 	return 1;
 });
 
