@@ -366,6 +366,110 @@ int ADC_client_hub_supports(const struct ADC_client* client, const char* feature
  */
 const char* ADC_client_hub_support_list(const struct ADC_client* client);
 
+/* --------------------------------------------------------------------- HBRI */
+
+/*
+ * HBRI ("hybrid connectivity") is an unofficial ADC extension, originally from
+ * AirDC++, that lets a dual-stack client be published with both an IPv4 and an
+ * IPv6 address instead of only the one it happened to connect over.
+ *
+ * A hub can only see the address a client arrived from, so a dual-stack client
+ * that reaches a dual-stack hub over IPv6 is published to everyone as
+ * IPv6-only -- and is undialable by every peer that has no IPv6, which on most
+ * hubs is most of them. HBRI closes that gap:
+ *
+ *   1. the client offers ADHBRI in its handshake, and names an address for the
+ *      other protocol family in its INF;
+ *   2. the hub answers with ITCP: its own address and port in that family,
+ *      plus an opaque token naming the session;
+ *   3. the client opens a second connection to that address -- necessarily over
+ *      the other protocol -- and sends "HTCP TO<token>" as its first command;
+ *   4. the hub publishes the address it observed there, and closes it.
+ *
+ * Nothing the client says about its addresses is believed: the INF address is a
+ * *signal* that this end thinks it has connectivity in that family, and what
+ * gets published is what the hub saw on the validation connection. A failed or
+ * absent validation costs nothing -- the session stays logged in, with one
+ * protocol.
+ *
+ * Which address to name is the question this end has to answer, and a
+ * multi-homed hub is what makes it answerable: the hub's name resolves in both
+ * families, so the routing table can be asked which source address this host
+ * would use to reach the hub over the family it did not connect over. That
+ * costs one unconnected UDP socket and sends nothing (see
+ * net_local_address_for), and a host with no route in that family simply fails
+ * -- which is exactly the case where nothing should be advertised.
+ */
+
+/**
+ * Room for a validation token, including the terminator. uhub mints a 43
+ * character one (a SID prefix plus a Tiger MAC), but the token is opaque to a
+ * client, so this is deliberately generous.
+ */
+#define ADC_HBRI_TOKEN_MAX 64
+
+/**
+ * A parsed ITCP: where the hub wants to be dialled back, over which protocol,
+ * and the token that names the session. Broken out so the parse can be tested
+ * without a socket -- it runs on hub-supplied bytes and decides what this
+ * client connects to.
+ */
+struct ADC_client_hbri_request
+{
+	int af;                              /**< AF_INET or AF_INET6 */
+	char address[INET6_ADDRSTRLEN + 1];  /**< the hub's address in that family */
+	uint16_t port;                       /**< 1 - 65535 */
+	char token[ADC_HBRI_TOKEN_MAX];      /**< echoed back verbatim, still escaped */
+};
+
+/**
+ * Parse an ITCP validation request into @p out.
+ *
+ * The protocol family is named by which address flag the hub used (I6 with P6,
+ * or I4 with P4); everything is checked before it is believed, since a
+ * malformed request would otherwise decide what this client dials.
+ *
+ * Pure: it reads a message and touches nothing else.
+ *
+ * @return 1 if the request is well formed and usable, 0 otherwise -- in which
+ *         case @p out is left zeroed.
+ */
+int ADC_client_parse_hbri_request(struct adc_message* cmd, struct ADC_client_hbri_request* out);
+
+/**
+ * Take part in HBRI.
+ *
+ * Off by default, and opting in is a claim: it adds ADHBRI to the handshake,
+ * puts this host's addresses in the INF, and answers an ITCP by opening a
+ * second connection to the hub. Only a client that wants to be dialled by peers
+ * -- one with a listening socket -- has anything to gain from it.
+ *
+ * Must be set before ADC_client_connect(); the handshake is where it is
+ * announced.
+ */
+void ADC_client_set_hbri(struct ADC_client* client, int enable);
+
+/** @return 1 if this client takes part in HBRI. */
+int ADC_client_get_hbri(const struct ADC_client* client);
+
+/**
+ * This host's own address in family @p af (AF_INET or AF_INET6), as the source
+ * address the routing table would use to reach the hub -- "", never NULL, when
+ * there is no route in that family, or before it has been worked out.
+ *
+ * The address for the family the connection was made over is read off the
+ * socket and is known as soon as it connects. The other one is worked out from
+ * the hub's other DNS records, needs a lookup, and only exists at all when HBRI
+ * is enabled -- so it appears some time after the connection does, or never.
+ *
+ * This is the address before any NAT; what the hub publishes is what the hub
+ * sees, which behind NAT is a different address.
+ *
+ * The string is held in a small ring of static buffers shared with the rest of
+ * the address formatting, so a caller that keeps it must copy it out.
+ */
+const char* ADC_client_get_local_address(const struct ADC_client* client, int af);
+
 /**
  * Build the INF this client would send, without sending it or needing a
  * connection. The caller owns the message and must adc_msg_free() it.

@@ -68,6 +68,20 @@ nothing: it stays logged in with a single-protocol address.
 Requires hbri_enable plus both hbri_address4 and hbri_address6; the extension is
 only advertised when all three are set.
 
+uhub's own ADC client (src/tools/adcclient.c, used by uhub-seeder and uhub-fuse)
+speaks the client half of this. Both daemons listen for peers, so being
+published on one protocol only leaves them undialable by everyone on the other;
+they call ADC_client_set_hbri() and the transport does the rest.
+
+The one thing a client has to work out for itself is which address to name for
+the family it did not connect over. It cannot observe that address -- there is
+no socket in that family -- but a multi-homed hub gives it a way to ask: resolve
+the hub's name in each family and let the routing table say which source address
+would reach it (net_local_address_for(), a connected UDP socket that sends
+nothing). The lookups start before the connection is made, because the answer is
+wanted for the login INF: an INF *update* would be a second INF within seconds
+of login, which the hub's own update flood control refuses.
+
 
 == The hub architecture ==
 

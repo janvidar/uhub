@@ -199,6 +199,13 @@ static void render_hub(struct render_buf* out, const struct fs_render_ctx* ctx,
 	}
 }
 
+/*
+ * me/: who this mount is on the hub.
+ *
+ * ip4 and ip6 are this host's own addresses, and render as an empty file when
+ * it has no address in that family -- there is no answer, and a lone newline
+ * would read like one.
+ */
 static void render_me(struct render_buf* out, const struct fs_render_ctx* ctx,
                       const struct fs_field* field)
 {
@@ -210,6 +217,16 @@ static void render_me(struct render_buf* out, const struct fs_render_ctx* ctx,
 		put_sid(out, ctx->my_sid);
 	else if (strcmp(field->name, "support") == 0)
 		put_line(out, ctx->my_support);
+	else if (strcmp(field->name, "ip4") == 0)
+	{
+		if (ctx->my_ip4 && *ctx->my_ip4)
+			put_line(out, ctx->my_ip4);
+	}
+	else if (strcmp(field->name, "ip6") == 0)
+	{
+		if (ctx->my_ip6 && *ctx->my_ip6)
+			put_line(out, ctx->my_ip6);
+	}
 }
 
 static void render_user(struct render_buf* out, const struct fs_render_ctx* ctx,

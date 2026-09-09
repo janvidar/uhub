@@ -39,6 +39,11 @@ const struct fs_field fs_me_fields[] = {
 	{ "cid",         NULL, FS_FIELD_READ },
 	{ "sid",         NULL, FS_FIELD_READ },
 	{ "support",     NULL, FS_FIELD_READ },
+	/* This host's own addresses, not the ones the hub publishes: these are what
+	   the routing table says, before any NAT. Empty for a family with no route
+	   to the hub, which is what a single-protocol mount looks like. */
+	{ "ip4",         NULL, FS_FIELD_READ },
+	{ "ip6",         NULL, FS_FIELD_READ },
 	{ NULL,          NULL, 0 }
 };
 

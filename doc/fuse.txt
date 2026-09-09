@@ -27,7 +27,9 @@ See uhub-fuse(1) for the command line, and getstarted.txt for the hub itself.
         users         how many are online
         sid           our session id
         tls           the TLS version and cipher, or "no"
-      me/           nick, cid, sid, support -- the mount's own identity
+      me/           nick, cid, sid, support -- the mount's own identity,
+                    plus ip4 and ip6: this host's own addresses for reaching
+                    the hub, empty for a family it has no route in
       chat/
         main          the hub's chat: read it, tail it, write to it
         private       what was said to you, and what you said to somebody

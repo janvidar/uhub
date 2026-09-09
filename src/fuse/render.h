@@ -65,6 +65,8 @@ struct fs_render_ctx
 	const char* my_nick;
 	const char* my_cid;
 	const char* my_support;
+	const char* my_ip4;          /** this host's own address, "" if none */
+	const char* my_ip6;
 	sid_t       my_sid;
 
 	/* users/<cid>/ */

@@ -1575,6 +1575,12 @@ static void seed_hub_close_client(struct seed_hub* hub)
  * the parsed address) that has no reset, and the one place it is safe to throw
  * it away is here -- from the timer, never from inside one of its own
  * callbacks.
+ *
+ * HBRI is asked for unconditionally. The seeder always has a listening socket
+ * -- the daemon exits if it cannot bind one -- so a hub that knows only the
+ * address it connected from leaves it undialable by every peer on the other
+ * protocol. It costs nothing when the hub does not offer HBRI, or when this
+ * host has only one protocol to offer.
  */
 static void seed_hub_open(struct seed_hub* hub)
 {
@@ -1595,6 +1601,8 @@ static void seed_hub_open(struct seed_hub* hub)
 	/* Re-applied per attempt: seed_hub_open() builds a fresh ADC_client every
 	   time, and one that forgot its SU would come back as a passive seeder. */
 	ADC_client_set_support(hub->client, hub->support);
+
+	ADC_client_set_hbri(hub->client, 1);
 
 	/*
 	 * Offering BBS0 in the HSUP is what makes the hub send board descriptors:

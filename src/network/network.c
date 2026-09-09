@@ -488,6 +488,77 @@ int net_accept(int fd, struct ip_addr_encap* ipaddr)
 }
 
 
+int net_local_address_for(const struct ip_addr_encap* remote, uint16_t port, struct ip_addr_encap* out)
+{
+	struct sockaddr_storage storage;
+	struct sockaddr_in*  addr4 = (struct sockaddr_in*)  &storage;
+	struct sockaddr_in6* addr6 = (struct sockaddr_in6*) &storage;
+	socklen_t addr_size;
+	int sd;
+	int ok = 0;
+
+	if (!remote || !out)
+		return 0;
+
+	if (remote->af != AF_INET && remote->af != AF_INET6)
+		return 0;
+
+	if (remote->af == AF_INET6 && !net_is_ipv6_supported())
+		return 0;
+
+	sd = net_socket_create(remote->af, SOCK_DGRAM, 0);
+	if (sd == -1)
+		return 0;
+
+	memset(&storage, 0, sizeof(storage));
+	if (remote->af == AF_INET6)
+	{
+		addr6->sin6_family = AF_INET6;
+		addr6->sin6_port = htons(port);
+		memcpy(&addr6->sin6_addr, &remote->internal_ip_data.in6, sizeof(struct in6_addr));
+		addr_size = sizeof(struct sockaddr_in6);
+	}
+	else
+	{
+		addr4->sin_family = AF_INET;
+		addr4->sin_port = htons(port);
+		memcpy(&addr4->sin_addr, &remote->internal_ip_data.in, sizeof(struct in_addr));
+		addr_size = sizeof(struct sockaddr_in);
+	}
+
+	/* Sends nothing: this only records the peer and runs the route lookup. */
+	if (net_connect(sd, (struct sockaddr*) &storage, addr_size) == 0)
+	{
+		addr_size = sizeof(storage);
+		memset(&storage, 0, sizeof(storage));
+
+		if (getsockname(sd, (struct sockaddr*) &storage, &addr_size) == 0
+			&& storage.ss_family == remote->af)
+		{
+			/* Unusable answers: no source chosen, or IPv4 in IPv6 spelling. */
+			if (remote->af == AF_INET6)
+				ok = !IN6_IS_ADDR_UNSPECIFIED(&addr6->sin6_addr)
+					&& !IN6_IS_ADDR_V4MAPPED(&addr6->sin6_addr);
+			else
+				ok = addr4->sin_addr.s_addr != htonl(INADDR_ANY);
+
+			if (ok)
+			{
+				memset(out, 0, sizeof(*out));
+				out->af = remote->af;
+				if (remote->af == AF_INET6)
+					memcpy(&out->internal_ip_data.in6, &addr6->sin6_addr, sizeof(struct in6_addr));
+				else
+					memcpy(&out->internal_ip_data.in, &addr4->sin_addr, sizeof(struct in_addr));
+			}
+		}
+	}
+
+	net_close(sd);
+	return ok;
+}
+
+
 int net_connect(int fd, const struct sockaddr *serv_addr, socklen_t addrlen)
 {
 	/*

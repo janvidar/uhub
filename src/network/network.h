@@ -267,6 +267,33 @@ extern const char* net_get_peer_address(int fd);
 extern const char* net_get_local_address(int fd);
 
 /**
+ * Work out which local address this host would use as the source when talking
+ * to @p remote -- "our address in that address family", as the far end would
+ * see it before any NAT.
+ *
+ * A datagram socket is connected to the address and then asked its own name.
+ * connect() on a datagram socket only fixes the peer and runs the route
+ * lookup: not a single packet is sent, and @p remote never learns of it. A
+ * family the host has no route in fails here, which is the useful answer --
+ * that is how a host with no IPv6 connectivity is told apart from one that
+ * simply has not been asked.
+ *
+ * The port takes part only because a policy-routing rule may key on it.
+ *
+ * @param remote the address to be reached; AF_INET or AF_INET6.
+ * @param port the port that would be dialled.
+ * @param out receives the source address, untouched unless 1 is returned.
+ * @return 1 on success, 0 if there is no route, if the query failed, or if the
+ *         answer is not usable as an address of that family. The unspecified
+ *         address means no source was chosen at all, and an IPv4-mapped one --
+ *         which net_socket_create() leaves possible, since it turns
+ *         IPV6_V6ONLY off -- is an IPv4 address wearing IPv6 spelling, not
+ *         IPv6 connectivity. The caller publishes what it gets back, so
+ *         neither may be handed over.
+ */
+extern int net_local_address_for(const struct ip_addr_encap* remote, uint16_t port, struct ip_addr_encap* out);
+
+/**
  * See man(3) inet_ntop.
  */
 extern const char* net_address_to_string(int af, const void *src, char *dst, socklen_t cnt);

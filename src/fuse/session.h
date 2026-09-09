@@ -89,6 +89,15 @@ struct fs_session
 	char* tls_version;     /** NULL while the connection is plaintext. */
 	char* tls_cipher;
 
+	/**
+	 * This host's own addresses, for me/. Copied out of the ADC client rather
+	 * than pointed at: it returns them through a rotating static buffer, which
+	 * a render context is far too long-lived to hold. "" when the family has no
+	 * route to the hub -- see ADC_client_get_local_address().
+	 */
+	char my_ip4[INET6_ADDRSTRLEN + 1];
+	char my_ip6[INET6_ADDRSTRLEN + 1];
+
 	/* What has been said. main is the hub's chat; private is what was said to
 	   us and what we said to somebody, which would otherwise be a
 	   conversation with only one side of it written down. */

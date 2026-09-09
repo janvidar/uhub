@@ -19,7 +19,29 @@
 
 #include "tools/adcclient.h"
 
+#include "network/dnsresolver.h"
+#include "network/ipcalc.h"
+
 #define ADC_HANDSHAKE "HSUP ADBASE ADTIGR ADPING"
+
+/*
+ * How long the HBRI validation connection is given to connect, hand over its
+ * token and be answered. It is one short exchange over a network this host has
+ * just been shown a route to, so a generous timeout only delays giving up: the
+ * session is logged in and unaffected either way.
+ */
+#define ADC_HBRI_TIMEOUT 30
+
+/*
+ * How long the login INF waits for the address lookups to land.
+ *
+ * They are started before the connection is even made, so on any real network
+ * they are long finished by the time the hub has answered with a SID. Against a
+ * hub on loopback there is no round trip to hide them behind, and a lookup that
+ * is a few milliseconds late would otherwise cost the session its second
+ * protocol -- see ADC_client_send_login_info().
+ */
+#define ADC_HBRI_LOOKUP_GRACE 3
 #define ADC_CID_SIZE 39
 #define BIG_BUFSIZE 32768
 #define TIGERSIZE 24
@@ -97,8 +119,50 @@ struct ADC_client
 	 * connection.
 	 */
 	char hub_support[ADC_SUPPORT_MAX];
+
+	/*
+	 * HBRI. primary_af is the family the current connection was made over (0
+	 * before it is known); local4/local6 are this host's own source addresses
+	 * for reaching the hub, with af 0 meaning "not known". See the extension's
+	 * description in adcclient.h.
+	 */
+	int hbri;                              /* the caller opted in */
+	int primary_af;
+	struct ip_addr_encap local4;
+	struct ip_addr_encap local6;
+	struct net_dns_job* hbri_dns4;         /* the hub's address lookups, in flight */
+	struct net_dns_job* hbri_dns6;
+	struct timeout_evt* hbri_timer;        /* bounds the wait for those lookups */
+	int info_pending;                      /* the login INF is waiting on them */
+	struct ADC_client_hbri* validation;    /* validation connection in flight */
+
 	int flags;
 	void* ptr;
+};
+
+/*
+ * One HBRI validation connection: a second, short-lived connection to the hub
+ * over the protocol the session did not use, whose only purpose is to let the
+ * hub observe this host's address in that family. It carries a single command
+ * and is then closed, from either end.
+ *
+ * It is deliberately not an ADC_client of its own: there is no handshake, no
+ * SID and no INF on it -- HTCP is its first and last word.
+ */
+struct ADC_client_hbri
+{
+	struct ADC_client* client;
+	struct net_connect_handle* connect_job;
+	struct net_connection* con;
+	int af;                                /* the family being proven */
+	uint16_t port;
+	char address[INET6_ADDRSTRLEN + 1];    /* the hub, in that family */
+	char token[ADC_HBRI_TOKEN_MAX];
+	int tls;                               /* the session is adcs://, so this is too */
+	int sent;                              /* the HTCP has been fully written */
+	char out[ADC_HBRI_TOKEN_MAX + 16];     /* "HTCP TO<token>\n" */
+	size_t out_length;
+	size_t out_offset;
 };
 
 
@@ -110,6 +174,7 @@ static void ADC_client_on_connected_ssl(struct ADC_client* client);
 static void ADC_client_on_disconnected(struct ADC_client* client);
 static void ADC_client_on_login(struct ADC_client* client);
 static int ADC_client_parse_address(struct ADC_client* client, const char* arg);
+static void ADC_client_hbri_release_login(struct ADC_client* client);
 static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, size_t length);
 static int ADC_client_send_queue(struct ADC_client* client);
 
@@ -437,6 +502,648 @@ static void ADC_client_on_hub_support(struct ADC_client* client, struct adc_mess
 	}
 }
 
+/* ---------------------------------------------------------------- HBRI ---- */
+
+/* The slot holding this host's own address for @p af, or NULL for any other
+   address family. */
+static struct ip_addr_encap* ADC_client_local_slot(struct ADC_client* client, int af)
+{
+	if (af == AF_INET)
+		return &client->local4;
+	if (af == AF_INET6)
+		return &client->local6;
+	return NULL;
+}
+
+static const char* ADC_client_af_name(int af)
+{
+	return (af == AF_INET6) ? "IPv6" : "IPv4";
+}
+
+/*
+ * Whether two addresses are the same address.
+ *
+ * Compared field by field rather than with one memcmp over the struct: the
+ * union is wide enough for IPv6, so the twelve bytes past an IPv4 address are
+ * whatever the caller's stack held, and a memcmp over them reports two
+ * identical IPv4 addresses as different -- which here means re-announcing an
+ * address that never changed.
+ */
+static int ADC_client_addr_equal(const struct ip_addr_encap* a, const struct ip_addr_encap* b)
+{
+	if (a->af != b->af)
+		return 0;
+
+	if (a->af == AF_INET6)
+		return memcmp(&a->internal_ip_data.in6, &b->internal_ip_data.in6, sizeof(struct in6_addr)) == 0;
+
+	return memcmp(&a->internal_ip_data.in, &b->internal_ip_data.in, sizeof(struct in_addr)) == 0;
+}
+
+/*
+ * Record one of this host's own addresses.
+ *
+ * Nothing is sent from here, deliberately. An address that lands after the
+ * login INF has gone out cannot be handed to the hub in a second INF: a hub's
+ * update flood control counts the login INF itself, so with uhub's own defaults
+ * -- two INFs per five seconds -- the very next one is refused with "Update
+ * flood detected". Naming the address in the *login* INF is the only way to ask
+ * for a validation challenge without that, which is why the lookups start
+ * before the connection and the login waits a moment for them. One that is
+ * later still than that is kept (it is what this host will offer on its next
+ * connection, and what ADC_client_get_local_address reports meanwhile) but
+ * costs this session its second protocol.
+ */
+static void ADC_client_set_local_address(struct ADC_client* client, const struct ip_addr_encap* addr)
+{
+	struct ip_addr_encap* slot = ADC_client_local_slot(client, addr->af);
+
+	if (!slot || ADC_client_addr_equal(slot, addr))
+		return;
+
+	*slot = *addr;
+
+	LOG_WIRE("adc[%s] own %s address is %s", ADC_client_host(client),
+		ADC_client_af_name(addr->af), ip_convert_to_string(addr));
+}
+
+/*
+ * One family's worth of the hub's addresses is in: ask the routing table which
+ * source address would reach the first of them.
+ *
+ * Only the first that answers is taken. A multi-homed hub may publish several
+ * addresses in a family, but they all reach the same hub, and "which source
+ * address would I use" has one answer per family.
+ */
+static int ADC_client_hbri_dns_callback(struct net_dns_job* job, const struct net_dns_result* result)
+{
+	struct ADC_client* client = (struct ADC_client*) net_dns_job_get_ptr(job);
+	struct ip_addr_encap* addr;
+
+	if (client->hbri_dns4 == job)
+		client->hbri_dns4 = NULL;
+	else if (client->hbri_dns6 == job)
+		client->hbri_dns6 = NULL;
+
+	if (!result)
+		return 1;
+
+	for (addr = net_dns_result_first(result); addr; addr = net_dns_result_next(result))
+	{
+		struct ip_addr_encap* slot = ADC_client_local_slot(client, addr->af);
+		struct ip_addr_encap local;
+
+		if (!slot || slot->af == addr->af)
+			continue; /* not a family this tracks, or one already answered */
+
+		if (net_local_address_for(addr, client->address.port, &local))
+			ADC_client_set_local_address(client, &local);
+		else
+			LOG_WIRE("adc[%s] no %s route to the hub at %s; not offering it for validation.",
+				ADC_client_host(client), ADC_client_af_name(addr->af), ip_convert_to_string(addr));
+	}
+
+	if (!client->hbri_dns4 && !client->hbri_dns6)
+		ADC_client_hbri_release_login(client);
+
+	return 1;
+}
+
+/*
+ * Send the login INF that was held back, now that there is nothing left to wait
+ * for -- either the lookups have all landed, or the grace period has run out.
+ */
+static void ADC_client_hbri_release_login(struct ADC_client* client)
+{
+	if (!client->info_pending)
+		return;
+
+	client->info_pending = 0;
+
+	if (client->hbri_timer && timeout_evt_is_scheduled(client->hbri_timer))
+		timeout_queue_remove(net_backend_get_timeout_queue(), client->hbri_timer);
+
+	ADC_client_send_info(client);
+}
+
+/* The grace period expired: log in with whatever is known. */
+static void ADC_client_hbri_grace_expired(struct timeout_evt* evt)
+{
+	struct ADC_client* client = (struct ADC_client*) evt->ptr;
+
+	LOG_WIRE("adc[%s] address lookup did not finish in time; logging in with one protocol.",
+		ADC_client_host(client));
+	ADC_client_hbri_release_login(client);
+}
+
+/*
+ * The login INF, held just long enough for the address lookups.
+ *
+ * They were started before the connection was made, so against any hub reached
+ * over a network they are long done by the time its SID arrives and this waits
+ * for nothing. It is loopback, where there is no round trip to hide them
+ * behind, that needs the grace -- and losing the second protocol there by a
+ * millisecond is exactly the kind of thing that never reproduces later.
+ */
+static void ADC_client_send_login_info(struct ADC_client* client)
+{
+	if (client->hbri && (client->hbri_dns4 || client->hbri_dns6) && client->hbri_timer)
+	{
+		client->info_pending = 1;
+		timeout_queue_insert(net_backend_get_timeout_queue(), client->hbri_timer,
+			ADC_HBRI_LOOKUP_GRACE);
+		return;
+	}
+
+	ADC_client_send_info(client);
+}
+
+static void ADC_client_hbri_cancel_lookup(struct ADC_client* client)
+{
+	if (client->info_pending)
+	{
+		client->info_pending = 0;
+		if (client->hbri_timer && timeout_evt_is_scheduled(client->hbri_timer))
+			timeout_queue_remove(net_backend_get_timeout_queue(), client->hbri_timer);
+	}
+
+	if (client->hbri_dns4)
+	{
+		net_dns_job_cancel(client->hbri_dns4);
+		client->hbri_dns4 = NULL;
+	}
+
+	if (client->hbri_dns6)
+	{
+		net_dns_job_cancel(client->hbri_dns6);
+		client->hbri_dns6 = NULL;
+	}
+}
+
+/*
+ * Forget what was worked out for the connection being replaced, and -- when
+ * this client takes part in HBRI -- start working it out again for the new one.
+ *
+ * Started here, before the connection rather than once it is up, because the
+ * answer is wanted for the *login* INF: naming the second family there is what
+ * asks the hub for a validation challenge. The INF goes out one round trip
+ * after a connect that itself waits on a lookup of this very name, so a lookup
+ * started here has all of that to complete in and effectively always wins.
+ * Started after the connection instead, it routinely lost that race and arrived
+ * only in time for an INF update -- which, right after the login INF, is
+ * exactly what a hub's update flood control refuses.
+ *
+ * One lookup per family, rather than one AF_UNSPEC lookup for both. They are
+ * not the same question: glibc answers "localhost" with 127.0.0.1 for AF_UNSPEC
+ * and with ::1 for AF_INET6, and a family this asked about and was told nothing
+ * of is a family this host would then never offer.
+ *
+ * A hub named by an address literal resolves in one family only. The other
+ * lookup finds nothing, which is the right answer: there is no second address
+ * to reach the hub at, so none is claimed.
+ */
+static void ADC_client_hbri_restart_lookup(struct ADC_client* client)
+{
+	ADC_client_hbri_cancel_lookup(client);
+
+	/* A reconnect may be from another network entirely; nothing carries over. */
+	client->info_pending = 0;
+	client->primary_af = 0;
+	memset(&client->local4, 0, sizeof(client->local4));
+	memset(&client->local6, 0, sizeof(client->local6));
+
+	if (!client->hbri || !client->address.hostname)
+		return;
+
+	client->hbri_dns4 = net_dns_gethostbyname(client->address.hostname, AF_INET,
+		ADC_client_hbri_dns_callback, client);
+
+	if (net_is_ipv6_supported())
+		client->hbri_dns6 = net_dns_gethostbyname(client->address.hostname, AF_INET6,
+			ADC_client_hbri_dns_callback, client);
+}
+
+/*
+ * The address this connection was actually made from, read straight off the
+ * socket once it is up. It is the same answer the route lookup above gives for
+ * that family, but observed rather than predicted, so it wins.
+ *
+ * A dual-stack socket names an IPv4 address as "::ffff:a.b.c.d", which belongs
+ * in the IPv4 slot: taken at face value it would be published as IPv6
+ * connectivity this host does not have.
+ */
+static void ADC_client_discover_local_address(struct ADC_client* client)
+{
+	struct ip_addr_encap addr;
+	const char* text;
+
+	if (!client->con)
+		return;
+
+	text = net_get_local_address(net_con_get_sd(client->con));
+	if (!text || !*text)
+		return;
+
+	/* An IPv4 address in IPv6 spelling is an IPv4 address. */
+	if (strncmp(text, "::ffff:", 7) == 0)
+		text += 7;
+
+	memset(&addr, 0, sizeof(addr));
+	if (ip_convert_to_binary(text, &addr) <= 0)
+		return;
+
+	client->primary_af = addr.af;
+	ADC_client_set_local_address(client, &addr);
+}
+
+int ADC_client_parse_hbri_request(struct adc_message* cmd, struct ADC_client_hbri_request* out)
+{
+	char* address;
+	char* port;
+	char* token;
+	int af;
+	int ok = 0;
+
+	if (!cmd || !out)
+		return 0;
+
+	memset(out, 0, sizeof(*out));
+
+	/* The address flag names the family; the port flag has to agree with it. */
+	address = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_IPV6_ADDR);
+	af = AF_INET6;
+	if (!address)
+	{
+		address = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_IPV4_ADDR);
+		af = AF_INET;
+	}
+
+	port = adc_msg_get_named_argument(cmd,
+		(af == AF_INET6) ? ADC_INF_FLAG_IPV6_TCP_PORT : ADC_INF_FLAG_IPV4_TCP_PORT);
+	token = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_TOKEN);
+
+	if (address && port && token)
+	{
+		int value = 0;
+		size_t token_len = strlen(token);
+
+		ok = strlen(address) < sizeof(out->address)
+			&& (af == AF_INET6 ? ip_is_valid_ipv6(address) : ip_is_valid_ipv4(address))
+			&& is_number(port, &value) && value > 0 && value <= 65535
+			/* Echoed back as one argument, so no separator may hide in it. */
+			&& token_len > 0 && token_len < sizeof(out->token)
+			&& !strpbrk(token, " \n\r");
+
+		if (ok)
+		{
+			out->af = af;
+			out->port = (uint16_t) value;
+			uhub_strlcpy(out->address, address, sizeof(out->address));
+			uhub_strlcpy(out->token, token, sizeof(out->token));
+		}
+	}
+
+	hub_free(address);
+	hub_free(port);
+	hub_free(token);
+
+	if (!ok)
+		memset(out, 0, sizeof(*out));
+
+	return ok;
+}
+
+/*
+ * Abandon the validation connection, whatever state it had reached.
+ *
+ * The client's handle on it is cleared before anything is torn down: closing
+ * the connection re-enters this through the connection's own callback on some
+ * paths, and it must find nothing left to do.
+ */
+static void ADC_client_hbri_close(struct ADC_client* client)
+{
+	struct ADC_client_hbri* v = client->validation;
+
+	if (!v)
+		return;
+
+	client->validation = NULL;
+
+	if (v->connect_job)
+		net_connect_destroy(v->connect_job);
+
+	if (v->con)
+		net_con_close(v->con);
+
+	hub_free(v);
+}
+
+/*
+ * Write what is left of the HTCP.
+ *
+ * It is one short line on a socket that has just connected, so it almost always
+ * leaves in a single write -- but "almost always" is not a reason to lose the
+ * one command this connection exists to carry, so the remainder is kept and
+ * finished on the next writable event.
+ */
+static void ADC_client_hbri_flush(struct ADC_client_hbri* v)
+{
+	ssize_t size;
+
+	if (!v->con || v->sent)
+		return;
+
+	while (v->out_offset < v->out_length)
+	{
+		size = net_con_send(v->con, v->out + v->out_offset, v->out_length - v->out_offset);
+		if (size < 0)
+		{
+			LOG_WIRE("adc[%s] the HBRI validation connection failed while sending.",
+				ADC_client_host(v->client));
+			ADC_client_hbri_close(v->client);
+			return;
+		}
+		if (size == 0)
+		{
+			net_con_update(v->con, NET_EVENT_READ | NET_EVENT_WRITE);
+			return;
+		}
+		v->out_offset += (size_t) size;
+	}
+
+	v->sent = 1;
+	ADC_client_log_wire(v->client, "hbri -->", v->out, v->out_length);
+	net_con_update(v->con, NET_EVENT_READ);
+}
+
+/*
+ * Check the hub's certificate on the validation connection against the pinned
+ * keyprint. It is the same hub, so the same certificate is expected; a
+ * different one means this connection is not reaching it.
+ *
+ * @return 1 to carry on, 0 when the validation has been abandoned.
+ */
+static int ADC_client_hbri_verify_keyprint(struct ADC_client_hbri* v)
+{
+	struct ADC_client* client = v->client;
+	char presented[ADC_KEYPRINT_MAX];
+
+	if (!client->address.keyprint[0])
+		return 1;
+
+	if (!net_ssl_get_peer_keyprint(v->con, presented, sizeof(presented)))
+		presented[0] = '\0';
+
+	if (presented[0] && net_ssl_keyprint_equal(presented, client->address.keyprint))
+		return 1;
+
+	LOG_ERROR("adc[%s] the HBRI validation connection to %s presented %s, not the pinned certificate. Abandoning it.",
+		ADC_client_host(client), v->address, presented[0] ? presented : "no certificate");
+	ADC_client_hbri_close(client);
+	return 0;
+}
+
+/* The hub's answer: one ISTA, and then it closes. Read for the log -- there is
+   nothing to do about it either way, since the session is unaffected. */
+static void ADC_client_hbri_on_reply(struct ADC_client_hbri* v, const char* line, size_t length)
+{
+	struct ADC_client* client = v->client;
+	struct adc_message* msg;
+	char* code;
+	int value = 0;
+	int succeeded;
+
+	ADC_client_log_wire(client, "hbri <--", line, length);
+
+	msg = adc_msg_parse(line, length);
+	if (!msg)
+		return;
+
+	/* Severity 0 -- a code below 100 -- is the only success. */
+	code = (msg->cmd == ADC_CMD_ISTA) ? adc_msg_get_argument(msg, 0) : NULL;
+	succeeded = code && is_number(code, &value) && value >= 0 && value < 100;
+
+	if (succeeded)
+	{
+		LOG_INFO("adc[%s] validated this host's %s address with the hub; it is now published on both protocols.",
+			ADC_client_host(client), ADC_client_af_name(v->af));
+	}
+	else
+	{
+		char* text = adc_msg_get_argument(msg, 1);
+		LOG_WARN("adc[%s] the hub refused the %s validation (%s); staying %s-only.",
+			ADC_client_host(client), ADC_client_af_name(v->af),
+			text ? text : "no reason given",
+			ADC_client_af_name(client->primary_af));
+		hub_free(text);
+	}
+
+	hub_free(code);
+	adc_msg_free(msg);
+}
+
+/*
+ * The validation connection's only event handler.
+ *
+ * On a TLS connection the first event is the completed handshake -- and it
+ * arrives as a READ, which is what it is not: the hub cannot have answered yet,
+ * since the question is only going out now. The HTCP waits for that event,
+ * because net_ssl_callback() delivers nothing before it.
+ */
+static void ADC_client_hbri_event(struct net_connection* con, int events, void* arg)
+{
+	struct ADC_client_hbri* v = (struct ADC_client_hbri*) net_con_get_ptr(con);
+	char buf[512];
+	ssize_t size;
+	char* end;
+
+	(void) arg;
+	ADC_TRACE;
+
+	if (events == NET_EVENT_TIMEOUT)
+	{
+		LOG_WARN("adc[%s] the HBRI validation connection to %s timed out; staying %s-only.",
+			ADC_client_host(v->client), v->address, ADC_client_af_name(v->client->primary_af));
+		ADC_client_hbri_close(v->client);
+		return;
+	}
+
+	if (events & NET_EVENT_ERROR)
+	{
+		LOG_WIRE("adc[%s] the HBRI validation connection to %s failed.",
+			ADC_client_host(v->client), v->address);
+		ADC_client_hbri_close(v->client);
+		return;
+	}
+
+	/* On TLS this first event is the handshake finishing, not an answer. */
+	if (!v->sent)
+	{
+		if (v->tls && !ADC_client_hbri_verify_keyprint(v))
+			return;
+
+		ADC_client_hbri_flush(v);
+		return;
+	}
+
+	if (!(events & NET_EVENT_READ))
+		return;
+
+	size = net_con_recv(con, buf, sizeof(buf) - 1);
+	if (size == 0)
+		return; /* woken with nothing readable yet */
+
+	if (size > 0)
+	{
+		buf[size] = '\0';
+		end = strchr(buf, '\n');
+		if (end)
+			*end = '\0';
+		if (*buf)
+			ADC_client_hbri_on_reply(v, buf, strlen(buf));
+	}
+
+	/* One command, one answer: it has served its entire purpose. */
+	ADC_client_hbri_close(v->client);
+}
+
+static void ADC_client_hbri_connect_callback(struct net_connect_handle* handle,
+	enum net_connect_status status, struct net_connection* con, void* ptr)
+{
+	struct ADC_client_hbri* v = (struct ADC_client_hbri*) ptr;
+	struct ADC_client* client = v->client;
+
+	(void) handle;
+	v->connect_job = NULL;
+
+	if (status != net_connect_status_ok)
+	{
+		LOG_WARN("adc[%s] unable to reach the hub at %s port %u over %s; staying %s-only.",
+			ADC_client_host(client), v->address, (unsigned) v->port,
+			ADC_client_af_name(v->af), ADC_client_af_name(client->primary_af));
+		ADC_client_hbri_close(client);
+		return;
+	}
+
+	v->con = con;
+	net_con_reinitialize(con, ADC_client_hbri_event, v, NET_EVENT_READ);
+	net_con_set_timeout(con, ADC_HBRI_TIMEOUT);
+
+	if (v->tls)
+	{
+		/* Same hub, same port, which demultiplexes ADC and TLS on it. */
+		net_con_update(con, NET_EVENT_READ | NET_EVENT_WRITE);
+		if (net_con_ssl_handshake(con, net_con_ssl_mode_client, g_adc_client->ctx) < 0)
+		{
+			LOG_WARN("adc[%s] the HBRI validation connection to %s could not start a TLS handshake.",
+				ADC_client_host(client), v->address);
+			ADC_client_hbri_close(client);
+		}
+		return; /* the HTCP goes out once the handshake completes */
+	}
+
+	ADC_client_hbri_flush(v);
+}
+
+/*
+ * An ITCP: the hub is asking this client to prove the protocol it did not
+ * connect over, by reaching it at the address named here.
+ *
+ * A request naming the family this session already runs over is refused rather
+ * than dialled. It would prove nothing the hub has not already observed, and no
+ * hub has a reason to send one.
+ */
+static void ADC_client_on_hbri_request(struct ADC_client* client, struct adc_message* cmd)
+{
+	struct ADC_client_hbri_request req;
+	struct ADC_client_hbri* v;
+
+	if (!client->hbri)
+	{
+		LOG_WIRE("adc[%s] ignoring an HBRI validation request: this client does not offer HBRI.",
+			ADC_client_host(client));
+		return;
+	}
+
+	if (!ADC_client_parse_hbri_request(cmd, &req))
+	{
+		LOG_WARN("adc[%s] the hub sent an HBRI validation request that cannot be used.",
+			ADC_client_host(client));
+		return;
+	}
+
+	/* The whole point is to prove the *other* protocol. */
+	if (req.af == client->primary_af)
+	{
+		LOG_WARN("adc[%s] the hub asked for %s validation over the protocol this session already uses; ignoring it.",
+			ADC_client_host(client), ADC_client_af_name(req.af));
+		return;
+	}
+
+	/* One at a time: the newest token is the only one the hub still accepts. */
+	ADC_client_hbri_close(client);
+
+	v = (struct ADC_client_hbri*) hub_malloc_zero(sizeof(struct ADC_client_hbri));
+	if (!v)
+		return;
+
+	v->client = client;
+	v->af = req.af;
+	v->port = req.port;
+	v->tls = (client->flags & cflag_ssl) ? 1 : 0;
+	uhub_strlcpy(v->address, req.address, sizeof(v->address));
+	uhub_strlcpy(v->token, req.token, sizeof(v->token));
+
+	v->out_length = (size_t) snprintf(v->out, sizeof(v->out), "HTCP %s%s\n",
+		ADC_INF_FLAG_TOKEN, v->token);
+	if (v->out_length >= sizeof(v->out))
+	{
+		hub_free(v);
+		return;
+	}
+
+	client->validation = v;
+
+	LOG_WIRE("adc[%s] opening an HBRI %s validation connection to %s port %u.",
+		ADC_client_host(client), ADC_client_af_name(v->af), v->address, (unsigned) v->port);
+
+	/* A literal in one family only, so this connects over that protocol. */
+	v->connect_job = net_con_connect(v->address, v->port, ADC_client_hbri_connect_callback, v);
+	if (!v->connect_job)
+	{
+		LOG_WARN("adc[%s] unable to start the HBRI validation connection to %s.",
+			ADC_client_host(client), v->address);
+		ADC_client_hbri_close(client);
+	}
+}
+
+void ADC_client_set_hbri(struct ADC_client* client, int enable)
+{
+	ADC_TRACE;
+	if (client)
+		client->hbri = enable ? 1 : 0;
+}
+
+int ADC_client_get_hbri(const struct ADC_client* client)
+{
+	return client ? client->hbri : 0;
+}
+
+const char* ADC_client_get_local_address(const struct ADC_client* client, int af)
+{
+	const struct ip_addr_encap* slot;
+
+	if (!client)
+		return "";
+
+	slot = (af == AF_INET) ? &client->local4 : (af == AF_INET6) ? &client->local6 : NULL;
+	if (!slot || slot->af != af)
+		return "";
+
+	return ip_convert_to_string(slot);
+}
+
+
 static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, size_t length)
 {
 	struct ADC_chat_message chat;
@@ -475,6 +1182,11 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 			ADC_client_on_hub_support(client, msg);
 			break;
 
+		case ADC_CMD_ITCP:
+			/* HBRI: the hub wants the other protocol proven. */
+			ADC_client_on_hbri_request(client, msg);
+			break;
+
 		case ADC_CMD_IGPA:
 			if (client->state == ps_identify || client->state == ps_verify)
 			{
@@ -496,7 +1208,7 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 					hub_free(sid);
 					client->callback(client, ADC_CLIENT_LOGGING_IN, 0);
 					ADC_client_set_state(client, ps_identify);
-					ADC_client_send_info(client);
+					ADC_client_send_login_info(client);
 				}
 			}
 			break;
@@ -881,6 +1593,15 @@ struct adc_message* ADC_client_build_info(struct ADC_client* client)
 	if (client->support[0])
 		adc_msg_add_named_argument_string(info, ADC_INF_FLAG_SUPPORT, client->support);
 
+	/* Only what the routing table answered; an unknown address is left out. */
+	if (client->hbri)
+	{
+		if (client->local4.af == AF_INET)
+			adc_msg_add_named_argument(info, ADC_INF_FLAG_IPV4_ADDR, ip_convert_to_string(&client->local4));
+		if (client->local6.af == AF_INET6)
+			adc_msg_add_named_argument(info, ADC_INF_FLAG_IPV6_ADDR, ip_convert_to_string(&client->local6));
+	}
+
 	adc_msg_add_named_argument_string(info, ADC_INF_FLAG_USER_AGENT_PRODUCT, PRODUCT);
 	adc_msg_add_named_argument_string(info, ADC_INF_FLAG_USER_AGENT_VERSION, VERSION);
 	adc_msg_add_named_argument_int(info, ADC_INF_FLAG_UPLOAD_SLOTS, 0);
@@ -999,6 +1720,10 @@ struct ADC_client* ADC_client_create(const char* nickname, const char* descripti
 	client->send_queue = ioq_send_create();
 	client->recv_queue = ioq_recv_create();
 
+	client->hbri_timer = (struct timeout_evt*) hub_malloc_zero(sizeof(struct timeout_evt));
+	if (client->hbri_timer)
+		timeout_evt_initialize(client->hbri_timer, ADC_client_hbri_grace_expired, client);
+
 	client->ptr = ptr;
 
 	if (!g_adc_client)
@@ -1025,6 +1750,7 @@ void ADC_client_destroy(struct ADC_client* client)
 	hub_free(client->extra_support);
 	hub_free(client->extra_inf);
 	hub_free(client->address.hostname);
+	hub_free(client->hbri_timer);
 	hub_free(client);
 
 	if (g_adc_client && g_adc_client->references > 0)
@@ -1080,6 +1806,9 @@ int ADC_client_connect(struct ADC_client* client, const char* address)
 	   let a client keep using an extension the hub has stopped announcing. */
 	client->hub_support[0] = '\0';
 
+	/* Both the addresses and the lookup that finds them belong to one attempt. */
+	ADC_client_hbri_restart_lookup(client);
+
 	ADC_client_set_state(client, ps_conn);
 	client->callback(client, ADC_CLIENT_CONNECTING, 0);
 	client->connect_job = net_con_connect(client->address.hostname, client->address.port, connect_callback, client);
@@ -1097,7 +1826,9 @@ static void ADC_client_send_handshake(struct ADC_client* client)
 	struct adc_message* handshake;
 	char buf[256];
 
-	snprintf(buf, sizeof(buf), "%s%s\n", ADC_HANDSHAKE,
+	/* Announced here or not at all: no ADHBRI in the SUP, no ITCP. */
+	snprintf(buf, sizeof(buf), "%s%s%s\n", ADC_HANDSHAKE,
+	         client->hbri ? " AD" ADC_EXT_HBRI : "",
 	         client->extra_support ? client->extra_support : "");
 	handshake = adc_msg_create(buf);
 
@@ -1111,6 +1842,10 @@ static void ADC_client_send_handshake(struct ADC_client* client)
 static void ADC_client_on_connected(struct ADC_client* client)
 {
 	ADC_TRACE;
+
+	/* On the socket right now, and wanted for the login INF. */
+	ADC_client_discover_local_address(client);
+
 	if (client->flags & cflag_ssl)
 	{
 		/* No "kp=" means TLS without an identity: encrypted, but anyone able to
@@ -1192,6 +1927,11 @@ static void ADC_client_on_connected_ssl(struct ADC_client* client)
 static void ADC_client_on_disconnected(struct ADC_client* client)
 {
 	ADC_TRACE;
+
+	/* Both belong to the connection that is going away. */
+	ADC_client_hbri_close(client);
+	ADC_client_hbri_cancel_lookup(client);
+
 	if (client->con)
 	{
 		net_con_close(client->con);
@@ -1216,6 +1956,10 @@ static void ADC_client_on_login(struct ADC_client* client)
 void ADC_client_disconnect(struct ADC_client* client)
 {
 	ADC_TRACE;
+
+	ADC_client_hbri_close(client);
+	ADC_client_hbri_cancel_lookup(client);
+
 	/* Cancel a still-pending connect (DNS/connect in flight). connect_callback()
 	   clears connect_job before it fires and the net layer frees the handle
 	   itself afterwards, so a non-NULL connect_job here means the callback has

@@ -105,6 +105,8 @@ EXO_TEST(fuse_render_hub_reset, {
 	ctx.my_nick = "tester";
 	ctx.my_cid = CID_A;
 	ctx.my_support = "ADBASE";
+	ctx.my_ip4 = "192.0.2.20";
+	ctx.my_ip6 = "";     /* this host has no route to the hub over IPv6 */
 	return 1;
 });
 
@@ -129,6 +131,16 @@ EXO_TEST(fuse_render_hub_tls_on, {
 
 EXO_TEST(fuse_render_me_nick, { return render_is("/me/nick", "tester\n"); });
 EXO_TEST(fuse_render_me_cid, { return render_is("/me/cid", CID_A "\n"); });
+EXO_TEST(fuse_render_me_ip4, { return render_is("/me/ip4", "192.0.2.20\n"); });
+
+/* A family with no route to the hub renders as an empty file, not as a blank
+   line: there is no address, and "" is how that is said. */
+EXO_TEST(fuse_render_me_ip6_unknown, { return render_is("/me/ip6", ""); });
+
+EXO_TEST(fuse_render_me_ip6, {
+	ctx.my_ip6 = "2001:db8::20";
+	return render_is("/me/ip6", "2001:db8::20\n");
+});
 
 /* ------------------------------------------------------- buffer and errors */
 

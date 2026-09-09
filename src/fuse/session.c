@@ -787,6 +787,13 @@ struct fs_session* fs_session_create(const struct fs_config* config)
 	return session;
 }
 
+/*
+ * Adopt the transfer, and tell the hub what having one means.
+ *
+ * A listening socket is what makes the mount worth dialling, and it is also
+ * what makes HBRI worth asking for: published on only the protocol it logged in
+ * over, the mount is undialable by every peer on the other one.
+ */
 void fs_session_set_transfer(struct fs_session* session, struct fs_transfer* transfer)
 {
 	session->transfer = transfer;
@@ -796,7 +803,11 @@ void fs_session_set_transfer(struct fs_session* session, struct fs_transfer* tra
 	   which would leave it unable to fetch from the passive peers that make up
 	   most of a hub. */
 	if (transfer)
+	{
 		ADC_client_set_support(session->client, fs_transfer_support(transfer));
+
+		ADC_client_set_hbri(session->client, 1);
+	}
 }
 
 void fs_session_destroy(struct fs_session* session)
@@ -887,4 +898,11 @@ void fs_session_render_ctx(struct fs_session* session, struct fs_render_ctx* ctx
 	ctx->my_cid = ADC_client_get_cid(session->client);
 	ctx->my_support = ADC_client_get_support(session->client);
 	ctx->my_sid = ADC_client_get_sid(session->client);
+
+	uhub_strlcpy(session->my_ip4, ADC_client_get_local_address(session->client, AF_INET),
+		sizeof(session->my_ip4));
+	uhub_strlcpy(session->my_ip6, ADC_client_get_local_address(session->client, AF_INET6),
+		sizeof(session->my_ip6));
+	ctx->my_ip4 = session->my_ip4;
+	ctx->my_ip6 = session->my_ip6;
 }
