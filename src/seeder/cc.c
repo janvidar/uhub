@@ -389,8 +389,7 @@ static void cc_parse_inf(struct adc_message* msg, struct seed_cc_request* req)
 	   because that is the form the grant was issued in. */
 	if (token && *token && strlen(token) <= SEED_TOKEN_MAX)
 	{
-		strncpy(req->token, token, SEED_TOKEN_MAX);
-		req->token[SEED_TOKEN_MAX] = '\0';
+		uhub_strlcpy(req->token, token, sizeof(req->token));
 	}
 
 	hub_free(cid);
@@ -1384,8 +1383,7 @@ static int cc_handle_inf(struct seed_cc_connection* b, const struct seed_cc_requ
 	 * its bytes under it, and a caller with more than one request outstanding
 	 * has nothing else to tell them apart by.
 	 */
-	strncpy(b->token, grant.token, SEED_TOKEN_MAX);
-	b->token[SEED_TOKEN_MAX] = '\0';
+	uhub_strlcpy(b->token, grant.token, sizeof(b->token));
 
 	b->want_start = grant.start;
 	b->want_range = grant.length;
@@ -1979,7 +1977,7 @@ int seed_cc_connect_to_peer(const struct seed_cc_policy* policy, const struct se
 	b->initiator = 1;
 	b->use_tls = use_tls;
 	memcpy(&b->addr, peer->addr, sizeof(struct ip_addr_encap));
-	strncpy(b->token, token, SEED_TOKEN_MAX);
+	uhub_strlcpy(b->token, token, sizeof(b->token));
 	memcpy(b->peer_cid, peer->cid, SEED_CID_LEN + 1);
 
 	seed_cc_uploads++;
