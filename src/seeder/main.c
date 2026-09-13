@@ -352,9 +352,16 @@ static void seeder_on_connect_req(void* ptr, const struct seed_user* from, const
 	if (!from || !token || !*token)
 		return;
 
-	if (!ip_convert_to_binary(from->address, &addr))
+	/* ip_convert_to_binary() answers -1, never 0: tested for zero this guard
+	   never fired, and a peer with no address was dialled at whatever the
+	   uninitialised stack held. Said out loud, too -- a peer that cannot be
+	   dialled is the whole story behind a transfer that never happens, and
+	   LOG_DEBUG compiles out of a release build. */
+	memset(&addr, 0, sizeof(addr));
+	if (ip_convert_to_binary(from->address, &addr) == -1)
 	{
-		LOG_DEBUG("seeder: no usable address for %s; not dialling.", from->nick);
+		LOG_WARN("seed: %s asked us to connect, but the hub published no address we can dial for it.",
+			from->nick);
 		return;
 	}
 

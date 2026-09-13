@@ -724,6 +724,21 @@ EXO_TEST(adchbri_val_survives_refusal, {
 	return vh_val != -1 && vh_wait_readable(vh_val, 5);
 });
 
+/*
+ * The contract the dialling guards depend on: a failed conversion is -1, and
+ * never 0. Two call sites tested it for zero, so the guard never fired and the
+ * caller went on to use an address that had not been parsed.
+ */
+EXO_TEST(adchbri_ip_convert_failure_is_minus_one, {
+	struct ip_addr_encap addr;
+
+	return ip_convert_to_binary("", &addr) == -1
+		&& ip_convert_to_binary("not-an-address", &addr) == -1
+		&& ip_convert_to_binary("192.0.2.999", &addr) == -1
+		&& ip_convert_to_binary("192.0.2.5", &addr) == AF_INET
+		&& ip_convert_to_binary("2001:db8::5", &addr) == AF_INET6;
+});
+
 EXO_TEST(adchbri_val_teardown, {
 	if (vh_client)
 		ADC_client_destroy(vh_client);

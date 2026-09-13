@@ -449,7 +449,8 @@ int fs_session_peer_by_sid(struct fs_session* session, sid_t sid, struct fs_peer
 	if (!value)
 		return 0;
 
-	if (!ip_convert_to_binary(value, &out->addr))
+	/* -1, never 0, is the failure answer. */
+	if (ip_convert_to_binary(value, &out->addr) == -1)
 	{
 		hub_free(value);
 		return 0;
