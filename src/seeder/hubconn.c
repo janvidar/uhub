@@ -1345,7 +1345,10 @@ static void seed_hub_on_connect_req(struct seed_hub* hub, struct adc_message* ms
 
 	if (!seed_hub_parse_ctm(msg, &req))
 	{
-		LOG_DEBUG("seeder: dropping malformed CTM from %s", sid_to_string(msg->source));
+		/* Said out loud: a dropped connect request is the whole story behind a
+		   transfer that never happens, and LOG_DEBUG is compiled out of a
+		   release build -- which is where the question always gets asked. */
+		LOG_WARN("seed: dropping a malformed connect request from %s", sid_to_string(msg->source));
 		return;
 	}
 
