@@ -90,12 +90,35 @@ static int opt_expect_line_n = 0;
 static int opt_dump = 0;
 static int opt_linger = 1;   /* seconds to stay connected after login */
 
-/* Send a line to the hub verbatim. adc_msg_create() takes the line as-is, so
-   whatever the caller wrote is what goes on the wire -- the point of --raw. */
+/*
+ * Send a line to the hub verbatim. adc_msg_create() takes the line as-is, so
+ * whatever the caller wrote is what goes on the wire -- the point of --raw.
+ *
+ * The one substitution is "%SID%", which becomes this client's own session id.
+ * A D-type message carries its source SID and the hub verifies it, so without
+ * this there is no way to script one: the SID is only known at run time.
+ */
 static void send_raw(struct ADC_client* client, const char* line)
 {
 	char buf[MAX_ADC_CMD_LEN];
 	struct adc_message* cmd;
+	const char* mark = strstr(line, "%SID%");
+
+	if (mark)
+	{
+		snprintf(buf, sizeof(buf), "%.*s%s%s\n", (int) (mark - line), line,
+			sid_to_string(ADC_client_get_sid(client)), mark + 5);
+		cmd = adc_msg_create(buf);
+		if (!cmd)
+		{
+			printf("RAW-INVALID: %s\n", buf);
+			return;
+		}
+		ADC_client_send(client, cmd);
+		adc_msg_free(cmd);
+		printf("RAW: %s", buf);
+		return;
+	}
 
 	snprintf(buf, sizeof(buf), "%s\n", line);
 	cmd = adc_msg_create(buf);
