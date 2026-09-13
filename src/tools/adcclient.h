@@ -174,6 +174,15 @@ struct ADC_user
 	char cid[MAX_CID_LEN+1];
 	char name[MAX_NICK_LEN+1];
 	char description[MAX_DESC_LEN+1];
+	/**
+	 * The address to reach this peer at, as the hub published it: its I4, or
+	 * its I6 when the hub published no I4. Empty when it published neither.
+	 *
+	 * IPv4 is preferred because a peer reachable over both is reachable over
+	 * IPv4, and not every client is. The fallback is what makes an IPv6-only
+	 * peer connectable at all -- reading I4 alone left one with no address,
+	 * and every connect request from it silently unanswered.
+	 */
 	char address[INET6_ADDRSTRLEN+1];
 	char version[MAX_UA_LEN+1];
 

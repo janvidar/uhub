@@ -398,6 +398,8 @@ static uint16_t vh_port6 = 0;
 static uint16_t vh_dead6 = 0;    /* an IPv6 port with nothing listening */
 static int vh_connected = 0;
 static int vh_lines = 0;         /* lines the client has taken off the socket */
+static int vh_joins = 0;
+static char vh_join_address[INET6_ADDRSTRLEN + 1];
 static int vh_skip = 0;
 static struct timeout_evt vh_tick;
 
@@ -415,6 +417,11 @@ static int vh_callback(struct ADC_client* client, enum ADC_client_callback_type 
 		vh_connected = 1;
 	else if (type == ADC_CLIENT_RAW_LINE)
 		vh_lines++;
+	else if (type == ADC_CLIENT_USER_JOIN && data && data->user)
+	{
+		uhub_strlcpy(vh_join_address, data->user->address, sizeof(vh_join_address));
+		vh_joins++;
+	}
 	return 1;
 }
 
@@ -722,6 +729,84 @@ EXO_TEST(adchbri_val_survives_refusal, {
 
 	vh_val = accept(vh_listen6, NULL, NULL);
 	return vh_val != -1 && vh_wait_readable(vh_val, 5);
+});
+
+/* ---------------------------------------------------------------------------
+ * Which address the roster reports for a peer
+ *
+ * It is the address the seeder dials on a connect request, so a peer the hub
+ * published without one is a peer that can never be connected to -- and the
+ * failure is silent, which is how it survived: a DC++ user on an IPv6-only
+ * connection sent CTM after CTM into nothing.
+ * ------------------------------------------------------------------------- */
+
+/* Hand the client a BINF for some other user and report what the roster made
+   of its address. */
+static const char* vh_join(const char* inf)
+{
+	char line[512];
+	int len = snprintf(line, sizeof(line), "%s\n", inf);
+	int before = vh_joins;
+
+	vh_join_address[0] = '\0';
+
+	if (len <= 0 || (size_t) len >= sizeof(line))
+		return NULL;
+	if (send(vh_hub, line, (size_t) len, 0) != len)
+		return NULL;
+	if (!vh_wait_line(5))
+		return NULL;
+
+	return (vh_joins == before + 1) ? vh_join_address : NULL;
+}
+
+/* The ordinary case, and the one that always worked. */
+EXO_TEST(adchbri_roster_ipv4, {
+	const char* addr;
+
+	if (vh_skip)
+		EXO_SKIP("no IPv6 loopback listener on this host");
+
+	addr = vh_join("BINF AAAE IDMUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA NIv4peer I4192.0.2.5");
+	return addr && strcmp(addr, "192.0.2.5") == 0;
+});
+
+/*
+ * A peer the hub published over IPv6 only -- which is every client that does
+ * not speak HBRI and reached a dual-stack hub over IPv6. Reading I4 alone left
+ * this empty, and a connect request from such a peer went unanswered.
+ */
+EXO_TEST(adchbri_roster_ipv6_only, {
+	const char* addr;
+
+	if (vh_skip)
+		EXO_SKIP("no IPv6 loopback listener on this host");
+
+	addr = vh_join("BINF AAAF IDNUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA NIv6peer I62001:db8::5");
+	return addr && strcmp(addr, "2001:db8::5") == 0;
+});
+
+/* Both published: IPv4 wins, since a peer reachable over both is reachable
+   over IPv4 and not every client is. */
+EXO_TEST(adchbri_roster_prefers_ipv4, {
+	const char* addr;
+
+	if (vh_skip)
+		EXO_SKIP("no IPv6 loopback listener on this host");
+
+	addr = vh_join("BINF AAAG IDPUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA NIboth I4192.0.2.6 I62001:db8::6");
+	return addr && strcmp(addr, "192.0.2.6") == 0;
+});
+
+/* Neither: nothing to dial, and the roster says so rather than inventing one. */
+EXO_TEST(adchbri_roster_no_address, {
+	const char* addr;
+
+	if (vh_skip)
+		EXO_SKIP("no IPv6 loopback listener on this host");
+
+	addr = vh_join("BINF AAAH IDQUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA NInoaddr");
+	return addr && *addr == '\0';
 });
 
 /*

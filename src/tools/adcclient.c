@@ -1321,7 +1321,10 @@ static int ADC_client_on_recv_line(struct ADC_client* client, const char* line, 
 					EXTRACT_NAMED_ARG_X(msg, "DE", user.description, sizeof(user.description));
 					EXTRACT_NAMED_ARG_X(msg, "VE", user.version, sizeof(user.version));
 					EXTRACT_NAMED_ARG_X(msg, "ID", user.cid, sizeof(user.cid));
-					EXTRACT_NAMED_ARG_X(msg, "I4", user.address, sizeof(user.address));
+					/* IPv4 by preference, IPv6 when that is all there is. */
+					EXTRACT_NAMED_ARG_X(msg, ADC_INF_FLAG_IPV4_ADDR, user.address, sizeof(user.address));
+					if (!user.address[0])
+						EXTRACT_NAMED_ARG_X(msg, ADC_INF_FLAG_IPV6_ADDR, user.address, sizeof(user.address));
 
 					{
 						char ct[8];
