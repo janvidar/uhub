@@ -85,6 +85,10 @@ struct seed_hub
 	unsigned int backoff;      /** Current delay in seconds; 0 before the first retry. */
 	unsigned int retry_left;   /** Seconds of the current delay not yet waited out. */
 	int retry_pending;         /** A reconnect is scheduled. */
+
+	time_t drop_window;        /** Start of the current dropped-request log window. */
+	unsigned int drop_logged;     /** Drops logged in that window. */
+	unsigned int drop_suppressed; /** Drops not logged in that window. */
 };
 
 static void seed_hub_open(struct seed_hub* hub);
@@ -403,12 +407,12 @@ int seed_hub_parse_search(struct adc_message* msg, struct seed_search* out)
  * The shared half of CTM and RCM: the protocol is argument 0 and the token is
  * the last argument, with the port wedged between them only for a CTM.
  */
-static int seed_hub_parse_connect(struct adc_message* msg, struct seed_connect* out, int with_port)
+static int seed_hub_parse_connect(struct adc_message* msg, struct seed_connect* out, int with_port, const char** reason)
 {
 	char* protocol;
 	char* port_str = NULL;
 	char* token;
-	int ok = 1;
+	const char* why = NULL;
 
 	if (!msg || !out)
 		return 0;
@@ -420,18 +424,19 @@ static int seed_hub_parse_connect(struct adc_message* msg, struct seed_connect* 
 		port_str = adc_msg_get_argument(msg, 1);
 	token = adc_msg_get_argument(msg, with_port ? 2 : 1);
 
-	if (!seed_hub_copy_arg(out->protocol, sizeof(out->protocol), protocol))
-		ok = 0;
-	if (ok && !seed_hub_copy_arg(out->token, sizeof(out->token), token))
-		ok = 0;
-	if (ok && (!*out->protocol || !*out->token))
-		ok = 0;
-
-	if (ok && with_port)
+	if (!protocol || !*protocol)
+		why = "no protocol";
+	else if (!seed_hub_copy_arg(out->protocol, sizeof(out->protocol), protocol))
+		why = "protocol too long";
+	else if (!token || !*token)
+		why = "no token";
+	else if (!seed_hub_copy_arg(out->token, sizeof(out->token), token))
+		why = "token too long";
+	else if (with_port)
 	{
 		int port = 0;
 		if (!port_str || !is_number(port_str, &port) || port <= 0 || port > 65535)
-			ok = 0;
+			why = "bad port";
 		else
 			out->port = (uint16_t) port;
 	}
@@ -440,19 +445,24 @@ static int seed_hub_parse_connect(struct adc_message* msg, struct seed_connect* 
 	hub_free(port_str);
 	hub_free(token);
 
-	if (!ok)
+	if (reason)
+		*reason = why;
+	if (why)
+	{
 		memset(out, 0, sizeof(*out));
-	return ok;
+		return 0;
+	}
+	return 1;
 }
 
 int seed_hub_parse_ctm(struct adc_message* msg, struct seed_connect* out)
 {
-	return seed_hub_parse_connect(msg, out, 1);
+	return seed_hub_parse_connect(msg, out, 1, NULL);
 }
 
 int seed_hub_parse_rcm(struct adc_message* msg, struct seed_connect* out)
 {
-	return seed_hub_parse_connect(msg, out, 0);
+	return seed_hub_parse_connect(msg, out, 0, NULL);
 }
 
 /* -------------------------------------------------------------------------
@@ -1297,6 +1307,62 @@ static void seed_hub_on_chat(struct seed_hub* hub, const struct ADC_chat_message
 	hub->cb.on_chat(hub->ptr, from, chat->message, is_private);
 }
 
+/**
+ * How much of a message to put in a log line: the raw line without its
+ * terminator, capped so a peer cannot write arbitrarily long log lines.
+ */
+static int seed_hub_log_length(const struct adc_message* msg)
+{
+	size_t len = msg->length;
+
+	while (len && (msg->cache[len - 1] == '\n' || msg->cache[len - 1] == '\r'))
+		len--;
+	if (len > 200)
+		len = 200;
+	return (int) len;
+}
+
+#define SEED_DROP_LOG_WINDOW 60 /* seconds */
+#define SEED_DROP_LOG_BURST  5  /* drops logged per window */
+
+/*
+ * A dropped connect request is the whole story behind a transfer that never
+ * happens, and LOG_DEBUG is compiled out of a release build -- which is where
+ * the question always gets asked. So it is a warning, but any peer can send as
+ * many malformed requests as it likes, so only the first few per window are
+ * logged and the rest are counted and summed up when the next window opens.
+ */
+static void seed_hub_log_drop(struct seed_hub* hub, struct adc_message* msg, const char* kind, const char* reason)
+{
+	struct seed_user fallback;
+	const struct seed_user* from;
+	time_t now = time(NULL);
+
+	if (now - hub->drop_window >= SEED_DROP_LOG_WINDOW || now < hub->drop_window)
+	{
+		if (hub->drop_suppressed)
+			LOG_WARN("seeder: %u more malformed connect requests were dropped without being logged",
+				hub->drop_suppressed);
+		hub->drop_window = now;
+		hub->drop_logged = 0;
+		hub->drop_suppressed = 0;
+	}
+
+	if (hub->drop_logged >= SEED_DROP_LOG_BURST)
+	{
+		hub->drop_suppressed++;
+		return;
+	}
+	hub->drop_logged++;
+
+	from = seed_hub_sender(hub, msg->source, &fallback);
+	LOG_WARN("seeder: dropping malformed %s from %s%s (%s): \"%.*s\"", kind,
+		*from->nick ? from->nick : "SID ",
+		*from->nick ? "" : sid_to_string(msg->source),
+		reason ? reason : "unparsable",
+		seed_hub_log_length(msg), msg->cache);
+}
+
 static void seed_hub_on_search(struct seed_hub* hub, struct adc_message* msg)
 {
 	struct seed_search search;
@@ -1318,15 +1384,8 @@ static void seed_hub_on_search(struct seed_hub* hub, struct adc_message* msg)
 		 * a search that never arrived) look identical from outside and have
 		 * completely different causes.
 		 */
-		size_t len = msg->length;
-
-		while (len && (msg->cache[len - 1] == '\n' || msg->cache[len - 1] == '\r'))
-			len--;
-		if (len > 200)
-			len = 200;
-
 		LOG_DEBUG("seed_hub: unanswerable search from SID %s: \"%.*s\"",
-			sid_to_string(msg->source), (int) len, msg->cache);
+			sid_to_string(msg->source), seed_hub_log_length(msg), msg->cache);
 		return;
 	}
 
@@ -1339,16 +1398,14 @@ static void seed_hub_on_connect_req(struct seed_hub* hub, struct adc_message* ms
 	struct seed_connect req;
 	struct seed_user fallback;
 	const struct seed_user* from;
+	const char* reason = NULL;
 
 	if (!msg || msg->source == seed_hub_own_sid(hub))
 		return;
 
-	if (!seed_hub_parse_ctm(msg, &req))
+	if (!seed_hub_parse_connect(msg, &req, 1, &reason))
 	{
-		/* Said out loud: a dropped connect request is the whole story behind a
-		   transfer that never happens, and LOG_DEBUG is compiled out of a
-		   release build -- which is where the question always gets asked. */
-		LOG_WARN("seed: dropping a malformed connect request from %s", sid_to_string(msg->source));
+		seed_hub_log_drop(hub, msg, "CTM", reason);
 		return;
 	}
 
@@ -1364,13 +1421,14 @@ static void seed_hub_on_revconnect_req(struct seed_hub* hub, struct adc_message*
 	struct seed_connect req;
 	struct seed_user fallback;
 	const struct seed_user* from;
+	const char* reason = NULL;
 
 	if (!msg || msg->source == seed_hub_own_sid(hub))
 		return;
 
-	if (!seed_hub_parse_rcm(msg, &req))
+	if (!seed_hub_parse_connect(msg, &req, 0, &reason))
 	{
-		LOG_DEBUG("seeder: dropping malformed RCM from %s", sid_to_string(msg->source));
+		seed_hub_log_drop(hub, msg, "RCM", reason);
 		return;
 	}
 
