@@ -85,6 +85,22 @@ enum log_verbosity {
 extern void hub_set_log_verbosity(int log_verbosity);
 
 /**
+ * The current verbosity. A message is printed when its level is below it, so
+ * the most detailed level shown is one less, and 0 means nothing is printed.
+ */
+extern int hub_get_log_verbosity(void);
+
+/**
+ * The name of a log level ("info"), or NULL for a value that is not one.
+ */
+extern const char* hub_log_level_to_string(int level);
+
+/**
+ * The log level with this name, ignoring case, or -1 for an unknown name.
+ */
+extern int hub_log_level_from_string(const char* name);
+
+/**
  * @return 1 when a message logged at @p log_verbosity would be printed.
  *
  * For callers that would otherwise pay to format a message nobody will see --

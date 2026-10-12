@@ -159,6 +159,35 @@ void hub_set_log_verbosity(int verb)
 	verbosity = verb;
 }
 
+int hub_get_log_verbosity(void)
+{
+	return verbosity;
+}
+
+/* Indexed by enum log_verbosity. */
+static const char* const log_level_names[] = {
+	"fatal", "error", "warning", "user", "info", "debug",
+	"trace", "dump", "memory", "protocol", "plugin",
+};
+
+const char* hub_log_level_to_string(int level)
+{
+	if (level < 0 || level >= (int) (sizeof(log_level_names) / sizeof(log_level_names[0])))
+		return NULL;
+	return log_level_names[level];
+}
+
+int hub_log_level_from_string(const char* name)
+{
+	int level;
+	if (!name)
+		return -1;
+	for (level = 0; level < (int) (sizeof(log_level_names) / sizeof(log_level_names[0])); level++)
+		if (!strcasecmp(name, log_level_names[level]))
+			return level;
+	return -1;
+}
+
 int hub_log_enabled(int log_verbosity)
 {
 	/* These two are written to a file of their own whatever the verbosity is,

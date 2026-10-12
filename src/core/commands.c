@@ -446,7 +446,9 @@ static int command_kick(struct command_base* cbase, struct hub_user* user, struc
 {
 	struct cbuffer* buf;
 	struct hub_command_arg_data* arg = hub_command_arg_next(cmd, type_user);
+	struct hub_command_arg_data* reason_arg = hub_command_arg_next(cmd, type_string);
 	struct hub_user* target = arg->data.user;
+	const char* reason = reason_arg ? reason_arg->data.string : NULL;
 
 	buf = cbuf_create(128);
 	if (target == user)
@@ -455,9 +457,79 @@ static int command_kick(struct command_base* cbase, struct hub_user* user, struc
 	}
 	else
 	{
-		cbuf_append_format(buf, "Kicking user \"%s\".", target->id.nick);
+		/* Only the user being kicked hears why: by the time the hub tells
+		   everyone else they are gone, the connection is already closed. The
+		   disconnect flushes what is queued before it closes. */
+		if (reason)
+		{
+			struct cbuffer* note = cbuf_create(128);
+			cbuf_append_format(note, "You were kicked by %s: %s", user->id.nick, reason);
+			send_message(cbase, target, note);
+			cbuf_append_format(buf, "Kicking user \"%s\": %s", target->id.nick, reason);
+		}
+		else
+		{
+			cbuf_append_format(buf, "Kicking user \"%s\".", target->id.nick);
+		}
+		LOG_INFO("%s kicked %s%s%s", user->id.nick, target->id.nick, reason ? ": " : "", reason ? reason : "");
 		hub_disconnect_user(cbase->hub, target, quit_kicked);
 	}
+	return command_status(cbase, user, cmd, buf);
+}
+
+static void append_log_levels(struct cbuffer* buf)
+{
+	int level;
+	const char* name;
+	cbuf_append(buf, " Levels:");
+	for (level = 0; (name = hub_log_level_to_string(level)); level++)
+		cbuf_append_format(buf, " %s", name);
+	cbuf_append(buf, ".");
+}
+
+/*
+ * !loglevel [level]: show or set the most detailed level that is logged. Set
+ * here it lasts until the next !reload or restart, which go back to the
+ * verbosity given on the command line.
+ */
+static int command_loglevel(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
+{
+	struct cbuffer* buf = cbuf_create(256);
+	struct hub_command_arg_data* arg = hub_command_arg_next(cmd, type_string);
+	int verbosity = hub_get_log_verbosity();
+	int level;
+
+	if (!arg)
+	{
+		const char* name = hub_log_level_to_string(verbosity - 1);
+		if (verbosity <= 0)
+			cbuf_append(buf, "Logging is off.");
+		else
+			cbuf_append_format(buf, "Log level: %s.", name ? name : "all");
+		append_log_levels(buf);
+		return command_status(cbase, user, cmd, buf);
+	}
+
+	level = hub_log_level_from_string(arg->data.string);
+	if (level < 0)
+	{
+		cbuf_append_format(buf, "Unknown log level \"%s\".", arg->data.string);
+		append_log_levels(buf);
+		return command_status(cbase, user, cmd, buf);
+	}
+
+	/* Say so at a level that is still logged, whichever way it goes. */
+	if (level < log_info)
+		LOG_INFO("Log level set to %s by %s", hub_log_level_to_string(level), user->id.nick);
+	hub_set_log_verbosity(level + 1);
+	if (level >= log_info)
+		LOG_INFO("Log level set to %s by %s", hub_log_level_to_string(level), user->id.nick);
+
+	cbuf_append_format(buf, "Log level set to %s until the next reload or restart.", hub_log_level_to_string(level));
+#ifndef DEBUG
+	if (level >= log_debug)
+		cbuf_append(buf, " Debug, trace and plugin messages are only compiled into debug builds.");
+#endif
 	return command_status(cbase, user, cmd, buf);
 }
 
@@ -971,7 +1043,8 @@ void commands_builtin_add(struct command_base* cbase)
 	ADD_COMMAND("help",       4, "?c",auth_cred_guest,     command_help,     "Show this help message."      );
 	ADD_COMMAND("ban",        3, "u?n+n",auth_cred_operator, command_ban,    "Ban a user (cluster-wide); optional duration e.g. 30m/12h/7d then optional reason");
 	ADD_COMMAND("unban",      5, "+n",auth_cred_operator,  command_unban,    "Remove a ban by nick/CID/IP"  );
-	ADD_COMMAND("kick",       4, "u", auth_cred_operator,  command_kick,     "Kick a user"                  );
+	ADD_COMMAND("kick",       4, "u?+m",auth_cred_operator, command_kick,    "Kick a user, with an optional reason");
+	ADD_COMMAND("loglevel",   8, "?m",auth_cred_admin,     command_loglevel, "Show or set the hub log level");
 	ADD_COMMAND("redirect",   8, "uA",auth_cred_operator,  command_redirect, "Redirect a user to another hub");
 	ADD_COMMAND("log",        3, "?m",auth_cred_operator,  command_log,      "Display log"                  ); // fail
 	ADD_COMMAND("myip",       4, "",  auth_cred_guest,     command_myip,     "Show your own IP."            );

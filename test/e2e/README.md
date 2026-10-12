@@ -39,7 +39,9 @@ local port), then verifies the ban/unban lifecycle end to end:
 3. the banned nick is refused on reconnect (`check_acl`);
 4. `!unban` lets the nick back in;
 5. a timed `!ban <nick> 1h` is reported as a *temporary* ban (status 232);
-6. a ban survives a hub restart (persisted by `mod_auth_sqlite`).
+6. a ban survives a hub restart (persisted by `mod_auth_sqlite`);
+7. a ban reason is shown to the banned user;
+8. a `!kick` reason reaches the user being kicked.
 
 ```sh
 # after a normal build:

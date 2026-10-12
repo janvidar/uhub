@@ -254,6 +254,33 @@ EXO_TEST(command_redirect_addr_space,        { return command_redirect_valid_add
 EXO_TEST(command_redirect_addr_plain,        { return command_redirect_valid_address("justtext") == 0; });
 EXO_TEST(command_redirect_addr_empty,        { return command_redirect_valid_address("") == 0; });
 
+/* !kick takes "u?+m": a user, then an optional reason that keeps its spaces. */
+static int kick_spec_parse(const char* line, const char* expected_reason)
+{
+	struct command_handle* h = create_handler("kickspec", "u?+m", auth_cred_guest);
+	struct hub_command* parsed;
+	struct hub_command_arg_data* reason;
+	int ok;
+
+	if (!command_add(cbase, h, NULL))
+		return 0;
+	parsed = command_parse(cbase, hub, &user, line);
+	ok = parsed->status == cmd_status_ok && verify_arg_user(parsed, &user);
+	reason = hub_command_arg_next(parsed, type_string);
+	if (expected_reason)
+		ok = ok && reason && !strcmp(reason->data.string, expected_reason);
+	else
+		ok = ok && !reason;
+	command_free(parsed);
+	command_del(cbase, h);
+	hub_free(h);
+	return ok;
+}
+
+EXO_TEST(command_kick_spec_no_reason,   { return kick_spec_parse("!kickspec tester", NULL); });
+EXO_TEST(command_kick_spec_reason,      { return kick_spec_parse("!kickspec tester spamming", "spamming"); });
+EXO_TEST(command_kick_spec_long_reason, { return kick_spec_parse("!kickspec tester spamming the main chat", "spamming the main chat"); });
+
 EXO_TEST(command_user_destroy, { return uman_remove(hub->users, &user) == 0; });
 
 EXO_TEST(command_destroy, {

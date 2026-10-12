@@ -152,6 +152,7 @@ const tcc_sources = [_][]const u8{
     "test_keepalive.tcc",
     "test_link.tcc",
     "test_list.tcc",
+    "test_log.tcc",
     "test_memory.tcc",
     "test_message.tcc",
     "test_metrics.tcc",

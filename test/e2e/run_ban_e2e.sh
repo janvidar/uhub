@@ -4,7 +4,8 @@
 # clients (adc_cmd) against a live uhub. Exercises the runtime path that the C
 # unit tests cannot: an operator !ban disconnects an online user and blocks the
 # reconnect (check_acl), and !unban lets them back in. Also checks a timed ban
-# (temporary status) and persistence of a ban across a hub restart.
+# (temporary status), persistence of a ban across a hub restart, and that a
+# !kick reason reaches the user being kicked.
 #
 # Usage:  BUILD=/path/to/build  test/e2e/run_ban_e2e.sh  [port]
 # Requires (from the build dir): uhub, adc_cmd, uhub-passwd, mod_auth_sqlite.so.
@@ -143,6 +144,18 @@ if wait_for "LOGGED_IN" "$DIR/rvic_bg.log"; then
 	"$ADC" "$HUB" --nick admin --password adminpass --send "!unban rvic" --linger 2 >/dev/null 2>&1
 else
 	bad "rvic never logged in"; kill "$RBID" 2>/dev/null
+fi
+
+# 9. !kick with a reason: the kicked user is told why before being disconnected.
+"$ADC" "$HUB" --nick kvic --expect ok --linger 12 >"$DIR/kvic_bg.log" 2>&1 &
+KBID=$!
+if wait_for "LOGGED_IN" "$DIR/kvic_bg.log"; then
+	"$ADC" "$HUB" --nick admin --password adminpass --send "!kick kvic stop flooding the chat" --linger 3 >"$DIR/op_kick.log" 2>&1
+	wait "$KBID" 2>/dev/null
+	if grep -q "kicked by admin: stop flooding the chat" "$DIR/kvic_bg.log" && grep -q "DISCONNECTED" "$DIR/kvic_bg.log"; then
+		ok "!kick tells the kicked user the reason"; else bad "kick reason not delivered (see $DIR/kvic_bg.log / $DIR/op_kick.log)"; fi
+else
+	bad "kvic never logged in"; kill "$KBID" 2>/dev/null
 fi
 
 echo "== result: $pass passed, $fail failed =="

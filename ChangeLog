@@ -17,6 +17,10 @@ New features:
   record from another, and a guest-level record beats a refusal.
 - mod_joins: join and leave announcements in the main chat, optionally only
   to operators, with message templates read from files.
+- !kick takes an optional reason, which the kicked user is shown before being
+  disconnected and which goes into the log.
+- !loglevel (admin) shows or changes the log level until the next !reload or
+  restart.
 - Plugin API: hub.send_chat sends a message to the local users within a range
   of credentials.
 - Plugin API: hub.auth_delete_user, hub.auth_list_users (passwords cleared) and
