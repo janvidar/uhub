@@ -414,16 +414,101 @@ enum metrics_result metrics_classify_request(const char* req, const char* metric
 	return authorized ? METRICS_OK : METRICS_FORBIDDEN;
 }
 
+/* The request target (path) of a request line, without any query string, or
+   0 if it does not fit in out. */
+static int http_request_path(const char* req, char* out, size_t out_size)
+{
+	const char* p = strchr(req, ' ');
+	size_t len = 0;
+
+	if (!p)
+		return 0;
+	p++;
+	while (p[len] && p[len] != ' ' && p[len] != '?' && p[len] != '\r' && p[len] != '\n')
+	{
+		if (len >= out_size - 1)
+			return 0;
+		out[len] = p[len];
+		len++;
+	}
+	out[len] = '\0';
+	return 1;
+}
+
+enum metrics_result http_classify_request(const char* req, const char* metrics_path, const char* metrics_token, int redirect)
+{
+	enum metrics_result result;
+	char path[512];
+
+	if (!metrics_token)
+		return redirect ? METRICS_REDIRECT : METRICS_NOT_FOUND;
+
+	result = metrics_classify_request(req, metrics_path, metrics_token);
+	if (!redirect)
+		return result;
+
+	/* A POST to the metrics path is still told off for its method; a POST
+	   anywhere else is just someone in the wrong place. */
+	if (result == METRICS_NOT_FOUND)
+		return METRICS_REDIRECT;
+	if (result == METRICS_BAD_METHOD && (!http_request_path(req, path, sizeof(path)) || strcmp(path, metrics_path) != 0))
+		return METRICS_REDIRECT;
+	return result;
+}
+
+int http_redirect_valid_url(const char* url)
+{
+	const char* p;
+
+	if (!url)
+		return 0;
+	if (!strncmp(url, "http://", 7))
+		p = url + 7;
+	else if (!strncmp(url, "https://", 8))
+		p = url + 8;
+	else
+		return 0;
+	if (!*p)
+		return 0;
+	for (; *p; p++)
+	{
+		unsigned char c = (unsigned char) *p;
+		if (c <= ' ' || c == 0x7f || c == '"' || c == '<' || c == '>')
+			return 0;
+	}
+	return 1;
+}
+
+int metrics_http_wanted(struct hub_info* hub)
+{
+	struct hub_config* config = hub->config;
+	return (config->metrics_enable && *config->metrics_token) || http_redirect_valid_url(config->http_redirect_addr);
+}
+
 /*
  * The request line and headers are complete. Classify the request, then queue
- * either the metrics document or the matching error response.
+ * the metrics document, the redirect, or the matching error response.
  */
 static void metrics_handle_request(struct metrics_connection* m)
 {
 	struct hub_config* config = m->hub->config;
+	const char* token = (config->metrics_enable && *config->metrics_token) ? config->metrics_token : NULL;
+	int redirect = http_redirect_valid_url(config->http_redirect_addr);
 
-	switch (metrics_classify_request(m->req, config->metrics_path, config->metrics_token))
+	switch (http_classify_request(m->req, config->metrics_path, token, redirect))
 	{
+		case METRICS_REDIRECT:
+		{
+			struct cbuffer* body = cbuf_create(256);
+			struct cbuffer* headers = cbuf_create(256);
+			cbuf_append_format(body, "<html><body><a href=\"%s\">%s</a></body></html>\n", config->http_redirect_addr, config->http_redirect_addr);
+			cbuf_append_format(headers, "Location: %s\r\n", config->http_redirect_addr);
+			metrics_send_response(m, 307, "Temporary Redirect", "text/html; charset=utf-8", body, cbuf_get(headers));
+			cbuf_destroy(headers);
+			cbuf_destroy(body);
+			return;
+		}
+
 		case METRICS_BAD_METHOD:
 			metrics_send_error(m, 405, "Method Not Allowed", "Allow: GET\r\n");
 			return;

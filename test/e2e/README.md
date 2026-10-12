@@ -71,6 +71,18 @@ BUILD=/path/to/build test/e2e/run_users_e2e.sh [port]
 
 Set `KEEP=1` to keep the work directory (logs, `users.db`) for a failed run.
 
+## run_redirect_e2e.sh
+
+Starts a `uhub` with TLS, the metrics endpoint and `http_redirect_addr`, then
+checks that a browser opening the hub port gets a `307` to the configured URL
+over HTTP and HTTPS, that `/metrics` is still served (and still wants its
+token), and that ADC and ADCS logins on the same port are unaffected. Needs
+`curl`.
+
+```sh
+BUILD=/path/to/build test/e2e/run_redirect_e2e.sh [port]
+```
+
 ## run_link_e2e.sh
 
 Brings up **two linked hubs** (node 0 and node 1, a shared `link_secret`, node 1

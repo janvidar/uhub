@@ -111,3 +111,73 @@ EXO_TEST(metrics_forbidden_token_too_long, {
 	req[n] = '\0';
 	return CLASSIFY(req) == METRICS_FORBIDDEN;
 });
+
+/* --- http_classify_request: metrics and the http_redirect_addr redirect ---- */
+
+#define ROUTE(req, token, redirect) http_classify_request((req), M_PATH, (token), (redirect))
+
+/* Metrics on, redirect on: the metrics path still serves metrics... */
+EXO_TEST(http_route_metrics_still_served, {
+	return ROUTE("GET /metrics HTTP/1.1\r\nAuthorization: Bearer s3cr3t\r\n\r\n", M_TOKEN, 1) == METRICS_OK;
+});
+
+/* ...and still refuses a missing token rather than redirecting it away. */
+EXO_TEST(http_route_metrics_still_forbidden, {
+	return ROUTE("GET /metrics HTTP/1.1\r\n\r\n", M_TOKEN, 1) == METRICS_FORBIDDEN;
+});
+
+EXO_TEST(http_route_other_path_redirected, {
+	return ROUTE("GET / HTTP/1.1\r\nHost: hub.example\r\n\r\n", M_TOKEN, 1) == METRICS_REDIRECT;
+});
+
+/* A POST to the metrics path is a wrong method; anywhere else, a wrong place. */
+EXO_TEST(http_route_post_metrics_bad_method, {
+	return ROUTE("POST /metrics HTTP/1.1\r\n\r\n", M_TOKEN, 1) == METRICS_BAD_METHOD;
+});
+
+EXO_TEST(http_route_post_elsewhere_redirected, {
+	return ROUTE("POST /form HTTP/1.1\r\n\r\n", M_TOKEN, 1) == METRICS_REDIRECT;
+});
+
+EXO_TEST(http_route_head_redirected, {
+	return ROUTE("HEAD / HTTP/1.1\r\n\r\n", M_TOKEN, 1) == METRICS_REDIRECT;
+});
+
+/* Metrics off: everything is redirected, the metrics path included. */
+EXO_TEST(http_route_metrics_off_redirects_all, {
+	return ROUTE("GET /metrics HTTP/1.1\r\nAuthorization: Bearer s3cr3t\r\n\r\n", NULL, 1) == METRICS_REDIRECT
+		&& ROUTE("GET / HTTP/1.1\r\n\r\n", NULL, 1) == METRICS_REDIRECT;
+});
+
+/* Redirect off: exactly metrics_classify_request, as before. */
+EXO_TEST(http_route_no_redirect_unchanged, {
+	return ROUTE("GET / HTTP/1.1\r\n\r\n", M_TOKEN, 0) == METRICS_NOT_FOUND
+		&& ROUTE("POST / HTTP/1.1\r\n\r\n", M_TOKEN, 0) == METRICS_BAD_METHOD
+		&& ROUTE("GET /metrics HTTP/1.1\r\nAuthorization: Bearer s3cr3t\r\n\r\n", M_TOKEN, 0) == METRICS_OK;
+});
+
+/* --- http_redirect_valid_url --------------------------------------------- */
+
+EXO_TEST(http_redirect_url_ok, {
+	return http_redirect_valid_url("http://www.example.com/")
+		&& http_redirect_valid_url("https://example.com/hub?a=1&b=2");
+});
+
+EXO_TEST(http_redirect_url_scheme, {
+	return !http_redirect_valid_url("ftp://example.com/")
+		&& !http_redirect_valid_url("adc://example.com:1511")
+		&& !http_redirect_valid_url("example.com");
+});
+
+EXO_TEST(http_redirect_url_empty, {
+	return !http_redirect_valid_url("") && !http_redirect_valid_url("https://") && !http_redirect_valid_url(NULL);
+});
+
+/* Anything that could end the Location header or the href attribute early. */
+EXO_TEST(http_redirect_url_injection, {
+	return !http_redirect_valid_url("https://example.com/\r\nSet-Cookie: x=1")
+		&& !http_redirect_valid_url("https://example.com/ a")
+		&& !http_redirect_valid_url("https://example.com/\"onload=\"x")
+		&& !http_redirect_valid_url("https://example.com/<script>")
+		&& !http_redirect_valid_url("https://example.com/\x7f");
+});

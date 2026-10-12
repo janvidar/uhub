@@ -483,7 +483,7 @@ jobs:
         run: |
           for s in run_adcrush_asan run_link_stress_asan \
                    run_plugin_e2e run_ban_e2e run_link_e2e run_bbs_e2e \
-                   run_hbri_e2e run_users_e2e; do
+                   run_hbri_e2e run_users_e2e run_redirect_e2e; do
             echo "== $s =="
             BUILD=build-cov bash "test/e2e/$s.sh" || echo "($s did not pass; coverage still counted)"
           done

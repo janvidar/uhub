@@ -21,6 +21,9 @@ New features:
   disconnected and which goes into the log.
 - !loglevel (admin) shows or changes the log level until the next !reload or
   restart.
+- http_redirect_addr: a web browser opening the hub address is redirected to
+  this URL, over HTTP or HTTPS on the hub port. The metrics endpoint keeps its
+  path.
 - Plugin API: hub.send_chat sends a message to the local users within a range
   of credentials.
 - Plugin API: hub.auth_delete_user, hub.auth_list_users (passwords cleared) and

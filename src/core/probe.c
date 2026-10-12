@@ -164,13 +164,14 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 			else if (proto == probe_protocol_http)
 			{
 				/* Looks like HTTP (plaintext, or decrypted on a TLS connection). If
-				   the metrics endpoint is enabled (and a token is configured) hand the
-				   connection off to it; the handler does its own method/path/token
-				   checks and transparently uses TLS when con is encrypted. Otherwise
-				   it stays unsupported. */
-				if (probe->hub->config->metrics_enable && *probe->hub->config->metrics_token)
+				   the metrics endpoint is enabled (and a token is configured) or
+				   http_redirect_addr is set, hand the connection off to the HTTP
+				   handler; it does its own method/path/token checks, picks between
+				   metrics and the redirect, and transparently uses TLS when con is
+				   encrypted. Otherwise it stays unsupported. */
+				if (metrics_http_wanted(probe->hub))
 				{
-					LOG_TRACE("Probed HTTP connection - serving metrics endpoint (%s)", ip_convert_to_string(&probe->addr));
+					LOG_TRACE("Probed HTTP connection - serving metrics / redirect (%s)", ip_convert_to_string(&probe->addr));
 					metrics_handle_connection(probe->hub, probe->connection, &probe->addr);
 					probe->connection = 0;
 					/* See the ADC branch: on TLS the peeked bytes are buffered in

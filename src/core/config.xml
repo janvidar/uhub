@@ -111,6 +111,22 @@
 		<since>0.7.0</since>
 	</option>
 
+	<option name="http_redirect_addr" type="string" default="">
+		<check regexp="(https?://[^[:space:][:cntrl:]&quot;&lt;&gt;]+)?" />
+		<short>Send web browsers that connect to the hub port to this URL</short>
+		<description><![CDATA[
+			Someone who opens the hub address in a web browser gets an HTTP
+			redirect (307) to this URL, the hub's web site for instance, instead
+			of a closed connection. When the metrics endpoint is enabled it is
+			still served on metrics_path; every other request is redirected.
+			Works on a TLS-enabled hub over HTTPS too. Leave empty to turn it off.
+		]]></description>
+		<since>0.8.1</since>
+		<example><![CDATA[
+			http_redirect_addr = https://www.example.com/
+		]]></example>
+	</option>
+
 	<option name="workers" type="int" default="1">
 		<check min="0" max="256" />
 		<short>Run one logical hub as this many worker processes</short>

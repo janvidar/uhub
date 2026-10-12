@@ -242,6 +242,14 @@ EXO_TEST(cfg_empty_alt_ports,    { return cfg_expect("server_alt_ports = \"\"\n"
 EXO_TEST(cfg_empty_redirect,     { return cfg_expect("redirect_addr = \"\"\n", 0); });
 EXO_TEST(cfg_empty_tls_redirect, { return cfg_expect("tls_require_redirect_addr = \"\"\n", 0); });
 
+EXO_TEST(cfg_empty_http_redirect, { return cfg_expect("http_redirect_addr = \"\"\n", 0); });
+
+/* The redirect address ends up in an HTTP header and an HTML attribute, so it
+   may not carry what would break out of those. */
+EXO_TEST(cfg_http_redirect_ok,       { return cfg_expect("http_redirect_addr = https://www.example.com/hub\n", 0); });
+EXO_TEST(cfg_http_redirect_scheme,   { return cfg_expect("http_redirect_addr = javascript:alert(1)\n", -1); });
+EXO_TEST(cfg_http_redirect_quote,    { return cfg_expect("http_redirect_addr = \"https://example.com/\\\"x\"\n", -1); });
+
 /* An empty value does not disable validation for a non-empty value. */
 EXO_TEST(cfg_alt_ports_still_checked, { return cfg_expect("server_alt_ports = not,ports\n", -1); });
 EXO_TEST(cfg_redirect_still_checked,  { return cfg_expect("redirect_addr = ftp://elsewhere\n", -1); });
