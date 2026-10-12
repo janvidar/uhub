@@ -214,7 +214,7 @@ const plugins = [_]Plugin{
 const Ctx = struct {
     b: *std.Build,
     target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
+    optimize: std.lang.Optimize,
     cflags: []const []const u8,
     systemd: bool,
     strip: ?bool,
@@ -293,8 +293,8 @@ const Ctx = struct {
         const tcc_flags = std.mem.concat(b.allocator, []const u8, &.{
             ctx.cflags,
             &.{
-                "-include", b.pathFromRoot("third_party/exotic/src/autotest.h"),
-                b.fmt("-DUHUB_TEST_DIR=\"{s}\"", .{b.pathFromRoot("autotest")}),
+                "-include", rootPath(b, "third_party/exotic/src/autotest.h"),
+                b.fmt("-DUHUB_TEST_DIR=\"{s}\"", .{rootPath(b, "autotest")}),
             },
         }) catch @panic("OOM");
         m.addCSourceFiles(.{
@@ -351,7 +351,8 @@ pub fn build(b: *std.Build) void {
     // submodules -- an unpacked GitHub "Source code" archive, say, which cannot
     // contain them. Asking for tests explicitly still fails loudly.
     const exotic_present = blk: {
-        b.build_root.handle.access(b.graph.io, "third_party/exotic/src/autotest.c", .{}) catch break :blk false;
+        const probe = "third_party/exotic/src/autotest.c";
+        b.root.access(b.graph.io, probe, .{}) catch break :blk false;
         break :blk true;
     };
     // Left null by default so zig applies its per-optimize-mode default. The
@@ -402,7 +403,7 @@ pub fn build(b: *std.Build) void {
         .macos, .windows => {},
         else => flags.append("-fstack-clash-protection") catch @panic("OOM"),
     }
-    if (optimize != .Debug) flags.append("-D_FORTIFY_SOURCE=2") catch @panic("OOM");
+    if (optimize != .debug) flags.append("-D_FORTIFY_SOURCE=2") catch @panic("OOM");
     // Give defined behaviour to the two things the code relies on that are
     // otherwise UB: signed overflow (-fwrapv) and cast-based type punning
     // (-fno-strict-aliasing). This is what makes sanitize_c=off below safe --
@@ -470,7 +471,7 @@ pub fn build(b: *std.Build) void {
     // resolve. PIC so it can link into the plugin shared objects.
     const sqlite3_mod = b.createModule(.{
         .target = target,
-        .optimize = .ReleaseFast,
+        .optimize = .fast,
         .link_libc = true,
         .sanitize_c = .off,
     });
@@ -681,7 +682,7 @@ pub fn build(b: *std.Build) void {
     if (javascript) {
         const qjs_mod = b.createModule(.{
             .target = target,
-            .optimize = .ReleaseFast,
+            .optimize = .fast,
             .link_libc = true,
             .sanitize_c = .off,
             .pic = true,
@@ -727,7 +728,7 @@ pub fn build(b: *std.Build) void {
 
     // `zig build run` -> launch uhub.
     const run_step = b.addRunArtifact(uhub);
-    if (b.args) |args| run_step.addArgs(args);
+    run_step.addPassthruArgs();
     b.step("run", "Run uhub").dependOn(&run_step.step);
 
     // `zig build test` -> run the autotest suite (POSIX targets only).
@@ -750,4 +751,12 @@ fn gitVersion(b: *std.Build) []const u8 {
     const hash = std.mem.trim(u8, stdout, " \t\r\n");
     if (hash.len == 0) return fallback;
     return b.fmt("{d}.{d}.{d}-git-{s}", .{ version_major, version_minor, version_patch, hash });
+}
+
+/// Absolute path to a file under the build root. b.root may be the bare cwd,
+/// so it is resolved rather than joined.
+fn rootPath(b: *std.Build, sub_path: []const u8) []const u8 {
+    const joined = if (b.root.sub_path.len == 0) sub_path else b.pathJoin(&.{ b.root.sub_path, sub_path });
+    return b.root.root_dir.handle.realPathFileAlloc(b.graph.io, joined, b.graph.arena) catch |err|
+        std.debug.panic("unable to resolve {s}: {t}", .{ sub_path, err });
 }

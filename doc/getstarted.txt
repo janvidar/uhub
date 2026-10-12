@@ -37,7 +37,7 @@ Building with Zig (alternative)
 The repository also ships a build.zig, which is more self-contained: it
 fetches and statically links bundled LibreSSL and SQLite3, so no system
 TLS or SQLite development packages are required. You only need Zig
-(>= 0.14.1); get it from https://ziglang.org/download/.
+(>= 0.17.0); get it from https://ziglang.org/download/.
 
   % tar xzf uhub-0.6.1-src.tar.gz
   % cd uhub-0.6.1

@@ -101,7 +101,7 @@ build against LibreSSL when both are installed, point CMake at its prefix with
 
 The repository also ships a `build.zig` that fetches and statically links a
 bundled LibreSSL and SQLite3, so no system TLS or SQLite packages are needed —
-only [Zig](https://ziglang.org/download/) (≥ 0.14.1):
+only [Zig](https://ziglang.org/download/) (≥ 0.17.0):
 
 ```sh
 zig build                        # artifacts land in zig-out/bin

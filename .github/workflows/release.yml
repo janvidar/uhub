@@ -152,7 +152,7 @@ jobs:
           - macos-aarch64
           - windows-x86_64
     env:
-      ZIG_VERSION: "0.16.0"
+      ZIG_VERSION: "0.17.0"
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
