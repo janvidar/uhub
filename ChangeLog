@@ -33,6 +33,8 @@ New features:
 Fixes:
 - mod_welcome: a motd or rules text ending in a lone "%" made the formatter
   read past the end of the string.
+- The uhub_logouts_total metric stayed at 0: logouts were counted only for a
+  user still logged in, which by then none is.
 
 0.8.0:
 Incompatible changes (action required beyond replacing the binaries):

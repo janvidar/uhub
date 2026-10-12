@@ -181,3 +181,38 @@ EXO_TEST(http_redirect_url_injection, {
 		&& !http_redirect_valid_url("https://example.com/<script>")
 		&& !http_redirect_valid_url("https://example.com/\x7f");
 });
+
+/* --- the logout counter -------------------------------------------------- */
+
+#include "util/list.h"
+#include "core/hub.h"
+#include "core/hubevent.h"
+#include "core/config.h"
+#include "util/memory.h"
+
+/* on_logout_user() runs for a user already in state_cleanup, as the quit event
+   finds them; it must still count the logout. (It used to ask whether the user
+   was logged in, which by then they never are, so uhub_logouts_total stayed 0.) */
+EXO_TEST(metrics_logout_counted, {
+	struct hub_info hub;
+	struct hub_config config;
+	struct hub_user user;
+	int ok;
+
+	memset(&hub, 0, sizeof(hub));
+	memset(&config, 0, sizeof(config));
+	memset(&user, 0, sizeof(user));
+	config.max_logout_log = 1;
+	hub.config = &config;
+	hub.logout_info = list_create();
+	user.state = state_cleanup;
+	user.quit_reason = quit_disconnected;
+
+	on_logout_user(&hub, &user);
+	on_logout_user(&hub, &user);
+	ok = hub.metrics.logouts == 2;
+
+	list_clear(hub.logout_info, hub_free_handle);
+	list_destroy(hub.logout_info);
+	return ok;
+});

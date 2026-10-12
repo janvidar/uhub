@@ -119,10 +119,10 @@ void on_logout_user(struct hub_info* hub, struct hub_user* user)
 	plugin_log_user_logout(hub, user, reason);
 	hub_logout_log(hub, user);
 
-	/* Only count teardown of users that actually completed login, so the count
-	   pairs with metrics.logins (connecting users that never logged in quit here
-	   too, but were counted as login_failures instead). */
-	if (user_is_logged_in(user))
-		hub->metrics.logouts++;
+	/* Only a user who completed the login gets here: hub_disconnect_user()
+	   posts the quit event for no one else. So every call is a logout, pairing
+	   with metrics.logins. (Asking user_is_logged_in() here is no use -- the
+	   user is already in state_cleanup -- and is what kept this counter at 0.) */
+	hub->metrics.logouts++;
 }
 
