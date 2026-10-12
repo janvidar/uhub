@@ -433,6 +433,7 @@ static const struct plugin_default default_plugins[] = {
 	{ "mod_topic",        "" },
 	{ "mod_chat_history", "" },
 	{ "mod_ucmd",         "" },
+	{ "mod_users",        "" },
 };
 
 /*

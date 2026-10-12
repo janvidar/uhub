@@ -279,6 +279,37 @@ static plugin_st delete_user(struct plugin_handle *plugin, struct auth_info *use
     return st_allow;
 }
 
+/* Every account, nick order. The password is not even read: nobody listing
+   accounts has a use for it. */
+static plugin_st list_users(struct plugin_handle *plugin, auth_list_users_callback callback, void *ptr) {
+    struct sql_data *sql = (struct sql_data *)plugin->ptr;
+    sqlite3_stmt *stmt;
+    int rc;
+
+    rc = sqlite3_prepare_v2(sql->db, "SELECT nickname, credentials FROM users ORDER BY nickname COLLATE NOCASE;", -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+        return st_default;
+
+    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        const char *nick = (const char *)sqlite3_column_text(stmt, 0);
+        const char *cred = (const char *)sqlite3_column_text(stmt, 1);
+        struct auth_info info;
+
+        if (!nick || !cred)
+            continue;
+
+        memset(&info, 0, sizeof(info));
+        strncpy(info.nickname, nick, MAX_NICK_LEN);
+        info.nickname[MAX_NICK_LEN] = '\0';
+        if (!auth_string_to_cred(cred, &info.credentials))
+            continue;
+        callback(&info, ptr);
+    }
+
+    sqlite3_finalize(stmt);
+    return (rc == SQLITE_DONE) ? st_allow : st_default;
+}
+
 /* Persist a ban. The hub calls this write-through from !ban / hub_apply_ban. A
    record stores the CID and/or nick present in the ban (empty string when a
    field is not part of the ban). */
@@ -394,6 +425,7 @@ int plugin_register(struct plugin_handle *plugin, const char *config) {
     plugin->funcs.auth_register_user = register_user;
     plugin->funcs.auth_update_user = update_user;
     plugin->funcs.auth_delete_user = delete_user;
+    plugin->funcs.auth_list_users = list_users;
 
     // Ban storage/retention.
     plugin->funcs.auth_ban_add = ban_add;

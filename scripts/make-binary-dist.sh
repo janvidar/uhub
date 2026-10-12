@@ -196,6 +196,9 @@ Register an operator account first (mod_auth_sqlite is enabled by default):
     bin/uhub-passwd etc/users.db create
     bin/uhub-passwd etc/users.db add <nick> <password> admin
 
+Once logged in as that admin, !useradd / !userdel / !usermod / !userpass /
+!userlist (mod_users) manage the other accounts from inside the hub.
+
 If bin/uhub-seeder is present, it is the seed cache: a separate daemon that logs
 into a hub as a registered bot account and keeps files posted in chat available
 after the poster has left. It is not started by bin/uhub and does not read

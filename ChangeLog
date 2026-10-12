@@ -1,3 +1,20 @@
+Unreleased:
+Incompatible changes (action required beyond replacing the binaries):
+- Plugins must be rebuilt against plugin API 9 (minimum 9). struct
+  plugin_funcs gained auth_list_users, which moves the hub function table that
+  follows it in struct plugin_handle. Older plugins are refused at load.
+- Building with zig now needs zig 0.17.0 or newer.
+
+New features:
+- mod_users: operator account management from inside the hub. !useradd,
+  !userdel, !usermod, !userpass and !userlist work with whichever auth storage
+  plugin is loaded. An operator can only manage accounts below their own level
+  and give out levels below it; deleting or demoting an account disconnects a
+  user still logged in to it. mod_users joins the built-in default plugin set.
+- Plugin API: hub.auth_delete_user, hub.auth_list_users (passwords cleared) and
+  hub.get_user_by_nick, and an auth_list_users storage callback, implemented by
+  mod_auth_sqlite and mod_auth_simple.
+
 0.8.0:
 Incompatible changes (action required beyond replacing the binaries):
 - The acl file (file_acl) no longer defines registered users. The user_admin,

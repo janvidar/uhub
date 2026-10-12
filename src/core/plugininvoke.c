@@ -244,6 +244,16 @@ plugin_st plugin_auth_delete_user(struct hub_info* hub, struct auth_info* info)
 	PLUGIN_INVOKE_STATUS_1(hub, auth_delete_user, info);
 }
 
+int plugin_auth_list_users(struct hub_info* hub, auth_list_users_callback callback, void* ptr)
+{
+	int listed = 0;
+	INVOKE(hub, auth_list_users, {
+		if (plugin->funcs.auth_list_users(plugin, callback, ptr) == st_allow)
+			listed++;
+	});
+	return listed;
+}
+
 plugin_st plugin_ban_add(struct hub_info* hub, const struct ban_info* ban)
 {
 	PLUGIN_INVOKE_STATUS_1(hub, auth_ban_add, ban);

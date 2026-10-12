@@ -27,6 +27,7 @@
 #include "core/config.h"
 #include "core/hub.h"
 #include "core/plugincallback.h"
+#include "core/plugininvoke.h"
 #include "core/pluginloader.h"
 #include "core/route.h"
 #include "core/usermanager.h"
@@ -263,6 +264,47 @@ static int cbfunc_auth_register_user(struct plugin_handle* plugin, struct auth_i
 static int cbfunc_auth_update_user(struct plugin_handle* plugin, struct auth_info* user)
 {
 	return acl_update_user(plugin_get_hub(plugin), user);
+}
+
+static int cbfunc_auth_delete_user(struct plugin_handle* plugin, struct auth_info* user)
+{
+	if (!user)
+		return 0;
+	return acl_delete_user(plugin_get_hub(plugin), user->nickname);
+}
+
+struct auth_list_relay
+{
+	auth_list_users_callback callback;
+	void* ptr;
+	int count;
+};
+
+/* Storage plugins hand over whole records; the password stops here. */
+static void auth_list_users_relay(const struct auth_info* user, void* ptr)
+{
+	struct auth_list_relay* relay = (struct auth_list_relay*) ptr;
+	struct auth_info copy;
+
+	memcpy(&copy, user, sizeof(copy));
+	memset(copy.password, 0, sizeof(copy.password));
+	relay->callback(&copy, relay->ptr);
+	relay->count++;
+}
+
+static int cbfunc_auth_list_users(struct plugin_handle* plugin, auth_list_users_callback callback, void* ptr)
+{
+	struct auth_list_relay relay;
+
+	if (!callback)
+		return -1;
+
+	relay.callback = callback;
+	relay.ptr = ptr;
+	relay.count = 0;
+	if (!plugin_auth_list_users(plugin_get_hub(plugin), auth_list_users_relay, &relay))
+		return -1;
+	return relay.count;
 }
 
 static int cbfunc_command_add(struct plugin_handle* plugin, struct plugin_command_handle* cmdh)
@@ -520,6 +562,35 @@ static enum auth_credentials cbfunc_get_user_credentials(struct plugin_handle* p
 	return user ? as_hub_user(user)->credentials : auth_cred_none;
 }
 
+static struct plugin_user* cbfunc_get_user_by_nick(struct plugin_handle* plugin, const char* nick)
+{
+	struct hub_info* hub = plugin_get_hub(plugin);
+	struct hub_user* user;
+
+	if (!nick || !hub->users)
+		return NULL;
+
+	user = uman_get_user_by_nick(hub->users, nick);
+	if (!user)
+	{
+		/* The nick map is case-sensitive, account lookups are not. */
+		struct hub_user* candidate;
+		struct node* cursor;
+		LIST_FOREACH_SAFE(struct hub_user*, candidate, hub->users->list, cursor,
+		{
+			if (strcasecmp(candidate->id.nick, nick) == 0)
+			{
+				user = candidate;
+				break;
+			}
+		});
+	}
+
+	if (!user || user_is_remote(user))
+		return NULL;
+	return as_plugin_user(user);
+}
+
 static const char* cbfunc_get_tls_version(struct plugin_handle* plugin, struct plugin_user* user)
 {
 	(void) plugin;
@@ -593,6 +664,8 @@ void plugin_register_callback_functions(struct plugin_handle* handle)
 	handle->hub.auth_get_user = cbfunc_auth_get_user;
 	handle->hub.auth_register_user = cbfunc_auth_register_user;
 	handle->hub.auth_update_user = cbfunc_auth_update_user;
+	handle->hub.auth_delete_user = cbfunc_auth_delete_user;
+	handle->hub.auth_list_users = cbfunc_auth_list_users;
 	handle->hub.command_add = cbfunc_command_add;
 	handle->hub.command_del = cbfunc_command_del;
 	handle->hub.command_foreach = cbfunc_command_foreach;
@@ -608,6 +681,7 @@ void plugin_register_callback_functions(struct plugin_handle* handle)
 	handle->hub.get_user_user_agent = cbfunc_get_user_user_agent;
 	handle->hub.get_user_address = cbfunc_get_user_address;
 	handle->hub.get_user_credentials = cbfunc_get_user_credentials;
+	handle->hub.get_user_by_nick = cbfunc_get_user_by_nick;
 	handle->hub.get_name = cbfunc_get_hub_name;
 	handle->hub.set_name = cbfunc_set_hub_name;
 	handle->hub.get_description = cbfunc_get_hub_description;

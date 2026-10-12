@@ -33,6 +33,7 @@ Key features:
  - mod_chat_history   - chat history, in memory or persisted to SQLite
  - mod_topic          - !topic and friends
  - mod_ucmd           - right-click context menus in ADC clients
+ - mod_users          - operator account management (!useradd and friends)
  - mod_welcome        - MOTD / rules messages
  - and others; see /etc/uhub/plugins.conf
 

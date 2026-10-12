@@ -64,6 +64,13 @@ typedef plugin_st (*auth_get_user_t)(struct plugin_handle*, const char* nickname
 typedef plugin_st (*auth_register_user_t)(struct plugin_handle*, struct auth_info* user);
 typedef plugin_st (*auth_update_user_t)(struct plugin_handle*, struct auth_info* user);
 typedef plugin_st (*auth_delete_user_t)(struct plugin_handle*, struct auth_info* user);
+/* Called once per stored account by auth_list_users. Only the nickname and the
+   credentials are meaningful to the receiver: the hub clears the password
+   before passing a record on to a plugin that asked for the list. */
+typedef void (*auth_list_users_callback)(const struct auth_info* user, void* ptr);
+/* Enumerate every stored account. Return st_allow once all of them have been
+   passed to the callback, st_default for a storage plugin that cannot list. */
+typedef plugin_st (*auth_list_users_t)(struct plugin_handle*, auth_list_users_callback callback, void* ptr);
 
 typedef plugin_st (*auth_ban_add_t)(struct plugin_handle*, const struct ban_info* ban);
 typedef plugin_st (*auth_ban_del_t)(struct plugin_handle*, const struct ban_info* ban);
@@ -115,6 +122,7 @@ struct plugin_funcs
 	auth_register_user_t    auth_register_user;  /* Register user */
 	auth_update_user_t      auth_update_user;    /* Update a registered user */
 	auth_delete_user_t      auth_delete_user;    /* Delete a registered user */
+	auth_list_users_t       auth_list_users;     /* Enumerate the registered users */
 
 	// Ban storage/retention. The hub is the only caller: it persists bans here
 	// (write-through from !ban / hub_apply_ban) and asks at login whether a user
@@ -155,6 +163,12 @@ typedef int (*hfunc_unban)(struct plugin_handle*, const char* target);
 typedef int (*hfunc_auth_get_user)(struct plugin_handle*, const char* nick, struct auth_info* out);
 typedef int (*hfunc_auth_register_user)(struct plugin_handle*, struct auth_info* user);
 typedef int (*hfunc_auth_update_user)(struct plugin_handle*, struct auth_info* user);
+typedef int (*hfunc_auth_delete_user)(struct plugin_handle*, struct auth_info* user);
+/* Pass every stored account to the callback, password cleared. Every storage
+   plugin that can enumerate is asked, so with more than one loaded the list is
+   their union. Returns the number of accounts, or -1 if no loaded storage
+   plugin can enumerate its accounts. */
+typedef int (*hfunc_auth_list_users)(struct plugin_handle*, auth_list_users_callback callback, void* ptr);
 typedef int (*hfunc_command_add)(struct plugin_handle*, struct plugin_command_handle*);
 typedef int (*hfunc_command_del)(struct plugin_handle*, struct plugin_command_handle*);
 
@@ -193,6 +207,12 @@ typedef const char* (*hfunc_get_user_user_agent)(struct plugin_handle*, struct p
 typedef const struct ip_addr_encap* (*hfunc_get_user_address)(struct plugin_handle*, struct plugin_user* user);
 typedef enum auth_credentials (*hfunc_get_user_credentials)(struct plugin_handle*, struct plugin_user* user);
 
+/* The locally connected user with this nick, or NULL. The match falls back to
+   ignoring case, as account lookups do, so the account "Boss" finds a user who
+   logged in to it as "boss". Federated users are not returned: there is no
+   local connection to act on. Valid for the duration of the callback only. */
+typedef struct plugin_user* (*hfunc_get_user_by_nick)(struct plugin_handle*, const char* nick);
+
 /* Returns the negotiated TLS protocol version string (e.g. "TLSv1.3") for a
  * user's connection, or NULL if the user is not connected over TLS (plaintext
  * adc://, or a remote user learned over federation with no local socket). */
@@ -219,6 +239,8 @@ struct plugin_hub_funcs
 	hfunc_auth_get_user auth_get_user;           /* Look up a stored user record via the storage plugin(s) */
 	hfunc_auth_register_user auth_register_user; /* Create a stored user record */
 	hfunc_auth_update_user auth_update_user;     /* Update a stored user record */
+	hfunc_auth_delete_user auth_delete_user;     /* Delete a stored user record */
+	hfunc_auth_list_users auth_list_users;       /* Enumerate the stored user records */
 	hfunc_command_add command_add;
 	hfunc_command_del command_del;
 	hfunc_command_foreach command_foreach;
@@ -234,6 +256,7 @@ struct plugin_hub_funcs
 	hfunc_get_user_user_agent get_user_user_agent;
 	hfunc_get_user_address get_user_address;
 	hfunc_get_user_credentials get_user_credentials;
+	hfunc_get_user_by_nick get_user_by_nick;
 	hfunc_get_hub_name get_name;
 	hfunc_set_hub_name set_name;
 	hfunc_get_hub_description get_description;

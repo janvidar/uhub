@@ -26,15 +26,16 @@
 #include "util/credentials.h"
 #include "network/ipcalc.h"
 
-#define PLUGIN_API_VERSION 8
+#define PLUGIN_API_VERSION 9
 
 /* Oldest plugin ABI the current hub still accepts. Version 8 made struct
    plugin_user opaque, which retired the guarantee that its layout mirrors the
-   head of the hub's internal user struct. A v5-v7 plugin dereferences that
-   layout directly, so once the hub reorders its internals such a plugin would
-   read garbage rather than fail -- hence the floor moves with the version.
-   Plugins must switch to the hub.get_user_* accessors and rebuild. */
-#define PLUGIN_API_VERSION_MIN 8
+   head of the hub's internal user struct. Version 9 added auth_list_users to
+   struct plugin_funcs; struct plugin_handle carries the hub table after that
+   one, so growing it moves every hub.* function an older plugin would call.
+   Either way an older plugin would read garbage rather than fail -- hence the
+   floor moves with the version, and plugins must be rebuilt. */
+#define PLUGIN_API_VERSION_MIN 9
 
 struct plugin_handle;
 

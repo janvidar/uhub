@@ -68,7 +68,9 @@ writes only the ones that are missing. uhub also runs with no configuration file
 at all: every option has a built-in default, and when no plugin configuration
 is given the hub loads a default set of plugins compiled into it --
 mod_auth_sqlite (registered users and persistent bans), mod_logging, mod_topic,
-mod_chat_history and mod_ucmd. That is enough for a working, administrable hub.
+mod_chat_history, mod_ucmd and mod_users (!useradd and friends, so operators
+can manage accounts from inside the hub). That is enough for a working,
+administrable hub.
 
 Setting file_plugins in uhub.conf REPLACES that default set rather than adding
 to it, so a plugins.conf must list every plugin you want. See doc/plugins.conf,

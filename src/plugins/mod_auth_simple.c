@@ -232,6 +232,17 @@ static plugin_st delete_user(struct plugin_handle* plugin, struct auth_info* use
 	return st_default;
 }
 
+static plugin_st list_users(struct plugin_handle* plugin, auth_list_users_callback callback, void* ptr)
+{
+	struct acl_data* acl = (struct acl_data*) plugin->ptr;
+	struct auth_info* info;
+	LIST_FOREACH(struct auth_info*, info, acl->users,
+	{
+		callback(info, ptr);
+	});
+	return st_allow;
+}
+
 PLUGIN_API int plugin_register(struct plugin_handle* plugin, const char* config)
 {
 	PLUGIN_INITIALIZE(plugin, "File authentication plugin", "0.1", "Authenticate users based on a read-only text file.");
@@ -241,6 +252,7 @@ PLUGIN_API int plugin_register(struct plugin_handle* plugin, const char* config)
 	plugin->funcs.auth_register_user = register_user;
 	plugin->funcs.auth_update_user = update_user;
 	plugin->funcs.auth_delete_user = delete_user;
+	plugin->funcs.auth_list_users = list_users;
 
 	plugin->ptr = load_acl(config, plugin);
 	if (plugin->ptr)

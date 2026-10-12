@@ -145,6 +145,41 @@ EXO_TEST(mas_update_case_insensitive, {
 	return got.credentials == auth_cred_operator && !strcmp(got.password, "newpass");
 });
 
+struct mas_list
+{
+	char nicks[4][MAX_NICK_LEN+1];
+	int count;
+	int leaked_password;
+};
+
+static void mas_list_collect(const struct auth_info* user, void* ptr)
+{
+	struct mas_list* list = (struct mas_list*) ptr;
+	if (*user->password)
+		list->leaked_password = 1;
+	if (list->count < 4)
+		snprintf(list->nicks[list->count], sizeof(list->nicks[0]), "%s", user->nickname);
+	list->count++;
+}
+
+/* auth_list_users passes every account, in case-insensitive nick order, and
+   never reads the password column at all. */
+EXO_TEST(mas_list_users, {
+	struct auth_info a = mas_info("alice", "pw", auth_cred_user);
+	struct mas_list list;
+	int ok;
+	memset(&list, 0, sizeof(list));
+	if (!mas_plugin.funcs.auth_list_users
+		|| mas_plugin.funcs.auth_register_user(&mas_plugin, &a) != st_allow)
+		return 0;
+	ok = mas_plugin.funcs.auth_list_users(&mas_plugin, mas_list_collect, &list) == st_allow
+		&& list.count == 2
+		&& !strcmp(list.nicks[0], "alice")
+		&& !strcmp(list.nicks[1], "Boss")
+		&& !list.leaked_password;
+	return mas_plugin.funcs.auth_delete_user(&mas_plugin, &a) == st_allow && ok;
+});
+
 /* auth_delete_user removes the registered account (returns st_allow), matching
    the nick case-insensitively -- deleting "boss" removes "Boss" -- so a
    subsequent lookup misses. */

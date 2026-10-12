@@ -49,6 +49,26 @@ BUILD=/path/to/build test/e2e/run_ban_e2e.sh [port]
 Exit status is 0 only if every scenario passes. Requires `uhub`, `adc_cmd`,
 `uhub-passwd`, and `mod_auth_sqlite.so` in the build dir.
 
+## run_users_e2e.sh
+
+Spins up a throwaway `uhub` with `mod_auth_sqlite` and `mod_users`, then checks
+the operator account commands against real logins:
+
+1. `!useradd` creates an account that can log in with its password;
+2. an operator cannot create another operator;
+3. `!userlist` lists the accounts and no password reaches the client;
+4. `!userdel` deletes an account and disconnects the user still logged in to it,
+   even when they logged in as `GRACE` to the account `grace`;
+5. `!usermod` demotes an operator and disconnects the session that still
+   carries operator rights;
+6. `!userpass` makes the new password work and the old one fail.
+
+```sh
+BUILD=/path/to/build test/e2e/run_users_e2e.sh [port]
+```
+
+Set `KEEP=1` to keep the work directory (logs, `users.db`) for a failed run.
+
 ## run_link_e2e.sh
 
 Brings up **two linked hubs** (node 0 and node 1, a shared `link_secret`, node 1

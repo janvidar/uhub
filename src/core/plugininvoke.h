@@ -72,6 +72,10 @@ plugin_st plugin_auth_get_user(struct hub_info* hub, const char* nickname, struc
 plugin_st plugin_auth_register_user(struct hub_info* hub, struct auth_info* user);
 plugin_st plugin_auth_update_user(struct hub_info* hub, struct auth_info* user);
 plugin_st plugin_auth_delete_user(struct hub_info* hub, struct auth_info* user);
+/* Asks every plugin that implements auth_list_users, rather than stopping at the
+   first answer: each storage plugin holds accounts the hub will accept. Returns
+   how many of them enumerated their accounts. */
+int plugin_auth_list_users(struct hub_info* hub, auth_list_users_callback callback, void* ptr);
 
 /* Ban storage/retention. The hub persists bans through a storage plugin and asks
    at login whether a user is banned. plugin_is_banned returns st_deny if any
