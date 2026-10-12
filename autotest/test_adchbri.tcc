@@ -9,6 +9,7 @@
 
 #include <poll.h>
 #include "tools/adcclient.h"
+#include "testutil_net.h"
 
 /*
  * The client half of HBRI: working out this host's own address in each protocol
@@ -40,11 +41,6 @@ static int ah_parse_fails(const char* line)
 	adc_msg_free(msg);
 	return ret;
 }
-
-EXO_TEST(adchbri_setup, {
-	net_initialize();
-	return 1;
-});
 
 /* ---------------------------------------------------------------------------
  * net_local_address_for(): which source address would reach a given peer
@@ -259,47 +255,23 @@ static int ah_make_listener(uint16_t* out_port)
 	return sd;
 }
 
-EXO_TEST(adchbri_client_create, {
+/*
+ * Every client test starts with ah_start() and ends with ah_stop(): a client
+ * that has opted in to HBRI, and -- when `connect` is set -- is connected over
+ * loopback to a listener standing in for the hub.
+ */
+static int ah_start(int connect)
+{
+	char url[64];
+	int i;
+
 	ah_client = ADC_client_create("hbritest", "", NULL);
 	if (!ah_client)
 		return 0;
 	ADC_client_set_callback(ah_client, ah_callback);
-	return ADC_client_get_hbri(ah_client) == 0;
-});
-
-/* Opting in is explicit: a client that does not listen has nothing to prove. */
-EXO_TEST(adchbri_client_opt_in, {
 	ADC_client_set_hbri(ah_client, 1);
-	return ADC_client_get_hbri(ah_client) == 1;
-});
-
-/* Nothing is known before there is a connection to read an address off. */
-EXO_TEST(adchbri_no_address_before_connect, {
-	return strcmp(ADC_client_get_local_address(ah_client, AF_INET), "") == 0
-		&& strcmp(ADC_client_get_local_address(ah_client, AF_INET6), "") == 0
-		&& strcmp(ADC_client_get_local_address(ah_client, AF_UNSPEC), "") == 0
-		&& strcmp(ADC_client_get_local_address(NULL, AF_INET), "") == 0;
-});
-
-/* ...and an address that is not known is left out of the INF rather than
-   invented: an I4 the hub cannot reach is worse than no I4 at all. */
-EXO_TEST(adchbri_inf_omits_unknown_address, {
-	struct adc_message* info = ADC_client_build_info(ah_client);
-	int ok;
-
-	if (!info)
-		return 0;
-
-	ok = !adc_msg_has_named_argument(info, "I4")
-		&& !adc_msg_has_named_argument(info, "I6");
-
-	adc_msg_free(info);
-	return ok;
-});
-
-EXO_TEST(adchbri_connect_loopback, {
-	char url[64];
-	int i;
+	if (!connect)
+		return 1;
 
 	ah_listener = ah_make_listener(&ah_port);
 	if (ah_listener == -1)
@@ -315,6 +287,72 @@ EXO_TEST(adchbri_connect_loopback, {
 		net_backend_process();
 
 	return ah_connected == 1;
+}
+
+static void ah_stop(void)
+{
+	if (ah_client)
+		ADC_client_destroy(ah_client);
+	ah_client = NULL;
+	if (ah_listener != -1)
+		close(ah_listener);
+	ah_listener = -1;
+}
+
+EXO_TEST(adchbri_client_create, {
+	int ok;
+	ah_client = ADC_client_create("hbritest", "", NULL);
+	if (!ah_client)
+		return 0;
+	ADC_client_set_callback(ah_client, ah_callback);
+	ok = ADC_client_get_hbri(ah_client) == 0;
+	ah_stop();
+	return ok;
+});
+
+/* Opting in is explicit: a client that does not listen has nothing to prove. */
+EXO_TEST(adchbri_client_opt_in, {
+	int ok = ah_start(0) && ADC_client_get_hbri(ah_client) == 1;
+	ah_stop();
+	return ok;
+});
+
+/* Nothing is known before there is a connection to read an address off. */
+EXO_TEST(adchbri_no_address_before_connect, {
+	int ok = ah_start(0)
+		&& strcmp(ADC_client_get_local_address(ah_client, AF_INET), "") == 0
+		&& strcmp(ADC_client_get_local_address(ah_client, AF_INET6), "") == 0
+		&& strcmp(ADC_client_get_local_address(ah_client, AF_UNSPEC), "") == 0
+		&& strcmp(ADC_client_get_local_address(NULL, AF_INET), "") == 0;
+	ah_stop();
+	return ok;
+});
+
+/* ...and an address that is not known is left out of the INF rather than
+   invented: an I4 the hub cannot reach is worse than no I4 at all. */
+EXO_TEST(adchbri_inf_omits_unknown_address, {
+	struct adc_message* info;
+	int ok;
+
+	if (!ah_start(0))
+	{
+		ah_stop();
+		return 0;
+	}
+	info = ADC_client_build_info(ah_client);
+	ok = info
+		&& !adc_msg_has_named_argument(info, "I4")
+		&& !adc_msg_has_named_argument(info, "I6");
+
+	adc_msg_free(info);
+	ah_stop();
+	return ok;
+});
+
+EXO_TEST(adchbri_connect_loopback, {
+	int ok = ah_start(1);
+	ah_stop();
+	return ok;
 });
 
 /*
@@ -322,23 +360,36 @@ EXO_TEST(adchbri_connect_loopback, {
  * it is known the moment the connection is up.
  */
 EXO_TEST(adchbri_primary_address_discovered, {
-	return strcmp(ADC_client_get_local_address(ah_client, AF_INET), "127.0.0.1") == 0;
+	int ok = ah_start(1)
+		&& strcmp(ADC_client_get_local_address(ah_client, AF_INET), "127.0.0.1") == 0;
+	ah_stop();
+	return ok;
 });
 
 /* And it is what the INF then states. */
 EXO_TEST(adchbri_inf_states_known_address, {
-	struct adc_message* info = ADC_client_build_info(ah_client);
+	struct adc_message* info;
 	char* addr;
 	int ok;
 
-	if (!info)
+	if (!ah_start(1))
+	{
+		ah_stop();
 		return 0;
+	}
+	info = ADC_client_build_info(ah_client);
+	if (!info)
+	{
+		ah_stop();
+		return 0;
+	}
 
 	addr = adc_msg_get_named_argument(info, "I4");
 	ok = addr && strcmp(addr, "127.0.0.1") == 0;
 
 	hub_free(addr);
 	adc_msg_free(info);
+	ah_stop();
 	return ok;
 });
 
@@ -348,11 +399,15 @@ EXO_TEST(adchbri_inf_states_known_address, {
  * while first, since that answer arrives through a lookup rather than at once.
  */
 EXO_TEST(adchbri_no_second_family_for_literal, {
+	int ok = ah_start(1);
+
 	/* Directly, not by pumping: with nothing due a poll would block. */
 	net_dns_wait_idle();
 	net_dns_process();
 
-	return strcmp(ADC_client_get_local_address(ah_client, AF_INET6), "") == 0;
+	ok = ok && strcmp(ADC_client_get_local_address(ah_client, AF_INET6), "") == 0;
+	ah_stop();
+	return ok;
 });
 
 /*
@@ -363,17 +418,17 @@ EXO_TEST(adchbri_no_second_family_for_literal, {
  * re-reads everything off the new socket.
  */
 EXO_TEST(adchbri_address_survives_disconnect, {
+	int ok = ah_start(1);
 	ADC_client_disconnect(ah_client);
-	return strcmp(ADC_client_get_local_address(ah_client, AF_INET), "127.0.0.1") == 0;
+	ok = ok && strcmp(ADC_client_get_local_address(ah_client, AF_INET), "127.0.0.1") == 0;
+	ah_stop();
+	return ok;
 });
 
 EXO_TEST(adchbri_client_destroy, {
-	ADC_client_destroy(ah_client);
-	ah_client = NULL;
-	if (ah_listener != -1)
-		close(ah_listener);
-	ah_listener = -1;
-	return 1;
+	int ok = ah_start(1);
+	ah_stop();
+	return ok;
 });
 
 /* ---------------------------------------------------------------------------
@@ -554,8 +609,15 @@ static int vh_send_itcp(const char* body)
 	return 1;
 }
 
-EXO_TEST(adchbri_val_setup, {
+/*
+ * The fake hub's listeners, made once for the file. Each validation test then
+ * makes its own session with vh_start() and ends it with vh_stop().
+ */
+EXO_SETUP({
 	int dead;
+
+	if (!test_net_acquire())
+		return 0;
 
 	memset(&vh_tick, 0, sizeof(vh_tick));
 	timeout_evt_initialize(&vh_tick, vh_tick_cb, NULL);
@@ -573,12 +635,54 @@ EXO_TEST(adchbri_val_setup, {
 	return 1;
 });
 
-EXO_TEST(adchbri_val_connect, {
+EXO_TEARDOWN({
+	if (vh_client)
+		ADC_client_destroy(vh_client);
+	vh_client = NULL;
+
+	if (timeout_evt_is_scheduled(&vh_tick))
+		timeout_queue_remove(net_backend_get_timeout_queue(), &vh_tick);
+
+	if (vh_val != -1) close(vh_val);
+	if (vh_hub != -1) close(vh_hub);
+	if (vh_listen4 != -1) close(vh_listen4);
+	if (vh_listen6 != -1) close(vh_listen6);
+	vh_val = vh_hub = vh_listen4 = vh_listen6 = -1;
+	test_net_release();
+	return 1;
+});
+
+/* Accept and drop whatever is still queued on a listener, so a connection one
+   test left behind cannot look like something the next test caused. */
+static void vh_drain(int listener)
+{
+	while (vh_ready(listener, 0))
+	{
+		int sd = accept(listener, NULL, NULL);
+		if (sd == -1)
+			break;
+		close(sd);
+	}
+}
+
+static void vh_stop(void)
+{
+	if (vh_client)
+		ADC_client_destroy(vh_client);
+	vh_client = NULL;
+	if (vh_val != -1) close(vh_val);
+	if (vh_hub != -1) close(vh_hub);
+	vh_val = vh_hub = -1;
+	vh_drain(vh_listen4);
+	vh_drain(vh_listen6);
+}
+
+/* A client with HBRI on, connected to the fake hub over IPv4, and the hub's
+   end of that session accepted as vh_hub. */
+static int vh_start(void)
+{
 	char url[64];
 	time_t deadline;
-
-	if (vh_skip)
-		EXO_SKIP("no IPv6 loopback listener on this host");
 
 	vh_client = ADC_client_create("hbrival", "", NULL);
 	if (!vh_client)
@@ -604,6 +708,45 @@ EXO_TEST(adchbri_val_connect, {
 	/* The session is over IPv4, so IPv6 is the protocol left to prove. */
 	return vh_connected == 1 && vh_hub != -1
 		&& strcmp(ADC_client_get_local_address(vh_client, AF_INET), "127.0.0.1") == 0;
+}
+
+/* vh_start(), then challenge the client to prove IPv6 and accept the
+   validation connection it opens as vh_val. */
+static int vh_open_validation(void)
+{
+	char body[128];
+
+	if (!vh_start())
+		return 0;
+	snprintf(body, sizeof(body), "I6::1 P6%u TO" VH_TOKEN, (unsigned) vh_port6);
+	if (!vh_send_itcp(body))
+		return 0;
+	if (!vh_ready(vh_listen6, 2000))
+		return 0;
+	vh_val = accept(vh_listen6, NULL, NULL);
+	return vh_val != -1;
+}
+
+/* Read what the client sent on the validation connection. */
+static int vh_read_validation(char* buf, size_t size)
+{
+	ssize_t n;
+	if (!vh_wait_readable(vh_val, 5))
+		return 0;
+	n = recv(vh_val, buf, size - 1, 0);
+	if (n <= 0)
+		return 0;
+	buf[n] = '\0';
+	return 1;
+}
+
+EXO_TEST(adchbri_val_connect, {
+	int ok;
+	if (vh_skip)
+		EXO_SKIP("no IPv6 loopback listener on this host");
+	ok = vh_start();
+	vh_stop();
+	return ok;
 });
 
 /*
@@ -613,48 +756,53 @@ EXO_TEST(adchbri_val_connect, {
  */
 EXO_TEST(adchbri_val_ignores_same_family, {
 	char body[128];
+	int ok;
 
 	if (vh_skip)
 		EXO_SKIP("no IPv6 loopback listener on this host");
 
-	snprintf(body, sizeof(body), "I4127.0.0.1 P4%u TO" VH_TOKEN, (unsigned) vh_port4);
-	if (!vh_send_itcp(body))
+	if (!vh_start())
+	{
+		vh_stop();
 		return 0;
-
-	return !vh_ready(vh_listen4, 200) && !vh_ready(vh_listen6, 0);
+	}
+	snprintf(body, sizeof(body), "I4127.0.0.1 P4%u TO" VH_TOKEN, (unsigned) vh_port4);
+	ok = vh_send_itcp(body)
+		&& !vh_ready(vh_listen4, 200) && !vh_ready(vh_listen6, 0);
+	vh_stop();
+	return ok;
 });
 
 /* A request that cannot be read is dropped, not guessed at. */
 EXO_TEST(adchbri_val_ignores_malformed, {
 	char body[128];
+	int ok;
 
 	if (vh_skip)
 		EXO_SKIP("no IPv6 loopback listener on this host");
 
+	if (!vh_start())
+	{
+		vh_stop();
+		return 0;
+	}
 	/* A valid address and token, but no port to dial. */
 	snprintf(body, sizeof(body), "I6::1 TO" VH_TOKEN);
-	if (!vh_send_itcp(body))
-		return 0;
-
-	return !vh_ready(vh_listen6, 200);
+	ok = vh_send_itcp(body) && !vh_ready(vh_listen6, 200);
+	vh_stop();
+	return ok;
 });
 
 /* The real thing: the client dials the address it was given, over IPv6. */
 EXO_TEST(adchbri_val_opens_connection, {
-	char body[128];
+	int ok;
 
 	if (vh_skip)
 		EXO_SKIP("no IPv6 loopback listener on this host");
 
-	snprintf(body, sizeof(body), "I6::1 P6%u TO" VH_TOKEN, (unsigned) vh_port6);
-	if (!vh_send_itcp(body))
-		return 0;
-
-	if (!vh_ready(vh_listen6, 2000))
-		return 0;
-
-	vh_val = accept(vh_listen6, NULL, NULL);
-	return vh_val != -1;
+	ok = vh_open_validation();
+	vh_stop();
+	return ok;
 });
 
 /*
@@ -663,20 +811,16 @@ EXO_TEST(adchbri_val_opens_connection, {
  */
 EXO_TEST(adchbri_val_sends_token, {
 	char buf[256];
-	ssize_t n;
+	int ok;
 
 	if (vh_skip)
 		EXO_SKIP("no IPv6 loopback listener on this host");
 
-	if (!vh_wait_readable(vh_val, 5))
-		return 0;
-
-	n = recv(vh_val, buf, sizeof(buf) - 1, 0);
-	if (n <= 0)
-		return 0;
-	buf[n] = '\0';
-
-	return strcmp(buf, "HTCP TO" VH_TOKEN "\n") == 0;
+	ok = vh_open_validation()
+		&& vh_read_validation(buf, sizeof(buf))
+		&& strcmp(buf, "HTCP TO" VH_TOKEN "\n") == 0;
+	vh_stop();
+	return ok;
 });
 
 /* One command, one answer: the client lets the connection go afterwards. */
@@ -684,17 +828,21 @@ EXO_TEST(adchbri_val_closes_after_reply, {
 	const char* reply = "ISTA 000 Validation\\ssucceeded\n";
 	char buf[64];
 
+	char token[256];
+	int ok;
+
 	if (vh_skip)
 		EXO_SKIP("no IPv6 loopback listener on this host");
 
-	if (send(vh_val, reply, strlen(reply), 0) != (ssize_t) strlen(reply))
-		return 0;
-
-	/* The close reaches this end as readable-then-EOF. */
-	if (!vh_wait_readable(vh_val, 5))
-		return 0;
-
-	return recv(vh_val, buf, sizeof(buf), 0) == 0;
+	/* Take the HTCP off first, so that what is read below is the close. */
+	ok = vh_open_validation()
+		&& vh_read_validation(token, sizeof(token))
+		&& send(vh_val, reply, strlen(reply), 0) == (ssize_t) strlen(reply)
+		/* The close reaches this end as readable-then-EOF. */
+		&& vh_wait_readable(vh_val, 5)
+		&& recv(vh_val, buf, sizeof(buf), 0) == 0;
+	vh_stop();
+	return ok;
 });
 
 /*
@@ -705,15 +853,23 @@ EXO_TEST(adchbri_val_closes_after_reply, {
 EXO_TEST(adchbri_val_survives_refusal, {
 	char body[128];
 
+	int ok;
+
 	if (vh_skip)
 		EXO_SKIP("no IPv6 loopback listener on this host");
 
-	close(vh_val);
-	vh_val = -1;
+	if (!vh_start())
+	{
+		vh_stop();
+		return 0;
+	}
 
 	snprintf(body, sizeof(body), "I6::1 P6%u TO" VH_TOKEN, (unsigned) vh_dead6);
 	if (!vh_send_itcp(body))
+	{
+		vh_stop();
 		return 0;
+	}
 
 	/* Let the refusal be noticed and cleaned up before the next challenge, so
 	   that what is under test is recovery from a failure and not the tearing
@@ -721,14 +877,14 @@ EXO_TEST(adchbri_val_survives_refusal, {
 	vh_turn_a_few();
 
 	snprintf(body, sizeof(body), "I6::1 P6%u TO" VH_TOKEN, (unsigned) vh_port6);
-	if (!vh_send_itcp(body))
-		return 0;
-
-	if (!vh_ready(vh_listen6, 2000))
-		return 0;
-
-	vh_val = accept(vh_listen6, NULL, NULL);
-	return vh_val != -1 && vh_wait_readable(vh_val, 5);
+	ok = vh_send_itcp(body) && vh_ready(vh_listen6, 2000);
+	if (ok)
+	{
+		vh_val = accept(vh_listen6, NULL, NULL);
+		ok = vh_val != -1 && vh_wait_readable(vh_val, 5);
+	}
+	vh_stop();
+	return ok;
 });
 
 /* ---------------------------------------------------------------------------
@@ -763,12 +919,20 @@ static const char* vh_join(const char* inf)
 /* The ordinary case, and the one that always worked. */
 EXO_TEST(adchbri_roster_ipv4, {
 	const char* addr;
+	int ok;
 
 	if (vh_skip)
 		EXO_SKIP("no IPv6 loopback listener on this host");
 
+	if (!vh_start())
+	{
+		vh_stop();
+		return 0;
+	}
 	addr = vh_join("BINF AAAE IDMUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA NIv4peer I4192.0.2.5");
-	return addr && strcmp(addr, "192.0.2.5") == 0;
+	ok = addr && strcmp(addr, "192.0.2.5") == 0;
+	vh_stop();
+	return ok;
 });
 
 /*
@@ -778,35 +942,59 @@ EXO_TEST(adchbri_roster_ipv4, {
  */
 EXO_TEST(adchbri_roster_ipv6_only, {
 	const char* addr;
+	int ok;
 
 	if (vh_skip)
 		EXO_SKIP("no IPv6 loopback listener on this host");
 
+	if (!vh_start())
+	{
+		vh_stop();
+		return 0;
+	}
 	addr = vh_join("BINF AAAF IDNUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA NIv6peer I62001:db8::5");
-	return addr && strcmp(addr, "2001:db8::5") == 0;
+	ok = addr && strcmp(addr, "2001:db8::5") == 0;
+	vh_stop();
+	return ok;
 });
 
 /* Both published: IPv4 wins, since a peer reachable over both is reachable
    over IPv4 and not every client is. */
 EXO_TEST(adchbri_roster_prefers_ipv4, {
 	const char* addr;
+	int ok;
 
 	if (vh_skip)
 		EXO_SKIP("no IPv6 loopback listener on this host");
 
+	if (!vh_start())
+	{
+		vh_stop();
+		return 0;
+	}
 	addr = vh_join("BINF AAAG IDPUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA NIboth I4192.0.2.6 I62001:db8::6");
-	return addr && strcmp(addr, "192.0.2.6") == 0;
+	ok = addr && strcmp(addr, "192.0.2.6") == 0;
+	vh_stop();
+	return ok;
 });
 
 /* Neither: nothing to dial, and the roster says so rather than inventing one. */
 EXO_TEST(adchbri_roster_no_address, {
 	const char* addr;
+	int ok;
 
 	if (vh_skip)
 		EXO_SKIP("no IPv6 loopback listener on this host");
 
+	if (!vh_start())
+	{
+		vh_stop();
+		return 0;
+	}
 	addr = vh_join("BINF AAAH IDQUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA NInoaddr");
-	return addr && *addr == '\0';
+	ok = addr && *addr == '\0';
+	vh_stop();
+	return ok;
 });
 
 /*
@@ -822,24 +1010,4 @@ EXO_TEST(adchbri_ip_convert_failure_is_minus_one, {
 		&& ip_convert_to_binary("192.0.2.999", &addr) == -1
 		&& ip_convert_to_binary("192.0.2.5", &addr) == AF_INET
 		&& ip_convert_to_binary("2001:db8::5", &addr) == AF_INET6;
-});
-
-EXO_TEST(adchbri_val_teardown, {
-	if (vh_client)
-		ADC_client_destroy(vh_client);
-	vh_client = NULL;
-
-	if (timeout_evt_is_scheduled(&vh_tick))
-		timeout_queue_remove(net_backend_get_timeout_queue(), &vh_tick);
-
-	if (vh_val != -1) close(vh_val);
-	if (vh_hub != -1) close(vh_hub);
-	if (vh_listen4 != -1) close(vh_listen4);
-	if (vh_listen6 != -1) close(vh_listen6);
-	vh_val = vh_hub = vh_listen4 = vh_listen6 = -1;
-	return 1;
-});
-
-EXO_TEST(adchbri_teardown, {
-	return net_destroy() == 0;
 });

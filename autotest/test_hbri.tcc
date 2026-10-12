@@ -35,7 +35,9 @@ static void hbri_make_user(struct hub_user* user, sid_t sid, uint64_t conn_id, t
 	user->tm_connected = tm;
 }
 
-EXO_TEST(hbri_setup, {
+/* The hub secret and user the token tests mint for. A test that changes the
+   secret puts it back before it returns. */
+EXO_SETUP({
 	memset(&hbri_hub, 0, sizeof(hbri_hub));
 	hbri_set_secret(&hbri_hub, 0xA5);
 	hbri_make_user(&hbri_user, 5, 1, 1000);

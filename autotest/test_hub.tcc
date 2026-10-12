@@ -2,74 +2,72 @@
 #include "core/auth.h"
 #include "core/config.h"
 #include "core/hub.h"
-
-static struct hub_config g_config;
-static struct acl_handle g_acl;
-static struct hub_info* g_hub;
+#include "testutil_net.h"
 
 /*
-static void create_test_user()
-{
-	if (g_user)
-		return;
+ * Starting and stopping the hub service. Each test brings up what it needs and
+ * takes it down again, so each one runs alone or in any order.
+ */
 
-	g_user = (struct hub_user*) malloc(sizeof(struct hub_user));
-	memset(g_user, 0, sizeof(struct hub_user));
-	memcpy(g_user->id.nick, "exotic-tester", 13);
-	g_user->sid = 1;
-}
-*/
-
-EXO_TEST(hub_net_startup, {
-	return (net_initialize() != -1);
+EXO_SETUP({
+	return test_net_acquire();
 });
 
+EXO_TEARDOWN({
+	test_net_release();
+	return 1;
+});
+
+static void hub_test_config(struct hub_config* config)
+{
+	config_defaults(config);
+	config->server_port = 65111;
+}
+
 EXO_TEST(hub_config_initialize, {
-	config_defaults(&g_config);
-	g_config.server_port = 65111;
+	struct hub_config config;
+	hub_test_config(&config);
+	free_config(&config);
 	return 1;
 });
 
 EXO_TEST(hub_acl_initialize, {
-	return (acl_initialize(&g_config, &g_acl) != -1);
+	struct hub_config config;
+	struct acl_handle acl;
+	int ok;
+	hub_test_config(&config);
+	ok = acl_initialize(&config, &acl) != -1;
+	acl_shutdown(&acl);
+	free_config(&config);
+	return ok;
 });
 
-EXO_TEST(hub_service_initialize, {
-	g_hub = hub_start_service(&g_config);
-	return g_hub ? 1 : 0;
-});
+/* The whole life of the service: start it, hand it its variables, take them
+   back, stop it. */
+EXO_TEST(hub_service_lifecycle, {
+	struct hub_config config;
+	struct acl_handle acl;
+	struct hub_info* hub;
 
-EXO_TEST(hub_variables_startup, {
-	hub_set_variables(g_hub, &g_acl);
-	return 1;
-});
-
-/*** HUB IS OPERATIONAL HERE! ***/
-
-EXO_TEST(hub_variables_shutdown, {
-	hub_free_variables(g_hub);
-	return 1;
-});
-
-EXO_TEST(hub_acl_shutdown, {
-	acl_shutdown(&g_acl);
-	return 1;
-});
-
-EXO_TEST(hub_config_shutdown, {
-	free_config(&g_config);
-	return 1;
-});
-
-EXO_TEST(hub_service_shutdown, {
-	if (g_hub)
+	hub_test_config(&config);
+	if (acl_initialize(&config, &acl) == -1)
 	{
-		hub_shutdown_service(g_hub);
-		return 1;
+		free_config(&config);
+		return 0;
 	}
-	return 0;
-});
 
-EXO_TEST(hub_net_shutdown, {
-	return (net_destroy() != -1);
+	hub = hub_start_service(&config);
+	if (hub)
+	{
+		hub_set_variables(hub, &acl);
+		/*** HUB IS OPERATIONAL HERE! ***/
+		hub_free_variables(hub);
+	}
+
+	acl_shutdown(&acl);
+	free_config(&config);
+	if (!hub)
+		return 0;
+	hub_shutdown_service(hub);
+	return 1;
 });

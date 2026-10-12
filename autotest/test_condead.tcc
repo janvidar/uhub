@@ -2,6 +2,7 @@
 #include "util/memory.h"
 #include "network/network.h"
 #include "network/connection.h"
+#include "testutil_net.h"
 
 static struct net_connection* cd_con = 0;
 static int cd_listen = -1;
@@ -73,8 +74,16 @@ static void cd_disconnect(void)
 	cd_peer = cd_local = cd_listen = -1;
 }
 
-EXO_TEST(condead_setup, {
-	net_initialize();
+/* A fresh loopback connection, the previous one (if any) closed first. */
+static int cd_fresh(void)
+{
+	cd_disconnect();
+	return cd_connect();
+}
+
+EXO_SETUP({
+	if (!test_net_acquire())
+		return 0;
 	cd_con = (struct net_connection*) hub_malloc_zero(sizeof(struct net_connection));
 	if (!cd_con)
 		return 0;
@@ -82,13 +91,23 @@ EXO_TEST(condead_setup, {
 	return 1;
 });
 
+EXO_TEARDOWN({
+	cd_disconnect();
+	hub_free(cd_con);
+	cd_con = 0;
+	test_net_release();
+	return 1;
+});
+
 EXO_TEST(condead_closed_socket_is_dead, {
+	cd_disconnect();
 	cd_con->sd = -1;
+	cd_con->flags = 0;
 	return net_con_is_dead(cd_con) == 1;
 });
 
 EXO_TEST(condead_cleanup_flag_is_dead, {
-	if (!cd_connect())
+	if (!cd_fresh())
 		return 0;
 	cd_con->flags = NET_CLEANUP;
 	if (net_con_is_dead(cd_con) != 1)
@@ -98,6 +117,8 @@ EXO_TEST(condead_cleanup_flag_is_dead, {
 });
 
 EXO_TEST(condead_established_is_alive, {
+	if (!cd_fresh())
+		return 0;
 	if (net_con_is_dead(cd_con) != 0)
 		return 0;
 	return net_con_is_dead(cd_con) == 0;
@@ -105,6 +126,8 @@ EXO_TEST(condead_established_is_alive, {
 
 EXO_TEST(condead_pending_data_is_alive, {
 	char buf[4];
+	if (!cd_fresh())
+		return 0;
 	if (send(cd_peer, "x", 1, 0) != 1)
 		return 0;
 	if (!cd_wait_readable(cd_local))
@@ -117,6 +140,8 @@ EXO_TEST(condead_pending_data_is_alive, {
 });
 
 EXO_TEST(condead_peer_fin_is_dead, {
+	if (!cd_fresh())
+		return 0;
 	net_close(cd_peer);
 	cd_peer = -1;
 	if (!cd_wait_readable(cd_local))
@@ -126,8 +151,7 @@ EXO_TEST(condead_peer_fin_is_dead, {
 
 EXO_TEST(condead_peer_reset_is_dead, {
 	struct linger opt;
-	cd_disconnect();
-	if (!cd_connect())
+	if (!cd_fresh())
 		return 0;
 
 	opt.l_onoff = 1;
@@ -140,11 +164,4 @@ EXO_TEST(condead_peer_reset_is_dead, {
 	if (!cd_wait_readable(cd_local))
 		return 0;
 	return net_con_is_dead(cd_con) == 1;
-});
-
-EXO_TEST(condead_teardown, {
-	cd_disconnect();
-	hub_free(cd_con);
-	cd_con = 0;
-	return 1;
 });

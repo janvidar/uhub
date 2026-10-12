@@ -19,7 +19,7 @@ static void ka_set_quiet(int age)
 	ka_con->last_recv = KA_NOW - age;
 }
 
-EXO_TEST(keepalive_setup, {
+EXO_SETUP({
 	ka_user = (struct hub_user*) hub_malloc_zero(sizeof(struct hub_user));
 	ka_con = (struct net_connection*) hub_malloc_zero(sizeof(struct net_connection));
 	if (!ka_user || !ka_con)
@@ -33,45 +33,77 @@ EXO_TEST(keepalive_setup, {
 	return 1;
 });
 
+EXO_TEARDOWN({
+	if (ka_user)
+		ioq_send_destroy(ka_user->send_queue);
+	hub_free(ka_con);
+	hub_free(ka_user);
+	ka_user = 0;
+	ka_con = 0;
+	return 1;
+});
+
+/* Every test starts here: a logged-in local user, idle for ten minutes, heard
+   from just now, with nothing queued. */
+static void ka_reset(void)
+{
+	ka_user->state = state_normal;
+	ka_user->connection = ka_con;
+	ka_user->origin_link = 0;
+	ka_user->send_queue->size = 0;
+	ka_user->send_queue->offset = 0;
+	ka_set_idle(600);
+	ka_set_quiet(0);
+}
+
 EXO_TEST(keepalive_due_when_idle, {
+	ka_reset();
 	return user_keepalive_due(ka_user, KA_NOW, 120) == 1;
 });
 
 EXO_TEST(keepalive_due_at_exact_interval, {
+	ka_reset();
 	ka_set_idle(120);
 	return user_keepalive_due(ka_user, KA_NOW, 120) == 1;
 });
 
 EXO_TEST(keepalive_not_due_below_interval, {
+	ka_reset();
 	ka_set_idle(119);
 	return user_keepalive_due(ka_user, KA_NOW, 120) == 0;
 });
 
 EXO_TEST(keepalive_not_due_when_just_written, {
+	ka_reset();
 	ka_set_idle(0);
 	return user_keepalive_due(ka_user, KA_NOW, 120) == 0;
 });
 
 EXO_TEST(keepalive_disabled_by_zero_interval, {
+	ka_reset();
 	ka_set_idle(600);
 	return user_keepalive_due(ka_user, KA_NOW, 0) == 0;
 });
 
 EXO_TEST(keepalive_disabled_by_negative_interval, {
+	ka_reset();
 	return user_keepalive_due(ka_user, KA_NOW, -1) == 0;
 });
 
 EXO_TEST(keepalive_skips_user_logging_in, {
+	ka_reset();
 	ka_user->state = state_identify;
 	return user_keepalive_due(ka_user, KA_NOW, 120) == 0;
 });
 
 EXO_TEST(keepalive_skips_disconnecting_user, {
+	ka_reset();
 	ka_user->state = state_cleanup;
 	return user_keepalive_due(ka_user, KA_NOW, 120) == 0;
 });
 
 EXO_TEST(keepalive_skips_user_without_connection, {
+	ka_reset();
 	ka_user->state = state_normal;
 	ka_user->connection = 0;
 	if (user_keepalive_due(ka_user, KA_NOW, 120) != 0)
@@ -81,6 +113,7 @@ EXO_TEST(keepalive_skips_user_without_connection, {
 });
 
 EXO_TEST(keepalive_skips_remote_user, {
+	ka_reset();
 	ka_user->origin_link = (struct hub_link*) ka_con;
 	if (user_keepalive_due(ka_user, KA_NOW, 120) != 0)
 		return 0;
@@ -89,11 +122,13 @@ EXO_TEST(keepalive_skips_remote_user, {
 });
 
 EXO_TEST(keepalive_skips_user_with_queued_data, {
+	ka_reset();
 	ka_user->send_queue->size = 42;
 	return user_keepalive_due(ka_user, KA_NOW, 120) == 0;
 });
 
 EXO_TEST(keepalive_due_when_queue_drained, {
+	ka_reset();
 	ka_user->send_queue->size = 42;
 	ka_user->send_queue->offset = 42;
 	if (user_keepalive_due(ka_user, KA_NOW, 120) != 1)
@@ -104,39 +139,35 @@ EXO_TEST(keepalive_due_when_queue_drained, {
 });
 
 EXO_TEST(silent_not_when_recently_heard_from, {
+	ka_reset();
 	ka_set_quiet(30);
 	return user_is_silent(ka_user, KA_NOW, 120) == 0;
 });
 
 EXO_TEST(silent_at_exact_threshold, {
+	ka_reset();
 	ka_set_quiet(120);
 	return user_is_silent(ka_user, KA_NOW, 120) == 1;
 });
 
 EXO_TEST(silent_when_long_quiet, {
+	ka_reset();
 	ka_set_quiet(600);
 	return user_is_silent(ka_user, KA_NOW, 120) == 1;
 });
 
 EXO_TEST(silent_ignores_hub_writes, {
+	ka_reset();
 	ka_set_quiet(600);
 	ka_set_idle(0);
 	return user_is_silent(ka_user, KA_NOW, 120) == 1;
 });
 
 EXO_TEST(silent_never_for_remote_user, {
+	ka_reset();
 	ka_user->origin_link = (struct hub_link*) ka_con;
 	if (user_is_silent(ka_user, KA_NOW, 120) != 0)
 		return 0;
 	ka_user->origin_link = 0;
-	return 1;
-});
-
-EXO_TEST(keepalive_teardown, {
-	ioq_send_destroy(ka_user->send_queue);
-	hub_free(ka_con);
-	hub_free(ka_user);
-	ka_user = 0;
-	ka_con = 0;
 	return 1;
 });

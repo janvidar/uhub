@@ -5,6 +5,7 @@
 #include "core/hub.h"
 #include "core/usermanager.h"
 #include "core/route.h"
+#include "testutil_net.h"
 
 /*
  * Unit tests for route.c's send-queue ceiling, the slow-reader / send-queue
@@ -15,8 +16,11 @@
 
 static struct hub_info* rt_hub = 0;
 
-EXO_TEST(route_setup, {
-	net_initialize();
+/* A hub with just the config and user manager the limits are computed from.
+   Each test sets the user count it needs. */
+EXO_SETUP({
+	if (!test_net_acquire())
+		return 0;
 	rt_hub = (struct hub_info*) hub_malloc_zero(sizeof(struct hub_info));
 	if (!rt_hub)
 		return 0;
@@ -57,7 +61,7 @@ EXO_TEST(route_maxq_soft_is_fixed, {
 	return get_max_send_queue_soft(rt_hub) == 500;
 });
 
-EXO_TEST(route_teardown, {
+EXO_TEARDOWN({
 	if (rt_hub)
 	{
 		uman_shutdown(rt_hub->users);
@@ -66,6 +70,6 @@ EXO_TEST(route_teardown, {
 		hub_free(rt_hub);
 	}
 	rt_hub = 0;
-	net_destroy();
+	test_net_release();
 	return 1;
 });

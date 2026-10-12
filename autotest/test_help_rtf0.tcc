@@ -14,25 +14,25 @@ static struct command_base* help_cbase = NULL;
 static struct hub_user help_user;
 static struct command_handle* help_handle = NULL;
 
-EXO_TEST(help_rtf0_setup, {
-	help_hub = hub_malloc_zero(sizeof(struct hub_info));
-	help_cbase = command_initialize(help_hub);
-	help_hub->commands = help_cbase;
-
-	memset(&help_user, 0, sizeof(help_user));
-	help_user.id.sid = 1;
-	help_user.credentials = auth_cred_guest;
-	return help_hub && help_cbase;
-});
-
 static int help_dummy_handler(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
 	(void) cbase; (void) user; (void) cmd;
 	return 0;
 }
 
-/* A command whose description carries markdown metacharacters. */
-EXO_TEST(help_rtf0_add_handler, {
+/* The built-in commands, a guest to render them for, and one more command
+   whose description carries markdown metacharacters. */
+EXO_SETUP({
+	help_hub = hub_malloc_zero(sizeof(struct hub_info));
+	help_cbase = command_initialize(help_hub);
+	help_hub->commands = help_cbase;
+	if (!help_hub || !help_cbase)
+		return 0;
+
+	memset(&help_user, 0, sizeof(help_user));
+	help_user.id.sid = 1;
+	help_user.credentials = auth_cred_guest;
+
 	help_handle = hub_malloc_zero(sizeof(struct command_handle));
 	help_handle->prefix = "autotest";
 	help_handle->length = strlen(help_handle->prefix);
@@ -42,6 +42,14 @@ EXO_TEST(help_rtf0_add_handler, {
 	help_handle->description = "a|b *c* _d_ `e` [f] <g> ~h~ i\\j";
 	help_handle->origin = "exotic test";
 	return command_add(help_cbase, help_handle, NULL);
+});
+
+EXO_TEARDOWN({
+	command_del(help_cbase, help_handle);
+	hub_free(help_handle);
+	command_shutdown(help_cbase);
+	hub_free(help_hub);
+	return 1;
 });
 
 static struct cbuffer* help_render(struct command_handle* command)
@@ -85,14 +93,9 @@ EXO_TEST(help_rtf0_single_usage, {
 
 /* ... and stays hidden when it is out of reach. */
 EXO_TEST(help_rtf0_single_denied, {
+	int ok;
 	help_handle->cred = auth_cred_admin;
-	return help_contains(help_handle, "This command is not available to you.");
-});
-
-EXO_TEST(help_rtf0_cleanup, {
-	command_del(help_cbase, help_handle);
-	hub_free(help_handle);
-	command_shutdown(help_cbase);
-	hub_free(help_hub);
-	return 1;
+	ok = help_contains(help_handle, "This command is not available to you.");
+	help_handle->cred = auth_cred_guest;
+	return ok;
 });

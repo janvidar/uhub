@@ -2,6 +2,7 @@
 #include "network/connection.h"
 #include "network/backend.h"
 #include "network/dnsresolver.h"
+#include "testutil_net.h"
 
 /*
  * Tests for the outbound-connect / happy-eyeballs failover path in
@@ -92,8 +93,13 @@ static int ct_make_socket(int do_listen, uint16_t* out_port)
 	return sd;
 }
 
-EXO_TEST(connect_init, {
-	return net_initialize() == 0;
+EXO_SETUP({
+	return test_net_acquire();
+});
+
+EXO_TEARDOWN({
+	test_net_release();
+	return 1;
 });
 
 /*
@@ -295,8 +301,4 @@ EXO_TEST(connect_dns_cancel_races, {
 	net_dns_process();
 
 	return dns_stress_count == N / 2;
-});
-
-EXO_TEST(connect_shutdown, {
-	return net_destroy() == 0;
 });
