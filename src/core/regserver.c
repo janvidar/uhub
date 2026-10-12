@@ -133,8 +133,17 @@ int regserver_parse_url(const char* url, struct regserver_url* out)
 	return 1;
 }
 
+/* True for an IPv6 literal without brackets ("::1", "2001:db8::1"): more than
+ * one colon, which neither a host name nor "host:port" has. */
+static int hostport_is_bare_ipv6(const char* hostport)
+{
+	const char* colon = strchr(hostport, ':');
+	return *hostport != '[' && colon && strchr(colon + 1, ':');
+}
+
 /* True if a "host[:port]" string already carries a ":port", accounting for a
- * bracketed IPv6 literal where the colons inside the brackets are not a port. */
+ * bracketed IPv6 literal where the colons inside the brackets are not a port,
+ * and for a bare one, which cannot carry a port at all. */
 static int hostport_has_port(const char* hostport)
 {
 	if (*hostport == '[')
@@ -142,6 +151,8 @@ static int hostport_has_port(const char* hostport)
 		const char* close = strchr(hostport, ']');
 		return close && close[1] == ':';
 	}
+	if (hostport_is_bare_ipv6(hostport))
+		return 0;
 	return strchr(hostport, ':') != NULL;
 }
 
@@ -199,7 +210,12 @@ int regserver_hub_url(const char* hub_address, int use_tls, int server_port, con
 			return 0;
 	}
 
-	n = snprintf(out, out_size, "%s%s%s%s", scheme, hostport, portbuf, kpbuf);
+	/* A bare IPv6 literal goes in brackets, or the port would read as part of
+	   the address. */
+	if (hostport_is_bare_ipv6(hostport))
+		n = snprintf(out, out_size, "%s[%s]%s%s", scheme, hostport, portbuf, kpbuf);
+	else
+		n = snprintf(out, out_size, "%s%s%s%s", scheme, hostport, portbuf, kpbuf);
 	if (n < 0 || (size_t) n >= out_size)
 		return 0;
 	return 1;

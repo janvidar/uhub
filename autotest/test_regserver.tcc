@@ -151,6 +151,20 @@ EXO_TEST(regserver_hh_ipv6_keep_port, {
 		&& strcmp(hh, "adcs://[2001:db8::1]:1511") == 0;
 });
 
+/* A bare IPv6 literal -- what the hub falls back to when bound to one, as
+ * net_get_local_address() spells it -- is bracketed and given the port. Its
+ * colons are not a port separator: a port after an IPv6 literal needs the
+ * brackets. */
+EXO_TEST(regserver_hh_ipv6_bare, {
+	return regserver_hub_url("::1", 0, 1511, NULL, hh, sizeof(hh))
+		&& strcmp(hh, "adc://[::1]:1511") == 0;
+});
+
+EXO_TEST(regserver_hh_ipv6_bare_scheme, {
+	return regserver_hub_url("adcs://2001:db8::1", 0, 1511, NULL, hh, sizeof(hh))
+		&& strcmp(hh, "adcs://[2001:db8::1]:1511") == 0;
+});
+
 /* Empty / NULL hub_address -> no address to advertise. */
 EXO_TEST(regserver_hh_empty, {
 	return regserver_hub_url("", 0, 1511, NULL, hh, sizeof(hh)) == 0
