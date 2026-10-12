@@ -58,10 +58,70 @@ static int sg_reset(void)
 	return seed_grant_count(sg) == 0;
 }
 
-EXO_TEST(seedgrant_setup, {
+/* One table for the file; every test that cares about its contents starts by
+   emptying it, or by filling it to a known state with one of the helpers
+   below. */
+EXO_SETUP({
 	sg = seed_grants_create();
 	return sg != NULL && seed_grant_count(sg) == 0;
 });
+
+/* The table owns what is still in it when it goes. */
+EXO_TEARDOWN({
+	seed_grants_destroy(sg);
+	sg = NULL;
+	return 1;
+});
+
+/* SG_CID holding its whole slice: tokens slice0, slice1, ... */
+static int sg_slice_full(time_t now)
+{
+	unsigned i;
+	char token[32];
+	if (!sg_reset()) return 0;
+	for (i = 0; i < SEED_GRANT_MAX_PER_CID; i++)
+	{
+		snprintf(token, sizeof(token), "slice%u", i);
+		if (!seed_grant_issue(sg, token, SG_CID, NULL, now)) return 0;
+	}
+	return seed_grant_count(sg) == SEED_GRANT_MAX_PER_CID;
+}
+
+/* SG_CID at its ceiling, one of its grants under the token "repeat" and the
+   rest under fill1, fill2, ... */
+static int sg_slice_full_with_repeat(time_t now)
+{
+	unsigned i;
+	char token[32];
+	if (!sg_reset()) return 0;
+	if (!seed_grant_issue(sg, "repeat", SG_CID, NULL, now)) return 0;
+	for (i = 1; i < SEED_GRANT_MAX_PER_CID; i++)
+	{
+		snprintf(token, sizeof(token), "fill%u", i);
+		if (!seed_grant_issue(sg, token, SG_CID, NULL, now)) return 0;
+	}
+	return seed_grant_count(sg) == SEED_GRANT_MAX_PER_CID;
+}
+
+/* The whole table full: SG_CIDS peers, each at its ceiling, under the tokens
+   full<peer>_<n>. */
+static int sg_table_full(time_t now)
+{
+	unsigned c, i;
+	char cid[SEED_CID_LEN + 1];
+	char token[32];
+	if (!sg_reset()) return 0;
+	for (c = 0; c < SG_CIDS; c++)
+	{
+		sg_make_cid(cid, c + 1);
+		for (i = 0; i < SEED_GRANT_MAX_PER_CID; i++)
+		{
+			snprintf(token, sizeof(token), "full%u_%u", c, i);
+			if (!seed_grant_issue(sg, token, cid, NULL, now)) return 0;
+		}
+	}
+	return seed_grant_count(sg) == SEED_GRANT_MAX_TOTAL;
+}
 
 /* --- the round trip ------------------------------------------------------- */
 
@@ -99,6 +159,8 @@ EXO_TEST(seedgrant_rejects_another_cid, {
 EXO_TEST(seedgrant_rejects_a_token_prefix, {
 	time_t now = 1000;
 
+	if (!sg_reset()) return 0;
+	if (!seed_grant_issue(sg, "bound", SG_CID, NULL, now)) return 0;
 	if (seed_grant_check(sg, "boun", SG_CID, now, NULL)) return 0;
 	if (seed_grant_check(sg, "bounde", SG_CID, now, NULL)) return 0;
 	if (seed_grant_check(sg, "bounc", SG_CID, now, NULL)) return 0;
@@ -206,8 +268,7 @@ EXO_TEST(seedgrant_repeat_does_not_double_count_the_cid, {
 EXO_TEST(seedgrant_repeat_moves_the_cid_accounting, {
 	time_t now = 4000;
 
-	/* Carries on from the previous test: SG_CID is at its ceiling. */
-	if (seed_grant_count(sg) != SEED_GRANT_MAX_PER_CID) return 0;
+	if (!sg_slice_full_with_repeat(now)) return 0;
 	if (seed_grant_issue(sg, "onemore", SG_CID, NULL, now)) return 0;
 
 	/* Hand one of its grants to another peer. */
@@ -257,6 +318,7 @@ EXO_TEST(seedgrant_per_cid_ceiling_does_not_stop_another_cid, {
 	unsigned i;
 	char token[32];
 
+	if (!sg_slice_full(now)) return 0;
 	if (seed_grant_issue(sg, "over", SG_CID, NULL, now)) return 0;
 
 	for (i = 0; i < SEED_GRANT_MAX_PER_CID; i++)
@@ -272,12 +334,14 @@ EXO_TEST(seedgrant_per_cid_ceiling_does_not_stop_another_cid, {
 EXO_TEST(seedgrant_per_cid_ceiling_covers_downloads, {
 	time_t now = 5000;
 
+	if (!sg_slice_full(now)) return 0;
 	return seed_grant_issue_download(sg, "dlover", SG_CID, SG_TTH, 4096, "x.bin", now) == 0;
 });
 
 EXO_TEST(seedgrant_release_returns_the_cid_slice, {
 	time_t now = 5000;
 
+	if (!sg_slice_full(now)) return 0;
 	seed_grant_release(sg, "slice0");
 	if (!seed_grant_issue(sg, "over", SG_CID, NULL, now)) return 0;
 	return seed_grant_issue(sg, "over2", SG_CID, NULL, now) == 0;
@@ -288,6 +352,7 @@ EXO_TEST(seedgrant_expiry_returns_the_cid_slice, {
 	unsigned i;
 	char token[32];
 
+	if (!sg_slice_full(now)) return 0;
 	seed_grant_sweep(sg, now + SEED_GRANT_TTL);
 	if (seed_grant_count(sg) != 0) return 0;
 
@@ -307,22 +372,9 @@ EXO_TEST(seedgrant_expiry_returns_the_cid_slice, {
 
 EXO_TEST(seedgrant_table_ceiling_refuses_cleanly, {
 	time_t now = 6000;
-	unsigned c, i;
 	char cid[SEED_CID_LEN + 1];
-	char token[32];
 
-	if (!sg_reset()) return 0;
-
-	for (c = 0; c < SG_CIDS; c++)
-	{
-		sg_make_cid(cid, c + 1);
-		for (i = 0; i < SEED_GRANT_MAX_PER_CID; i++)
-		{
-			snprintf(token, sizeof(token), "full%u_%u", c, i);
-			if (!seed_grant_issue(sg, token, cid, NULL, now)) return 0;
-		}
-	}
-	if (seed_grant_count(sg) != SEED_GRANT_MAX_TOTAL) return 0;
+	if (!sg_table_full(now)) return 0;
 
 	/* A peer nobody has heard from yet is refused, and refusal is all it is:
 	   the table is unchanged and every grant in it still resolves. */
@@ -342,7 +394,7 @@ EXO_TEST(seedgrant_repeat_is_allowed_at_the_table_ceiling, {
 	time_t now = 6000;
 	char cid[SEED_CID_LEN + 1];
 
-	if (seed_grant_count(sg) != SEED_GRANT_MAX_TOTAL) return 0;
+	if (!sg_table_full(now)) return 0;
 
 	sg_make_cid(cid, 1);
 	if (!seed_grant_issue(sg, "full0_0", cid, SG_TTH, now + 1)) return 0;
@@ -368,7 +420,7 @@ EXO_TEST(seedgrant_every_entry_in_a_full_table_resolves, {
 	char cid[SEED_CID_LEN + 1];
 	char token[32];
 
-	if (seed_grant_count(sg) != SEED_GRANT_MAX_TOTAL) return 0;
+	if (!sg_table_full(now)) return 0;
 
 	for (c = 0; c < SG_CIDS; c++)
 	{
@@ -393,6 +445,7 @@ EXO_TEST(seedgrant_thousands_of_misses_on_a_full_table, {
 	unsigned i;
 	char token[32];
 
+	if (!sg_table_full(now)) return 0;
 	for (i = 0; i < 5000; i++)
 	{
 		snprintf(token, sizeof(token), "absent%u", i);
@@ -407,6 +460,7 @@ EXO_TEST(seedgrant_thousands_of_cycles_on_a_full_table, {
 	unsigned i;
 	char cid[SEED_CID_LEN + 1];
 
+	if (!sg_table_full(now)) return 0;
 	sg_make_cid(cid, 1);
 
 	/* Consume and reissue at the ceiling, which is what a busy seeder does:
@@ -497,6 +551,7 @@ EXO_TEST(seedgrant_sweep_drops_the_expired_and_keeps_the_live, {
 });
 
 EXO_TEST(seedgrant_sweep_of_an_empty_table, {
+	if (!sg_reset()) return 0;
 	seed_grant_sweep(sg, 0);
 	seed_grant_sweep(sg, 1 << 30);
 	seed_grant_sweep(NULL, 0);
@@ -526,6 +581,7 @@ EXO_TEST(seedgrant_download_round_trip, {
 	struct seed_grant g;
 	time_t now = 8000;
 
+	if (!sg_reset()) return 0;
 	if (!seed_grant_issue_download(sg, "dl", SG_CID, SG_TTH, 4096, "wanted.bin", now)) return 0;
 	if (seed_grant_count(sg) != 1) return 0;
 
@@ -549,6 +605,7 @@ EXO_TEST(seedgrant_download_round_trip, {
 EXO_TEST(seedgrant_upload_is_not_a_download, {
 	time_t now = 8000;
 
+	if (!sg_reset()) return 0;
 	if (!seed_grant_issue(sg, "up", SG_CID, SG_TTH, now)) return 0;
 	if (seed_grant_is_download(sg, "up", now, NULL)) return 0;
 	return seed_grant_check(sg, "up", SG_CID, now, NULL) == 1;
@@ -586,6 +643,7 @@ EXO_TEST(seedgrant_oversized_token_refused, {
 	char token[SEED_TOKEN_MAX + 8];
 	time_t now = 9000;
 
+	if (!sg_reset()) return 0;
 	memset(token, 'A', sizeof(token) - 1);
 	token[sizeof(token) - 1] = '\0';
 	if (seed_grant_issue(sg, token, SG_CID, NULL, now)) return 0;
@@ -608,7 +666,7 @@ EXO_TEST(seedgrant_minted_tokens_are_distinct, {
 	return strcmp(a, b) != 0;
 });
 
-/* --- teardown ------------------------------------------------------------- */
+/* --- destruction ---------------------------------------------------------- */
 
 /* Destroying a table that still holds grants must free them all; the ASan build
    is what actually checks this. */
@@ -634,15 +692,5 @@ EXO_TEST(seedgrant_destroy_a_populated_table, {
 
 	seed_grants_destroy(doomed);
 	seed_grants_destroy(NULL);
-	return 1;
-});
-
-EXO_TEST(seedgrant_teardown, {
-	time_t now = 9000;
-
-	/* Left non-empty on purpose: the table owns what is still in it. */
-	if (!seed_grant_issue(sg, "leftover", SG_CID, NULL, now)) return 0;
-	seed_grants_destroy(sg);
-	sg = NULL;
 	return 1;
 });

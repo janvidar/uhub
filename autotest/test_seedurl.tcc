@@ -2,6 +2,7 @@
 #include "network/ipcalc.h"
 #include "network/network.h"
 #include "seeder/url.h"
+#include "testutil_net.h"
 
 static struct seed_url bu;
 static struct seed_url bu2;
@@ -28,8 +29,23 @@ static int seedurl_allowed(const char* address)
 	return seedurl_check_addr(bpolicy, address) == 1;
 }
 
-EXO_TEST(seedurl_prepare_network, {
-	return net_initialize() == 0;
+/* The network layer, and the two address policies the policy tests consult:
+   one that refuses private ranges and one that allows them. */
+EXO_SETUP({
+	if (!test_net_acquire())
+		return 0;
+	bpolicy = seed_addr_policy_create(0);
+	bpolicy_private = seed_addr_policy_create(1);
+	return bpolicy != NULL && bpolicy_private != NULL;
+});
+
+EXO_TEARDOWN({
+	seed_addr_policy_destroy(bpolicy);
+	seed_addr_policy_destroy(bpolicy_private);
+	bpolicy = NULL;
+	bpolicy_private = NULL;
+	test_net_release();
+	return 1;
 });
 
 /* ---------------------------------------------------------------- parser: accept */
@@ -281,9 +297,12 @@ EXO_TEST(seedurl_error_strings, {
 /* ---------------------------------------------------------------- address policy */
 
 EXO_TEST(seedurl_policy_create, {
-	bpolicy = seed_addr_policy_create(0);
-	bpolicy_private = seed_addr_policy_create(1);
-	return bpolicy != NULL && bpolicy_private != NULL;
+	struct seed_addr_policy* strict = seed_addr_policy_create(0);
+	struct seed_addr_policy* open = seed_addr_policy_create(1);
+	int ok = strict != NULL && open != NULL;
+	seed_addr_policy_destroy(strict);
+	seed_addr_policy_destroy(open);
+	return ok;
 });
 
 EXO_TEST(seedurl_policy_null_fails_closed, {
@@ -432,30 +451,37 @@ EXO_TEST(seedurl_allow_private_permits_loopback, {
 
 /* ---------------------------------------------------------------- redirects */
 
-EXO_TEST(seedurl_redirect_setup, {
+/* A redirect from one host to another, in bu and bu2. The parser tests above
+   write to bu as well, so every redirect test sets the pair up afresh. */
+static int seedurl_redirect_pair(void)
+{
 	return seed_url_parse("http://a.example.org/one", NULL, &bu) == SEED_URL_OK
 		&& seed_url_parse("http://b.example.org/two", NULL, &bu2) == SEED_URL_OK;
+}
+
+EXO_TEST(seedurl_redirect_setup, {
+	return seedurl_redirect_pair();
 });
 
 EXO_TEST(seedurl_redirect_first_hop_ok, {
-	return seed_url_redirect_ok(&bu, &bu2, 0, 3) == 1;
+	return seedurl_redirect_pair() && seed_url_redirect_ok(&bu, &bu2, 0, 3) == 1;
 });
 
 EXO_TEST(seedurl_redirect_last_hop_ok, {
-	return seed_url_redirect_ok(&bu, &bu2, 2, 3) == 1;
+	return seedurl_redirect_pair() && seed_url_redirect_ok(&bu, &bu2, 2, 3) == 1;
 });
 
 EXO_TEST(seedurl_redirect_hop_limit, {
-	return seed_url_redirect_ok(&bu, &bu2, 3, 3) == 0
+	return seedurl_redirect_pair() && seed_url_redirect_ok(&bu, &bu2, 3, 3) == 0
 		&& seed_url_redirect_ok(&bu, &bu2, 4, 3) == 0;
 });
 
 EXO_TEST(seedurl_redirect_zero_max, {
-	return seed_url_redirect_ok(&bu, &bu2, 0, 0) == 0;
+	return seedurl_redirect_pair() && seed_url_redirect_ok(&bu, &bu2, 0, 0) == 0;
 });
 
 EXO_TEST(seedurl_redirect_null, {
-	return seed_url_redirect_ok(NULL, &bu2, 0, 3) == 0
+	return seedurl_redirect_pair() && seed_url_redirect_ok(NULL, &bu2, 0, 3) == 0
 		&& seed_url_redirect_ok(&bu, NULL, 0, 3) == 0;
 });
 
@@ -545,15 +571,8 @@ EXO_TEST(seedurl_host_list_shorter_than_entry, {
 	return seed_host_matches_list("com", "example.com") == 0;
 });
 
-/* Pairs with seedurl_prepare_network above. net_initialize() fails if the
-   network is already up, so a file that leaves it initialized fails whichever
-   test file happens to sort after it. */
 EXO_TEST(seedurl_policy_destroy, {
-	seed_addr_policy_destroy(bpolicy);
-	seed_addr_policy_destroy(bpolicy_private);
+	seed_addr_policy_destroy(seed_addr_policy_create(0));
 	seed_addr_policy_destroy(NULL);
-	bpolicy = NULL;
-	bpolicy_private = NULL;
-	net_destroy();
 	return 1;
 });

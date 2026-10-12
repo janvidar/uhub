@@ -242,9 +242,14 @@ EXO_TEST(seedingest_cred_names_are_case_insensitive, {
 
 /* --- selecting what to ask for -------------------------------------------- */
 
-EXO_TEST(seedingest_setup, {
+/* A fresh, empty cache: every select test starts from one, so a block or an
+   ingest in one test is not seen by the next. */
+static int si_fresh(void)
+{
 	struct seed_cache_config cfg;
 
+	seed_cache_close(si_cache);
+	si_cache = NULL;
 	si_rmtree(SI_DIR);
 	memset(&cfg, 0, sizeof(cfg));
 	cfg.dir = SI_DIR;
@@ -255,15 +260,30 @@ EXO_TEST(seedingest_setup, {
 
 	si_cache = seed_cache_open(&cfg);
 	return si_cache != NULL;
+}
+
+EXO_TEARDOWN({
+	seed_cache_close(si_cache);
+	si_cache = NULL;
+	si_rmtree(SI_DIR);
+	return 1;
+});
+
+EXO_TEST(seedingest_setup, {
+	return si_fresh();
 });
 
 /* Nothing to scan is not an error, it is just nothing. */
 EXO_TEST(seedingest_select_no_embeds, {
+	if (!si_fresh())
+		return 0;
 	return si_select("hello, world") == 0
 		&& si_select("") == 0;
 });
 
 EXO_TEST(seedingest_select_null_text_is_safe, {
+	if (!si_fresh())
+		return 0;
 	return seed_ingest_select(si_cache, NULL, si_embeds, SEED_INGEST_MAX_PER_MESSAGE) == 0;
 });
 
@@ -272,6 +292,8 @@ EXO_TEST(seedingest_select_without_cache_selects_nothing, {
 });
 
 EXO_TEST(seedingest_select_finds_one, {
+	if (!si_fresh())
+		return 0;
 	return si_select(si_magnet(SI_TTH1)) == 1
 		&& strcmp(si_embeds[0].tth, SI_TTH1) == 0
 		&& si_embeds[0].size == 4096
@@ -284,6 +306,8 @@ EXO_TEST(seedingest_select_finds_one, {
  * topic produces no request instead of a request for nothing.
  */
 EXO_TEST(seedingest_select_malformed_magnet, {
+	if (!si_fresh())
+		return 0;
 	return si_select("![x](magnet:?xt=urn:tree:tiger:TOOSHORT&xl=1)") == 0
 		&& si_select("![x](magnet:?xt=urn:sha1:" SI_TTH1 ")") == 0
 		&& si_select("![x](magnet:?xl=4096&dn=shot.png)") == 0
@@ -295,6 +319,8 @@ EXO_TEST(seedingest_select_malformed_magnet, {
 /* At most SEED_INGEST_MAX_PER_MESSAGE, however many were posted. */
 EXO_TEST(seedingest_select_caps_per_message, {
 	char text[2048];
+	if (!si_fresh())
+		return 0;
 	snprintf(text, sizeof(text), "%s %s %s %s %s",
 		si_magnet(SI_TTH1), si_magnet(SI_TTH2), si_magnet(SI_TTH3),
 		si_magnet(SI_TTH4), si_magnet(SI_TTH5));
@@ -304,6 +330,8 @@ EXO_TEST(seedingest_select_caps_per_message, {
 /* ...and a caller with less room than that gets no more than it asked for. */
 EXO_TEST(seedingest_select_honours_a_smaller_max, {
 	char text[2048];
+	if (!si_fresh())
+		return 0;
 	snprintf(text, sizeof(text), "%s %s %s", si_magnet(SI_TTH1), si_magnet(SI_TTH2), si_magnet(SI_TTH3));
 	memset(si_embeds, 0, sizeof(si_embeds));
 	return seed_ingest_select(si_cache, text, si_embeds, 1) == 1
@@ -313,6 +341,8 @@ EXO_TEST(seedingest_select_honours_a_smaller_max, {
 /* The same file posted twice in one line is asked for once. */
 EXO_TEST(seedingest_select_deduplicates, {
 	char text[1024];
+	if (!si_fresh())
+		return 0;
 	snprintf(text, sizeof(text), "%s and again %s", si_magnet(SI_TTH1), si_magnet(SI_TTH1));
 	return si_select(text) == 1;
 });
@@ -320,6 +350,8 @@ EXO_TEST(seedingest_select_deduplicates, {
 /* An operator said no: never ask for it again, and say so before looking it up. */
 EXO_TEST(seedingest_select_skips_blocked, {
 	char text[1024];
+	if (!si_fresh())
+		return 0;
 
 	if (!seed_cache_block(si_cache, SI_TTH2, "op", "dmca"))
 		return 0;
@@ -336,6 +368,8 @@ EXO_TEST(seedingest_select_skips_blocked, {
 EXO_TEST(seedingest_select_skips_cached, {
 	char cached[SEED_TTH_STR_LEN + 1];
 	char text[1024];
+	if (!si_fresh())
+		return 0;
 
 	if (!si_ingest(cached))
 		return 0;
@@ -358,6 +392,8 @@ EXO_TEST(seedingest_select_does_not_count_an_access, {
 	char cached[SEED_TTH_STR_LEN + 1];
 	struct seed_entry before;
 	struct seed_entry after;
+	if (!si_fresh())
+		return 0;
 
 	if (!si_ingest(cached))
 		return 0;
@@ -433,11 +469,4 @@ EXO_TEST(seedingest_trigger_destroy_accepts_null, {
 
 EXO_TEST(seedingest_on_chat_accepts_null, {
 	return seed_ingest_on_chat(NULL, NULL, "![x](magnet:?xt=urn:tree:tiger:" SI_TTH1 ")") == 0;
-});
-
-EXO_TEST(seedingest_cleanup, {
-	seed_cache_close(si_cache);
-	si_cache = NULL;
-	si_rmtree(SI_DIR);
-	return 1;
 });

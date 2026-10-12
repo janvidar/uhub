@@ -59,34 +59,113 @@ static void sh_rmtree(const char* path)
  * Roster
  * ------------------------------------------------------------------------- */
 
-EXO_TEST(seedhub_roster_create, {
+/*
+ * Each roster test starts from one of these, so none depends on another. They
+ * build up the same story step by step: alice joins, updates her INF, starts
+ * carrying a different CID, is joined by bob and a CID-less ghost, and bob
+ * leaves again.
+ */
+static int sh_roster_fresh(void)
+{
+	seed_roster_destroy(sh_roster);
 	sh_roster = seed_roster_create();
-	return sh_roster != NULL && seed_roster_size(sh_roster) == 0;
+	return sh_roster != NULL;
+}
+
+static int sh_roster_alice(void)
+{
+	struct seed_user user;
+	sh_fill(&user, 4, SH_CID, "alice", "192.0.2.10", SEED_CT_REGISTERED);
+	return sh_roster_fresh() && seed_roster_update(sh_roster, &user) != NULL;
+}
+
+static int sh_roster_alice_updated(void)
+{
+	struct seed_user user;
+	sh_fill(&user, 4, SH_CID, "alice2", "192.0.2.11", SEED_CT_REGISTERED | SEED_CT_OPERATOR);
+	return sh_roster_alice() && seed_roster_update(sh_roster, &user) != NULL;
+}
+
+static int sh_roster_alice_rekeyed(void)
+{
+	struct seed_user user;
+	sh_fill(&user, 4, SH_CID2, "alice2", "192.0.2.11", SEED_CT_REGISTERED);
+	return sh_roster_alice_updated() && seed_roster_update(sh_roster, &user) != NULL;
+}
+
+static int sh_roster_with_bob(void)
+{
+	struct seed_user user;
+	sh_fill(&user, 9, SH_CID, "bob", "192.0.2.20", SEED_CT_BOT);
+	return sh_roster_alice_rekeyed() && seed_roster_update(sh_roster, &user) != NULL;
+}
+
+static int sh_roster_three(void)
+{
+	struct seed_user user;
+	sh_fill(&user, 11, "", "ghost", "", 0);
+	return sh_roster_with_bob() && seed_roster_update(sh_roster, &user) != NULL;
+}
+
+static int sh_roster_bob_left(void)
+{
+	return sh_roster_three() && seed_roster_remove(sh_roster, 9) == 1;
+}
+
+/* A PID directory holding a freshly generated PID, read into sh_pid_first. */
+static int sh_pid_fresh(void)
+{
+	sh_rmtree(SH_PID_DIR);
+	memset(sh_pid_first, 0, sizeof(sh_pid_first));
+	return seed_hub_pid_load(SH_PID_DIR, sh_pid_first) == 1;
+}
+
+EXO_TEARDOWN({
+	seed_roster_destroy(sh_roster);
+	sh_roster = NULL;
+	sh_rmtree(SH_PID_DIR);
+	return 1;
+});
+
+EXO_TEST(seedhub_roster_create, {
+	return sh_roster_fresh() && seed_roster_size(sh_roster) == 0;
 });
 
 EXO_TEST(seedhub_roster_empty_lookup, {
+	if (!(sh_roster_fresh()))
+		return 0;
 	return seed_roster_get_sid(sh_roster, 1) == NULL
 		&& seed_roster_get_cid(sh_roster, SH_CID) == NULL;
 });
 
 EXO_TEST(seedhub_roster_add, {
 	struct seed_user user;
+	if (!(sh_roster_fresh()))
+		return 0;
 	sh_fill(&user, 4, SH_CID, "alice", "192.0.2.10", SEED_CT_REGISTERED);
 	return seed_roster_update(sh_roster, &user) != NULL && seed_roster_size(sh_roster) == 1;
 });
 
 EXO_TEST(seedhub_roster_get_by_sid, {
-	const struct seed_user* user = seed_roster_get_sid(sh_roster, 4);
+	const struct seed_user* user;
+	if (!(sh_roster_alice()))
+		return 0;
+	user = seed_roster_get_sid(sh_roster, 4);
 	return user && user->sid == 4 && strcmp(user->nick, "alice") == 0
 		&& strcmp(user->address, "192.0.2.10") == 0;
 });
 
 EXO_TEST(seedhub_roster_get_by_cid, {
-	const struct seed_user* user = seed_roster_get_cid(sh_roster, SH_CID);
+	const struct seed_user* user;
+	if (!(sh_roster_alice()))
+		return 0;
+	user = seed_roster_get_cid(sh_roster, SH_CID);
 	return user && user->sid == 4 && strcmp(user->cid, SH_CID) == 0;
 });
 
 EXO_TEST(seedhub_roster_get_by_cid_unknown, {
+	if (!(sh_roster_alice()))
+		return 0;
 	return seed_roster_get_cid(sh_roster, SH_CID2) == NULL
 		&& seed_roster_get_cid(sh_roster, "") == NULL
 		&& seed_roster_get_cid(sh_roster, NULL) == NULL;
@@ -95,12 +174,17 @@ EXO_TEST(seedhub_roster_get_by_cid_unknown, {
 /* A second BINF for a SID already in the roster is an update, not a duplicate. */
 EXO_TEST(seedhub_roster_duplicate_sid, {
 	struct seed_user user;
+	if (!(sh_roster_alice()))
+		return 0;
 	sh_fill(&user, 4, SH_CID, "alice2", "192.0.2.11", SEED_CT_REGISTERED | SEED_CT_OPERATOR);
 	return seed_roster_update(sh_roster, &user) != NULL && seed_roster_size(sh_roster) == 1;
 });
 
 EXO_TEST(seedhub_roster_update_applied, {
-	const struct seed_user* user = seed_roster_get_sid(sh_roster, 4);
+	const struct seed_user* user;
+	if (!(sh_roster_alice_updated()))
+		return 0;
+	user = seed_roster_get_sid(sh_roster, 4);
 	return user && strcmp(user->nick, "alice2") == 0
 		&& strcmp(user->address, "192.0.2.11") == 0
 		&& seed_user_is_operator(user);
@@ -109,6 +193,8 @@ EXO_TEST(seedhub_roster_update_applied, {
 /* The CID index has to follow when a SID starts carrying a different CID. */
 EXO_TEST(seedhub_roster_update_cid_reindexes, {
 	struct seed_user user;
+	if (!(sh_roster_alice_updated()))
+		return 0;
 	sh_fill(&user, 4, SH_CID2, "alice2", "192.0.2.11", SEED_CT_REGISTERED);
 	seed_roster_update(sh_roster, &user);
 	return seed_roster_get_cid(sh_roster, SH_CID) == NULL
@@ -118,6 +204,8 @@ EXO_TEST(seedhub_roster_update_cid_reindexes, {
 
 EXO_TEST(seedhub_roster_second_user, {
 	struct seed_user user;
+	if (!(sh_roster_alice_rekeyed()))
+		return 0;
 	sh_fill(&user, 9, SH_CID, "bob", "192.0.2.20", SEED_CT_BOT);
 	seed_roster_update(sh_roster, &user);
 	return seed_roster_size(sh_roster) == 2
@@ -127,6 +215,8 @@ EXO_TEST(seedhub_roster_second_user, {
 
 EXO_TEST(seedhub_roster_no_cid_is_not_indexed, {
 	struct seed_user user;
+	if (!(sh_roster_with_bob()))
+		return 0;
 	sh_fill(&user, 11, "", "ghost", "", 0);
 	seed_roster_update(sh_roster, &user);
 	return seed_roster_size(sh_roster) == 3
@@ -135,23 +225,33 @@ EXO_TEST(seedhub_roster_no_cid_is_not_indexed, {
 });
 
 EXO_TEST(seedhub_roster_remove, {
-	int removed = seed_roster_remove(sh_roster, 9);
+	int removed;
+	if (!(sh_roster_three()))
+		return 0;
+	removed = seed_roster_remove(sh_roster, 9);
 	return removed == 1 && seed_roster_size(sh_roster) == 2
 		&& seed_roster_get_sid(sh_roster, 9) == NULL
 		&& seed_roster_get_cid(sh_roster, SH_CID) == NULL;
 });
 
 EXO_TEST(seedhub_roster_remove_unknown, {
+	if (!(sh_roster_bob_left()))
+		return 0;
 	return seed_roster_remove(sh_roster, 9) == 0 && seed_roster_size(sh_roster) == 2;
 });
 
 EXO_TEST(seedhub_roster_survivor_intact, {
-	const struct seed_user* user = seed_roster_get_sid(sh_roster, 4);
+	const struct seed_user* user;
+	if (!(sh_roster_bob_left()))
+		return 0;
+	user = seed_roster_get_sid(sh_roster, 4);
 	return user && strcmp(user->cid, SH_CID2) == 0
 		&& seed_roster_get_cid(sh_roster, SH_CID2) == user;
 });
 
 EXO_TEST(seedhub_roster_clear, {
+	if (!(sh_roster_bob_left()))
+		return 0;
 	seed_roster_clear(sh_roster);
 	return seed_roster_size(sh_roster) == 0
 		&& seed_roster_get_sid(sh_roster, 4) == NULL
@@ -160,11 +260,16 @@ EXO_TEST(seedhub_roster_clear, {
 
 EXO_TEST(seedhub_roster_reuse_after_clear, {
 	struct seed_user user;
+	if (!(sh_roster_bob_left()))
+		return 0;
+	seed_roster_clear(sh_roster);
 	sh_fill(&user, 4, SH_CID, "alice", "192.0.2.10", 0);
 	return seed_roster_update(sh_roster, &user) != NULL && seed_roster_size(sh_roster) == 1;
 });
 
 EXO_TEST(seedhub_roster_null_safe, {
+	if (!(sh_roster_fresh()))
+		return 0;
 	return seed_roster_update(sh_roster, NULL) == NULL
 		&& seed_roster_update(NULL, NULL) == NULL
 		&& seed_roster_get_sid(NULL, 1) == NULL
@@ -173,8 +278,7 @@ EXO_TEST(seedhub_roster_null_safe, {
 });
 
 EXO_TEST(seedhub_roster_destroy, {
-	seed_roster_destroy(sh_roster);
-	sh_roster = NULL;
+	seed_roster_destroy(seed_roster_create());
 	seed_roster_destroy(NULL);
 	return 1;
 });
@@ -668,15 +772,14 @@ EXO_TEST(seedhub_result_bad_tth_refused, {
  * ------------------------------------------------------------------------- */
 
 EXO_TEST(seedhub_pid_generated, {
-	sh_rmtree(SH_PID_DIR);
-	memset(sh_pid_first, 0, sizeof(sh_pid_first));
-	return seed_hub_pid_load(SH_PID_DIR, sh_pid_first) == 1
-		&& strlen(sh_pid_first) == MAX_CID_LEN;
+	return sh_pid_fresh() && strlen(sh_pid_first) == MAX_CID_LEN;
 });
 
 /* The whole point: the same PID, hence the same CID, on the next start. */
 EXO_TEST(seedhub_pid_is_stable, {
 	char again[MAX_CID_LEN + 1];
+	if (!(sh_pid_fresh()))
+		return 0;
 	memset(again, 0, sizeof(again));
 	return seed_hub_pid_load(SH_PID_DIR, again) == 1
 		&& strcmp(again, sh_pid_first) == 0;
@@ -685,6 +788,8 @@ EXO_TEST(seedhub_pid_is_stable, {
 EXO_TEST(seedhub_pid_file_is_private, {
 	struct stat st;
 	char path[512];
+	if (!(sh_pid_fresh()))
+		return 0;
 	snprintf(path, sizeof(path), "%s/pid", SH_PID_DIR);
 	return stat(path, &st) == 0 && (st.st_mode & 0777) == 0600;
 });
@@ -693,6 +798,8 @@ EXO_TEST(seedhub_pid_file_is_private, {
 EXO_TEST(seedhub_pid_corrupt_is_regenerated, {
 	char path[512];
 	char again[MAX_CID_LEN + 1];
+	if (!(sh_pid_fresh()))
+		return 0;
 	FILE* file;
 
 	snprintf(path, sizeof(path), "%s/pid", SH_PID_DIR);
@@ -715,10 +822,6 @@ EXO_TEST(seedhub_pid_null_safe, {
 		&& seed_hub_pid_load(SH_PID_DIR, NULL) == 0;
 });
 
-EXO_TEST(seedhub_pid_cleanup, {
-	sh_rmtree(SH_PID_DIR);
-	return 1;
-});
 
 
 /* -------------------------------------------------------------------------

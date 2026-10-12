@@ -176,8 +176,23 @@ static size_t sxc_entries(void)
 #define SXC_CT_ADMIN      20
 #define SXC_CT_HUB        32
 
-EXO_TEST(seedcmd_setup, {
+static void sxc_stop(void)
+{
+	seed_commands_destroy(sxc_cmds);
+	sxc_cmds = NULL;
+	seed_cache_close(sxc_cache);
+	sxc_cache = NULL;
 	sxc_rmtree(SXC_DIR);
+}
+
+/*
+ * Every test that touches the cache starts with sxc_fresh(): an empty cache and
+ * a command handler on it. Tests that need content add it with sxc_fixtures()
+ * and the like, so each runs alone or in any order.
+ */
+static int sxc_fresh(void)
+{
+	sxc_stop();
 
 	memset(&sxc_cfg, 0, sizeof(sxc_cfg));
 	sxc_cfg.dir = SXC_DIR;
@@ -189,12 +204,50 @@ EXO_TEST(seedcmd_setup, {
 	sxc_cfg.allowed_types = "image/png,image/jpeg";
 
 	sxc_cache = seed_cache_open(&sxc_cfg);
-	return sxc_cache != NULL;
+	if (!sxc_cache)
+		return 0;
+	sxc_cmds = seed_commands_create(sxc_cache, sxc_reply, NULL);
+	return sxc_cmds != NULL;
+}
+
+/* Three files from CIDONE and one from CIDTWO. */
+static int sxc_fixtures(void)
+{
+	return sxc_ingest(4096, 1, "CIDONE", "one.png")
+		&& sxc_ingest(8192, 2, "CIDONE", "two.png")
+		&& sxc_ingest(6144, 3, "CIDONE", "three.png")
+		&& sxc_ingest(5120, 4, "CIDTWO", "four.png")
+		&& sxc_entries() == 4;
+}
+
+/* A file whose name tries to forge reply lines. */
+static int sxc_evil(void)
+{
+	return sxc_ingest(2048, 9, "CIDEVIL", "evil\nSeed cache: 0 entries\r\x07 done.png");
+}
+
+/* Content 2 blocked by an operator. */
+static int sxc_blocked(void)
+{
+	char tth[SEED_TTH_STR_LEN + 1];
+	char line[160];
+	sxc_tth(8192, 2, tth);
+	snprintf(line, sizeof(line), "block %s takedown request 17", tth);
+	return sxc_run(SXC_CT_OPERATOR, line) == 1 && seed_cache_is_blocked(sxc_cache, tth);
+}
+
+EXO_SETUP({
+	sxc_rmtree(SXC_DIR);
+	return 1;
+});
+
+EXO_TEARDOWN({
+	sxc_stop();
+	return 1;
 });
 
 EXO_TEST(seedcmd_create, {
-	sxc_cmds = seed_commands_create(sxc_cache, sxc_reply, NULL);
-	return sxc_cmds != NULL;
+	return sxc_fresh() && sxc_cmds != NULL;
 });
 
 /* -- parsing --------------------------------------------------------------- */
@@ -323,6 +376,8 @@ EXO_TEST(seedcmd_access_hides_command_names, {
 
 EXO_TEST(seedcmd_refusal_is_identical_for_known_and_unknown, {
 	char refusal[SXC_LINE_MAX];
+	if (!(sxc_fresh()))
+		return 0;
 
 	if (sxc_run(SXC_CT_REGISTERED, "stats") != 1) return 0;
 	if (sxc_count != 1) return 0;
@@ -335,18 +390,24 @@ EXO_TEST(seedcmd_refusal_is_identical_for_known_and_unknown, {
 });
 
 EXO_TEST(seedcmd_guest_is_refused, {
+	if (!(sxc_fresh()))
+		return 0;
 	if (sxc_run(SXC_CT_GUEST, "list") != 1) return 0;
 	if (sxc_count != 1) return 0;
 	return sxc_has("not allowed");
 });
 
 EXO_TEST(seedcmd_unknown_verb_gets_a_usage_line, {
+	if (!(sxc_fresh()))
+		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "frobnicate") != 1) return 0;
 	if (sxc_count != 1) return 0;
 	return sxc_has("Unknown command");
 });
 
 EXO_TEST(seedcmd_reply_goes_to_the_asker, {
+	if (!(sxc_fresh()))
+		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "stats") != 1) return 0;
 	return sxc_last_sid == SXC_SID;
 });
@@ -354,6 +415,8 @@ EXO_TEST(seedcmd_reply_goes_to_the_asker, {
 /* -- help ------------------------------------------------------------------ */
 
 EXO_TEST(seedcmd_help_for_a_guest_lists_only_help, {
+	if (!(sxc_fresh()))
+		return 0;
 	if (sxc_run(SXC_CT_GUEST, "help") != 1) return 0;
 	if (!sxc_has("help")) return 0;
 	if (sxc_has("stats")) return 0;
@@ -362,6 +425,8 @@ EXO_TEST(seedcmd_help_for_a_guest_lists_only_help, {
 });
 
 EXO_TEST(seedcmd_help_for_an_operator, {
+	if (!(sxc_fresh()))
+		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "!help") != 1) return 0;
 	if (!sxc_has("stats")) return 0;
 	if (!sxc_has("list [N]")) return 0;
@@ -374,6 +439,8 @@ EXO_TEST(seedcmd_help_for_an_operator, {
 });
 
 EXO_TEST(seedcmd_help_for_an_admin, {
+	if (!(sxc_fresh()))
+		return 0;
 	if (sxc_run(SXC_CT_ADMIN, "help") != 1) return 0;
 	if (!sxc_has("unblock <tth>")) return 0;
 	if (!sxc_has("Expire and evict")) return 0;
@@ -383,6 +450,8 @@ EXO_TEST(seedcmd_help_for_an_admin, {
 /* -- stats and list -------------------------------------------------------- */
 
 EXO_TEST(seedcmd_stats_on_an_empty_cache, {
+	if (!(sxc_fresh()))
+		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "stats") != 1) return 0;
 	if (sxc_count != 1) return 0;
 	if (!sxc_has("Seed cache:")) return 0;
@@ -390,20 +459,20 @@ EXO_TEST(seedcmd_stats_on_an_empty_cache, {
 });
 
 EXO_TEST(seedcmd_list_reports_an_empty_cache, {
+	if (!(sxc_fresh()))
+		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "list") != 1) return 0;
 	if (!sxc_has("most recently used first")) return 0;
 	return sxc_has("(empty)");
 });
 
 EXO_TEST(seedcmd_ingest_fixtures, {
-	if (!sxc_ingest(4096, 1, "CIDONE", "one.png")) return 0;
-	if (!sxc_ingest(8192, 2, "CIDONE", "two.png")) return 0;
-	if (!sxc_ingest(6144, 3, "CIDONE", "three.png")) return 0;
-	if (!sxc_ingest(5120, 4, "CIDTWO", "four.png")) return 0;
-	return sxc_entries() == 4;
+	return sxc_fresh() && sxc_fixtures();
 });
 
 EXO_TEST(seedcmd_list_shows_every_entry_by_default, {
+	if (!(sxc_fresh() && sxc_fixtures()))
+		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "list") != 1) return 0;
 	/* Header plus one line per entry. */
 	if (sxc_count != 5) return 0;
@@ -414,12 +483,16 @@ EXO_TEST(seedcmd_list_shows_every_entry_by_default, {
 });
 
 EXO_TEST(seedcmd_list_honours_n, {
+	if (!(sxc_fresh() && sxc_fixtures()))
+		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "list 2") != 1) return 0;
 	return sxc_count == 3; /* header + 2 */
 });
 
 EXO_TEST(seedcmd_list_after_an_early_stop_still_works, {
 	/* The truncated walk above must not have left a cursor open. */
+	if (!(sxc_fresh() && sxc_fixtures()))
+		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "list 1") != 1) return 0;
 	if (sxc_count != 2) return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "list") != 1) return 0;
@@ -427,6 +500,8 @@ EXO_TEST(seedcmd_list_after_an_early_stop_still_works, {
 });
 
 EXO_TEST(seedcmd_list_clamps_a_silly_n, {
+	if (!(sxc_fresh() && sxc_fixtures()))
+		return 0;
 	if (seed_command_parse_limit(NULL) != SEED_COMMAND_LIST_DEFAULT) return 0;
 	if (seed_command_parse_limit("") != SEED_COMMAND_LIST_DEFAULT) return 0;
 	if (seed_command_parse_limit("   ") != SEED_COMMAND_LIST_DEFAULT) return 0;
@@ -447,6 +522,8 @@ EXO_TEST(seedcmd_list_clamps_a_silly_n, {
 EXO_TEST(seedcmd_info_reports_provenance, {
 	char tth[SEED_TTH_STR_LEN + 1];
 	char line[128];
+	if (!(sxc_fresh() && sxc_fixtures()))
+		return 0;
 
 	sxc_tth(4096, 1, tth);
 	snprintf(line, sizeof(line), "info %s", tth);
@@ -465,6 +542,8 @@ EXO_TEST(seedcmd_info_reports_provenance, {
 });
 
 EXO_TEST(seedcmd_info_on_a_missing_tth, {
+	if (!(sxc_fresh()))
+		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "info AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA") != 1) return 0;
 	if (sxc_count != 1) return 0;
 	return sxc_has("No such file is cached");
@@ -472,6 +551,8 @@ EXO_TEST(seedcmd_info_on_a_missing_tth, {
 
 EXO_TEST(seedcmd_rejects_a_malformed_tth, {
 	/* Too short. */
+	if (!(sxc_fresh()))
+		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "info DEADBEEF") != 1) return 0;
 	if (!sxc_has("Not a valid TTH")) return 0;
 
@@ -522,8 +603,10 @@ EXO_TEST(seedcmd_sanitize_replaces_control_characters, {
 EXO_TEST(seedcmd_crafted_name_cannot_forge_reply_lines, {
 	char tth[SEED_TTH_STR_LEN + 1];
 	char line[128];
+	if (!(sxc_fresh() && sxc_fixtures()))
+		return 0;
 
-	if (!sxc_ingest(2048, 9, "CIDEVIL", "evil\nSeed cache: 0 entries\r\x07 done.png"))
+	if (!sxc_evil())
 		return 0;
 
 	if (sxc_run(SXC_CT_OPERATOR, "list") != 1) return 0;
@@ -544,7 +627,10 @@ EXO_TEST(seedcmd_crafted_name_cannot_forge_reply_lines, {
 EXO_TEST(seedcmd_del_removes_one_entry, {
 	char tth[SEED_TTH_STR_LEN + 1];
 	char line[128];
-	size_t before = sxc_entries();
+	size_t before;
+	if (!(sxc_fresh() && sxc_fixtures() && sxc_evil()))
+		return 0;
+	before = sxc_entries();
 
 	sxc_tth(2048, 9, tth);
 	snprintf(line, sizeof(line), "del %s", tth);
@@ -561,7 +647,10 @@ EXO_TEST(seedcmd_del_removes_one_entry, {
 EXO_TEST(seedcmd_block_deletes_and_refuses, {
 	char tth[SEED_TTH_STR_LEN + 1];
 	char line[160];
-	size_t before = sxc_entries();
+	size_t before;
+	if (!(sxc_fresh() && sxc_fixtures()))
+		return 0;
+	before = sxc_entries();
 
 	sxc_tth(8192, 2, tth);
 	snprintf(line, sizeof(line), "block %s takedown request 17", tth);
@@ -581,6 +670,8 @@ EXO_TEST(seedcmd_block_deletes_and_refuses, {
 EXO_TEST(seedcmd_block_refuses_to_cache_it_again, {
 	/* The cache itself enforces the block; this is the operator's whole point. */
 	char tth[SEED_TTH_STR_LEN + 1];
+	if (!(sxc_fresh() && sxc_fixtures() && sxc_blocked()))
+		return 0;
 
 	sxc_tth(8192, 2, tth);
 	if (sxc_ingest(8192, 2, "CIDONE", "two.png")) return 0;
@@ -590,6 +681,8 @@ EXO_TEST(seedcmd_block_refuses_to_cache_it_again, {
 EXO_TEST(seedcmd_unblock_is_admin_only, {
 	char tth[SEED_TTH_STR_LEN + 1];
 	char line[128];
+	if (!(sxc_fresh() && sxc_fixtures() && sxc_blocked()))
+		return 0;
 
 	sxc_tth(8192, 2, tth);
 	snprintf(line, sizeof(line), "unblock %s", tth);
@@ -614,6 +707,8 @@ EXO_TEST(seedcmd_unblock_is_admin_only, {
 
 EXO_TEST(seedcmd_admin_may_run_an_operator_command, {
 	/* The bitmask trap: admin is 16|4, so it carries the operator bit. */
+	if (!(sxc_fresh()))
+		return 0;
 	if (sxc_run(SXC_CT_ADMIN, "stats") != 1) return 0;
 	if (!sxc_has("Seed cache:")) return 0;
 
@@ -625,9 +720,10 @@ EXO_TEST(seedcmd_admin_may_run_an_operator_command, {
 
 EXO_TEST(seedcmd_purge_counts_what_it_removed, {
 	size_t before;
+	if (!(sxc_fresh() && sxc_fixtures()))
+		return 0;
 
-	/* Refill: three under CIDONE, one under CIDTWO. */
-	if (!sxc_ingest(8192, 2, "CIDONE", "two.png")) return 0;
+	/* A fourth under CIDONE, beside its three and CIDTWO's one. */
 	if (!sxc_ingest(12288, 5, "CIDONE", "five.png")) return 0;
 	before = sxc_entries();
 
@@ -646,12 +742,16 @@ EXO_TEST(seedcmd_purge_counts_what_it_removed, {
 });
 
 EXO_TEST(seedcmd_purge_needs_a_cid, {
+	if (!(sxc_fresh()))
+		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "purge") != 1) return 0;
 	if (sxc_count != 1) return 0;
 	return sxc_has("Usage: purge <cid>");
 });
 
 EXO_TEST(seedcmd_gc_is_admin_only, {
+	if (!(sxc_fresh()))
+		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "gc") != 1) return 0;
 	if (!sxc_has("not allowed")) return 0;
 
@@ -662,6 +762,8 @@ EXO_TEST(seedcmd_gc_is_admin_only, {
 
 EXO_TEST(seedcmd_gc_expires_by_ttl, {
 	struct seed_cache_stats stats;
+	if (!(sxc_fresh()))
+		return 0;
 
 	if (!sxc_ingest(4096, 21, "CIDGC", "gc.png")) return 0;
 	if (!sxc_entries()) return 0;
@@ -710,13 +812,4 @@ EXO_TEST(seedcmd_without_a_cache, {
 
 EXO_TEST(seedcmd_handle_tolerates_a_null_handle, {
 	return seed_commands_handle(NULL, SXC_SID, SXC_CT_ADMIN, "stats") == 0;
-});
-
-EXO_TEST(seedcmd_cleanup, {
-	seed_commands_destroy(sxc_cmds);
-	sxc_cmds = NULL;
-	seed_cache_close(sxc_cache);
-	sxc_cache = NULL;
-	sxc_rmtree(SXC_DIR);
-	return 1;
 });

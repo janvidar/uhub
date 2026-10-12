@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 
+#include "testutil_net.h"
 #include "seeder/fetch.h"
 #include "seeder/cache.h"
 #include "seeder/config.h"
@@ -617,10 +618,12 @@ EXO_TEST(seedfetch_error_strings, {
 
 /* -------------------------------------------------------- policy: no socket */
 
-EXO_TEST(seedfetch_setup, {
+/* The network layer, a mirroring config and a cache to fetch into. Each policy
+   test starts by zeroing bf_callbacks, and puts back any option it changes. */
+EXO_SETUP({
 	struct seed_cache_config cache_config;
 
-	if (net_initialize() != 0)
+	if (!test_net_acquire())
 		return 0;
 
 	bf_rmtree(BF_DIR);
@@ -649,6 +652,7 @@ EXO_TEST(seedfetch_setup, {
 /* seed_url_mirror off: refused outright, and without calling the callback. */
 EXO_TEST(seedfetch_start_refused_when_mirror_off, {
 	struct seed_fetch* job;
+	bf_callbacks = 0;
 	bf_config.seed_url_mirror = 0;
 	job = bf_start("http://cdn.example.org/x.png");
 	bf_config.seed_url_mirror = 1;
@@ -657,6 +661,7 @@ EXO_TEST(seedfetch_start_refused_when_mirror_off, {
 
 EXO_TEST(seedfetch_start_refused_without_config, {
 	struct seed_ingest_request req;
+	bf_callbacks = 0;
 	memset(&req, 0, sizeof(req));
 	return seed_fetch_start(bf_cache, NULL, "http://cdn.example.org/x.png", &req, bf_cb, NULL) == NULL
 		&& bf_callbacks == 0;
@@ -664,6 +669,7 @@ EXO_TEST(seedfetch_start_refused_without_config, {
 
 EXO_TEST(seedfetch_start_refused_without_store, {
 	struct seed_ingest_request req;
+	bf_callbacks = 0;
 	memset(&req, 0, sizeof(req));
 	return seed_fetch_start(NULL, &bf_config, "http://cdn.example.org/x.png", &req, bf_cb, NULL) == NULL
 		&& bf_callbacks == 0;
@@ -672,6 +678,7 @@ EXO_TEST(seedfetch_start_refused_without_store, {
 /* The hash of a mirrored URL is not knowable in advance. */
 EXO_TEST(seedfetch_start_refused_with_expect_tth, {
 	struct seed_ingest_request req;
+	bf_callbacks = 0;
 	memset(&req, 0, sizeof(req));
 	req.expect_tth = "OZ4V2GDGZLGXQKAWXQBDIT4KM7HRFCWHMLPEXAI";
 	return seed_fetch_start(bf_cache, &bf_config, "http://cdn.example.org/x.png", &req, bf_cb, NULL) == NULL
@@ -679,6 +686,7 @@ EXO_TEST(seedfetch_start_refused_with_expect_tth, {
 });
 
 EXO_TEST(seedfetch_start_refused_bad_scheme, {
+	bf_callbacks = 0;
 	return bf_start("ftp://cdn.example.org/x.png") == NULL
 		&& bf_start("file:///etc/passwd") == NULL
 		&& bf_start("cdn.example.org/x.png") == NULL
@@ -686,11 +694,13 @@ EXO_TEST(seedfetch_start_refused_bad_scheme, {
 });
 
 EXO_TEST(seedfetch_start_refused_userinfo, {
+	bf_callbacks = 0;
 	return bf_start("http://user:pass@cdn.example.org/x.png") == NULL && bf_callbacks == 0;
 });
 
 /* Port outside seed_url_allow_ports ("80,443" by default). */
 EXO_TEST(seedfetch_start_refused_port, {
+	bf_callbacks = 0;
 	return bf_start("http://cdn.example.org:8080/x.png") == NULL
 		&& bf_start("http://cdn.example.org:22/x.png") == NULL
 		&& bf_callbacks == 0;
@@ -698,6 +708,7 @@ EXO_TEST(seedfetch_start_refused_port, {
 
 EXO_TEST(seedfetch_start_allows_listed_port, {
 	struct seed_fetch* job;
+	bf_callbacks = 0;
 	bf_set(&bf_config.seed_url_allow_ports, "80,443,8080");
 	job = bf_start("http://93.184.216.34:8080/x.png");
 	if (job)
@@ -708,6 +719,7 @@ EXO_TEST(seedfetch_start_allows_listed_port, {
 
 EXO_TEST(seedfetch_start_refused_denied_host, {
 	struct seed_fetch* job;
+	bf_callbacks = 0;
 	bf_set(&bf_config.seed_url_deny_hosts, "internal.example.org");
 	/* Suffix match: a subdomain of a denied host is denied too. */
 	job = bf_start("http://images.internal.example.org/x.png");
@@ -717,6 +729,7 @@ EXO_TEST(seedfetch_start_refused_denied_host, {
 
 EXO_TEST(seedfetch_start_refused_not_on_allow_list, {
 	struct seed_fetch* job;
+	bf_callbacks = 0;
 	bf_set(&bf_config.seed_url_allow_hosts, "cdn.example.org");
 	job = bf_start("http://other.example.net/x.png");
 	bf_set(&bf_config.seed_url_allow_hosts, "");
@@ -730,7 +743,9 @@ EXO_TEST(seedfetch_start_refused_not_on_allow_list, {
  * handle without ever invoking the callback.
  */
 EXO_TEST(seedfetch_cancel_during_dns, {
-	struct seed_fetch* job = bf_start("http://93.184.216.34/x.png");
+	struct seed_fetch* job;
+	bf_callbacks = 0;
+	job = bf_start("http://93.184.216.34/x.png");
 	if (!job)
 		return 0;
 	seed_fetch_cancel(job);
@@ -741,8 +756,11 @@ EXO_TEST(seedfetch_cancel_during_dns, {
 
 /* Two outstanding fetches cancelled together: neither may deliver. */
 EXO_TEST(seedfetch_cancel_two, {
-	struct seed_fetch* a = bf_start("http://93.184.216.34/a.png");
-	struct seed_fetch* b = bf_start("http://93.184.216.35/b.png");
+	struct seed_fetch* a;
+	struct seed_fetch* b;
+	bf_callbacks = 0;
+	a = bf_start("http://93.184.216.34/a.png");
+	b = bf_start("http://93.184.216.35/b.png");
 	if (!a || !b)
 		return 0;
 	seed_fetch_cancel(a);
@@ -768,12 +786,13 @@ EXO_TEST(seedfetch_denied_address_after_resolve, {
 	return bf_callbacks == 1;
 });
 
-EXO_TEST(seedfetch_cleanup, {
+EXO_TEARDOWN({
 	net_dns_wait_idle();
 	net_dns_process();
 	seed_cache_close(bf_cache);
 	bf_cache = NULL;
 	bf_rmtree(BF_DIR);
 	seed_config_free(&bf_config);
-	return net_destroy() == 0;
+	test_net_release();
+	return 1;
 });

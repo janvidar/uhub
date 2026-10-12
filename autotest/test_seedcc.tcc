@@ -9,6 +9,7 @@
 #include "network/ipcalc.h"
 #include "network/network.h"
 #include "network/timeout.h"
+#include "testutil_net.h"
 #include "seeder/cache.h"
 #include "seeder/cc.h"
 #include "seeder/grant.h"
@@ -1089,26 +1090,27 @@ EXO_TEST(seedcc_offered_protocol_follows_the_context, {
 
 static struct seed_grants* scc_grants = NULL;
 
-EXO_TEST(seedcc_grants_setup, {
-	scc_grants = seed_grants_create();
-	return scc_grants != NULL && seed_grant_count(scc_grants) == 0;
-});
+static void scc_reset(void);
 
 EXO_TEST(seedcc_grant_unknown_token_refused, {
+	scc_reset();
 	return seed_grant_check(scc_grants, "nosuchtoken", SCC_CID, time(NULL), NULL) == 0;
 });
 
 EXO_TEST(seedcc_grant_empty_token_refused, {
+	scc_reset();
 	return seed_grant_check(scc_grants, "", SCC_CID, time(NULL), NULL) == 0;
 });
 
 EXO_TEST(seedcc_grant_null_table_refused, {
+	scc_reset();
 	return seed_grant_issue(NULL, "t", SCC_CID, NULL, time(NULL)) == 0 &&
 	       seed_grant_check(NULL, "t", SCC_CID, time(NULL), NULL) == 0 &&
 	       seed_grant_count(NULL) == 0;
 });
 
 EXO_TEST(seedcc_grant_accepts_its_own_cid, {
+	scc_reset();
 	if (!seed_grant_issue(scc_grants, "uptoken", SCC_CID, NULL, time(NULL))) return 0;
 	return seed_grant_check(scc_grants, "uptoken", SCC_CID, time(NULL), NULL) == 1;
 });
@@ -1116,17 +1118,23 @@ EXO_TEST(seedcc_grant_accepts_its_own_cid, {
 /* A grant is bound to the peer it was issued to: quoting someone else's token
    is exactly the attack the CID binding exists for. */
 EXO_TEST(seedcc_grant_rejects_another_cid, {
+	scc_reset();
+	if (!seed_grant_issue(scc_grants, "uptoken", SCC_CID, NULL, time(NULL))) return 0;
 	return seed_grant_check(scc_grants, "uptoken", SCC_TTH, time(NULL), NULL) == 0;
 });
 
 /* The token alone still identifies it, which is what the accepted path relies
    on before it has looked at the CID. */
 EXO_TEST(seedcc_grant_null_cid_checks_the_token_only, {
+	scc_reset();
+	if (!seed_grant_issue(scc_grants, "uptoken", SCC_CID, NULL, time(NULL))) return 0;
 	return seed_grant_check(scc_grants, "uptoken", NULL, time(NULL), NULL) == 1;
 });
 
 EXO_TEST(seedcc_grant_expired_refused, {
-	time_t stale = time(NULL) - (SEED_GRANT_TTL + 1);
+	time_t stale;
+	scc_reset();
+	stale = time(NULL) - (SEED_GRANT_TTL + 1);
 	if (!seed_grant_issue(scc_grants, "oldtoken", SCC_CID, NULL, stale)) return 0;
 	return seed_grant_check(scc_grants, "oldtoken", SCC_CID, time(NULL), NULL) == 0;
 });
@@ -1134,6 +1142,7 @@ EXO_TEST(seedcc_grant_expired_refused, {
 /* A CID that is not 39 base32 characters is not one the seeder ever saw on the
    hub, so a grant is never recorded for it. */
 EXO_TEST(seedcc_grant_refuses_a_malformed_cid, {
+	scc_reset();
 	return seed_grant_issue(scc_grants, "badcid", "short", NULL, time(NULL)) == 0 &&
 	       seed_grant_issue(scc_grants, "badcid", "", NULL, time(NULL)) == 0 &&
 	       seed_grant_issue(scc_grants, "badcid", NULL, NULL, time(NULL)) == 0;
@@ -1141,6 +1150,7 @@ EXO_TEST(seedcc_grant_refuses_a_malformed_cid, {
 
 EXO_TEST(seedcc_grant_refuses_an_oversized_token, {
 	char token[SEED_TOKEN_MAX + 8];
+	scc_reset();
 	memset(token, 'x', SEED_TOKEN_MAX + 1);
 	token[SEED_TOKEN_MAX + 1] = '\0';
 	return seed_grant_issue(scc_grants, token, SCC_CID, NULL, time(NULL)) == 0;
@@ -1148,11 +1158,14 @@ EXO_TEST(seedcc_grant_refuses_an_oversized_token, {
 
 /* An upload grant is not a licence for the seeder to download anything. */
 EXO_TEST(seedcc_upload_grant_is_not_a_download_grant, {
+	scc_reset();
+	if (!seed_grant_issue(scc_grants, "uptoken", SCC_CID, NULL, time(NULL))) return 0;
 	return seed_grant_is_download(scc_grants, "uptoken", time(NULL), NULL) == 0;
 });
 
 EXO_TEST(seedcc_download_grant_is_marked, {
 	struct seed_grant dl;
+	scc_reset();
 	if (!seed_grant_issue_download(scc_grants, "dltoken", SCC_CID, SCC_TTH2, 4096, "wanted.png", time(NULL)))
 		return 0;
 	if (!seed_grant_is_download(scc_grants, "dltoken", time(NULL), &dl)) return 0;
@@ -1162,26 +1175,34 @@ EXO_TEST(seedcc_download_grant_is_marked, {
 
 /* It is still an ordinary grant, so the CID binding and the TTL apply to it. */
 EXO_TEST(seedcc_download_grant_checks_cid, {
+	scc_reset();
+	if (!seed_grant_issue_download(scc_grants, "dltoken", SCC_CID, SCC_TTH2, 4096, "wanted.png", time(NULL))) return 0;
 	return seed_grant_check(scc_grants, "dltoken", SCC_CID, time(NULL), NULL) == 1 &&
 	       seed_grant_check(scc_grants, "dltoken", SCC_TTH, time(NULL), NULL) == 0;
 });
 
 EXO_TEST(seedcc_download_grant_expires, {
-	time_t stale = time(NULL) - (SEED_GRANT_TTL + 1);
+	time_t stale;
+	scc_reset();
+	stale = time(NULL) - (SEED_GRANT_TTL + 1);
 	if (!seed_grant_issue_download(scc_grants, "olddl", SCC_CID, SCC_TTH2, 0, NULL, stale)) return 0;
 	return seed_grant_is_download(scc_grants, "olddl", time(NULL), NULL) == 0;
 });
 
 /* The seeder must know what it is fetching before it agrees to fetch anything. */
 EXO_TEST(seedcc_download_grant_requires_a_tth, {
+	scc_reset();
 	return seed_grant_issue_download(scc_grants, "nottht", SCC_CID, NULL, 0, NULL, time(NULL)) == 0;
 });
 
 EXO_TEST(seedcc_download_grant_refuses_a_malformed_tth, {
+	scc_reset();
 	return seed_grant_issue_download(scc_grants, "badtth", SCC_CID, "nope", 0, NULL, time(NULL)) == 0;
 });
 
 EXO_TEST(seedcc_download_grant_released_once_used, {
+	scc_reset();
+	if (!seed_grant_issue_download(scc_grants, "dltoken", SCC_CID, SCC_TTH2, 4096, "wanted.png", time(NULL))) return 0;
 	seed_grant_release(scc_grants, "dltoken");
 	return seed_grant_check(scc_grants, "dltoken", SCC_CID, time(NULL), NULL) == 0 &&
 	       seed_grant_is_download(scc_grants, "dltoken", time(NULL), NULL) == 0;
@@ -1190,6 +1211,7 @@ EXO_TEST(seedcc_download_grant_released_once_used, {
 /* Re-issuing the same token replaces the grant rather than accumulating. */
 EXO_TEST(seedcc_grant_reissue_replaces, {
 	size_t before;
+	scc_reset();
 	if (!seed_grant_issue(scc_grants, "reissue", SCC_CID, NULL, time(NULL))) return 0;
 	before = seed_grant_count(scc_grants);
 	if (!seed_grant_issue(scc_grants, "reissue", SCC_CID, NULL, time(NULL))) return 0;
@@ -1199,6 +1221,8 @@ EXO_TEST(seedcc_grant_reissue_replaces, {
 });
 
 EXO_TEST(seedcc_grant_sweep_drops_expired, {
+	scc_reset();
+	if (!seed_grant_issue(scc_grants, "uptoken", SCC_CID, NULL, time(NULL))) return 0;
 	seed_grant_sweep(scc_grants, time(NULL) + SEED_GRANT_TTL + 1);
 	return seed_grant_count(scc_grants) == 0;
 });
@@ -1209,6 +1233,7 @@ EXO_TEST(seedcc_grant_token_is_fresh, {
 	char a[SEED_TOKEN_MAX + 1];
 	char b[SEED_TOKEN_MAX + 1];
 	size_t i;
+	scc_reset();
 	if (!seed_grant_make_token(a) || !seed_grant_make_token(b)) return 0;
 	if (strlen(a) != 24 || strlen(b) != 24) return 0;
 	if (strcmp(a, b) == 0) return 0;
@@ -1449,14 +1474,14 @@ static int scc_handshake(void)
 	return strncmp(line, "CINF ID", 7) == 0;
 }
 
-EXO_TEST(seedcc_setup, {
+static int scc_build_cache(void)
+{
 	struct seed_cache_config cfg;
 	struct seed_ingest_request req;
 	struct seed_ingest* job;
 	enum seed_error err = SEED_OK;
 
 	scc_rmtree(SCC_DIR);
-	net_initialize();
 
 	timeout_evt_initialize(&scc_tick, scc_tick_cb, NULL);
 	timeout_queue_insert(net_backend_get_timeout_queue(), &scc_tick, 1);
@@ -1496,9 +1521,24 @@ EXO_TEST(seedcc_setup, {
 	if (!job) return 0;
 	if (seed_ingest_write(job, scc_data, SCC_SIZE) != 0) return 0;
 	return seed_ingest_finish(job, NULL, &err) == 1;
-});
+}
+
+/* Put back what tests change: an empty grant table, no ingest quota, and the
+   cache holding just the one file it was set up with. */
+static void scc_reset(void)
+{
+	seed_grant_sweep(scc_grants, (time_t) 1 << 40);
+	scc_policy.cache = scc_cache;
+	scc_policy.grants = scc_grants;
+	scc_policy.ingest_interval = 300;
+	scc_policy.ingest_per_user = 0;
+	scc_policy.ingest_quota_kb = 0;
+	seed_cache_unblock(scc_cache, scc_dl_tth);
+	seed_cache_remove(scc_cache, scc_dl_tth, "test");
+}
 
 EXO_TEST(seedcc_setup_cached_the_file, {
+	scc_reset();
 	return seed_cache_lookup(scc_cache, scc_tth, NULL) == 1 &&
 	       seed_cache_lookup(scc_cache, scc_dl_tth, NULL) == 0;
 });
@@ -1506,6 +1546,7 @@ EXO_TEST(seedcc_setup_cached_the_file, {
 /* --- per-peer ingest quota ------------------------------------------------ */
 
 EXO_TEST(seedcc_quota_allows_when_unlimited, {
+	scc_reset();
 	scc_policy.ingest_interval = 300;
 	scc_policy.ingest_per_user = 0;
 	scc_policy.ingest_quota_kb = 0;
@@ -1515,34 +1556,40 @@ EXO_TEST(seedcc_quota_allows_when_unlimited, {
 /* The cache already holds one file contributed by SCC_CID, which is what the
    window counts -- no side table to keep in sync with eviction. */
 EXO_TEST(seedcc_quota_counts_cached_files, {
+	scc_reset();
 	scc_policy.ingest_per_user = 1;
 	scc_policy.ingest_quota_kb = 0;
 	return seed_cc_quota_allow(&scc_policy, SCC_CID, 4096, time(NULL)) == 0;
 });
 
 EXO_TEST(seedcc_quota_is_per_peer, {
+	scc_reset();
 	scc_policy.ingest_per_user = 1;
 	return seed_cc_quota_allow(&scc_policy, SCC_TTH, 4096, time(NULL)) == 1;
 });
 
 EXO_TEST(seedcc_quota_allows_below_the_file_limit, {
+	scc_reset();
 	scc_policy.ingest_per_user = 2;
 	return seed_cc_quota_allow(&scc_policy, SCC_CID, 4096, time(NULL)) == 1;
 });
 
 EXO_TEST(seedcc_quota_counts_bytes, {
+	scc_reset();
 	scc_policy.ingest_per_user = 0;
 	scc_policy.ingest_quota_kb = 5; /* 5 KiB; 4 KiB is already cached */
 	return seed_cc_quota_allow(&scc_policy, SCC_CID, 4096, time(NULL)) == 0;
 });
 
 EXO_TEST(seedcc_quota_allows_below_the_byte_limit, {
+	scc_reset();
 	scc_policy.ingest_quota_kb = 64;
 	return seed_cc_quota_allow(&scc_policy, SCC_CID, 4096, time(NULL)) == 1;
 });
 
 /* An absurd request cannot wrap the byte accounting into an allow. */
 EXO_TEST(seedcc_quota_refuses_absurd_size, {
+	scc_reset();
 	scc_policy.ingest_quota_kb = 64;
 	return seed_cc_quota_allow(&scc_policy, SCC_CID, UINT64_MAX, time(NULL)) == 0;
 });
@@ -1550,6 +1597,7 @@ EXO_TEST(seedcc_quota_refuses_absurd_size, {
 /* Content cached before the window began no longer counts against whoever
    contributed it. */
 EXO_TEST(seedcc_quota_window_expires, {
+	scc_reset();
 	scc_policy.ingest_per_user = 1;
 	scc_policy.ingest_quota_kb = 0;
 	scc_policy.ingest_interval = 300;
@@ -1557,26 +1605,26 @@ EXO_TEST(seedcc_quota_window_expires, {
 });
 
 EXO_TEST(seedcc_quota_needs_a_cid, {
+	scc_reset();
 	return seed_cc_quota_allow(&scc_policy, "", 4096, time(NULL)) == 0 &&
 	       seed_cc_quota_allow(&scc_policy, NULL, 4096, time(NULL)) == 0;
 });
 
 EXO_TEST(seedcc_quota_without_a_policy, {
+	scc_reset();
 	return seed_cc_quota_allow(NULL, SCC_CID, 4096, time(NULL)) == 0;
 });
 
 /* --- asking a peer for content -------------------------------------------- */
 
 EXO_TEST(seedcc_request_setup, {
-	scc_policy.ingest_interval = 300;
-	scc_policy.ingest_per_user = 0;
-	scc_policy.ingest_quota_kb = 0;
-	seed_grant_sweep(scc_grants, time(NULL) + SEED_GRANT_TTL + 1);
+	scc_reset();
 	return seed_grant_count(scc_grants) == 0;
 });
 
 EXO_TEST(seedcc_request_rejects_null_arguments, {
 	char token[SEED_TOKEN_MAX + 1];
+	scc_reset();
 	return seed_cc_request_token(NULL, SCC_CID, scc_dl_tth, 0, NULL, token) == 0 &&
 	       seed_cc_request_token(&scc_policy, NULL, scc_dl_tth, 0, NULL, token) == 0 &&
 	       seed_cc_request_token(&scc_policy, SCC_CID, NULL, 0, NULL, token) == 0 &&
@@ -1585,6 +1633,7 @@ EXO_TEST(seedcc_request_rejects_null_arguments, {
 
 EXO_TEST(seedcc_request_rejects_a_malformed_tth, {
 	char token[SEED_TOKEN_MAX + 1];
+	scc_reset();
 	return seed_cc_request_token(&scc_policy, SCC_CID, "nope", 0, NULL, token) == 0;
 });
 
@@ -1592,8 +1641,10 @@ EXO_TEST(seedcc_request_rejects_a_malformed_tth, {
    anything. */
 EXO_TEST(seedcc_request_without_a_cache, {
 	char token[SEED_TOKEN_MAX + 1];
-	struct seed_cache* cache = scc_policy.cache;
+	struct seed_cache* cache;
 	int result;
+	scc_reset();
+	cache = scc_policy.cache;
 	scc_policy.cache = NULL;
 	result = seed_cc_request_token(&scc_policy, SCC_CID, scc_dl_tth, 4096, "x.png", token);
 	scc_policy.cache = cache;
@@ -1605,7 +1656,9 @@ EXO_TEST(seedcc_request_without_a_cache, {
 EXO_TEST(seedcc_request_issues_a_download_grant, {
 	char token[SEED_TOKEN_MAX + 1];
 	struct seed_grant grant;
-	size_t before = seed_grant_count(scc_grants);
+	size_t before;
+	scc_reset();
+	before = seed_grant_count(scc_grants);
 
 	if (seed_cc_request_token(&scc_policy, SCC_CID, scc_dl_tth, 4096, "wanted.png", token) != 1)
 		return 0;
@@ -1623,16 +1676,21 @@ EXO_TEST(seedcc_request_issues_a_download_grant, {
 /* Content the seeder already holds is never requested again. */
 EXO_TEST(seedcc_request_skips_cached_content, {
 	char token[SEED_TOKEN_MAX + 1];
-	size_t before = seed_grant_count(scc_grants);
-	int result = seed_cc_request_token(&scc_policy, SCC_CID, scc_tth, 4096, "served.png", token);
+	size_t before;
+	int result;
+	scc_reset();
+	before = seed_grant_count(scc_grants);
+	result = seed_cc_request_token(&scc_policy, SCC_CID, scc_tth, 4096, "served.png", token);
 	return result == 0 && seed_grant_count(scc_grants) == before && token[0] == '\0';
 });
 
 /* An operator said no to this content: do not go and fetch it. */
 EXO_TEST(seedcc_request_skips_blocked_content, {
 	char token[SEED_TOKEN_MAX + 1];
-	size_t before = seed_grant_count(scc_grants);
+	size_t before;
 	int result;
+	scc_reset();
+	before = seed_grant_count(scc_grants);
 	if (!seed_cache_block(scc_cache, scc_dl_tth, "operator", "test")) return 0;
 	result = seed_cc_request_token(&scc_policy, SCC_CID, scc_dl_tth, 4096, "wanted.png", token);
 	seed_cache_unblock(scc_cache, scc_dl_tth);
@@ -1643,6 +1701,7 @@ EXO_TEST(seedcc_request_skips_blocked_content, {
 EXO_TEST(seedcc_request_honours_the_quota, {
 	char token[SEED_TOKEN_MAX + 1];
 	int result;
+	scc_reset();
 	scc_policy.ingest_per_user = 1;
 	result = seed_cc_request_token(&scc_policy, SCC_CID, scc_dl_tth, 4096, "x.png", token);
 	scc_policy.ingest_per_user = 0;
@@ -1659,6 +1718,7 @@ EXO_TEST(seedcc_serves_the_cached_bytes, {
 	char line[512];
 	char expect[128];
 	uint8_t body[SCC_SIZE];
+	scc_reset();
 
 	if (!scc_open_connection()) return 0;
 	if (!seed_grant_issue(scc_grants, SCC_TOKEN, SCC_CID, NULL, time(NULL))) return 0;
@@ -1692,6 +1752,7 @@ EXO_TEST(seedcc_informational_status_does_not_end_the_connection, {
 	char line[512];
 	char expect[128];
 	uint8_t body[SCC_SIZE];
+	scc_reset();
 
 	if (!scc_open_connection()) return 0;
 	if (!seed_grant_issue(scc_grants, SCC_TOKEN, SCC_CID, NULL, time(NULL))) return 0;
@@ -1723,6 +1784,7 @@ EXO_TEST(seedcc_informational_status_does_not_end_the_connection, {
 EXO_TEST(seedcc_recoverable_status_still_closes, {
 	char line[512];
 	int closed;
+	scc_reset();
 
 	if (!scc_open_connection()) return 0;
 	if (!seed_grant_issue(scc_grants, SCC_TOKEN, SCC_CID, NULL, time(NULL))) return 0;
@@ -1747,6 +1809,7 @@ EXO_TEST(seedcc_serves_a_range, {
 	char line[512];
 	char expect[128];
 	uint8_t body[1024];
+	scc_reset();
 
 	if (!scc_open_connection()) return 0;
 	if (!seed_grant_issue(scc_grants, SCC_TOKEN, SCC_CID, NULL, time(NULL))) return 0;
@@ -1775,6 +1838,7 @@ EXO_TEST(seedcc_serves_a_range, {
 EXO_TEST(seedcc_refuses_without_a_grant, {
 	char line[512];
 	int refused;
+	scc_reset();
 
 	if (!scc_open_connection()) return 0;
 	if (!scc_handshake()) return 0;
@@ -1794,6 +1858,7 @@ EXO_TEST(seedcc_refuses_without_a_grant, {
 EXO_TEST(seedcc_serves_nothing_without_a_grant, {
 	char line[512];
 	int refused;
+	scc_reset();
 
 	if (!scc_open_connection()) return 0;
 	if (!scc_handshake()) return 0;
@@ -1813,6 +1878,7 @@ EXO_TEST(seedcc_refuses_another_cid, {
 	char line[512];
 	char other[SEED_CID_LEN + 1];
 	int refused;
+	scc_reset();
 
 	if (!scc_open_connection()) return 0;
 	if (!seed_grant_issue(scc_grants, SCC_TOKEN, SCC_CID, NULL, time(NULL))) return 0;
@@ -1835,6 +1901,7 @@ EXO_TEST(seedcc_refuses_another_cid, {
 EXO_TEST(seedcc_token_is_single_use, {
 	char line[512];
 	int refused;
+	scc_reset();
 
 	if (!scc_open_connection()) return 0;
 	if (!seed_grant_issue(scc_grants, SCC_TOKEN, SCC_CID, NULL, time(NULL))) return 0;
@@ -1863,6 +1930,7 @@ EXO_TEST(seedcc_token_is_single_use, {
 EXO_TEST(seedcc_expired_token_is_refused, {
 	char line[512];
 	int refused;
+	scc_reset();
 
 	if (!scc_open_connection()) return 0;
 	if (!seed_grant_issue(scc_grants, SCC_TOKEN, SCC_CID, NULL,
@@ -1884,6 +1952,7 @@ EXO_TEST(seedcc_expired_token_is_refused, {
 EXO_TEST(seedcc_unknown_tth_is_refused, {
 	char line[512];
 	int refused;
+	scc_reset();
 
 	if (!scc_open_connection()) return 0;
 	if (!seed_grant_issue(scc_grants, SCC_TOKEN, SCC_CID, NULL, time(NULL))) return 0;
@@ -1904,6 +1973,7 @@ EXO_TEST(seedcc_unknown_tth_is_refused, {
 EXO_TEST(seedcc_tthl_is_recoverable, {
 	char line[512];
 	int recoverable;
+	scc_reset();
 
 	if (!scc_open_connection()) return 0;
 	if (!seed_grant_issue(scc_grants, SCC_TOKEN, SCC_CID, NULL, time(NULL))) return 0;
@@ -1925,6 +1995,7 @@ EXO_TEST(seedcc_tthl_is_recoverable, {
 EXO_TEST(seedcc_recovers_after_a_refusal, {
 	char line[512];
 	char expect[128];
+	scc_reset();
 
 	if (!scc_open_connection()) return 0;
 	if (!seed_grant_issue(scc_grants, SCC_TOKEN, SCC_CID, NULL, time(NULL))) return 0;
@@ -1951,6 +2022,7 @@ EXO_TEST(seedcc_recovers_after_a_refusal, {
 EXO_TEST(seedcc_gfi_answers_from_the_cache, {
 	char line[512];
 	char expect[256];
+	scc_reset();
 
 	if (!scc_open_connection()) return 0;
 	if (!seed_grant_issue(scc_grants, SCC_TOKEN, SCC_CID, NULL, time(NULL))) return 0;
@@ -1980,6 +2052,7 @@ EXO_TEST(seedcc_ingests_over_a_download_grant, {
 	char expect[128];
 	time_t deadline;
 	int done = 0;
+	scc_reset();
 
 	if (!scc_open_connection()) return 0;
 	if (!seed_grant_issue_download(scc_grants, SCC_TOKEN, SCC_CID, scc_dl_tth,
@@ -2015,6 +2088,7 @@ EXO_TEST(seedcc_refuses_a_mismatched_body, {
 	char expect[128];
 	uint8_t junk[SCC_SIZE];
 	int i;
+	scc_reset();
 
 	if (!scc_open_connection()) return 0;
 	if (!seed_grant_issue_download(scc_grants, SCC_TOKEN, SCC_CID, SCC_TTH2,
@@ -2045,6 +2119,7 @@ EXO_TEST(seedcc_refuses_a_substituted_csnd, {
 	char line[512];
 	char expect[128];
 	int i;
+	scc_reset();
 
 	if (!scc_open_connection()) return 0;
 	if (!seed_grant_issue_download(scc_grants, SCC_TOKEN, SCC_CID, SCC_TTH2,
@@ -2154,7 +2229,8 @@ static int scc_accept_dial(void)
 	return 0;
 }
 
-EXO_TEST(seedcc_active_setup, {
+static int scc_build_active(void)
+{
 	if (!scc_start_listener()) return 0;
 
 	memset(&scc_peer_addr, 0, sizeof(scc_peer_addr));
@@ -2165,6 +2241,45 @@ EXO_TEST(seedcc_active_setup, {
 	scc_peer.addr = &scc_peer_addr;
 	scc_peer.addr_is_client_supplied = 0;
 	return seed_cc_may_dial(&scc_policy, &scc_peer) == 1;
+}
+
+/*
+ * The fixture for the whole file: a grant table, a cache holding one file to
+ * serve, the policy that ties them together, and a listener for the seeder to
+ * dial. Every test after the pure policy checks starts with scc_reset(), which
+ * puts back what tests change -- the grants, the ingest quota, the downloaded
+ * file -- so each runs alone or in any order.
+ */
+EXO_SETUP({
+	if (!test_net_acquire())
+		return 0;
+	scc_grants = seed_grants_create();
+	if (!scc_grants)
+		return 0;
+	return scc_build_cache() && scc_build_active();
+});
+
+EXO_TEARDOWN({
+	scc_close_connection();
+	if (scc_listen_fd >= 0)
+	{
+		close(scc_listen_fd);
+		scc_listen_fd = -1;
+	}
+	timeout_queue_remove(net_backend_get_timeout_queue(), &scc_tick);
+	seed_grants_destroy(scc_grants);
+	scc_grants = NULL;
+	seed_cache_close(scc_cache);
+	scc_cache = NULL;
+	scc_rmtree(SCC_DIR);
+	test_net_release();
+	return 1;
+});
+
+/* The listener and the peer it stands for are there, and may be dialled. */
+EXO_TEST(seedcc_active_setup, {
+	scc_reset();
+	return scc_listen_fd >= 0 && seed_cc_may_dial(&scc_policy, &scc_peer) == 1;
 });
 
 /*
@@ -2175,6 +2290,7 @@ EXO_TEST(seedcc_active_speaks_first_and_serves, {
 	char line[512];
 	char expect[128];
 	uint8_t body[SCC_SIZE];
+	scc_reset();
 
 	if (!seed_cc_connect_to_peer(&scc_policy, &scc_peer, "ADC/1.0", scc_listen_port, SCC_TOKEN))
 		return 0;
@@ -2223,6 +2339,7 @@ EXO_TEST(seedcc_active_refuses_unexpected_cid, {
 	char line[512];
 	char other[SEED_CID_LEN + 1];
 	int refused;
+	scc_reset();
 
 	if (!seed_cc_connect_to_peer(&scc_policy, &scc_peer, "ADC/1.0", scc_listen_port, SCC_TOKEN))
 		return 0;
@@ -2248,6 +2365,7 @@ EXO_TEST(seedcc_active_refuses_unexpected_cid, {
    client-supplied. */
 EXO_TEST(seedcc_active_refuses_a_client_supplied_address, {
 	int refused;
+	scc_reset();
 
 	scc_peer.addr_is_client_supplied = 1;
 	refused = (seed_cc_may_dial(&scc_policy, &scc_peer) == 0) &&
@@ -2257,22 +2375,27 @@ EXO_TEST(seedcc_active_refuses_a_client_supplied_address, {
 });
 
 EXO_TEST(seedcc_active_refuses_a_privileged_port, {
+	scc_reset();
 	return seed_cc_connect_to_peer(&scc_policy, &scc_peer, "ADC/1.0", 80, SCC_TOKEN) == 0;
 });
 
 EXO_TEST(seedcc_active_refuses_an_unknown_protocol, {
+	scc_reset();
 	return seed_cc_connect_to_peer(&scc_policy, &scc_peer, "ADC0", scc_listen_port, SCC_TOKEN) == 0 &&
 	       seed_cc_connect_to_peer(&scc_policy, &scc_peer, "NMDC", scc_listen_port, SCC_TOKEN) == 0;
 });
 
 EXO_TEST(seedcc_active_refuses_without_a_token, {
+	scc_reset();
 	return seed_cc_connect_to_peer(&scc_policy, &scc_peer, "ADC/1.0", scc_listen_port, NULL) == 0 &&
 	       seed_cc_connect_to_peer(&scc_policy, &scc_peer, "ADC/1.0", scc_listen_port, "") == 0;
 });
 
 /* A peer with no CID is not a peer we can identify, so it is not one we dial. */
 EXO_TEST(seedcc_active_refuses_a_peer_without_a_cid, {
-	struct seed_cc_peer bad = scc_peer;
+	struct seed_cc_peer bad;
+	scc_reset();
+	bad = scc_peer;
 	bad.cid = NULL;
 	if (seed_cc_may_dial(&scc_policy, &bad)) return 0;
 	bad.cid = "short";
@@ -2285,20 +2408,13 @@ EXO_TEST(seedcc_active_refuses_a_peer_without_a_cid, {
 /* Without our own CID there is no CINF to send, so nothing is dialled or
    accepted. */
 EXO_TEST(seedcc_refuses_without_our_own_cid, {
-	struct seed_cc_policy broken = scc_policy;
+	struct seed_cc_policy broken;
+	scc_reset();
+	broken = scc_policy;
 	broken.cid = NULL;
 	if (seed_cc_may_dial(&broken, &scc_peer)) return 0;
 	broken.cid = "not-a-cid";
 	return seed_cc_may_dial(&broken, &scc_peer) == 0;
-});
-
-EXO_TEST(seedcc_active_teardown, {
-	if (scc_listen_fd >= 0)
-	{
-		close(scc_listen_fd);
-		scc_listen_fd = -1;
-	}
-	return 1;
 });
 
 /* --- nothing left behind -------------------------------------------------- */
@@ -2306,6 +2422,7 @@ EXO_TEST(seedcc_active_teardown, {
 /* Nothing may be left pinned once the transfers are over. */
 EXO_TEST(seedcc_releases_every_pin, {
 	struct seed_cache_stats stats;
+	scc_reset();
 	seed_cache_get_stats(scc_cache, &stats);
 	return stats.pinned == 0 && stats.entries >= 1;
 });
@@ -2316,23 +2433,14 @@ EXO_TEST(seedcc_releases_every_pin, {
  * active transfer until the seeder refuses to serve anybody.
  */
 EXO_TEST(seedcc_releases_every_upload_slot, {
+	scc_reset();
 	return seed_cc_active_uploads() == 0;
 });
 
 EXO_TEST(seedcc_no_ingest_left_running, {
 	struct seed_cache_stats stats;
+	scc_reset();
 	seed_cache_get_stats(scc_cache, &stats);
 	return stats.active_ingests == 0;
 });
 
-EXO_TEST(seedcc_cleanup, {
-	scc_close_connection();
-	timeout_queue_remove(net_backend_get_timeout_queue(), &scc_tick);
-	seed_grants_destroy(scc_grants);
-	scc_grants = NULL;
-	seed_cache_close(scc_cache);
-	scc_cache = NULL;
-	net_destroy();
-	scc_rmtree(SCC_DIR);
-	return 1;
-});
