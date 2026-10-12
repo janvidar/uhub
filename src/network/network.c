@@ -139,8 +139,16 @@ int net_error()
 const char* net_error_string(int code)
 {
 #ifdef WINSOCK
-	static char string[32];
-	snprintf(string, 32, "error code: %d", code);
+	/* Winsock codes are not errno values, so strerror() knows nothing of them;
+	   the system message table does. */
+	static char string[256];
+	DWORD len = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL, (DWORD) code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), string, sizeof(string), NULL);
+	/* It ends in ".\r\n", which a log line does not want. */
+	while (len && (string[len - 1] == '\n' || string[len - 1] == '\r' || string[len - 1] == '.' || string[len - 1] == ' '))
+		string[--len] = '\0';
+	if (!len)
+		snprintf(string, sizeof(string), "error code: %d", code);
 	return string;
 #else
 	return strerror(code);
@@ -282,29 +290,29 @@ int net_set_keepalive(int fd, int toggle)
 		return ret;
 	}
 
-#ifndef WINSOCK
 	/*
 	 * Tune the per-socket keepalive timers so a dead peer is detected in a few
 	 * minutes instead of the OS default of ~2 hours. Best-effort: a platform
 	 * that lacks one of these options simply keeps its default, so the return
 	 * values are intentionally ignored (no error spam). The idle option is
-	 * TCP_KEEPIDLE on Linux and TCP_KEEPALIVE on the BSDs/macOS.
+	 * TCP_KEEPIDLE on Linux and Windows, TCP_KEEPALIVE on the BSDs/macOS.
+	 * Windows takes all three from Windows 10 1709 on, in seconds as elsewhere;
+	 * its setsockopt() wants a char pointer, hence the cast.
 	 */
 	if (toggle)
 	{
 #if defined(TCP_KEEPIDLE)
-		{ int v = KEEPALIVE_IDLE;  (void) setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE,  &v, sizeof(v)); }
+		{ int v = KEEPALIVE_IDLE;  (void) setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE,  (const char*) &v, sizeof(v)); }
 #elif defined(TCP_KEEPALIVE)
-		{ int v = KEEPALIVE_IDLE;  (void) setsockopt(fd, IPPROTO_TCP, TCP_KEEPALIVE, &v, sizeof(v)); }
+		{ int v = KEEPALIVE_IDLE;  (void) setsockopt(fd, IPPROTO_TCP, TCP_KEEPALIVE, (const char*) &v, sizeof(v)); }
 #endif
 #if defined(TCP_KEEPINTVL)
-		{ int v = KEEPALIVE_INTVL; (void) setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &v, sizeof(v)); }
+		{ int v = KEEPALIVE_INTVL; (void) setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, (const char*) &v, sizeof(v)); }
 #endif
 #if defined(TCP_KEEPCNT)
-		{ int v = KEEPALIVE_CNT;   (void) setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT,   &v, sizeof(v)); }
+		{ int v = KEEPALIVE_CNT;   (void) setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT,   (const char*) &v, sizeof(v)); }
 #endif
 	}
-#endif
 	return ret;
 }
 
@@ -640,47 +648,15 @@ int net_socket_create(int af, int type, int protocol)
 	return sd;
 }
 
+/*
+ * inet_ntop() / inet_pton() on every platform, Windows included (Winsock has
+ * had them since Vista). Windows once went through WSAAddressToStringA()
+ * instead, which leaves an IPv4-mapped address as "::ffff:a.b.c.d" -- and
+ * net_accept() then failed to read that back as IPv4, so on a dual-stack
+ * listener every IPv4 client came out as 0.0.0.0.
+ */
 const char* net_address_to_string(int af, const void* src, char* dst, socklen_t cnt)
 {
-#ifdef WINSOCK
-	struct sockaddr_in  sin4;
-	struct sockaddr_in6 sin6;
-	struct in_addr*  addr4 = (struct in_addr*)  src;
-	struct in6_addr* addr6 = (struct in6_addr*) src;
-	size_t size;
-	LPSOCKADDR addr;
-	DWORD len = cnt;
-
-	switch (af)
-	{
-		case AF_INET:
-			sin4.sin_family  = AF_INET;
-			sin4.sin_port    = 0;
-			sin4.sin_addr    = *addr4;
-			size             = sizeof(sin4);
-			addr             = (LPSOCKADDR) &sin4;
-			break;
-
-		case AF_INET6:
-			sin6.sin6_family = AF_INET6;
-			sin6.sin6_port   = 0;
-			sin6.sin6_addr   = *addr6;
-			sin6.sin6_scope_id = 0;
-			size             = sizeof(sin6);
-			addr             = (LPSOCKADDR) &sin6;
-			break;
-
-		default:
-			return NULL;
-	}
-
-	if (WSAAddressToStringA(addr, size, NULL, dst, &len) == 0)
-	{
-		return dst;
-	}
-
-	return NULL;
-#else
 	if (inet_ntop(af, src, dst, cnt))
 	{
 		/* IPv6 mapped IPv4 address. Only strip the prefix when there is
@@ -693,50 +669,11 @@ const char* net_address_to_string(int af, const void* src, char* dst, socklen_t 
 		return dst;
 	}
 	return NULL;
-#endif
 }
 
 int net_string_to_address(int af, const char* src, void* dst)
 {
-#ifdef WINSOCK
-	int ret, size;
-	struct sockaddr_in  addr4;
-	struct sockaddr_in6 addr6;
-	struct sockaddr* addr = 0;
-	if (af == AF_INET6)
-	{
-		if (net_is_ipv6_supported() != 1) return -1;
-		size = sizeof(struct sockaddr_in6);
-		addr = (struct sockaddr*) &addr6;
-	}
-	else
-	{
-		size = sizeof(struct sockaddr_in);
-		addr = (struct sockaddr*) &addr4;
-	}
-
-	if (!net_initialized)
-		net_initialize();
-
-	ret = WSAStringToAddressA((char*) src, af, NULL, addr, &size);
-	if (ret == -1)
-	{
-		return -1;
-	}
-
-	if (af == AF_INET6)
-	{
-		memcpy(dst, &addr6.sin6_addr, sizeof(addr6.sin6_addr));
-	}
-	else
-	{
-		memcpy(dst, &addr4.sin_addr, sizeof(addr4.sin_addr));
-	}
-
-	return 1;
-#else
 	return inet_pton(af, src, dst);
-#endif
 }
 
 const char* net_get_peer_address(int fd)
@@ -797,17 +734,12 @@ const char* net_get_local_address(int fd)
 
 	if (getsockname(fd, (struct sockaddr*) name, &namelen) != -1)
 	{
-#ifndef WINSOCK
 		int af = storage.ss_family;
 		if (af == AF_INET6)
 		{
 			net_address_to_string(af, (void*) &name6->sin6_addr, address, sizeof(address));
 		}
 		else
-#else
-		int af = AF_INET;
-		(void) name6; /* IPv6 branch is POSIX-only; unused under WinSock */
-#endif
 		{
 			net_address_to_string(af, (void*) &name4->sin_addr, address, sizeof(address));
 		}

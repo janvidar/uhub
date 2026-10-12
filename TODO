@@ -15,10 +15,11 @@ since the 0.7.1 tag.
   at both levels (autotest/test_hbri.tcc, run_hbri_e2e.sh phase 8).
 
 ## Networking / platform
-- Windows socket support — src/network/network.c. uhub is meant to be portable
-  to Windows (not a tier-1 platform, though CI now has a windows job).
-  net_set_close_on_exec is resolved (deliberate no-op); other WINSOCK paths may
-  still need real implementations.
+- Windows: the WINSOCK paths in src/network/network.c are done (readable
+  error text, keepalive tuning, inet_ntop/inet_pton, the local address family).
+  autotest still does not build for Windows -- it relies on POSIX socket
+  semantics -- so test/e2e/run_windows_wine_e2e.sh (zig + wine, not in CI) is
+  the runtime check; the CI windows job only starts uhub.exe.
 
 ## Cleanup
 - Branch sprawl: 27 local and 34 remote branches, mostly unmerged historical

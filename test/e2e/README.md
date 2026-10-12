@@ -83,6 +83,19 @@ token), and that ADC and ADCS logins on the same port are unaffected. Needs
 BUILD=/path/to/build test/e2e/run_redirect_e2e.sh [port]
 ```
 
+## run_windows_wine_e2e.sh
+
+Builds uhub for Windows with zig, runs `uhub.exe` under Wine and drives it with
+the native `adc_cmd`: an IPv4 client on a dual-stack listener keeps its
+address, an IPv6 listener reports its own address, socket errors read as text,
+and TLS logins and plugin DLLs work. `autotest` does not build for Windows, so
+this is the only runtime check of the Winsock paths. Needs `zig` and `wine`;
+not run in CI.
+
+```sh
+BUILD=/path/to/native/build test/e2e/run_windows_wine_e2e.sh [port]
+```
+
 ## run_link_e2e.sh
 
 Brings up **two linked hubs** (node 0 and node 1, a shared `link_secret`, node 1

@@ -33,6 +33,10 @@ New features:
 Fixes:
 - mod_welcome: a motd or rules text ending in a lone "%" made the formatter
   read past the end of the string.
+- Windows: an IPv4 client on a dual-stack listener (the default) was seen as
+  0.0.0.0, defeating IP bans, per-IP limits and !myip; an IPv6 listener
+  reported 0.0.0.0 as its address; socket errors read "error code: N" rather
+  than a message; and TCP keepalive kept the two-hour system default.
 - The uhub_logouts_total metric stayed at 0: logouts were counted only for a
   user still logged in, which by then none is.
 
