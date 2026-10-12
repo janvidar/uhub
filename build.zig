@@ -162,6 +162,7 @@ const tcc_sources = [_][]const u8{
     "test_mod_guest_passwd.tcc",
     "test_mod_joins.tcc",
     "test_mod_users.tcc",
+    "test_mod_welcome.tcc",
     "test_netbackend.tcc",
     "test_probe.tcc",
     "test_rbtree.tcc",
@@ -579,6 +580,7 @@ pub fn build(b: *std.Build) void {
         ctx.addSources(autotest_mod, &.{"autotest/mod_users_shim.c"});
         ctx.addSources(autotest_mod, &.{"autotest/mod_guest_passwd_shim.c"});
         ctx.addSources(autotest_mod, &.{"autotest/mod_joins_shim.c"});
+        ctx.addSources(autotest_mod, &.{"autotest/mod_welcome_shim.c"});
         ctx.addSqlite(autotest_mod);
         ctx.addAutotest(autotest_mod);
         autotest_mod.linkLibrary(common);

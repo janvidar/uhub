@@ -30,6 +30,10 @@ New features:
   hub.get_user_by_nick, and an auth_list_users storage callback, implemented by
   mod_auth_sqlite and mod_auth_simple.
 
+Fixes:
+- mod_welcome: a motd or rules text ending in a lone "%" made the formatter
+  read past the end of the string.
+
 0.8.0:
 Incompatible changes (action required beyond replacing the binaries):
 - The acl file (file_acl) no longer defines registered users. The user_admin,

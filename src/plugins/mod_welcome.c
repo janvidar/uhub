@@ -182,6 +182,16 @@ static struct cbuffer* parse_message(struct plugin_handle* plugin, struct plugin
 		cbuf_append_bytes(buf, start, (offset - start));
 
 		offset++;
+
+		/* A "%" at the very end is just a "%". Stepping over the terminator
+		   as for a code would leave start past the end of the string. */
+		if (!*offset)
+		{
+			cbuf_append(buf, "%");
+			start = offset;
+			break;
+		}
+
 		switch (offset[0])
 		{
 			case 'n':

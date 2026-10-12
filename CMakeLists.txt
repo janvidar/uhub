@@ -425,7 +425,8 @@ target_sources(autotest-bin PRIVATE
 	${AUTOTEST_DIR}/mod_chat_history_shim.c
 	${AUTOTEST_DIR}/mod_users_shim.c
 	${AUTOTEST_DIR}/mod_guest_passwd_shim.c
-	${AUTOTEST_DIR}/mod_joins_shim.c)
+	${AUTOTEST_DIR}/mod_joins_shim.c
+	${AUTOTEST_DIR}/mod_welcome_shim.c)
 target_include_directories(autotest-bin PRIVATE ${AUTOTEST_DIR})
 
 # fuse/filelist.c is in fuse_test_SOURCES. Its parser needs no library; its
