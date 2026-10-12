@@ -3,6 +3,7 @@
 #include "network/ipcalc.h"
 #include "network/network.h"
 #include "core/auth.h"
+#include "testutil_net.h"
 
 static int ipv6 = 0;
 
@@ -16,8 +17,73 @@ static struct ip_addr_encap mask;
 static struct ip_range ban6;
 static struct ip_range ban4;
 
-EXO_TEST(prepare_network, {
-    return net_initialize() == 0;
+static struct acl_handle g_acl_ipban;
+
+static void ipban_free_range(void* ptr)
+{
+	hub_free(ptr);
+}
+
+/* The comparison operands. The bitwise tests further down reuse these
+   variables, so a comparison test sets them afresh rather than relying on
+   whatever ran before it. */
+static void set_addresses(void)
+{
+	ip_convert_to_binary("192.168.0.0",              &ip4_a);
+	ip_convert_to_binary("192.168.255.255",          &ip4_b);
+	ip_convert_to_binary("192.168.0.1",              &ip4_c);
+	ip_convert_to_binary("2001::201:2ff:fefa:0",     &ip6_a);
+	ip_convert_to_binary("2001::201:2ff:fefa:ffff",  &ip6_b);
+	ip_convert_to_binary("2001::201:2ff:fefa:fffe",  &ip6_c);
+}
+
+/* The network layer, the ranges the check_ban tests look in, and the ACL the
+   acl_ipban tests consult. Nothing here is changed by a test. */
+EXO_SETUP({
+	struct ip_range* r4;
+	struct ip_range* r4_single;
+	struct ip_range* r6;
+
+	if (!test_net_acquire())
+		return 0;
+	ipv6 = net_is_ipv6_supported();
+
+	if (!ip_convert_to_binary("2001::201:2ff:fefa:0",    &ban6.lo) ||
+	    !ip_convert_to_binary("2001::201:2ff:fefa:ffff", &ban6.hi) ||
+	    !ip_convert_to_binary("192.168.0.0",             &ban4.lo) ||
+	    !ip_convert_to_binary("192.168.0.255",           &ban4.hi))
+		return 0;
+
+	memset(&g_acl_ipban, 0, sizeof(g_acl_ipban));
+	g_acl_ipban.networks = list_create();
+	if (!g_acl_ipban.networks) return 0;
+
+	r4 = (struct ip_range*) hub_malloc_zero(sizeof(struct ip_range));
+	if (!ip_convert_address_to_range("192.168.1.0/24", r4)) return 0;
+	list_append(g_acl_ipban.networks, r4);
+
+	r4_single = (struct ip_range*) hub_malloc_zero(sizeof(struct ip_range));
+	if (!ip_convert_address_to_range("10.0.0.5", r4_single)) return 0;
+	list_append(g_acl_ipban.networks, r4_single);
+
+	if (ipv6)
+	{
+		r6 = (struct ip_range*) hub_malloc_zero(sizeof(struct ip_range));
+		if (!ip_convert_address_to_range("2001:db8::/32", r6)) return 0;
+		list_append(g_acl_ipban.networks, r6);
+	}
+	return 1;
+});
+
+EXO_TEARDOWN({
+	if (g_acl_ipban.networks)
+	{
+		list_clear(g_acl_ipban.networks, &ipban_free_range);
+		list_destroy(g_acl_ipban.networks);
+		g_acl_ipban.networks = NULL;
+	}
+	test_net_release();
+	return 1;
 });
 
 EXO_TEST(check_ipv6, {
@@ -91,56 +157,68 @@ EXO_TEST(ip_is_valid_ipv6_3, {
 });
 
 EXO_TEST(ip4_compare_1, {
+	set_addresses();
 	return ip_compare(&ip4_a, &ip4_b) < 0;
 });
 
 EXO_TEST(ip4_compare_2, {
+	set_addresses();
 	return ip_compare(&ip4_a, &ip4_c) < 0;
 });
 
 EXO_TEST(ip4_compare_3, {
+	set_addresses();
 	return ip_compare(&ip4_b, &ip4_c) > 0;
 });
 
 EXO_TEST(ip4_compare_4, {
+	set_addresses();
 	return ip_compare(&ip4_b, &ip4_a) > 0;
 });
 
 EXO_TEST(ip4_compare_5, {
+	set_addresses();
 	return ip_compare(&ip4_c, &ip4_a) > 0;
 });
 
 EXO_TEST(ip4_compare_6, {
+	set_addresses();
 	if (!ipv6) return 1;
 	return ip_compare(&ip4_c, &ip4_c) == 0;
 });
 
 EXO_TEST(ip6_compare_1, {
+	set_addresses();
 	if (!ipv6) return 1;
 	return ip_compare(&ip6_a, &ip6_b) < 0;
 });
 
 EXO_TEST(ip6_compare_2, {
+	set_addresses();
 	if (!ipv6) return 1;
 	return ip_compare(&ip6_a, &ip6_c) < 0;
 });
 
 EXO_TEST(ip6_compare_3, {
+	set_addresses();
 	if (!ipv6) return 1;
 	return ip_compare(&ip6_b, &ip6_c) > 0;
 });
 
 EXO_TEST(ip6_compare_4, {
+	set_addresses();
 	if (!ipv6) return 1;
 	return ip_compare(&ip6_b, &ip6_a) > 0;
 });
 
 EXO_TEST(ip6_compare_5, {
+	set_addresses();
 	if (!ipv6) return 1;
 	return ip_compare(&ip6_c, &ip6_a) > 0;
 });
 
 EXO_TEST(ip6_compare_6, {
+	set_addresses();
 	if (!ipv6) return 1;
 	return ip_compare(&ip6_c, &ip6_c) == 0;
 });
@@ -491,38 +569,6 @@ EXO_TEST(check_ban_afmix_2, {
  * The function used to be defined but never called from check_acl(),
  * so deny_ip entries had no effect at login time.
  */
-static struct acl_handle g_acl_ipban;
-
-static void ipban_free_range(void* ptr)
-{
-	hub_free(ptr);
-}
-
-EXO_TEST(acl_ipban_setup, {
-	struct ip_range* r4;
-	struct ip_range* r4_single;
-	struct ip_range* r6;
-	memset(&g_acl_ipban, 0, sizeof(g_acl_ipban));
-	g_acl_ipban.networks = list_create();
-	if (!g_acl_ipban.networks) return 0;
-
-	r4 = (struct ip_range*) hub_malloc_zero(sizeof(struct ip_range));
-	if (!ip_convert_address_to_range("192.168.1.0/24", r4)) return 0;
-	list_append(g_acl_ipban.networks, r4);
-
-	r4_single = (struct ip_range*) hub_malloc_zero(sizeof(struct ip_range));
-	if (!ip_convert_address_to_range("10.0.0.5", r4_single)) return 0;
-	list_append(g_acl_ipban.networks, r4_single);
-
-	if (ipv6)
-	{
-		r6 = (struct ip_range*) hub_malloc_zero(sizeof(struct ip_range));
-		if (!ip_convert_address_to_range("2001:db8::/32", r6)) return 0;
-		list_append(g_acl_ipban.networks, r6);
-	}
-	return 1;
-});
-
 EXO_TEST(acl_ipban_ipv4_in_range, {
 	return acl_is_ip_banned(&g_acl_ipban, "192.168.1.100") == 1;
 });
@@ -575,13 +621,6 @@ EXO_TEST(acl_ipban_empty_list, {
 	result = acl_is_ip_banned(&empty, "192.168.1.100");
 	list_destroy(empty.networks);
 	return result == 0;
-});
-
-EXO_TEST(acl_ipban_shutdown, {
-	list_clear(g_acl_ipban.networks, &ipban_free_range);
-	list_destroy(g_acl_ipban.networks);
-	g_acl_ipban.networks = NULL;
-	return 1;
 });
 
 EXO_TEST(ip4_bitwise_AND_1, {
@@ -794,9 +833,4 @@ EXO_TEST(ip_convert_to_string_no_alias, {
 	sa = ip_convert_to_string(&a);
 	sb = ip_convert_to_string(&b);
 	return sa != sb && strcmp(sa, "10.0.0.1") == 0 && strcmp(sb, "10.0.0.2") == 0;
-});
-
-
-EXO_TEST(shutdown_network, {
-    return net_destroy() == 0;
 });

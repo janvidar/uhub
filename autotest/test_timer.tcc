@@ -2,6 +2,11 @@
 #include "util/memory.h"
 #include "network/timeout.h"
 
+/*
+ * Each test starts a fresh queue with timer_start() and shuts it down again
+ * with timer_stop(), so each one runs alone or in any order.
+ */
+
 #define MAX_EVENTS 15
 static struct timeout_queue* g_queue;
 static time_t g_now;
@@ -51,7 +56,8 @@ size_t timeout_queue_get_next_timeout(struct timeout_queue*, time_t now);
 */
 
 
-EXO_TEST(timer_setup,{
+static int timer_start(void)
+{
 	size_t n;
 	g_queue = hub_malloc_zero(sizeof(struct timeout_queue));
 	g_now = 0;
@@ -66,39 +72,18 @@ EXO_TEST(timer_setup,{
 	}
 
 	return g_queue != NULL;
-});
+}
 
+static void timer_stop(void)
+{
+	timeout_queue_shutdown(g_queue);
+	hub_free(g_queue);
+	g_queue = NULL;
+}
 
-EXO_TEST(timer_check_timeout_0,{
-	return timeout_queue_get_next_timeout(g_queue, g_now) == g_max;
-});
-
-
-EXO_TEST(timer_add_event_1,{
-	timeout_queue_insert(g_queue, &g_events[0], 2);
-	return g_events[0].prev != NULL;
-});
-
-EXO_TEST(timer_check_timeout_1,{
-	return timeout_queue_get_next_timeout(g_queue, g_now) == 2;
-});
-
-EXO_TEST(timer_remove_event_1,{
-	timeout_queue_remove(g_queue, &g_events[0]);
-	return g_events[0].prev == NULL;
-});
-
-EXO_TEST(timer_check_timeout_2,{
-	return timeout_queue_get_next_timeout(g_queue, g_now) == g_max;
-});
-
-/* test re-removing an event - should not crash! */
-EXO_TEST(timer_remove_event_1_no_crash,{
-	timeout_queue_remove(g_queue, &g_events[0]);
-	return g_events[0].prev == NULL;
-});
-
-EXO_TEST(timer_add_5_events_1,{
+/* Five events, due in 0..4 seconds. */
+static int timer_add_5(void)
+{
 	timeout_queue_insert(g_queue, &g_events[0], 0);
 	timeout_queue_insert(g_queue, &g_events[1], 1);
 	timeout_queue_insert(g_queue, &g_events[2], 2);
@@ -110,19 +95,92 @@ EXO_TEST(timer_add_5_events_1,{
 			g_events[2].prev != NULL &&
 			g_events[3].prev != NULL &&
 			g_events[4].prev != NULL);
+}
+
+EXO_TEST(timer_setup, {
+	int ok = timer_start();
+	timer_stop();
+	return ok;
 });
 
-EXO_TEST(timer_check_5_events_1,{
-	return timeout_queue_get_next_timeout(g_queue, g_now) == 1;
+/* Nothing queued: the next timeout is the queue's horizon. */
+EXO_TEST(timer_check_timeout_0, {
+	int ok = timer_start() && timeout_queue_get_next_timeout(g_queue, g_now) == g_max;
+	timer_stop();
+	return ok;
 });
 
-EXO_TEST(timer_process_5_events_1,{
+EXO_TEST(timer_add_event_1, {
+	int ok = timer_start();
+	timeout_queue_insert(g_queue, &g_events[0], 2);
+	ok = ok && g_events[0].prev != NULL;
+	timer_stop();
+	return ok;
+});
+
+EXO_TEST(timer_check_timeout_1, {
+	int ok = timer_start();
+	timeout_queue_insert(g_queue, &g_events[0], 2);
+	ok = ok && timeout_queue_get_next_timeout(g_queue, g_now) == 2;
+	timer_stop();
+	return ok;
+});
+
+EXO_TEST(timer_remove_event_1, {
+	int ok = timer_start();
+	timeout_queue_insert(g_queue, &g_events[0], 2);
+	timeout_queue_remove(g_queue, &g_events[0]);
+	ok = ok && g_events[0].prev == NULL;
+	timer_stop();
+	return ok;
+});
+
+EXO_TEST(timer_check_timeout_2, {
+	int ok = timer_start();
+	timeout_queue_insert(g_queue, &g_events[0], 2);
+	timeout_queue_remove(g_queue, &g_events[0]);
+	ok = ok && timeout_queue_get_next_timeout(g_queue, g_now) == g_max;
+	timer_stop();
+	return ok;
+});
+
+/* test re-removing an event - should not crash! */
+EXO_TEST(timer_remove_event_1_no_crash, {
+	int ok = timer_start();
+	timeout_queue_insert(g_queue, &g_events[0], 2);
+	timeout_queue_remove(g_queue, &g_events[0]);
+	timeout_queue_remove(g_queue, &g_events[0]);
+	ok = ok && g_events[0].prev == NULL;
+	timer_stop();
+	return ok;
+});
+
+EXO_TEST(timer_add_5_events_1, {
+	int ok = timer_start() && timer_add_5();
+	timer_stop();
+	return ok;
+});
+
+EXO_TEST(timer_check_5_events_1, {
+	int ok = timer_start() && timer_add_5()
+		&& timeout_queue_get_next_timeout(g_queue, g_now) == 1;
+	timer_stop();
+	return ok;
+});
+
+EXO_TEST(timer_process_5_events_1, {
+	int ok = timer_start() && timer_add_5();
 	g_now = 4;
-	return timeout_queue_process(g_queue, g_now) == g_triggered;
+	ok = ok && timeout_queue_process(g_queue, g_now) == g_triggered && g_triggered > 0;
+	timer_stop();
+	return ok;
 });
 
-EXO_TEST(timer_shutdown,{
-	timeout_queue_shutdown(g_queue);
-	hub_free(g_queue);
+/* Shutting down with events still queued. */
+EXO_TEST(timer_shutdown, {
+	if (!timer_start())
+		return 0;
+	timer_add_5();
+	timer_stop();
 	return 1;
 });

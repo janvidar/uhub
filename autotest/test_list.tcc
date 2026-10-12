@@ -1,7 +1,11 @@
 #include "util/list.h"
 
-static struct linked_list* list = NULL;
-static struct linked_list* list2 = NULL;
+#include <stdarg.h>
+
+/*
+ * Every test builds the list it needs with list_of() and destroys it again, so
+ * each one runs alone or in any order.
+ */
 
 static char A[2] = { 'A', 0 };
 static char B[2] = { 'B', 0 };
@@ -10,13 +14,31 @@ static char A2[2] = { 'a', 0 };
 static char B2[2] = { 'b', 0 };
 static char C2[2] = { 'c', 0 };
 
-
-
 static void null_free(void* ptr)
 {
 	(void) ptr;
 }
 
+/* A new list holding the given items, in order; NULL ends the arguments. */
+static struct linked_list* list_of(char* first, ...)
+{
+	struct linked_list* list = list_create();
+	va_list args;
+	char* item;
+
+	va_start(args, first);
+	for (item = first; item; item = va_arg(args, char*))
+		list_append(list, item);
+	va_end(args);
+	return list;
+}
+
+/* The items are not owned by the list, so only the nodes go. */
+static void list_done(struct linked_list* list)
+{
+	list_clear(list, &null_free);
+	list_destroy(list);
+}
 
 EXO_TEST(list_create_destroy, {
 	int ok = 0;
@@ -28,106 +50,193 @@ EXO_TEST(list_create_destroy, {
 });
 
 EXO_TEST(list_create, {
-	list = list_create();
-	return list->size == 0;
+	struct linked_list* list = list_create();
+	int ok = list->size == 0;
+	list_destroy(list);
+	return ok;
 });
 
 EXO_TEST(list_append_1, {
-	list_append(list, (char*) A);
-	return list->size == 1;
+	struct linked_list* list = list_create();
+	int ok;
+	list_append(list, A);
+	ok = list->size == 1;
+	list_done(list);
+	return ok;
 });
 
 EXO_TEST(list_remove_1, {
-	list_remove(list, (char*) A);
-	return list->size == 0;
+	struct linked_list* list = list_of(A, NULL);
+	int ok;
+	list_remove(list, A);
+	ok = list->size == 0;
+	list_done(list);
+	return ok;
 });
 
-
 EXO_TEST(list_append_2, {
+	struct linked_list* list = list_create();
+	int ok;
 	list_append(list, A);
 	list_append(list, B);
-	return list->size == 2;
+	ok = list->size == 2;
+	list_done(list);
+	return ok;
 });
 
 EXO_TEST(list_remove_2, {
-	list_remove(list, (char*) A);
-	return list->size == 1;
+	struct linked_list* list = list_of(A, B, NULL);
+	int ok;
+	list_remove(list, A);
+	ok = list->size == 1 && list_get_first(list) == B;
+	list_done(list);
+	return ok;
 });
 
+/* Removing an item that is not there has no effect. */
 EXO_TEST(list_remove_3, {
-	list_remove(list, (char*) A); /* already removed, so should have no effect */
-	return list->size == 1;
+	struct linked_list* list = list_of(B, NULL);
+	int ok;
+	list_remove(list, A);
+	ok = list->size == 1;
+	list_done(list);
+	return ok;
 });
 
 EXO_TEST(list_remove_4, {
-	list_remove(list, (char*) B); /* already removed, so should have no effect */
-	return list->size == 0;
+	struct linked_list* list = list_of(B, NULL);
+	int ok;
+	list_remove(list, B);
+	ok = list->size == 0;
+	list_done(list);
+	return ok;
 });
 
 EXO_TEST(list_append_3, {
+	struct linked_list* list = list_create();
+	int ok;
 	list_append(list, A);
 	list_append(list, B);
 	list_append(list, C);
-	return list->size == 3;
+	ok = list->size == 3;
+	list_done(list);
+	return ok;
 });
 
+/* The same item can be in the list more than once. */
 EXO_TEST(list_append_4, {
-	list_append(list, A); /* OK. adding the same one *AGAIN* */
-	return list->size == 4;
+	struct linked_list* list = list_of(A, B, C, NULL);
+	int ok;
+	list_append(list, A);
+	ok = list->size == 4;
+	list_done(list);
+	return ok;
 });
 
+/* With an item in twice, the first one is removed. */
 EXO_TEST(list_remove_5, {
-	list_remove(list, A); /* removing the first one. */
-	return list->size == 3;
+	struct linked_list* list = list_of(A, B, C, A, NULL);
+	int ok;
+	list_remove(list, A);
+	ok = list->size == 3
+		&& list_get_index(list, 0) == B
+		&& list_get_index(list, 2) == A;
+	list_done(list);
+	return ok;
 });
+
+/* The list the indexing and iteration tests below look at: B, C, A. */
+#define LIST_BCA() list_of(B, C, A, NULL)
 
 EXO_TEST(list_get_index_1, {
-	return list_get_index(list, 0) == B;
+	struct linked_list* list = LIST_BCA();
+	int ok = list_get_index(list, 0) == B;
+	list_done(list);
+	return ok;
 });
 
 EXO_TEST(list_get_index_2, {
-	return list_get_index(list, 1) == C;
+	struct linked_list* list = LIST_BCA();
+	int ok = list_get_index(list, 1) == C;
+	list_done(list);
+	return ok;
 });
 
 EXO_TEST(list_get_index_3, {
-	return list_get_index(list, 2) == A;
+	struct linked_list* list = LIST_BCA();
+	int ok = list_get_index(list, 2) == A;
+	list_done(list);
+	return ok;
 });
 
 EXO_TEST(list_get_index_4, {
-	return list_get_index(list, 3) == NULL;
+	struct linked_list* list = LIST_BCA();
+	int ok = list_get_index(list, 3) == NULL;
+	list_done(list);
+	return ok;
 });
 
 EXO_TEST(list_get_first_1, {
-	return list_get_first(list) == B;
+	struct linked_list* list = LIST_BCA();
+	int ok = list_get_first(list) == B;
+	list_done(list);
+	return ok;
 });
 
 EXO_TEST(list_get_first_next_1, {
-	return list_get_next(list) == C;
+	struct linked_list* list = LIST_BCA();
+	int ok = list_get_first(list) == B && list_get_next(list) == C;
+	list_done(list);
+	return ok;
 });
 
 EXO_TEST(list_get_first_next_2, {
-	return list_get_next(list) == A;
+	struct linked_list* list = LIST_BCA();
+	int ok = list_get_first(list) == B && list_get_next(list) == C && list_get_next(list) == A;
+	list_done(list);
+	return ok;
 });
 
 EXO_TEST(list_get_last_1, {
-	return list_get_last(list) == A;
+	struct linked_list* list = LIST_BCA();
+	int ok = list_get_last(list) == A;
+	list_done(list);
+	return ok;
 });
 
 EXO_TEST(list_get_last_prev_1, {
-	return list_get_prev(list) == C;
+	struct linked_list* list = LIST_BCA();
+	int ok = list_get_last(list) == A && list_get_prev(list) == C;
+	list_done(list);
+	return ok;
 });
 
 EXO_TEST(list_get_last_prev_2, {
-	return list_get_prev(list) == B;
+	struct linked_list* list = LIST_BCA();
+	int ok = list_get_last(list) == A && list_get_prev(list) == C && list_get_prev(list) == B;
+	list_done(list);
+	return ok;
 });
 
+/* The cursor can turn around: back from the end, then forward again. */
 EXO_TEST(list_get_last_prev_next_1, {
-	return list_get_next(list) == C;
+	struct linked_list* list = LIST_BCA();
+	int ok = list_get_last(list) == A
+		&& list_get_prev(list) == C
+		&& list_get_prev(list) == B
+		&& list_get_next(list) == C;
+	list_done(list);
+	return ok;
 });
 
 EXO_TEST(list_clear, {
+	struct linked_list* list = LIST_BCA();
+	int ok;
+	list_get_first(list); /* leave the cursor somewhere */
 	list_clear(list, &null_free);
-	return list->size == 0 && list->first == 0 && list->last == 0 && list->iterator == 0;
+	ok = list->size == 0 && list->first == 0 && list->last == 0 && list->iterator == 0;
+	list_destroy(list);
+	return ok;
 });
 
 static int g_remove_flag = 0;
@@ -137,79 +246,105 @@ static void null_free_inc_flag(void* ptr)
 	g_remove_flag++;
 }
 
-EXO_TEST(list_remove_first_1_1,
-{
+EXO_TEST(list_remove_first_1_1, {
+	struct linked_list* list = list_create();
+	int ok;
 	list_append(list, A);
 	list_append(list, B);
 	list_append(list, C);
-	return list->size == 3;
+	ok = list->size == 3;
+	list_done(list);
+	return ok;
 });
 
-EXO_TEST(list_remove_first_1_2,
-{
+/* The free handle is called for the item removed. */
+EXO_TEST(list_remove_first_1_2, {
+	struct linked_list* list = list_of(A, B, C, NULL);
+	int ok;
 	g_remove_flag = 0;
 	list_remove_first(list, null_free_inc_flag);
-	return list->size == 2 && g_remove_flag == 1;
+	ok = list->size == 2 && g_remove_flag == 1 && list_get_first(list) == B;
+	list_done(list);
+	return ok;
 });
 
-EXO_TEST(list_remove_first_1_3,
-{
+EXO_TEST(list_remove_first_1_3, {
+	struct linked_list* list = list_of(B, C, NULL);
+	int ok;
 	list_remove_first(list, NULL);
-	return list->size == 1;
+	ok = list->size == 1 && list_get_first(list) == C;
+	list_done(list);
+	return ok;
 });
 
-EXO_TEST(list_remove_first_1_4,
-{
+EXO_TEST(list_remove_first_1_4, {
+	struct linked_list* list = list_of(C, NULL);
+	int ok;
 	list_remove_first(list, NULL);
-	return list->size == 0;
+	ok = list->size == 0;
+	list_done(list);
+	return ok;
 });
 
-
-EXO_TEST(list_remove_first_1_5,
-{
+/* On an empty list it does nothing. */
+EXO_TEST(list_remove_first_1_5, {
+	struct linked_list* list = list_create();
+	int ok;
 	list_remove_first(list, NULL);
-	return list->size == 0;
+	ok = list->size == 0;
+	list_destroy(list);
+	return ok;
 });
 
-
-EXO_TEST(list_append_list_1,
-{
-	list_append(list, A);
-	list_append(list, B);
-	list_append(list, C);
-	list2 = list_create();
-	list_append(list2, A2);
-	list_append(list2, B2);
-	list_append(list2, C2);
-	return list->size == 3 && list2->size == 3;
+EXO_TEST(list_append_list_1, {
+	struct linked_list* list = list_of(A, B, C, NULL);
+	struct linked_list* list2 = list_of(A2, B2, C2, NULL);
+	int ok = list->size == 3 && list2->size == 3;
+	list_done(list);
+	list_done(list2);
+	return ok;
 });
 
-EXO_TEST(list_append_list_2,
-{
+/* Appending a list moves its items over and leaves it empty... */
+EXO_TEST(list_append_list_2, {
+	struct linked_list* list = list_of(A, B, C, NULL);
+	struct linked_list* list2 = list_of(A2, B2, C2, NULL);
+	int ok;
 	list_append_list(list, list2);
-	return list->size == 6 && list2->size == 0;
+	ok = list->size == 6 && list2->size == 0;
+	list_done(list);
+	list_destroy(list2);
+	return ok;
 });
 
-EXO_TEST(list_append_list_3,
-{
+/* ...after the items already there, in order. */
+EXO_TEST(list_append_list_3, {
+	struct linked_list* list = list_of(A, B, C, NULL);
+	struct linked_list* list2 = list_of(A2, B2, C2, NULL);
+	int ok;
+	list_append_list(list, list2);
 	list_destroy(list2);
-	return list_get_index(list, 0) == A &&
+	ok = list_get_index(list, 0) == A &&
 			list_get_index(list, 1) == B &&
 			list_get_index(list, 2) == C &&
 			list_get_index(list, 3) == A2 &&
 			list_get_index(list, 4) == B2 &&
 			list_get_index(list, 5) == C2;
+	list_done(list);
+	return ok;
 });
 
-EXO_TEST(list_clear_list_last,
-{
+EXO_TEST(list_clear_list_last, {
+	struct linked_list* list = list_of(A, B, C, A2, B2, C2, NULL);
+	int ok;
 	list_clear(list, &null_free);
-	return 1;
+	ok = list->size == 0;
+	list_destroy(list);
+	return ok;
 });
-
 
 EXO_TEST(list_destroy_1, {
-	list_destroy(list);
+	list_destroy(list_create());
 	return 1;
 });
 
@@ -279,4 +414,3 @@ EXO_TEST(list_iterator_nested, {
 	/* outer visits each of 3 once; each drives a full 3-element inner walk. */
 	return outer_visits == 3 && inner_total == 9;
 });
-

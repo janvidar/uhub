@@ -8,20 +8,23 @@ static const char* test_string3 = "BINF AAAB IDAN7ZMSLIEBL53OPTM7WXGSTXUS3XOY6KQ
 static const char* test_string4 = "BMSG AAAB\n";
 static const char* test_string5 = "BMSG AAAB \n";
 
-static void create_test_user()
-{
-	if (g_user)
-		return;
-
-	g_user = (struct hub_user*) malloc(sizeof(struct hub_user));
-	memset(g_user, 0, sizeof(struct hub_user));
+/* The user (SID AAAB) whose messages are verified, for every test here. Tests
+   that store an INF on it clear it again before they return. */
+EXO_SETUP({
+	g_user = (struct hub_user*) hub_malloc_zero(sizeof(struct hub_user));
+	if (!g_user)
+		return 0;
 	memcpy(g_user->id.nick, "exotic-tester", 13);
 	g_user->id.sid = 1;
-}
+	return 1;
+});
 
-EXO_TEST(adc_message_first, {
-	create_test_user();	
-	return g_user != 0;
+EXO_TEARDOWN({
+	if (g_user)
+		adc_msg_free(g_user->info);
+	hub_free(g_user);
+	g_user = 0;
+	return 1;
 });
 
 EXO_TEST(adc_message_parse_1, {
@@ -600,39 +603,52 @@ EXO_TEST(adc_message_copy_4, {
 });
 
 
-static struct adc_message* updater1 = NULL;
-static struct adc_message* updater2 = NULL;
 static const char* update_info1 = "BINF AAAB IDABCDEFGHIJKLMNOPQRSTUVWXYZ1234567ABCDEF NItester SL10 SS12817126127 SF4125 HN3 HR0 HO0 VE++\\s0.698 US104857600 DS81911808 SUTCP4,UDP4 I4127.0.0.1\n";
 static const char* update_info2 = "BINF AAAB HN34 SF4126 SS12817526127\n";
 
+/* Drop the INF stored on g_user, as the tests that set one leave it. */
+static void user_info_clear(void)
+{
+	adc_msg_free(g_user->info);
+	g_user->info = 0;
+}
+
 EXO_TEST(adc_message_update_1, {
-	updater1 = adc_msg_parse_verify(g_user, update_info1, strlen(update_info1));
-	return updater1 != NULL;
+	struct adc_message* updater1 = adc_msg_parse_verify(g_user, update_info1, strlen(update_info1));
+	int ok = updater1 != NULL;
+	adc_msg_free(updater1);
+	return ok;
 });
 
 EXO_TEST(adc_message_update_2, {
+	struct adc_message* updater1 = adc_msg_parse_verify(g_user, update_info1, strlen(update_info1));
+	int ok;
 	user_set_info(g_user, updater1);
-	return strcmp(g_user->info->cache, updater1->cache) == 0 && g_user->info == updater1;
+	ok = strcmp(g_user->info->cache, updater1->cache) == 0 && g_user->info == updater1;
+	adc_msg_free(updater1);
+	user_info_clear();
+	return ok;
 });
 
 EXO_TEST(adc_message_update_3, {
-	updater2 = adc_msg_parse_verify(g_user, update_info2, strlen(update_info2));
-	return updater2 != NULL;
-});
-
-EXO_TEST(adc_message_update_4, {
-	user_update_info(g_user, updater2);
-	return strlen(g_user->info->cache) == 159;
-});
-
-EXO_TEST(adc_message_update_4_cleanup, {
-	adc_msg_free(updater1);
-	updater1 = 0;
+	struct adc_message* updater2 = adc_msg_parse_verify(g_user, update_info2, strlen(update_info2));
+	int ok = updater2 != NULL;
 	adc_msg_free(updater2);
-	updater2 = 0;
-	adc_msg_free(g_user->info);
-	g_user->info = 0;
-	return 1;
+	return ok;
+});
+
+/* An update merges into the stored INF. */
+EXO_TEST(adc_message_update_4, {
+	struct adc_message* updater1 = adc_msg_parse_verify(g_user, update_info1, strlen(update_info1));
+	struct adc_message* updater2 = adc_msg_parse_verify(g_user, update_info2, strlen(update_info2));
+	int ok;
+	user_set_info(g_user, updater1);
+	user_update_info(g_user, updater2);
+	ok = strlen(g_user->info->cache) == 159;
+	adc_msg_free(updater1);
+	adc_msg_free(updater2);
+	user_info_clear();
+	return ok;
 });
 
 
@@ -640,35 +656,51 @@ EXO_TEST(adc_message_update_4_cleanup, {
    broadcast message, so repeated identical updates produce no fan-out. */
 static struct adc_message* noop_info = NULL;
 
-EXO_TEST(adc_message_noop_setup, {
+/* Store the INF the updates below are compared against. */
+static int noop_start(void)
+{
 	const char* base = "BINF AAAB IDABCDEFGHIJKLMNOPQRSTUVWXYZ1234567ABCDEF NItester SS100 SL5 DEhello\n";
 	noop_info = adc_msg_parse_verify(g_user, base, strlen(base));
 	if (!noop_info)
 		return 0;
 	user_set_info(g_user, noop_info);
 	return g_user->info != NULL;
-});
+}
+
+static void noop_stop(void)
+{
+	adc_msg_free(noop_info);
+	noop_info = 0;
+	user_info_clear();
+}
 
 /* Every field repeats the current value -> stripped to empty, no broadcast. */
 EXO_TEST(adc_message_noop_all, {
+	struct adc_message* cmd;
 	const char* upd = "BINF AAAB SS100 SL5\n";
-	struct adc_message* cmd = adc_msg_parse_verify(g_user, upd, strlen(upd));
 	int ok = 0;
+	if (!noop_start())
+		return 0;
+	cmd = adc_msg_parse_verify(g_user, upd, strlen(upd));
 	user_update_info(g_user, cmd);
 	ok = adc_msg_is_empty(cmd) == 1
 		&& adc_msg_has_named_argument(cmd, "SS") == 0
 		&& adc_msg_has_named_argument(cmd, "SL") == 0;
 	adc_msg_free(cmd);
+	noop_stop();
 	return ok;
 });
 
 /* Mixed update: the unchanged SS is dropped, the changed SL survives and the
    stored info reflects the new value. */
 EXO_TEST(adc_message_noop_mixed, {
+	struct adc_message* cmd;
 	const char* upd = "BINF AAAB SS100 SL9\n";
-	struct adc_message* cmd = adc_msg_parse_verify(g_user, upd, strlen(upd));
 	char* sl;
 	int ok = 0;
+	if (!noop_start())
+		return 0;
+	cmd = adc_msg_parse_verify(g_user, upd, strlen(upd));
 	user_update_info(g_user, cmd);
 	ok = adc_msg_has_named_argument(cmd, "SS") == 0
 		&& adc_msg_has_named_argument(cmd, "SL") == 1;
@@ -676,26 +708,23 @@ EXO_TEST(adc_message_noop_mixed, {
 	ok = ok && sl && strcmp(sl, "9") == 0;
 	hub_free(sl);
 	adc_msg_free(cmd);
+	noop_stop();
 	return ok;
 });
 
 /* A field absent from the stored info is new and must be kept. */
 EXO_TEST(adc_message_noop_newfield, {
+	struct adc_message* cmd;
 	const char* upd = "BINF AAAB AW1\n";
-	struct adc_message* cmd = adc_msg_parse_verify(g_user, upd, strlen(upd));
 	int ok = 0;
+	if (!noop_start())
+		return 0;
+	cmd = adc_msg_parse_verify(g_user, upd, strlen(upd));
 	user_update_info(g_user, cmd);
 	ok = adc_msg_has_named_argument(cmd, "AW") == 1;
 	adc_msg_free(cmd);
+	noop_stop();
 	return ok;
-});
-
-EXO_TEST(adc_message_noop_cleanup, {
-	adc_msg_free(noop_info);
-	noop_info = 0;
-	adc_msg_free(g_user->info);
-	g_user->info = 0;
-	return 1;
 });
 
 
@@ -1121,11 +1150,3 @@ EXO_TEST(adc_message_timestamp_remove_none, {
 	adc_msg_free(msg);
 	return ok;
 });
-
-EXO_TEST(adc_message_last, {
-	hub_free(g_user);
-	g_user = 0;
-	return g_user == 0;
-});
-
-

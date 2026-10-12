@@ -581,6 +581,7 @@ pub fn build(b: *std.Build) void {
         ctx.addSources(autotest_mod, &.{"autotest/mod_guest_passwd_shim.c"});
         ctx.addSources(autotest_mod, &.{"autotest/mod_joins_shim.c"});
         ctx.addSources(autotest_mod, &.{"autotest/mod_welcome_shim.c"});
+        ctx.addSources(autotest_mod, &.{"autotest/testutil_net.c"});
         ctx.addSqlite(autotest_mod);
         ctx.addAutotest(autotest_mod);
         autotest_mod.linkLibrary(common);
