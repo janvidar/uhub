@@ -78,7 +78,9 @@ static int command_regme_handler(struct plugin_handle* plugin, struct plugin_use
 		return 0;
 	}
 
-	if (plugin->hub.auth_get_user(plugin, nick, &info))
+	/* Below user level it is no account: mod_guest_passwd answers for every
+	   nick with a guest record. */
+	if (plugin->hub.auth_get_user(plugin, nick, &info) && info.credentials >= auth_cred_user)
 	{
 		cbuf_append_format(buf, "*** %s: The nick \"%s\" is already registered.", cmd->prefix, nick);
 		plugin->hub.send_message(plugin, user, cbuf_get(buf));
@@ -134,7 +136,7 @@ static int command_passwd_handler(struct plugin_handle* plugin, struct plugin_us
 	}
 
 	/* Load the existing record so the credential level is preserved across the update. */
-	if (!plugin->hub.auth_get_user(plugin, nick, &info))
+	if (!plugin->hub.auth_get_user(plugin, nick, &info) || info.credentials < auth_cred_user)
 	{
 		cbuf_append_format(buf, "*** %s: Could not find your registration. Contact an operator.", cmd->prefix);
 		plugin->hub.send_message(plugin, user, cbuf_get(buf));

@@ -11,6 +11,10 @@ New features:
   plugin is loaded. An operator can only manage accounts below their own level
   and give out levels below it; deleting or demoting an account disconnects a
   user still logged in to it. mod_users joins the built-in default plugin set.
+- mod_guest_passwd: a shared password guests must give to log in. Registered
+  accounts keep their own passwords. To make that independent of plugin order,
+  an account (user level or above) from any auth plugin now beats a guest-level
+  record from another, and a guest-level record beats a refusal.
 - Plugin API: hub.auth_delete_user, hub.auth_list_users (passwords cleared) and
   hub.get_user_by_nick, and an auth_list_users storage callback, implemented by
   mod_auth_sqlite and mod_auth_simple.

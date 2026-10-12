@@ -158,6 +158,7 @@ const tcc_sources = [_][]const u8{
     "test_misc.tcc",
     "test_mod_auth_sqlite.tcc",
     "test_mod_chat_history.tcc",
+    "test_mod_guest_passwd.tcc",
     "test_mod_users.tcc",
     "test_netbackend.tcc",
     "test_probe.tcc",
@@ -204,6 +205,7 @@ const plugins = [_]Plugin{
     .{ .name = "mod_auth_sqlite", .sqlite = true },
     .{ .name = "mod_selfregister" },
     .{ .name = "mod_users" },
+    .{ .name = "mod_guest_passwd" },
     .{ .name = "mod_chat_history", .sqlite = true },
     .{ .name = "mod_chat_only" },
     .{ .name = "mod_chat_is_privileged" },
@@ -572,6 +574,7 @@ pub fn build(b: *std.Build) void {
         // mod_auth_sqlite's above.
         ctx.addSources(autotest_mod, &.{"autotest/mod_chat_history_shim.c"});
         ctx.addSources(autotest_mod, &.{"autotest/mod_users_shim.c"});
+        ctx.addSources(autotest_mod, &.{"autotest/mod_guest_passwd_shim.c"});
         ctx.addSqlite(autotest_mod);
         ctx.addAutotest(autotest_mod);
         autotest_mod.linkLibrary(common);

@@ -224,9 +224,41 @@ plugin_st plugin_flood_detected(struct hub_info* hub, struct hub_user* who, enum
 	PLUGIN_INVOKE_STATUS_2(hub, on_flood_detected, user, type);
 }
 
+/*
+ * An account (credentials of a registered user or above) settles it, from
+ * whichever plugin holds it. Short of that a guest-level record wins, then a
+ * refusal: mod_guest_passwd answers for every nick, so without this its place
+ * in the plugins file would decide whether registered users can still log in,
+ * or -- behind a plugin that refuses unknown nicks -- whether guests are asked
+ * for the password at all.
+ */
 plugin_st plugin_auth_get_user(struct hub_info* hub, const char* nickname, struct auth_info* info)
 {
-	PLUGIN_INVOKE_STATUS_2(hub, auth_get_user, nickname, info);
+	struct auth_info guest;
+	int have_guest = 0;
+	int denied = 0;
+
+	INVOKE(hub, auth_get_user, {
+		plugin_st status = plugin->funcs.auth_get_user(plugin, nickname, info);
+		if (status == st_allow && info->credentials >= auth_cred_user)
+			return st_allow;
+		if (status == st_allow && !have_guest)
+		{
+			memcpy(&guest, info, sizeof(guest));
+			have_guest = 1;
+		}
+		else if (status == st_deny)
+		{
+			denied = 1;
+		}
+	});
+
+	if (have_guest)
+	{
+		memcpy(info, &guest, sizeof(*info));
+		return st_allow;
+	}
+	return denied ? st_deny : st_default;
 }
 
 plugin_st plugin_auth_register_user(struct hub_info* hub, struct auth_info* info)
