@@ -154,6 +154,13 @@ static int mch_sent_lines(void)
 	return lines;
 }
 
+EXO_TEARDOWN({
+	if (mch_plugin.ptr)
+		mod_chat_history_unregister(&mch_plugin);
+	remove(MCH_DB);
+	return 1;
+});
+
 /* No parameters at all: the plugin must come up on an in-memory database, and
    register both of its commands. This is how the built-in default plugin set
    loads it. */
@@ -163,17 +170,21 @@ EXO_TEST(mch_setup_defaults, {
 
 /* !history is available to guests; !historycleanup must not be. */
 EXO_TEST(mch_command_credentials, {
+	if (!mch_start(""))
+		return 0;
 	return mch_cmd_history->cred == auth_cred_guest
 		&& mch_cmd_cleanup->cred == auth_cred_admin;
 });
 
 EXO_TEST(mch_empty_history, {
-	if (!mch_history(0, 0))
+	if (!mch_start("") || !mch_history(0, 0))
 		return 0;
 	return strstr(mch_sent, "No messages found") != NULL;
 });
 
 EXO_TEST(mch_add_and_read_back, {
+	if (!mch_start(""))
+		return 0;
 	mch_say("hello");
 	if (!mch_history(0, 0))
 		return 0;
@@ -184,6 +195,9 @@ EXO_TEST(mch_add_and_read_back, {
 EXO_TEST(mch_ordering, {
 	const char* first;
 	const char* second;
+	if (!mch_start(""))
+		return 0;
+	mch_say("hello");
 	mch_say("second");
 	if (!mch_history(0, 0))
 		return 0;
@@ -194,6 +208,10 @@ EXO_TEST(mch_ordering, {
 
 /* An explicit count limits how many lines come back. */
 EXO_TEST(mch_explicit_count, {
+	if (!mch_start(""))
+		return 0;
+	mch_say("hello");
+	mch_say("second");
 	if (!mch_history(1, 1))
 		return 0;
 	return mch_sent_lines() == 1;
@@ -202,6 +220,9 @@ EXO_TEST(mch_explicit_count, {
 /* "!history -1" would be "no limit" to SQLite's LIMIT clause, so a negative
    count must clamp to zero rather than dumping the whole table. */
 EXO_TEST(mch_negative_count_clamped, {
+	if (!mch_start(""))
+		return 0;
+	mch_say("hello");
 	if (!mch_history(-1, 1))
 		return 0;
 	return strstr(mch_sent, "No messages found") != NULL;
@@ -238,6 +259,8 @@ EXO_TEST(mch_cleanup_empties_history, {
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.prefix = "historycleanup";
 
+	if (!mch_start(""))
+		return 0;
 	mch_say("forget me");
 	mch_sent[0] = '\0';
 	if (mch_cmd_cleanup->handler(&mch_plugin, mch_as_puser(&mch_alice), &cmd) != 0)
@@ -248,6 +271,8 @@ EXO_TEST(mch_cleanup_empties_history, {
 });
 
 EXO_TEST(mch_teardown_defaults, {
+	if (!mch_start(""))
+		return 0;
 	return mod_chat_history_unregister(&mch_plugin) == 0;
 });
 
@@ -282,9 +307,20 @@ EXO_TEST(mch_persists_across_reload, {
 	return strstr(mch_sent, "durable") != NULL;
 });
 
-/* An in-memory instance starts empty, so the previous test's file did not
-   leak into it -- ":memory:" really is per-instance storage. */
+/* An in-memory instance starts empty: a file-backed one with history in it
+   does not leak into it -- ":memory:" really is per-instance storage. */
 EXO_TEST(mch_memory_is_not_shared, {
+	struct plugin_handle p;
+	char cfg[256];
+
+	remove(MCH_DB);
+	snprintf(cfg, sizeof(cfg), "file=%s", MCH_DB);
+	mch_wire(&p);
+	if (mod_chat_history_register(&p, cfg) != 0)
+		return 0;
+	p.funcs.on_user_chat_message(&p, mch_as_puser(&mch_alice), "durable", 0);
+	mod_chat_history_unregister(&p);
+
 	if (!mch_start(""))
 		return 0;
 	if (!mch_history(0, 0))
@@ -310,10 +346,4 @@ EXO_TEST(mch_login_silent_when_disabled, {
 	mch_sent[0] = '\0';
 	mch_plugin.funcs.on_user_login(&mch_plugin, mch_as_puser(&mch_alice));
 	return mch_sent[0] == '\0';
-});
-
-EXO_TEST(mch_teardown, {
-	int ret = mod_chat_history_unregister(&mch_plugin) == 0;
-	remove(MCH_DB);
-	return ret;
 });

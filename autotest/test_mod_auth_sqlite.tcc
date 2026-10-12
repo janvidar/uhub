@@ -53,7 +53,13 @@ static struct auth_info mas_info(const char* nick, const char* pass, enum auth_c
 	return a;
 }
 
-EXO_TEST(mas_setup, {
+/*
+ * Every test starts with mas_start() -- a new database with the schema
+ * uhub-passwd creates, and the plugin registered on it -- and ends with
+ * mas_stop(), so none sees what another registered or banned.
+ */
+static int mas_start(void)
+{
 	sqlite3* db = 0;
 	int rc;
 	char cfg[256];
@@ -79,11 +85,33 @@ EXO_TEST(mas_setup, {
 		&& mas_plugin.funcs.auth_register_user
 		&& mas_plugin.funcs.auth_update_user
 		&& mas_plugin.funcs.auth_delete_user;
+}
+
+static int mas_stop(int ok)
+{
+	if (mas_plugin.ptr)
+		plugin_unregister(&mas_plugin);
+	memset(&mas_plugin, 0, sizeof(mas_plugin));
+	remove(MAS_DB);
+	return ok;
+}
+
+/* mas_start(), with "Boss" (password "secret") registered as a user. */
+static int mas_start_with_boss(void)
+{
+	struct auth_info a = mas_info("Boss", "secret", auth_cred_user);
+	return mas_start() && mas_plugin.funcs.auth_register_user(&mas_plugin, &a) == st_allow;
+}
+
+EXO_TEST(mas_setup, {
+	return mas_stop(mas_start());
 });
 
 EXO_TEST(mas_register, {
 	struct auth_info a = mas_info("Boss", "secret", auth_cred_user);
-	return mas_plugin.funcs.auth_register_user(&mas_plugin, &a) == st_allow;
+	if (!mas_start())
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_register_user(&mas_plugin, &a) == st_allow);
 });
 
 /* The case-insensitive UNIQUE constraint rejects a nick that collides with an
@@ -91,45 +119,55 @@ EXO_TEST(mas_register, {
 EXO_TEST(mas_register_dup_case_rejected, {
 	struct auth_info a = mas_info("boss", "other", auth_cred_user);
 	struct auth_info got;
+	if (!mas_start_with_boss())
+		return mas_stop(0);
 	memset(&got, 0, sizeof(got));
 	if (mas_plugin.funcs.auth_register_user(&mas_plugin, &a) != st_deny)
-		return 0;
+		return mas_stop(0);
 	/* The original registration is intact and unchanged. */
 	if (mas_plugin.funcs.auth_get_user(&mas_plugin, "Boss", &got) != st_allow)
-		return 0;
-	return !strcmp(got.nickname, "Boss") && !strcmp(got.password, "secret");
+		return mas_stop(0);
+	return mas_stop(!strcmp(got.nickname, "Boss") && !strcmp(got.password, "secret"));
 });
 
 EXO_TEST(mas_get_exact, {
 	struct auth_info a;
+	if (!mas_start_with_boss())
+		return mas_stop(0);
 	memset(&a, 0, sizeof(a));
 	if (mas_plugin.funcs.auth_get_user(&mas_plugin, "Boss", &a) != st_allow)
-		return 0;
-	return a.credentials == auth_cred_user
+		return mas_stop(0);
+	return mas_stop(a.credentials == auth_cred_user
 		&& !strcmp(a.nickname, "Boss")
-		&& !strcmp(a.password, "secret");
+		&& !strcmp(a.password, "secret"));
 });
 
 /* L-8: a lowercase variant resolves to the registered account and returns its
    canonical stored case. */
 EXO_TEST(mas_get_case_lower, {
 	struct auth_info a;
+	if (!mas_start_with_boss())
+		return mas_stop(0);
 	memset(&a, 0, sizeof(a));
 	if (mas_plugin.funcs.auth_get_user(&mas_plugin, "boss", &a) != st_allow)
-		return 0;
-	return a.credentials == auth_cred_user && !strcmp(a.nickname, "Boss");
+		return mas_stop(0);
+	return mas_stop(a.credentials == auth_cred_user && !strcmp(a.nickname, "Boss"));
 });
 
 EXO_TEST(mas_get_case_upper, {
 	struct auth_info a;
+	if (!mas_start_with_boss())
+		return mas_stop(0);
 	memset(&a, 0, sizeof(a));
-	return mas_plugin.funcs.auth_get_user(&mas_plugin, "BOSS", &a) == st_allow;
+	return mas_stop(mas_plugin.funcs.auth_get_user(&mas_plugin, "BOSS", &a) == st_allow);
 });
 
 EXO_TEST(mas_get_missing, {
 	struct auth_info a;
+	if (!mas_start_with_boss())
+		return mas_stop(0);
 	memset(&a, 0, sizeof(a));
-	return mas_plugin.funcs.auth_get_user(&mas_plugin, "stranger", &a) == st_default;
+	return mas_stop(mas_plugin.funcs.auth_get_user(&mas_plugin, "stranger", &a) == st_default);
 });
 
 /* Update matches the nick case-insensitively (a lowercase "boss" updates the
@@ -137,12 +175,14 @@ EXO_TEST(mas_get_missing, {
 EXO_TEST(mas_update_case_insensitive, {
 	struct auth_info a = mas_info("boss", "newpass", auth_cred_operator);
 	struct auth_info got;
+	if (!mas_start_with_boss())
+		return mas_stop(0);
 	memset(&got, 0, sizeof(got));
 	if (mas_plugin.funcs.auth_update_user(&mas_plugin, &a) != st_allow)
-		return 0;
+		return mas_stop(0);
 	if (mas_plugin.funcs.auth_get_user(&mas_plugin, "Boss", &got) != st_allow)
-		return 0;
-	return got.credentials == auth_cred_operator && !strcmp(got.password, "newpass");
+		return mas_stop(0);
+	return mas_stop(got.credentials == auth_cred_operator && !strcmp(got.password, "newpass"));
 });
 
 struct mas_list
@@ -168,16 +208,18 @@ EXO_TEST(mas_list_users, {
 	struct auth_info a = mas_info("alice", "pw", auth_cred_user);
 	struct mas_list list;
 	int ok;
+	if (!mas_start_with_boss())
+		return mas_stop(0);
 	memset(&list, 0, sizeof(list));
 	if (!mas_plugin.funcs.auth_list_users
 		|| mas_plugin.funcs.auth_register_user(&mas_plugin, &a) != st_allow)
-		return 0;
+		return mas_stop(0);
 	ok = mas_plugin.funcs.auth_list_users(&mas_plugin, mas_list_collect, &list) == st_allow
 		&& list.count == 2
 		&& !strcmp(list.nicks[0], "alice")
 		&& !strcmp(list.nicks[1], "Boss")
 		&& !list.leaked_password;
-	return mas_plugin.funcs.auth_delete_user(&mas_plugin, &a) == st_allow && ok;
+	return mas_stop(mas_plugin.funcs.auth_delete_user(&mas_plugin, &a) == st_allow && ok);
 });
 
 /* auth_delete_user removes the registered account (returns st_allow), matching
@@ -186,11 +228,13 @@ EXO_TEST(mas_list_users, {
 EXO_TEST(mas_delete_case_insensitive, {
 	struct auth_info a = mas_info("boss", "", auth_cred_user);
 	struct auth_info got;
+	if (!mas_start_with_boss())
+		return mas_stop(0);
 	memset(&got, 0, sizeof(got));
 	if (mas_plugin.funcs.auth_delete_user(&mas_plugin, &a) != st_allow)
-		return 0;
+		return mas_stop(0);
 	/* The account is gone afterwards (looked up by its registered case). */
-	return mas_plugin.funcs.auth_get_user(&mas_plugin, "Boss", &got) == st_default;
+	return mas_stop(mas_plugin.funcs.auth_get_user(&mas_plugin, "Boss", &got) == st_default);
 });
 
 /* A legacy database whose schema lacks the case-insensitive constraint gains
@@ -289,36 +333,55 @@ static struct mas_user mas_puser(const char* cid, const char* nick)
 
 #define MAS_CID "3AGHMAASJA2RFNM22AA6753V7B7DYEPNTIWHBAY"
 
+/* mas_start(), with one ban already stored. */
+static int mas_start_with_ban(struct ban_info b)
+{
+	return mas_start() && mas_plugin.funcs.auth_ban_add(&mas_plugin, &b) == st_allow;
+}
+
+/* The ban the lookup tests below check against: MAS_CID and "Eviluser". */
+#define MAS_EVIL_BAN() mas_start_with_ban(mas_ban(MAS_CID, "Eviluser"))
+
 EXO_TEST(mas_ban_funcs, {
-	return mas_plugin.funcs.auth_ban_add
+	if (!mas_start())
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_ban_add
 		&& mas_plugin.funcs.auth_ban_del
-		&& mas_plugin.funcs.auth_is_banned;
+		&& mas_plugin.funcs.auth_is_banned);
 });
 
 EXO_TEST(mas_ban_add, {
 	struct ban_info b = mas_ban(MAS_CID, "Eviluser");
-	return mas_plugin.funcs.auth_ban_add(&mas_plugin, &b) == st_allow;
+	if (!mas_start())
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_ban_add(&mas_plugin, &b) == st_allow);
 });
 
 /* A user matching the banned CID (any nick) is banned; expiry 0 = permanent. */
 EXO_TEST(mas_banned_by_cid, {
 	struct mas_user u = mas_puser(MAS_CID, "SomeOtherNick");
 	time_t exp = -1;
-	return mas_plugin.funcs.auth_is_banned(&mas_plugin, mas_as_puser(&u), &exp, NULL) == st_deny && exp == 0;
+	if (!MAS_EVIL_BAN())
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_is_banned(&mas_plugin, mas_as_puser(&u), &exp, NULL) == st_deny && exp == 0);
 });
 
 /* A user matching the banned nick (any CID), case-insensitively, is banned. */
 EXO_TEST(mas_banned_by_nick, {
 	struct mas_user u = mas_puser("CLEANCID000000000000000000000000000000A", "eviluser");
 	time_t exp = 0;
-	return mas_plugin.funcs.auth_is_banned(&mas_plugin, mas_as_puser(&u), &exp, NULL) == st_deny;
+	if (!MAS_EVIL_BAN())
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_is_banned(&mas_plugin, mas_as_puser(&u), &exp, NULL) == st_deny);
 });
 
 /* An unrelated user is not banned. */
 EXO_TEST(mas_not_banned, {
 	struct mas_user u = mas_puser("CLEANCID000000000000000000000000000000A", "innocent");
 	time_t exp = 0;
-	return mas_plugin.funcs.auth_is_banned(&mas_plugin, mas_as_puser(&u), &exp, NULL) == st_default;
+	if (!MAS_EVIL_BAN())
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_is_banned(&mas_plugin, mas_as_puser(&u), &exp, NULL) == st_default);
 });
 
 /* Unban by nick (hub offers the target as both fields) removes the record. */
@@ -326,15 +389,19 @@ EXO_TEST(mas_ban_del, {
 	struct ban_info b = mas_ban("Eviluser", "Eviluser");
 	struct mas_user u = mas_puser(MAS_CID, "Eviluser");
 	time_t exp = 0;
+	if (!MAS_EVIL_BAN())
+		return mas_stop(0);
 	if (mas_plugin.funcs.auth_ban_del(&mas_plugin, &b) != st_allow)
-		return 0;
-	return mas_plugin.funcs.auth_is_banned(&mas_plugin, mas_as_puser(&u), &exp, NULL) == st_default;
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_is_banned(&mas_plugin, mas_as_puser(&u), &exp, NULL) == st_default);
 });
 
 /* Deleting a ban that does not exist reports "no opinion" (st_default). */
 EXO_TEST(mas_ban_del_missing, {
 	struct ban_info b = mas_ban("nope", "nope");
-	return mas_plugin.funcs.auth_ban_del(&mas_plugin, &b) == st_default;
+	if (!mas_start())
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_ban_del(&mas_plugin, &b) == st_default);
 });
 
 /* Timed bans: a future expiry is enforced; a past expiry is treated as lifted. */
@@ -346,40 +413,52 @@ static struct ban_info mas_ban_exp(const char* cid, const char* nick, time_t exp
 }
 EXO_TEST(mas_timed_future_add, {
 	struct ban_info b = mas_ban_exp("TIMEDCID000000000000000000000000000000A", "timeduser", 2000000000);
-	return mas_plugin.funcs.auth_ban_add(&mas_plugin, &b) == st_allow;
+	if (!mas_start())
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_ban_add(&mas_plugin, &b) == st_allow);
 });
 EXO_TEST(mas_timed_future_hit, {
 	struct mas_user u = mas_puser("TIMEDCID000000000000000000000000000000A", "whoever");
 	time_t exp = 0;
-	return mas_plugin.funcs.auth_is_banned(&mas_plugin, mas_as_puser(&u), &exp, NULL) == st_deny && exp == 2000000000;
+	if (!mas_start_with_ban(mas_ban_exp("TIMEDCID000000000000000000000000000000A", "timeduser", 2000000000)))
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_is_banned(&mas_plugin, mas_as_puser(&u), &exp, NULL) == st_deny && exp == 2000000000);
 });
 EXO_TEST(mas_timed_past_add, {
 	struct ban_info b = mas_ban_exp("EXPIREDCID00000000000000000000000000000A", "expireduser", 1);
-	return mas_plugin.funcs.auth_ban_add(&mas_plugin, &b) == st_allow;
+	if (!mas_start())
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_ban_add(&mas_plugin, &b) == st_allow);
 });
 EXO_TEST(mas_timed_past_miss, {
 	struct mas_user u = mas_puser("EXPIREDCID00000000000000000000000000000A", "whoever");
 	time_t exp = 0;
-	return mas_plugin.funcs.auth_is_banned(&mas_plugin, mas_as_puser(&u), &exp, NULL) == st_default;
+	if (!mas_start_with_ban(mas_ban_exp("EXPIREDCID00000000000000000000000000000A", "expireduser", 1)))
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_is_banned(&mas_plugin, mas_as_puser(&u), &exp, NULL) == st_default);
 });
 
 /* A stored ban reason is persisted and returned by auth_is_banned. */
 EXO_TEST(mas_reason_add, {
 	struct ban_info b = mas_ban("REASONCID00000000000000000000000000000A", "reasonuser");
+	if (!mas_start())
+		return mas_stop(0);
 	snprintf(b.reason, sizeof(b.reason), "spam then flooding");
-	return mas_plugin.funcs.auth_ban_add(&mas_plugin, &b) == st_allow;
+	return mas_stop(mas_plugin.funcs.auth_ban_add(&mas_plugin, &b) == st_allow);
 });
 EXO_TEST(mas_reason_hit, {
 	struct mas_user u = mas_puser("REASONCID00000000000000000000000000000A", "whoever");
 	time_t exp = 0;
 	char reason[MAX_BAN_REASON];
+	struct ban_info b = mas_ban("REASONCID00000000000000000000000000000A", "reasonuser");
 	reason[0] = '\0';
-	return mas_plugin.funcs.auth_is_banned(&mas_plugin, mas_as_puser(&u), &exp, reason) == st_deny
-		&& strcmp(reason, "spam then flooding") == 0;
+	snprintf(b.reason, sizeof(b.reason), "spam then flooding");
+	if (!mas_start_with_ban(b))
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_is_banned(&mas_plugin, mas_as_puser(&u), &exp, reason) == st_deny
+		&& strcmp(reason, "spam then flooding") == 0);
 });
 
-EXO_TEST(mas_teardown, {
-	int rc = plugin_unregister(&mas_plugin);
-	remove(MAS_DB);
-	return rc == 0;
+EXO_TEARDOWN({
+	return mas_stop(1);
 });

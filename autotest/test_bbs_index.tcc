@@ -64,9 +64,89 @@ static int bbs_replay(const char* board, time_t from)
 	return bbs_index_replay(bbs_idx, board, from, &bbs_collect, 0);
 }
 
-EXO_TEST(bbs_index_setup, {
+/*
+ * Every test starts from one of these: an empty in-memory index, or that index
+ * with the posts a test needs. Each closes the previous index first, so a test
+ * runs alone or in any order.
+ */
+static int idx_fresh(void)
+{
+	bbs_index_close(bbs_idx);
 	bbs_idx = bbs_index_open(":memory:");
 	return bbs_idx != 0;
+}
+
+/* Post A on general, the thread everything else hangs off. */
+static int idx_a(void)
+{
+	struct bbs_entry e;
+	if (!idx_fresh())
+		return 0;
+	bbs_entry_init(&e, TTH_A, 0, "Hub upgrade on Saturday");
+	return bbs_index_append(bbs_idx, "general", &e, 1786439662, 0) == bbs_index_ok;
+}
+
+/* A, B replying to A, and C replying to B -- the newest at 1786442600. */
+static int idx_thread(void)
+{
+	return idx_a()
+		&& bbs_add("general", TTH_B, TTH_A, 1786442550)
+		&& bbs_add("general", TTH_C, TTH_B, 1786442600);
+}
+
+/* The thread, two more posts in its last second, and A relayed to
+   announcements: five entries on general. */
+static int idx_general_five(void)
+{
+	return idx_thread()
+		&& bbs_add("general", "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB", 0, 1000) /* clock went back */
+		&& bbs_add("general", "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC", 0, 1786442600)
+		&& bbs_add("announcements", TTH_A, 0, 1786439700);
+}
+
+/* ...with A withdrawn. */
+static int idx_withdrawn(void)
+{
+	return idx_general_five()
+		&& bbs_index_withdraw(bbs_idx, "general", TTH_A, 1786443100, 0) == bbs_index_ok;
+}
+
+/* Ten entries on "prune", at 2000..2009. */
+static int idx_prune10(void)
+{
+	int i;
+	char tth[BBS_TTH_LEN + 1];
+	struct bbs_entry e;
+	if (!idx_fresh())
+		return 0;
+	for (i = 0; i < 10; i++)
+	{
+		memset(tth, 'A' + (i % 20), BBS_TTH_LEN);
+		tth[BBS_TTH_LEN] = 0;
+		bbs_entry_init(&e, tth, 0, "Prunable");
+		if (bbs_index_append(bbs_idx, "prune", &e, 2000 + i, 0) != bbs_index_ok)
+			return 0;
+	}
+	return 1;
+}
+
+/* ...and an eleventh appended keeping five: 2006..2010 remain. */
+static int idx_pruned(void)
+{
+	struct bbs_entry e;
+	char tth[BBS_TTH_LEN + 1];
+	if (!idx_prune10())
+		return 0;
+	memset(tth, 'Z', BBS_TTH_LEN);
+	tth[BBS_TTH_LEN] = 0;
+	bbs_entry_init(&e, tth, 0, "The eleventh");
+	return bbs_index_append(bbs_idx, "prune", &e, 2010, 5) == bbs_index_ok;
+}
+
+EXO_TEARDOWN({
+	bbs_index_close(bbs_idx);
+	bbs_idx = 0;
+	return 1;
 });
 
 /* -- hash validation --------------------------------------------------- */
@@ -86,12 +166,16 @@ EXO_TEST(bbs_index_tth_digit_eight, { return !bbs_tth_is_valid("8X3TQ7ZVN5PLQGKD
 EXO_TEST(bbs_index_empty_board, {
 	time_t newest = 1, oldest = 1;
 	size_t count = 1;
+	if (!(idx_fresh()))
+		return 0;
 	return bbs_index_stats(bbs_idx, "general", &newest, &oldest, &count) == 0
 		&& newest == 0 && oldest == 0 && count == 0;
 });
 
 EXO_TEST(bbs_index_append_first, {
 	struct bbs_entry e;
+	if (!(idx_fresh()))
+		return 0;
 	bbs_entry_init(&e, TTH_A, 0, "Hub upgrade on Saturday");
 	return bbs_index_append(bbs_idx, "general", &e, 1786439662, 0) == bbs_index_ok
 		&& e.ts == 1786439662
@@ -102,6 +186,8 @@ EXO_TEST(bbs_index_append_first, {
 
 EXO_TEST(bbs_index_lookup_found, {
 	struct bbs_entry e;
+	if (!(idx_a()))
+		return 0;
 	return bbs_index_lookup(bbs_idx, "general", TTH_A, &e) == bbs_index_ok
 		&& !strcmp(e.tth, TTH_A)
 		&& !strcmp(e.cid, CID_A)
@@ -113,17 +199,23 @@ EXO_TEST(bbs_index_lookup_found, {
 });
 
 EXO_TEST(bbs_index_lookup_missing, {
+	if (!(idx_a()))
+		return 0;
 	return bbs_index_lookup(bbs_idx, "general", TTH_C, 0) == bbs_index_not_found;
 });
 
 /* A post is the same post on every hub, but an index entry belongs to one
    board on one hub. */
 EXO_TEST(bbs_index_lookup_other_board, {
+	if (!(idx_a()))
+		return 0;
 	return bbs_index_lookup(bbs_idx, "announcements", TTH_A, 0) == bbs_index_not_found;
 });
 
 EXO_TEST(bbs_index_append_duplicate, {
 	struct bbs_entry e;
+	if (!(idx_a()))
+		return 0;
 	bbs_entry_init(&e, TTH_A, 0, "Again");
 	return bbs_index_append(bbs_idx, "general", &e, 1786439700, 0) == bbs_index_duplicate;
 });
@@ -131,6 +223,8 @@ EXO_TEST(bbs_index_append_duplicate, {
 /* The same document may be indexed on a second board -- that is a relayed post,
    and it is the honest case. */
 EXO_TEST(bbs_index_append_same_tth_other_board, {
+	if (!(idx_a()))
+		return 0;
 	return bbs_add("announcements", TTH_A, 0, 1786439700);
 });
 
@@ -138,6 +232,8 @@ EXO_TEST(bbs_index_append_same_tth_other_board, {
 
 EXO_TEST(bbs_index_reply_inherits_thread, {
 	struct bbs_entry e;
+	if (!(idx_a()))
+		return 0;
 	bbs_entry_init(&e, TTH_B, TTH_A, "Re: Hub upgrade on Saturday");
 	return bbs_index_append(bbs_idx, "general", &e, 1786442550, 0) == bbs_index_ok
 		&& !strcmp(e.parent, TTH_A)
@@ -148,6 +244,8 @@ EXO_TEST(bbs_index_reply_inherits_thread, {
    parent. */
 EXO_TEST(bbs_index_nested_reply_keeps_root, {
 	struct bbs_entry e;
+	if (!(idx_a() && bbs_add("general", TTH_B, TTH_A, 1786442550)))
+		return 0;
 	bbs_entry_init(&e, TTH_C, TTH_B, "Re: Re: Hub upgrade");
 	return bbs_index_append(bbs_idx, "general", &e, 1786442600, 0) == bbs_index_ok
 		&& !strcmp(e.thread, TTH_A);
@@ -155,6 +253,8 @@ EXO_TEST(bbs_index_nested_reply_keeps_root, {
 
 EXO_TEST(bbs_index_reply_unknown_parent, {
 	struct bbs_entry e;
+	if (!(idx_fresh()))
+		return 0;
 	bbs_entry_init(&e, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", TTH_C, "Orphan");
 	return bbs_index_append(bbs_idx, "announcements", &e, 1786442700, 0) == bbs_index_no_parent;
 });
@@ -166,6 +266,8 @@ EXO_TEST(bbs_index_reply_unknown_parent, {
    one, so nothing ever enters the index behind a cursor that has passed it. */
 EXO_TEST(bbs_index_clock_moves_backwards, {
 	struct bbs_entry e;
+	if (!(idx_thread()))
+		return 0;
 	bbs_entry_init(&e, "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB", 0, "Back in time");
 	return bbs_index_append(bbs_idx, "general", &e, 1000, 0) == bbs_index_ok
 		&& e.ts == 1786442600;
@@ -175,6 +277,8 @@ EXO_TEST(bbs_index_clock_moves_backwards, {
    not perturb one to make it so. */
 EXO_TEST(bbs_index_same_second_not_perturbed, {
 	struct bbs_entry e;
+	if (!(idx_thread()))
+		return 0;
 	bbs_entry_init(&e, "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC", 0, "Same second");
 	return bbs_index_append(bbs_idx, "general", &e, 1786442600, 0) == bbs_index_ok
 		&& e.ts == 1786442600;
@@ -183,6 +287,8 @@ EXO_TEST(bbs_index_same_second_not_perturbed, {
 EXO_TEST(bbs_index_stats_after_appends, {
 	time_t newest = 0, oldest = 0;
 	size_t count = 0;
+	if (!(idx_general_five()))
+		return 0;
 	return bbs_index_stats(bbs_idx, "general", &newest, &oldest, &count) == 0
 		&& newest == 1786442600
 		&& oldest == 1786439662
@@ -192,10 +298,14 @@ EXO_TEST(bbs_index_stats_after_appends, {
 /* -- replay ------------------------------------------------------------ */
 
 EXO_TEST(bbs_index_replay_everything, {
+	if (!(idx_general_five()))
+		return 0;
 	return bbs_replay("general", 0) == 5 && bbs_seen == 5 && bbs_order_ok;
 });
 
 EXO_TEST(bbs_index_replay_from_cursor, {
+	if (!(idx_general_five()))
+		return 0;
 	/* Entries at 1786442550, 1786442600, 1786442600, 1786442600. */
 	return bbs_replay("general", 1786442550) == 4 && bbs_order_ok;
 });
@@ -204,22 +314,32 @@ EXO_TEST(bbs_index_replay_from_cursor, {
    a client discards them by hash. Resuming from one second later would skip a
    post accepted in the same second, which is why clients must not do it. */
 EXO_TEST(bbs_index_replay_resumption_window_overlaps, {
-	int with = bbs_replay("general", 1786442600);
-	int without = bbs_replay("general", 1786442601);
+	int with;
+	int without;
+	if (!(idx_general_five()))
+		return 0;
+	with = bbs_replay("general", 1786442600);
+	without = bbs_replay("general", 1786442601);
 	return with == 3 && without == 0;
 });
 
 EXO_TEST(bbs_index_replay_future_cursor, {
+	if (!(idx_general_five()))
+		return 0;
 	return bbs_replay("general", 2000000000) == 0;
 });
 
 EXO_TEST(bbs_index_replay_unknown_board, {
+	if (!(idx_general_five()))
+		return 0;
 	return bbs_replay("nosuchboard", 0) == 0;
 });
 
 /* -- withdrawal -------------------------------------------------------- */
 
 EXO_TEST(bbs_index_withdraw_missing, {
+	if (!(idx_general_five()))
+		return 0;
 	return bbs_index_withdraw(bbs_idx, "general", "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
 	                          1786443100, 0) == bbs_index_not_found;
 });
@@ -228,6 +348,8 @@ EXO_TEST(bbs_index_withdraw_missing, {
    it at the head of the stream where a resuming client will see it. */
 EXO_TEST(bbs_index_withdraw_tombstone, {
 	struct bbs_entry tomb;
+	if (!(idx_general_five()))
+		return 0;
 	return bbs_index_withdraw(bbs_idx, "general", TTH_A, 1786443100, &tomb) == bbs_index_ok
 		&& !strcmp(tomb.tth, TTH_A)
 		&& tomb.ts == 1786443100
@@ -241,6 +363,8 @@ EXO_TEST(bbs_index_withdraw_tombstone, {
 
 EXO_TEST(bbs_index_withdraw_marks_stored_entry, {
 	struct bbs_entry e;
+	if (!(idx_withdrawn()))
+		return 0;
 	return bbs_index_lookup(bbs_idx, "general", TTH_A, &e) == bbs_index_ok
 		&& e.removed == 1
 		&& e.ts == 1786443100;
@@ -250,10 +374,14 @@ EXO_TEST(bbs_index_withdraw_marks_stored_entry, {
    still deliver the withdrawal. */
 EXO_TEST(bbs_index_withdraw_excluded_from_count, {
 	size_t count = 0;
+	if (!(idx_withdrawn()))
+		return 0;
 	return bbs_index_stats(bbs_idx, "general", 0, 0, &count) == 0 && count == 4;
 });
 
 EXO_TEST(bbs_index_withdraw_replayed_as_tombstone, {
+	if (!(idx_withdrawn()))
+		return 0;
 	return bbs_replay("general", 1786443100) == 1
 		&& bbs_last.removed == 1
 		&& !strcmp(bbs_last.tth, TTH_A);
@@ -263,11 +391,15 @@ EXO_TEST(bbs_index_withdraw_replayed_as_tombstone, {
    and stays where it is. */
 EXO_TEST(bbs_index_withdraw_keeps_replies, {
 	struct bbs_entry e;
+	if (!(idx_withdrawn()))
+		return 0;
 	return bbs_index_lookup(bbs_idx, "general", TTH_B, &e) == bbs_index_ok && e.removed == 0;
 });
 
 EXO_TEST(bbs_index_withdraw_twice, {
 	struct bbs_entry tomb;
+	if (!(idx_withdrawn()))
+		return 0;
 	return bbs_index_withdraw(bbs_idx, "general", TTH_A, 1786443200, &tomb) == bbs_index_ok
 		&& tomb.ts == 1786443200;
 });
@@ -278,6 +410,8 @@ EXO_TEST(bbs_index_prune_setup, {
 	int i;
 	char tth[BBS_TTH_LEN + 1];
 	struct bbs_entry e;
+	if (!(idx_fresh()))
+		return 0;
 	for (i = 0; i < 10; i++)
 	{
 		memset(tth, 'A' + (i % 20), BBS_TTH_LEN);
@@ -292,6 +426,8 @@ EXO_TEST(bbs_index_prune_setup, {
 EXO_TEST(bbs_index_prune_drops_oldest, {
 	struct bbs_entry e;
 	char tth[BBS_TTH_LEN + 1];
+	if (!(idx_prune10()))
+		return 0;
 	memset(tth, 'Z', BBS_TTH_LEN);
 	tth[BBS_TTH_LEN] = 0;
 	bbs_entry_init(&e, tth, 0, "The eleventh");
@@ -304,12 +440,16 @@ EXO_TEST(bbs_index_prune_drops_oldest, {
    what OT reports -- so the hub never promises a replay it cannot deliver. */
 EXO_TEST(bbs_index_prune_raises_oldest, {
 	time_t oldest = 0;
+	if (!(idx_pruned()))
+		return 0;
 	return bbs_index_stats(bbs_idx, "prune", 0, &oldest, 0) == 0 && oldest == 2006;
 });
 
 EXO_TEST(bbs_index_prune_zero_retains_everything, {
 	struct bbs_entry e;
 	char tth[BBS_TTH_LEN + 1];
+	if (!(idx_pruned()))
+		return 0;
 	memset(tth, 'Y', BBS_TTH_LEN);
 	tth[BBS_TTH_LEN] = 0;
 	bbs_entry_init(&e, tth, 0, "Kept");
@@ -329,9 +469,7 @@ EXO_TEST(bbs_index_null_index, {
 		&& bbs_index_stats(0, "general", 0, 0, 0) == -1;
 });
 
-EXO_TEST(bbs_index_teardown, {
-	bbs_index_close(bbs_idx);
-	bbs_idx = 0;
+EXO_TEST(bbs_index_close_null, {
 	bbs_index_close(0); /* tolerates NULL */
 	return 1;
 });

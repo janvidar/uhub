@@ -128,7 +128,8 @@ static int mgp_lookup(struct plugin_handle** order, size_t count, const char* ni
 	return (int) status;
 }
 
-EXO_TEST(mgp_order_setup, {
+/* The real plugin and the fake storage plugins the order tests line up. */
+EXO_SETUP({
 	memset(&mgp_accounts, 0, sizeof(mgp_accounts));
 	mgp_accounts.funcs.auth_get_user = mgp_accounts_get_user;
 	memset(&mgp_refuse, 0, sizeof(mgp_refuse));
@@ -184,6 +185,7 @@ EXO_TEST(mgp_no_answer, {
 	return mgp_lookup(order, 1, "stranger", &info) == st_default;
 });
 
-EXO_TEST(mgp_order_teardown, {
-	return mod_guest_passwd_unregister(&mgp_guest) == 0;
+EXO_TEARDOWN({
+	mod_guest_passwd_unregister(&mgp_guest);
+	return 1;
 });

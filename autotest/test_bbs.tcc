@@ -7,9 +7,16 @@
 #include "core/usermanager.h"
 #include "network/network.h"
 #include "testutil_user.h"
+#include "testutil_net.h"
 
 /* BBS0 at the protocol level: the exact lines the hub puts on the wire, read
-   back out of the send queue (see testutil_user.h). */
+   back out of the send queue (see testutil_user.h).
+
+   Every test starts with bbs_fresh(): a new hub with the three standard boards,
+   an empty in-memory index and three users with empty queues and no
+   subscriptions. A test that needs posts, boards or subscriptions first builds
+   them with one of the helpers below, so each test runs alone or in any
+   order. The fixture is torn down by the next bbs_fresh(), or at teardown. */
 
 #define BBS_TTH_A "KX3TQ7ZVN5PLQGKD3NDBK6ZTZG5PYQXSNMFYVJH"
 #define BBS_CID_A "IPJJWEPPPLCA3PF2ZCRRYO4F2ZX2EV2JMW2KC3I"
@@ -28,8 +35,35 @@ static struct bbs_board* bbs_add_board(const char* line)
 	return board;
 }
 
-EXO_TEST(bbs_setup, {
-	net_initialize();
+static int bbs_in_hub(struct hub_user* user)
+{
+	return user && uman_get_user_by_nick(bh->users, user->id.nick) == user;
+}
+
+static void bbs_stop(void)
+{
+	if (!bh)
+		return;
+	if (bbs_in_hub(bu_guest)) uman_remove(bh->users, bu_guest);
+	if (bbs_in_hub(bu_reg))   uman_remove(bh->users, bu_reg);
+	if (bbs_in_hub(bu_op))    uman_remove(bh->users, bu_op);
+	tu_user_destroy(bu_guest);
+	tu_user_destroy(bu_reg);
+	tu_user_destroy(bu_op);
+	bu_guest = bu_reg = bu_op = 0;
+	bbs_shutdown(bh->bbs);
+	bh->bbs = 0;
+	uman_shutdown(bh->users);
+	list_destroy(bh->write_queue);
+	free_config(bh->config);
+	hub_free(bh->config);
+	hub_free(bh);
+	bh = 0;
+}
+
+static int bbs_fresh(void)
+{
+	bbs_stop();
 
 	bh = (struct hub_info*) hub_malloc_zero(sizeof(struct hub_info));
 	if (!bh)
@@ -59,23 +93,66 @@ EXO_TEST(bbs_setup, {
 	user_flag_set(bu_op, feature_bbs);
 
 	return bh->bbs->index && bh->users && bh->write_queue
-		&& bu_guest && bu_reg && bu_op;
+		&& bu_guest && bu_reg && bu_op
+		&& bbs_add_board("board general title=\"General discussion\" description=\"Anything about this hub\"")
+		&& bbs_add_board("board announcements title=\"Announcements\" post=operator max_size=65536")
+		&& bbs_add_board("board members subscribe=reg");
+}
+
+EXO_SETUP({
+	return test_net_acquire();
 });
 
+EXO_TEARDOWN({
+	bbs_stop();
+	test_net_release();
+	return 1;
+});
+
+/* A post on general from the guest, as the descriptor tests use it. */
+static int bbs_general_post(void)
+{
+	struct bbs_entry e;
+	memset(&e, 0, sizeof(e));
+	strcpy(e.tth, BBS_TTH_A);
+	strcpy(e.cid, BBS_CID_A);
+	strcpy(e.nick, "guest");
+	strcpy(e.subject, "Hub upgrade on Saturday");
+	e.size = 412;
+	return bbs_index_append(bh->bbs->index, "general", &e, 1786439662, 0) == bbs_index_ok;
+}
+
+/* ...and that post withdrawn again, later. */
+static int bbs_general_post_withdrawn(void)
+{
+	return bbs_general_post()
+		&& bbs_index_withdraw(bh->bbs->index, "general", BBS_TTH_A, 1786443100, 0) == bbs_index_ok;
+}
+
+/* The board list as `user` is sent it, in its otherwise empty queue. */
+static int bbs_list_sent(struct hub_user* user)
+{
+	tu_queue_clear(user);
+	bbs_send_board_list(bh, user);
+	return 1;
+}
+
 EXO_TEST(bbs_setup_boards, {
-	return bbs_add_board("board general title=\"General discussion\" description=\"Anything about this hub\"")
-		&& bbs_add_board("board announcements title=\"Announcements\" post=operator max_size=65536")
-		&& bbs_add_board("board members subscribe=reg")
-		&& list_size(bh->bbs->boards) == 3;
+	return bbs_fresh() && list_size(bh->bbs->boards) == 3;
 });
 
 EXO_TEST(bbs_is_enabled_when_index_open, {
+	if (!(bbs_fresh()))
+		return 0;
 	return bbs_is_enabled(bh);
 });
 
 EXO_TEST(bbs_is_enabled_false_without_handle, {
-	struct bbs_handle* saved = bh->bbs;
+	struct bbs_handle* saved;
 	int enabled;
+	if (!(bbs_fresh()))
+		return 0;
+	saved = bh->bbs;
 	bh->bbs = 0;
 	enabled = bbs_is_enabled(bh);
 	bh->bbs = saved;
@@ -88,6 +165,8 @@ EXO_TEST(bbs_is_enabled_false_without_handle, {
    exists. PE5 on general is subscribe (1) + reply (4); PE5 on announcements is
    the same, since only operators may start a thread there. */
 EXO_TEST(bbs_descriptor_guest_sees_two_boards, {
+	if (!(bbs_fresh()))
+		return 0;
 	tu_queue_clear(bu_guest);
 	bbs_send_board_list(bh, bu_guest);
 	return tu_queue_count(bu_guest) == 2
@@ -98,17 +177,23 @@ EXO_TEST(bbs_descriptor_guest_sees_two_boards, {
 
 /* The whole line, exactly. An empty board reports TS0, OT0 and NP0. */
 EXO_TEST(bbs_descriptor_wire_format, {
+	if (!(bbs_fresh() && bbs_list_sent(bu_guest)))
+		return 0;
 	return tu_queue_has(bu_guest,
 		"IBBD BDgeneral NIGeneral\\sdiscussion DEAnything\\sabout\\sthis\\shub"
 		" PE5 MS262144 TS0 OT0 NP0\n");
 });
 
 EXO_TEST(bbs_descriptor_max_size_is_per_board, {
+	if (!(bbs_fresh() && bbs_list_sent(bu_guest)))
+		return 0;
 	return tu_queue_has(bu_guest,
 		"IBBD BDannouncements NIAnnouncements PE5 MS65536 TS0 OT0 NP0\n");
 });
 
 EXO_TEST(bbs_descriptor_registered_user_sees_all_three, {
+	if (!(bbs_fresh()))
+		return 0;
 	tu_queue_clear(bu_reg);
 	bbs_send_board_list(bh, bu_reg);
 	return tu_queue_count(bu_reg) == 3
@@ -117,6 +202,8 @@ EXO_TEST(bbs_descriptor_registered_user_sees_all_three, {
 
 /* PE15 is 1+2+4+8: subscribe, post, reply and withdraw one's own. */
 EXO_TEST(bbs_descriptor_registered_permissions, {
+	if (!(bbs_fresh() && bbs_list_sent(bu_reg)))
+		return 0;
 	return tu_queue_has(bu_reg,
 		"IBBD BDgeneral NIGeneral\\sdiscussion DEAnything\\sabout\\sthis\\shub"
 		" PE15 MS262144 TS0 OT0 NP0\n");
@@ -124,6 +211,8 @@ EXO_TEST(bbs_descriptor_registered_permissions, {
 
 /* PE31 is every bit: an operator moderates as well as posts. */
 EXO_TEST(bbs_descriptor_operator_permissions, {
+	if (!(bbs_fresh()))
+		return 0;
 	tu_queue_clear(bu_op);
 	bbs_send_board_list(bh, bu_op);
 	return tu_queue_has(bu_op,
@@ -134,12 +223,16 @@ EXO_TEST(bbs_descriptor_operator_permissions, {
 /* Splitting post from reply is the point of an announcements board: a
    registered user gets 1+4+8 = 13, with the posting bit withheld. */
 EXO_TEST(bbs_descriptor_announcements_registered_cannot_post, {
+	if (!(bbs_fresh() && bbs_list_sent(bu_reg)))
+		return 0;
 	return tu_queue_has(bu_reg, "IBBD BDannouncements NIAnnouncements PE13 MS65536 TS0 OT0 NP0\n");
 });
 
 /* A client that never offered BBS0 receives no descriptor, whatever its
    permissions: the hub's announcement in SUP is what the exchange rests on. */
 EXO_TEST(bbs_descriptor_not_sent_without_feature, {
+	if (!(bbs_fresh()))
+		return 0;
 	user_flag_unset(bu_op, feature_bbs);
 	tu_queue_clear(bu_op);
 	bbs_send_board_list(bh, bu_op);
@@ -151,6 +244,8 @@ EXO_TEST(bbs_descriptor_not_sent_without_feature, {
 
 EXO_TEST(bbs_descriptor_reports_posts, {
 	struct bbs_entry e;
+	if (!(bbs_fresh()))
+		return 0;
 	memset(&e, 0, sizeof(e));
 	strcpy(e.tth, BBS_TTH_A);
 	strcpy(e.cid, BBS_CID_A);
@@ -172,6 +267,8 @@ EXO_TEST(bbs_descriptor_reports_posts, {
 /* A withdrawn post leaves the index entry in place, so it still bounds TS, but
    it stops counting towards NP. */
 EXO_TEST(bbs_descriptor_excludes_tombstones_from_count, {
+	if (!(bbs_fresh() && bbs_general_post()))
+		return 0;
 	if (bbs_index_withdraw(bh->bbs->index, "general", BBS_TTH_A, 1786443100, 0) != bbs_index_ok)
 		return 0;
 	tu_queue_clear(bu_guest);
@@ -184,9 +281,12 @@ EXO_TEST(bbs_descriptor_excludes_tombstones_from_count, {
 /* replay_days moves OT forward: the hub declares what it will replay rather
    than the age of its oldest entry. */
 EXO_TEST(bbs_descriptor_replay_days_bounds_oldest, {
-	struct bbs_board* board = bbs_add_board("board recent replay_days=1");
+	struct bbs_board* board;
 	time_t oldest;
 	struct bbs_entry e;
+	if (!(bbs_fresh()))
+		return 0;
+	board = bbs_add_board("board recent replay_days=1");
 	if (!board)
 		return 0;
 	memset(&e, 0, sizeof(e));
@@ -202,7 +302,10 @@ EXO_TEST(bbs_descriptor_replay_days_bounds_oldest, {
 
 /* With no age limit OT is simply the oldest entry held. */
 EXO_TEST(bbs_descriptor_no_replay_limit_reports_oldest_entry, {
-	struct bbs_board* board = bbs_board_find(bh->bbs, "general");
+	struct bbs_board* board;
+	if (!(bbs_fresh() && bbs_general_post_withdrawn()))
+		return 0;
+	board = bbs_board_find(bh->bbs, "general");
 	return board && bbs_board_oldest_replay(bh->bbs, board, 1786500000) == 1786443100;
 });
 
@@ -243,12 +346,49 @@ static int bbs_seed(const char* board, const char* tth, const char* parent,
 #define BBS_TTH_B "7ZQGKD3NDBK6ZTZG5PYQXSNMFYVJH4TXAVN6PLQ"
 #define BBS_TTH_C "VN6PLQ7ZQGKD3NDBK6ZTZG5PYQXSNMFYVJH4TXA"
 
-EXO_TEST(bbs_subscribe_seed_board, {
+/* Two entries on announcements: a thread, and a reply to it. */
+static int bbs_announcements_seeded(void)
+{
 	return bbs_seed("announcements", BBS_TTH_B, 0, "Hub upgrade on Saturday", 1786436000)
 		&& bbs_seed("announcements", BBS_TTH_C, BBS_TTH_B, "Re: Hub upgrade on Saturday", 1786438120);
+}
+
+/* One more board than a session may hold (many0, many1, ...), and the operator
+   subscribed to as many as allowed. */
+static int bbs_op_at_subscription_limit(void)
+{
+	int i;
+	char line[64];
+	for (i = 0; i < bh->config->bbs_max_subscriptions + 1; i++)
+	{
+		snprintf(line, sizeof(line), "board many%d", i);
+		if (!bbs_add_board(line))
+			return 0;
+	}
+	for (i = 0; i < bh->config->bbs_max_subscriptions; i++)
+	{
+		snprintf(line, sizeof(line), "HBBL BDmany%d TS0\n", i);
+		if (bbs_hbbl(bu_op, line) != 0)
+			return 0;
+	}
+	return 1;
+}
+
+/* A board with two old entries, for the OT clamping tests. */
+static int bbs_bounded_board(void)
+{
+	return bbs_add_board("board bounded") != 0
+		&& bbs_seed("bounded", "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD", 0, "First", 5000)
+		&& bbs_seed("bounded", "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE", 0, "Second", 6000);
+}
+
+EXO_TEST(bbs_subscribe_seed_board, {
+	return bbs_fresh() && bbs_announcements_seeded();
 });
 
 EXO_TEST(bbs_subscribe_replays_backlog, {
+	if (!(bbs_fresh() && bbs_announcements_seeded()))
+		return 0;
 	return bbs_hbbl(bu_guest, "HBBL BDannouncements TS0\n") == 0
 		&& tu_queue_count(bu_guest) == 2;
 });
@@ -256,12 +396,16 @@ EXO_TEST(bbs_subscribe_replays_backlog, {
 /* The entry, in full. TH names the thread root the hub derived; the reply's is
    its parent's hash, and nothing in a document names a thread. */
 EXO_TEST(bbs_subscribe_entry_wire_format, {
+	if (!(bbs_fresh() && bbs_announcements_seeded() && bbs_hbbl(bu_guest, "HBBL BDannouncements TS0\n") == 0))
+		return 0;
 	return tu_queue_has(bu_guest,
 		"IBBL TR" BBS_TTH_B " SI412 BDannouncements ID" BBS_CID_A
 		" NIjanvidar TH" BBS_TTH_B " SJHub\\supgrade\\son\\sSaturday TS1786436000\n");
 });
 
 EXO_TEST(bbs_subscribe_reply_carries_parent_and_thread, {
+	if (!(bbs_fresh() && bbs_announcements_seeded() && bbs_hbbl(bu_guest, "HBBL BDannouncements TS0\n") == 0))
+		return 0;
 	return tu_queue_has(bu_guest,
 		"IBBL TR" BBS_TTH_C " SI412 BDannouncements ID" BBS_CID_A
 		" NIjanvidar PA" BBS_TTH_B " TH" BBS_TTH_B
@@ -269,31 +413,45 @@ EXO_TEST(bbs_subscribe_reply_carries_parent_and_thread, {
 });
 
 EXO_TEST(bbs_subscribe_records_subscription, {
-	struct bbs_board* board = bbs_board_find(bh->bbs, "announcements");
-	struct bbs_subscription* sub = bbs_user_subscription(bu_guest, board);
+	struct bbs_board* board;
+	struct bbs_subscription* sub;
+	if (!(bbs_fresh() && bbs_announcements_seeded() && bbs_hbbl(bu_guest, "HBBL BDannouncements TS0\n") == 0))
+		return 0;
+	board = bbs_board_find(bh->bbs, "announcements");
+	sub = bbs_user_subscription(bu_guest, board);
 	return sub && sub->cursor == 1786438120;
 });
 
 /* Resuming from the highest timestamp seen re-delivers that second. */
 EXO_TEST(bbs_subscribe_resume_from_cursor, {
+	if (!(bbs_fresh() && bbs_announcements_seeded()))
+		return 0;
 	return bbs_hbbl(bu_guest, "HBBL BDannouncements TS1786438120\n") == 0
 		&& tu_queue_count(bu_guest) == 1;
 });
 
 /* A second HBBL replaces the first rather than adding to it. */
 EXO_TEST(bbs_subscribe_replaces_not_adds, {
-	struct bbs_board* board = bbs_board_find(bh->bbs, "announcements");
+	struct bbs_board* board;
+	if (!(bbs_fresh() && bbs_announcements_seeded() && bbs_hbbl(bu_guest, "HBBL BDannouncements TS0\n") == 0 && bbs_hbbl(bu_guest, "HBBL BDannouncements TS1786438120\n") == 0))
+		return 0;
+	board = bbs_board_find(bh->bbs, "announcements");
 	return list_size(bu_guest->bbs_subs) == 1
 		&& bbs_user_subscription(bu_guest, board) != 0;
 });
 
 EXO_TEST(bbs_subscribe_absent_ts_means_everything, {
+	if (!(bbs_fresh() && bbs_announcements_seeded()))
+		return 0;
 	return bbs_hbbl(bu_guest, "HBBL BDannouncements\n") == 0
 		&& tu_queue_count(bu_guest) == 2;
 });
 
 EXO_TEST(bbs_subscribe_cancel, {
-	struct bbs_board* board = bbs_board_find(bh->bbs, "announcements");
+	struct bbs_board* board;
+	if (!(bbs_fresh() && bbs_announcements_seeded() && bbs_hbbl(bu_guest, "HBBL BDannouncements TS0\n") == 0))
+		return 0;
+	board = bbs_board_find(bh->bbs, "announcements");
 	return bbs_hbbl(bu_guest, "HBBL BDannouncements RM1\n") == 0
 		&& tu_queue_count(bu_guest) == 0
 		&& bbs_user_subscription(bu_guest, board) == 0;
@@ -301,6 +459,8 @@ EXO_TEST(bbs_subscribe_cancel, {
 
 /* Cancelling something never subscribed to is not an error. */
 EXO_TEST(bbs_subscribe_cancel_when_not_subscribed, {
+	if (!(bbs_fresh() && bbs_announcements_seeded()))
+		return 0;
 	return bbs_hbbl(bu_guest, "HBBL BDannouncements RM1\n") == 0
 		&& tu_queue_count(bu_guest) == 0;
 });
@@ -308,6 +468,8 @@ EXO_TEST(bbs_subscribe_cancel_when_not_subscribed, {
 /* -- single entry requests ---------------------------------------------- */
 
 EXO_TEST(bbs_subscribe_single_entry, {
+	if (!(bbs_fresh() && bbs_announcements_seeded()))
+		return 0;
 	return bbs_hbbl(bu_guest, "HBBL BDannouncements TR" BBS_TTH_B "\n") == 0
 		&& tu_queue_count(bu_guest) == 1
 		&& tu_queue_find(bu_guest, "IBBL TR" BBS_TTH_B " ") == 0;
@@ -315,17 +477,24 @@ EXO_TEST(bbs_subscribe_single_entry, {
 
 /* A request carrying TR is a question, not a subscription. */
 EXO_TEST(bbs_subscribe_single_entry_does_not_subscribe, {
-	struct bbs_board* board = bbs_board_find(bh->bbs, "announcements");
+	struct bbs_board* board;
+	if (!(bbs_fresh() && bbs_announcements_seeded() && bbs_hbbl(bu_guest, "HBBL BDannouncements TR" BBS_TTH_B "\n") == 0))
+		return 0;
+	board = bbs_board_find(bh->bbs, "announcements");
 	return bbs_user_subscription(bu_guest, board) == 0;
 });
 
 EXO_TEST(bbs_subscribe_single_entry_missing, {
+	if (!(bbs_fresh() && bbs_announcements_seeded()))
+		return 0;
 	return bbs_hbbl(bu_guest, "HBBL BDannouncements TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n") == -1
 		&& tu_queue_has(bu_guest,
 			"ISTA 176 No\\ssuch\\spost FCBBL TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
 });
 
 EXO_TEST(bbs_subscribe_single_entry_bad_hash, {
+	if (!(bbs_fresh()))
+		return 0;
 	return bbs_hbbl(bu_guest, "HBBL BDannouncements TRnothash\n") == -1
 		&& tu_queue_has(bu_guest, "ISTA 143 Invalid\\shash FCBBL FBTR\n");
 });
@@ -333,11 +502,15 @@ EXO_TEST(bbs_subscribe_single_entry_bad_hash, {
 /* -- refusals ----------------------------------------------------------- */
 
 EXO_TEST(bbs_subscribe_missing_board, {
+	if (!(bbs_fresh()))
+		return 0;
 	return bbs_hbbl(bu_guest, "HBBL TS0\n") == -1
 		&& tu_queue_has(bu_guest, "ISTA 143 Missing\\sboard\\sname FCBBL FMBD\n");
 });
 
 EXO_TEST(bbs_subscribe_unknown_board, {
+	if (!(bbs_fresh()))
+		return 0;
 	return bbs_hbbl(bu_guest, "HBBL BDgenrel TS0\n") == -1
 		&& tu_queue_has(bu_guest, "ISTA 171 No\\ssuch\\sboard FCBBL BDgenrel\n");
 });
@@ -345,16 +518,22 @@ EXO_TEST(bbs_subscribe_unknown_board, {
 /* A board the session cannot subscribe to is refused exactly as one that does
    not exist, so the refusal does not disclose it. */
 EXO_TEST(bbs_subscribe_invisible_board_looks_missing, {
+	if (!(bbs_fresh()))
+		return 0;
 	return bbs_hbbl(bu_guest, "HBBL BDmembers TS0\n") == -1
 		&& tu_queue_has(bu_guest, "ISTA 171 No\\ssuch\\sboard FCBBL BDmembers\n");
 });
 
 EXO_TEST(bbs_subscribe_visible_to_registered, {
+	if (!(bbs_fresh()))
+		return 0;
 	return bbs_hbbl(bu_reg, "HBBL BDmembers TS0\n") == 0
 		&& tu_queue_count(bu_reg) == 0; /* the board is empty, but it exists */
 });
 
 EXO_TEST(bbs_subscribe_tr_and_ts_together, {
+	if (!(bbs_fresh() && bbs_announcements_seeded()))
+		return 0;
 	return bbs_hbbl(bu_guest, "HBBL BDannouncements TS0 TR" BBS_TTH_B "\n") == -1
 		&& tu_queue_has(bu_guest, "ISTA 140 TR\\sand\\sTS\\smust\\snot\\sboth\\sbe\\sgiven FCBBL\n");
 });
@@ -363,6 +542,8 @@ EXO_TEST(bbs_subscribe_limit, {
 	int i;
 	char line[64];
 	char name[32];
+	if (!(bbs_fresh()))
+		return 0;
 	/* One more board than the session is allowed to hold at once. */
 	for (i = 0; i < bh->config->bbs_max_subscriptions + 1; i++)
 	{
@@ -385,6 +566,8 @@ EXO_TEST(bbs_subscribe_limit, {
 /* Re-subscribing to a board already held is not a new subscription and does not
    count against the limit. */
 EXO_TEST(bbs_subscribe_resubscribe_within_limit, {
+	if (!(bbs_fresh() && bbs_op_at_subscription_limit()))
+		return 0;
 	return bbs_hbbl(bu_op, "HBBL BDmany0 TS0\n") == 0
 		&& list_size(bu_op->bbs_subs) == (size_t) bh->config->bbs_max_subscriptions;
 });
@@ -395,12 +578,12 @@ EXO_TEST(bbs_subscribe_resubscribe_within_limit, {
    treated as one from OT, so a client that has been away too long still gets
    everything the hub still holds. */
 EXO_TEST(bbs_subscribe_setup_bounded_board, {
-	return bbs_add_board("board bounded") != 0
-		&& bbs_seed("bounded", "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD", 0, "First", 5000)
-		&& bbs_seed("bounded", "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE", 0, "Second", 6000);
+	return bbs_fresh() && bbs_bounded_board();
 });
 
 EXO_TEST(bbs_subscribe_ancient_cursor_is_served_not_refused, {
+	if (!(bbs_fresh() && bbs_bounded_board()))
+		return 0;
 	return bbs_hbbl(bu_guest, "HBBL BDbounded TS1\n") == 0
 		&& tu_queue_count(bu_guest) == 2;
 });
@@ -408,13 +591,19 @@ EXO_TEST(bbs_subscribe_ancient_cursor_is_served_not_refused, {
 /* The cursor ends up at the newest entry actually sent, so the next resume
    starts from there rather than from the value the client asked for. */
 EXO_TEST(bbs_subscribe_cursor_follows_what_was_sent, {
-	struct bbs_board* board = bbs_board_find(bh->bbs, "bounded");
-	struct bbs_subscription* sub = bbs_user_subscription(bu_guest, board);
+	struct bbs_board* board;
+	struct bbs_subscription* sub;
+	if (!(bbs_fresh() && bbs_bounded_board() && bbs_hbbl(bu_guest, "HBBL BDbounded TS1\n") == 0))
+		return 0;
+	board = bbs_board_find(bh->bbs, "bounded");
+	sub = bbs_user_subscription(bu_guest, board);
 	return sub && sub->cursor == 6000;
 });
 
 /* A negative timestamp is not a way to ask for something before the beginning. */
 EXO_TEST(bbs_subscribe_negative_ts, {
+	if (!(bbs_fresh() && bbs_bounded_board()))
+		return 0;
 	return bbs_hbbl(bu_guest, "HBBL BDbounded TS-9999\n") == 0
 		&& tu_queue_count(bu_guest) == 2;
 });
@@ -424,7 +613,10 @@ EXO_TEST(bbs_subscribe_negative_ts, {
 /* Cancelling a board's subscriptions walks the user manager, so a user has to
    be in it to be reached. */
 EXO_TEST(bbs_subscribe_cancelled_when_board_goes, {
-	struct bbs_board* board = bbs_board_find(bh->bbs, "many0");
+	struct bbs_board* board;
+	if (!(bbs_fresh() && bbs_op_at_subscription_limit()))
+		return 0;
+	board = bbs_board_find(bh->bbs, "many0");
 	if (bbs_user_subscription(bu_op, board) == 0)
 		return 0;
 	uman_add(bh->users, bu_op);
@@ -436,6 +628,8 @@ EXO_TEST(bbs_subscribe_cancelled_when_board_goes, {
 });
 
 EXO_TEST(bbs_subscribe_unsubscribe_all, {
+	if (!(bbs_fresh() && bbs_op_at_subscription_limit()))
+		return 0;
 	bbs_user_unsubscribe_all(bu_op);
 	return bu_op->bbs_subs == 0
 		&& bbs_user_subscription(bu_op, bbs_board_find(bh->bbs, "many1")) == 0;
@@ -458,9 +652,10 @@ static int bbs_hbbp(struct hub_user* user, const char* line)
 #define BBS_TTH_Q "QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
 #define BBS_TTH_R "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
 
-EXO_TEST(bbs_post_setup, {
-	/* A board everyone can use, and two subscribers -- the poster is not one of
-	   them, so that "the entry is the acknowledgement" is actually tested. */
+/* A board everyone can use, and two subscribers -- the poster is not one of
+   them, so that "the entry is the acknowledgement" is actually tested. */
+static int bbs_talk(void)
+{
 	if (!bbs_add_board("board talk post=guest withdraw_own=guest"))
 		return 0;
 	bh->config->bbs_post_interval = 0; /* rate limiting has its own tests */
@@ -469,9 +664,41 @@ EXO_TEST(bbs_post_setup, {
 	tu_queue_clear(bu_guest);
 	tu_queue_clear(bu_reg);
 	return bbs_hbbl(bu_reg, "HBBL BDtalk TS0\n") == 0;
+}
+
+/* bbs_talk(), and the guest's thread P on it -- with the queues emptied first,
+   so what they hold afterwards is what P produced. */
+static int bbs_talk_p(void)
+{
+	if (!bbs_talk())
+		return 0;
+	tu_queue_clear(bu_guest);
+	tu_queue_clear(bu_reg);
+	return bbs_hbbp(bu_guest, "HBBP TR" BBS_TTH_P " SI412 BDtalk SJHub\\supgrade\\son\\sSaturday\n") == 0;
+}
+
+/* ...plus the registered user's own thread Q. */
+static int bbs_talk_pq(void)
+{
+	return bbs_talk_p()
+		&& bbs_hbbp(bu_reg, "HBBP TR" BBS_TTH_Q " SI99 BDtalk SJMine\n") == 0;
+}
+
+/* ...or the guest's reply R to P. */
+static int bbs_talk_pr(void)
+{
+	return bbs_talk_p()
+		&& bbs_hbbp(bu_guest, "HBBP TR" BBS_TTH_R " SI298 BDtalk PA" BBS_TTH_P
+		                      " SJRe:\\sHub\\supgrade\\son\\sSaturday\n") == 0;
+}
+
+EXO_TEST(bbs_post_setup, {
+	return bbs_fresh() && bbs_talk();
 });
 
 EXO_TEST(bbs_post_accepted, {
+	if (!(bbs_fresh() && bbs_talk()))
+		return 0;
 	tu_queue_clear(bu_guest);
 	tu_queue_clear(bu_reg);
 	return bbs_hbbp(bu_guest, "HBBP TR" BBS_TTH_P " SI412 BDtalk SJHub\\supgrade\\son\\sSaturday\n") == 0;
@@ -482,6 +709,8 @@ EXO_TEST(bbs_post_accepted, {
 EXO_TEST(bbs_post_author_receives_the_entry, {
 	char expect[512];
 	struct bbs_entry e;
+	if (!(bbs_fresh() && bbs_talk_p()))
+		return 0;
 	if (bbs_index_lookup(bh->bbs->index, "talk", BBS_TTH_P, &e) != bbs_index_ok)
 		return 0;
 	/* The hub stamps the post with its own clock, so the expected line is built
@@ -493,6 +722,8 @@ EXO_TEST(bbs_post_author_receives_the_entry, {
 });
 
 EXO_TEST(bbs_post_subscriber_receives_the_entry, {
+	if (!(bbs_fresh() && bbs_talk_p()))
+		return 0;
 	return tu_queue_count(bu_reg) == 1
 		&& tu_queue_find(bu_reg, "IBBL TR" BBS_TTH_P " ") == 0;
 });
@@ -501,6 +732,8 @@ EXO_TEST(bbs_post_subscriber_receives_the_entry, {
    from the absence of PA. */
 EXO_TEST(bbs_post_thread_root_is_own_hash, {
 	struct bbs_entry e;
+	if (!(bbs_fresh() && bbs_talk_p()))
+		return 0;
 	return bbs_index_lookup(bh->bbs->index, "talk", BBS_TTH_P, &e) == bbs_index_ok
 		&& !strcmp(e.thread, BBS_TTH_P)
 		&& e.parent[0] == 0;
@@ -510,6 +743,8 @@ EXO_TEST(bbs_post_thread_root_is_own_hash, {
    nick that session held -- both its own testimony. */
 EXO_TEST(bbs_post_records_submitting_session, {
 	struct bbs_entry e;
+	if (!(bbs_fresh() && bbs_talk_p()))
+		return 0;
 	return bbs_index_lookup(bh->bbs->index, "talk", BBS_TTH_P, &e) == bbs_index_ok
 		&& !strcmp(e.cid, BBS_CID_A)
 		&& !strcmp(e.nick, "guest");
@@ -519,6 +754,8 @@ EXO_TEST(bbs_post_records_submitting_session, {
    discarded, not the command refused. */
 EXO_TEST(bbs_post_discards_client_supplied_hub_fields, {
 	struct bbs_entry e;
+	if (!(bbs_fresh() && bbs_talk_p()))
+		return 0;
 	tu_queue_clear(bu_guest);
 	return bbs_hbbp(bu_reg,
 		"HBBP TR" BBS_TTH_Q " SI99 BDtalk SJMine IDLIEDABOUTTHISCIDAAAAAAAAAAAAAAAAAAAAAA"
@@ -532,6 +769,8 @@ EXO_TEST(bbs_post_discards_client_supplied_hub_fields, {
 
 EXO_TEST(bbs_post_reply_inherits_thread, {
 	struct bbs_entry e;
+	if (!(bbs_fresh() && bbs_talk_p()))
+		return 0;
 	return bbs_hbbp(bu_guest, "HBBP TR" BBS_TTH_R " SI298 BDtalk PA" BBS_TTH_P
 	                          " SJRe:\\sHub\\supgrade\\son\\sSaturday\n") == 0
 		&& bbs_index_lookup(bh->bbs->index, "talk", BBS_TTH_R, &e) == bbs_index_ok
@@ -541,6 +780,8 @@ EXO_TEST(bbs_post_reply_inherits_thread, {
 /* -- refusals ------------------------------------------------------------ */
 
 EXO_TEST(bbs_post_duplicate, {
+	if (!(bbs_fresh() && bbs_talk_p()))
+		return 0;
 	tu_queue_clear(bu_guest);
 	return bbs_hbbp(bu_guest, "HBBP TR" BBS_TTH_P " SI412 BDtalk SJAgain\n") == -1
 		&& tu_queue_has(bu_guest,
@@ -548,6 +789,8 @@ EXO_TEST(bbs_post_duplicate, {
 });
 
 EXO_TEST(bbs_post_unknown_parent, {
+	if (!(bbs_fresh() && bbs_talk()))
+		return 0;
 	tu_queue_clear(bu_guest);
 	return bbs_hbbp(bu_guest, "HBBP TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA SI1 BDtalk"
 	                          " PABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\n") == -1
@@ -556,36 +799,48 @@ EXO_TEST(bbs_post_unknown_parent, {
 });
 
 EXO_TEST(bbs_post_missing_hash, {
+	if (!(bbs_fresh() && bbs_talk()))
+		return 0;
 	tu_queue_clear(bu_guest);
 	return bbs_hbbp(bu_guest, "HBBP SI412 BDtalk\n") == -1
 		&& tu_queue_has(bu_guest, "ISTA 143 Missing\\shash FCBBP FMTR\n");
 });
 
 EXO_TEST(bbs_post_invalid_hash, {
+	if (!(bbs_fresh() && bbs_talk()))
+		return 0;
 	tu_queue_clear(bu_guest);
 	return bbs_hbbp(bu_guest, "HBBP TRnothash SI412 BDtalk\n") == -1
 		&& tu_queue_has(bu_guest, "ISTA 143 Invalid\\shash FCBBP FBTR\n");
 });
 
 EXO_TEST(bbs_post_missing_size, {
+	if (!(bbs_fresh() && bbs_talk()))
+		return 0;
 	tu_queue_clear(bu_guest);
 	return bbs_hbbp(bu_guest, "HBBP TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA BDtalk\n") == -1
 		&& tu_queue_has(bu_guest, "ISTA 143 Missing\\ssize FCBBP FMSI\n");
 });
 
 EXO_TEST(bbs_post_invalid_size, {
+	if (!(bbs_fresh() && bbs_talk()))
+		return 0;
 	tu_queue_clear(bu_guest);
 	return bbs_hbbp(bu_guest, "HBBP TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA SIbig BDtalk\n") == -1
 		&& tu_queue_has(bu_guest, "ISTA 143 Invalid\\ssize FCBBP FBSI\n");
 });
 
 EXO_TEST(bbs_post_missing_board, {
+	if (!(bbs_fresh() && bbs_talk()))
+		return 0;
 	tu_queue_clear(bu_guest);
 	return bbs_hbbp(bu_guest, "HBBP TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA SI1\n") == -1
 		&& tu_queue_has(bu_guest, "ISTA 143 Missing\\sboard\\sname FCBBP FMBD\n");
 });
 
 EXO_TEST(bbs_post_unknown_board, {
+	if (!(bbs_fresh() && bbs_talk()))
+		return 0;
 	tu_queue_clear(bu_guest);
 	return bbs_hbbp(bu_guest, "HBBP TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA SI1 BDgenrel\n") == -1
 		&& tu_queue_has(bu_guest, "ISTA 171 No\\ssuch\\sboard FCBBP BDgenrel\n");
@@ -594,6 +849,8 @@ EXO_TEST(bbs_post_unknown_board, {
 /* An operator may post to announcements, so this gets past the permission
    check and is refused on the board's MS instead. */
 EXO_TEST(bbs_post_too_large, {
+	if (!(bbs_fresh()))
+		return 0;
 	tu_queue_clear(bu_op);
 	return bbs_hbbp(bu_op, "HBBP TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA SI70000 BDannouncements\n") == -1
 		&& tu_queue_has(bu_op,
@@ -603,6 +860,8 @@ EXO_TEST(bbs_post_too_large, {
 /* Only operators may start a thread on the announcements board; a guest may
    still reply there. */
 EXO_TEST(bbs_post_thread_denied, {
+	if (!(bbs_fresh()))
+		return 0;
 	tu_queue_clear(bu_guest);
 	return bbs_hbbp(bu_guest, "HBBP TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA SI1 BDannouncements\n") == -1
 		&& tu_queue_has(bu_guest,
@@ -611,6 +870,8 @@ EXO_TEST(bbs_post_thread_denied, {
 });
 
 EXO_TEST(bbs_post_reply_allowed_where_thread_is_not, {
+	if (!(bbs_fresh() && bbs_announcements_seeded()))
+		return 0;
 	return bbs_hbbp(bu_guest, "HBBP TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA SI1 BDannouncements"
 	                          " PA" BBS_TTH_B "\n") == 0;
 });
@@ -618,6 +879,8 @@ EXO_TEST(bbs_post_reply_allowed_where_thread_is_not, {
 EXO_TEST(bbs_post_subject_too_long, {
 	char line[BBS_MAX_SUBJECT + 128];
 	char subject[BBS_MAX_SUBJECT + 2];
+	if (!(bbs_fresh() && bbs_talk()))
+		return 0;
 	memset(subject, 'x', sizeof(subject) - 1);
 	subject[sizeof(subject) - 1] = 0;
 	snprintf(line, sizeof(line), "HBBP TRCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC SI1 BDtalk SJ%s\n", subject);
@@ -629,6 +892,8 @@ EXO_TEST(bbs_post_subject_too_long, {
 /* A composing client emits no newline within a subject, so one arriving here
    means the index copy would not match the document. */
 EXO_TEST(bbs_post_subject_with_newline, {
+	if (!(bbs_fresh() && bbs_talk()))
+		return 0;
 	tu_queue_clear(bu_guest);
 	return bbs_hbbp(bu_guest, "HBBP TRCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC SI1 BDtalk SJone\\ntwo\n") == -1
 		&& tu_queue_has(bu_guest, "ISTA 143 Invalid\\ssubject FCBBP FBSJ\n");
@@ -637,6 +902,8 @@ EXO_TEST(bbs_post_subject_with_newline, {
 /* -- rate limiting ------------------------------------------------------- */
 
 EXO_TEST(bbs_post_rate_limited, {
+	if (!(bbs_fresh() && bbs_talk()))
+		return 0;
 	bh->config->bbs_post_interval = 60;
 	bu_guest->bbs_last_post = net_get_time();
 	tu_queue_clear(bu_guest);
@@ -646,12 +913,17 @@ EXO_TEST(bbs_post_rate_limited, {
 
 /* Bots and unrestricted operators are never rate-limited. */
 EXO_TEST(bbs_post_rate_limit_skips_unrestricted, {
+	if (!(bbs_fresh() && bbs_talk()))
+		return 0;
+	bh->config->bbs_post_interval = 60;
 	bu_op->credentials = auth_cred_opubot;
 	bu_op->bbs_last_post = net_get_time();
 	return bbs_hbbp(bu_op, "HBBP TRCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC SI1 BDtalk\n") == 0;
 });
 
 EXO_TEST(bbs_post_rate_limit_disabled, {
+	if (!(bbs_fresh() && bbs_talk()))
+		return 0;
 	bh->config->bbs_post_interval = 0;
 	bu_guest->bbs_last_post = net_get_time();
 	return bbs_hbbp(bu_guest, "HBBP TRFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF SI1 BDtalk\n") == 0;
@@ -660,16 +932,28 @@ EXO_TEST(bbs_post_rate_limit_disabled, {
 /* -- withdrawal ---------------------------------------------------------- */
 
 EXO_TEST(bbs_withdraw_own_post, {
+	if (!(bbs_fresh() && bbs_talk_p()))
+		return 0;
 	tu_queue_clear(bu_guest);
 	tu_queue_clear(bu_reg);
 	return bbs_hbbp(bu_guest, "HBBP TR" BBS_TTH_P " BDtalk RM1\n") == 0;
 });
+
+/* The guest withdraws P, with both queues emptied first. */
+static int bbs_withdrawn_p(void)
+{
+	tu_queue_clear(bu_guest);
+	tu_queue_clear(bu_reg);
+	return bbs_hbbp(bu_guest, "HBBP TR" BBS_TTH_P " BDtalk RM1\n") == 0;
+}
 
 /* A tombstone carries the hash, the board, the new timestamp and RM1, and
    nothing else. */
 EXO_TEST(bbs_withdraw_tombstone_wire_format, {
 	char expect[256];
 	struct bbs_entry e;
+	if (!(bbs_fresh() && bbs_talk_p() && bbs_withdrawn_p()))
+		return 0;
 	if (bbs_index_lookup(bh->bbs->index, "talk", BBS_TTH_P, &e) != bbs_index_ok)
 		return 0;
 	snprintf(expect, sizeof(expect), "IBBL TR" BBS_TTH_P " BDtalk TS%lld RM1\n", (long long) e.ts);
@@ -682,12 +966,16 @@ EXO_TEST(bbs_withdraw_tombstone_wire_format, {
    and stay where they are. */
 EXO_TEST(bbs_withdraw_keeps_replies, {
 	struct bbs_entry e;
+	if (!(bbs_fresh() && bbs_talk_pr() && bbs_withdrawn_p()))
+		return 0;
 	return bbs_index_lookup(bh->bbs->index, "talk", BBS_TTH_R, &e) == bbs_index_ok
 		&& e.removed == 0;
 });
 
 /* withdraw_own goes by the CID the hub accepted the post from, never the nick. */
 EXO_TEST(bbs_withdraw_someone_elses_denied, {
+	if (!(bbs_fresh() && bbs_talk_pq()))
+		return 0;
 	tu_queue_clear(bu_guest);
 	return bbs_hbbp(bu_guest, "HBBP TR" BBS_TTH_Q " BDtalk RM1\n") == -1
 		&& tu_queue_has(bu_guest,
@@ -696,35 +984,17 @@ EXO_TEST(bbs_withdraw_someone_elses_denied, {
 
 /* Permission 16 withdraws anything. */
 EXO_TEST(bbs_withdraw_any_by_operator, {
+	if (!(bbs_fresh() && bbs_talk_pq()))
+		return 0;
 	bu_op->credentials = auth_cred_operator;
 	return bbs_hbbp(bu_op, "HBBP TR" BBS_TTH_Q " BDtalk RM1\n") == 0;
 });
 
 EXO_TEST(bbs_withdraw_missing_post, {
+	if (!(bbs_fresh() && bbs_talk()))
+		return 0;
 	tu_queue_clear(bu_guest);
 	return bbs_hbbp(bu_guest, "HBBP TRZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ BDtalk RM1\n") == -1
 		&& tu_queue_has(bu_guest,
 			"ISTA 176 No\\ssuch\\spost FCBBP TRZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ\n");
-});
-
-EXO_TEST(bbs_post_cleanup_usermanager, {
-	uman_remove(bh->users, bu_guest);
-	uman_remove(bh->users, bu_reg);
-	return 1;
-});
-
-EXO_TEST(bbs_teardown, {
-	tu_user_destroy(bu_guest);
-	tu_user_destroy(bu_reg);
-	tu_user_destroy(bu_op);
-	bu_guest = bu_reg = bu_op = 0;
-	bbs_shutdown(bh->bbs);
-	bh->bbs = 0;
-	uman_shutdown(bh->users);
-	list_destroy(bh->write_queue);
-	free_config(bh->config);
-	hub_free(bh->config);
-	hub_free(bh);
-	bh = 0;
-	return net_destroy() == 0;
 });
