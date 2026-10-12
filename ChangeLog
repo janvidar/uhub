@@ -15,6 +15,10 @@ New features:
   accounts keep their own passwords. To make that independent of plugin order,
   an account (user level or above) from any auth plugin now beats a guest-level
   record from another, and a guest-level record beats a refusal.
+- mod_joins: join and leave announcements in the main chat, optionally only
+  to operators, with message templates read from files.
+- Plugin API: hub.send_chat sends a message to the local users within a range
+  of credentials.
 - Plugin API: hub.auth_delete_user, hub.auth_list_users (passwords cleared) and
   hub.get_user_by_nick, and an auth_list_users storage callback, implemented by
   mod_auth_sqlite and mod_auth_simple.

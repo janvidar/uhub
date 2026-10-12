@@ -171,6 +171,35 @@ static int cbfunc_send_broadcast(struct plugin_handle* plugin, const char* messa
 	return 1;
 }
 
+static int cbfunc_send_chat(struct plugin_handle* plugin, enum auth_credentials low, enum auth_credentials high, const char* message)
+{
+	struct hub_info* hub = plugin_get_hub(plugin);
+	struct adc_message* command;
+	struct hub_user* user;
+	struct node* cursor;
+	char* buffer;
+	int sent = 0;
+
+	if (!message || !hub->users)
+		return 0;
+
+	buffer = adc_msg_escape(message);
+	command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
+	adc_msg_add_argument(command, buffer);
+	LIST_FOREACH_SAFE(struct hub_user*, user, hub->users->list, cursor,
+	{
+		if (user_is_remote(user) || !user_is_logged_in(user))
+			continue;
+		if (user->credentials < low || user->credentials > high)
+			continue;
+		route_to_user(hub, user, command);
+		sent++;
+	});
+	adc_msg_free(command);
+	hub_free(buffer);
+	return sent;
+}
+
 static int cbfunc_send_status(struct plugin_handle* plugin, struct plugin_user* user, int code, const char* message)
 {
 	char code_str[4];
@@ -656,6 +685,7 @@ void plugin_register_callback_functions(struct plugin_handle* handle)
 	handle->hub.send_rich_message = cbfunc_send_rich_message;
 	handle->hub.user_supports_rich_text = cbfunc_user_supports_rich_text;
 	handle->hub.send_broadcast_message = cbfunc_send_broadcast;
+	handle->hub.send_chat = cbfunc_send_chat;
 	handle->hub.send_status_message = cbfunc_send_status;
 	handle->hub.send_user_command = cbfunc_send_user_command;
 	handle->hub.user_disconnect = cbfunc_user_disconnect;

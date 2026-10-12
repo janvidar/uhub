@@ -424,7 +424,8 @@ target_sources(autotest-bin PRIVATE
 	# -- otherwise they would clash with mod_auth_sqlite's above.
 	${AUTOTEST_DIR}/mod_chat_history_shim.c
 	${AUTOTEST_DIR}/mod_users_shim.c
-	${AUTOTEST_DIR}/mod_guest_passwd_shim.c)
+	${AUTOTEST_DIR}/mod_guest_passwd_shim.c
+	${AUTOTEST_DIR}/mod_joins_shim.c)
 target_include_directories(autotest-bin PRIVATE ${AUTOTEST_DIR})
 
 # fuse/filelist.c is in fuse_test_SOURCES. Its parser needs no library; its
@@ -457,6 +458,7 @@ add_library(mod_auth_sqlite MODULE ${UHUB_SOURCE_DIR}/plugins/mod_auth_sqlite.c)
 add_library(mod_selfregister MODULE ${UHUB_SOURCE_DIR}/plugins/mod_selfregister.c)
 add_library(mod_users MODULE ${UHUB_SOURCE_DIR}/plugins/mod_users.c)
 add_library(mod_guest_passwd MODULE ${UHUB_SOURCE_DIR}/plugins/mod_guest_passwd.c)
+add_library(mod_joins MODULE ${UHUB_SOURCE_DIR}/plugins/mod_joins.c)
 
 if(JAVASCRIPT_SUPPORT)
 	# QuickJS engine, pulled in as a git submodule at third_party/quickjs
@@ -514,6 +516,7 @@ set_target_properties(
 	mod_selfregister
 	mod_users
 	mod_guest_passwd
+	mod_joins
 	mod_chat_history
 	mod_chat_only
 	mod_chat_is_privileged
@@ -548,6 +551,7 @@ target_link_libraries(mod_auth_sqlite SQLite::SQLite3 utils)
 target_link_libraries(mod_selfregister utils)
 target_link_libraries(mod_users utils)
 target_link_libraries(mod_guest_passwd utils)
+target_link_libraries(mod_joins utils)
 target_link_libraries(mod_chat_history SQLite::SQLite3 utils)
 target_link_libraries(mod_no_guest_downloads utils)
 target_link_libraries(mod_flood utils)
@@ -806,7 +810,7 @@ if (UNIX)
 
 	# mod_example is sample code, not a feature -- it is built (so it keeps
 	# compiling against the current plugin API) but deliberately not installed.
-	install( TARGETS mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_selfregister mod_users mod_guest_passwd mod_chat_history mod_chat_only mod_chat_is_privileged mod_topic mod_no_guest_downloads mod_flood mod_ucmd DESTINATION ${UHUB_PLUGIN_DIR} OPTIONAL )
+	install( TARGETS mod_welcome mod_logging mod_auth_simple mod_auth_sqlite mod_selfregister mod_users mod_guest_passwd mod_joins mod_chat_history mod_chat_only mod_chat_is_privileged mod_topic mod_no_guest_downloads mod_flood mod_ucmd DESTINATION ${UHUB_PLUGIN_DIR} OPTIONAL )
 	if(JAVASCRIPT_SUPPORT)
 		install( TARGETS mod_javascript DESTINATION ${UHUB_PLUGIN_DIR} OPTIONAL )
 	endif()

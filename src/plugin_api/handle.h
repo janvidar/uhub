@@ -152,6 +152,10 @@ typedef int (*hfunc_send_rich_message)(struct plugin_handle*, struct plugin_user
  * markup and backslash escapes to a client that cannot render them. */
 typedef int (*hfunc_user_supports_rich_text)(struct plugin_handle*, struct plugin_user* user);
 typedef int (*hfunc_send_broadcast_message)(struct plugin_handle*, const char* message);
+/* Send a hub message to every locally connected, logged-in user whose
+ * credentials lie in [low, high]. Returns how many it was sent to. Federated
+ * users are left out: their own hub speaks to them. */
+typedef int (*hfunc_send_chat)(struct plugin_handle*, enum auth_credentials low, enum auth_credentials high, const char* message);
 typedef int (*hfunc_send_status)(struct plugin_handle*, struct plugin_user* to, int code, const char* message);
 typedef int (*hfunc_send_user_command)(struct plugin_handle*, struct plugin_user* user, const char* name, int context, const char* command);
 typedef int (*hfunc_user_disconnect)(struct plugin_handle*, struct plugin_user* user);
@@ -264,6 +268,7 @@ struct plugin_hub_funcs
 	hfunc_get_tls_version get_tls_version;
 	hfunc_send_rich_message send_rich_message;
 	hfunc_user_supports_rich_text user_supports_rich_text;
+	hfunc_send_chat send_chat;
 };
 
 struct plugin_handle
