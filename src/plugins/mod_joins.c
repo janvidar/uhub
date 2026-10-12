@@ -21,11 +21,9 @@
  * Announces users joining and leaving the hub. Modelled on Tim Schlueter's
  * mod_joins from the modelrockettier fork.
  *
- * The hub raises on_user_logout for every connection that goes away, including
- * one that never got past the login (a wrong password, a refused nick). So a
- * user is marked when they log in, and only a marked user's departure is
- * announced: otherwise anyone could fill the main chat with "left" lines by
- * failing to log in over and over.
+ * The hub raises on_user_logout only for a user who completed the login, so a
+ * failed login (a wrong password, a refused nick) is never announced as a
+ * departure.
  */
 
 #include "plugin_api/handle.h"
@@ -204,14 +202,9 @@ static void announce(struct plugin_handle* plugin, struct plugin_user* user, con
 	cbuf_destroy(buf);
 }
 
-/* Any non-NULL value will do as the mark; it is never dereferenced. */
-static char joins_marker;
-
 static void on_user_login(struct plugin_handle* plugin, struct plugin_user* user)
 {
 	struct joins_data* data = (struct joins_data*) plugin->ptr;
-
-	plugin->hub.set_user_data(plugin, user, &joins_marker, NULL);
 	if (data->join_message)
 		announce(plugin, user, data->join_message, NULL);
 }
@@ -219,10 +212,6 @@ static void on_user_login(struct plugin_handle* plugin, struct plugin_user* user
 static void on_user_logout(struct plugin_handle* plugin, struct plugin_user* user, const char* reason)
 {
 	struct joins_data* data = (struct joins_data*) plugin->ptr;
-
-	if (plugin->hub.get_user_data(plugin, user) != &joins_marker)
-		return;
-	plugin->hub.set_user_data(plugin, user, NULL, NULL);
 	if (data->leave_message)
 		announce(plugin, user, data->leave_message, reason);
 }

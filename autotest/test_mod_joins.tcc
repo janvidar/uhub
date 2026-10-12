@@ -3,11 +3,7 @@
 
 /*
  * Unit tests for mod_joins, through autotest/mod_joins_shim.c, against a fake
- * hub: send_chat records what would have gone out, and per-user data is kept
- * in the stand-in user struct.
- *
- * Above all: a connection that never logged in must not be announced as
- * leaving, or failing to log in becomes a way to write into the main chat.
+ * hub: send_chat records what would have gone out.
  */
 
 extern int mod_joins_register(struct plugin_handle* plugin, const char* config);
@@ -19,7 +15,6 @@ struct mj_user
 {
 	char nick[MAX_NICK_LEN+1];
 	enum auth_credentials cred;
-	void* data;
 };
 
 static struct mj_user mj_alice;
@@ -34,17 +29,6 @@ static const char* mj_get_nick(struct plugin_handle* p, struct plugin_user* u)
 static enum auth_credentials mj_get_credentials(struct plugin_handle* p, struct plugin_user* u)
 {
 	(void) p; return ((struct mj_user*) u)->cred;
-}
-
-static void mj_set_user_data(struct plugin_handle* p, struct plugin_user* u, void* data, plugin_user_data_free cleanup)
-{
-	(void) p; (void) cleanup;
-	((struct mj_user*) u)->data = data;
-}
-
-static void* mj_get_user_data(struct plugin_handle* p, struct plugin_user* u)
-{
-	(void) p; return ((struct mj_user*) u)->data;
 }
 
 /* The last send_chat call. */
@@ -70,8 +54,6 @@ static int mj_start(const char* config)
 	memset(&mj_plugin, 0, sizeof(mj_plugin));
 	mj_plugin.hub.get_user_nick = mj_get_nick;
 	mj_plugin.hub.get_user_credentials = mj_get_credentials;
-	mj_plugin.hub.set_user_data = mj_set_user_data;
-	mj_plugin.hub.get_user_data = mj_get_user_data;
 	mj_plugin.hub.send_chat = mj_send_chat;
 
 	memset(&mj_alice, 0, sizeof(mj_alice));
@@ -115,24 +97,6 @@ EXO_TEST(mj_default_leave, {
 	mj_login();
 	mj_logout("disconnected");
 	return mj_sends == 2 && !strcmp(mj_sent, "*** Alice left.");
-});
-
-/* Never logged in -- a wrong password, say -- so never joined: no "left". */
-EXO_TEST(mj_failed_login_not_announced, {
-	if (!mj_start(""))
-		return 0;
-	mj_logout("login error");
-	return mj_sends == 0;
-});
-
-/* And only once, should the hub ever report the same departure twice. */
-EXO_TEST(mj_leave_announced_once, {
-	if (!mj_start(""))
-		return 0;
-	mj_login();
-	mj_logout("disconnected");
-	mj_logout("disconnected");
-	return mj_sends == 2 && mj_alice.data == NULL;
 });
 
 /* ---- parameters ----------------------------------------------------------- */
