@@ -50,7 +50,12 @@ jobs:
         run: cmake --build build -j
 
       - name: Run unit tests
-        run: ./build/autotest-bin
+        run: |
+          ./build/autotest-bin
+          # Every test sets up what it needs, so the suite must also pass in
+          # any order. A failure prints the seed: rerun with that
+          # --sort=random:N to reproduce it.
+          ./build/autotest-bin --sort=random
 
   # ---------------------------------------------------------------------------
   # macOS build + tests, across both TLS providers. Exercises the kqueue backend
@@ -214,7 +219,12 @@ jobs:
         env:
           ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-        run: ./build-asan/autotest-bin
+        run: |
+          ./build-asan/autotest-bin
+          # Reordered too: a fixture one test frees and another still uses, or
+          # one that is only freed when a particular test runs last, shows up
+          # here as a leak or a use-after-free.
+          ./build-asan/autotest-bin --sort=random
 
   # ---------------------------------------------------------------------------
   # ThreadSanitizer over the full suite. The hub is single-threaded except for
