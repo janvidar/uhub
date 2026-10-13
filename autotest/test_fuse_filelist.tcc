@@ -39,44 +39,59 @@ EXO_TEST(fuse_filelist_parse_simple, { return parse(SIMPLE) != NULL; });
 
 EXO_TEST(fuse_filelist_counts_every_entry, {
 	/* Music, song.flac, Live, set.mp3, readme.txt */
+	if (!parse(SIMPLE))
+		return 0;
 	return fs_filelist_count(list) == 5;
 });
 
 EXO_TEST(fuse_filelist_root_in_document_order, {
-	struct fs_filelist_node* root = fs_filelist_root(list);
+	struct fs_filelist_node* root;
+	if (!parse(SIMPLE))
+		return 0;
+	root = fs_filelist_root(list);
 	return root && strcmp(root->name, "Music") == 0 && root->is_dir
 		&& root->next && strcmp(root->next->name, "readme.txt") == 0 && !root->next->is_dir
 		&& !root->next->next;
 });
 
 EXO_TEST(fuse_filelist_lookup_file, {
-	struct fs_filelist_node* node = fs_filelist_lookup(list, "Music/song.flac");
+	struct fs_filelist_node* node;
+	if (!parse(SIMPLE))
+		return 0;
+	node = fs_filelist_lookup(list, "Music/song.flac");
 	return node && !node->is_dir && node->size == 41234567
 		&& strcmp(node->tth, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA") == 0;
 });
 
 EXO_TEST(fuse_filelist_lookup_nested, {
-	struct fs_filelist_node* node = fs_filelist_lookup(list, "Music/Live/set.mp3");
+	struct fs_filelist_node* node;
+	if (!parse(SIMPLE))
+		return 0;
+	node = fs_filelist_lookup(list, "Music/Live/set.mp3");
 	return node && node->size == 12;
 });
 
 EXO_TEST(fuse_filelist_lookup_directory, {
-	struct fs_filelist_node* node = fs_filelist_lookup(list, "Music/Live");
+	struct fs_filelist_node* node;
+	if (!parse(SIMPLE))
+		return 0;
+	node = fs_filelist_lookup(list, "Music/Live");
 	return node && node->is_dir && node->children
 		&& strcmp(node->children->name, "set.mp3") == 0;
 });
 
-EXO_TEST(fuse_filelist_lookup_missing, { return fs_filelist_lookup(list, "Nope") == NULL; });
-EXO_TEST(fuse_filelist_lookup_missing_nested, { return fs_filelist_lookup(list, "Music/nope") == NULL; });
-EXO_TEST(fuse_filelist_lookup_below_a_file, {
-	return fs_filelist_lookup(list, "readme.txt/deeper") == NULL;
-});
-EXO_TEST(fuse_filelist_lookup_empty, { return fs_filelist_lookup(list, "") == NULL; });
-EXO_TEST(fuse_filelist_lookup_empty_component, { return fs_filelist_lookup(list, "Music//song.flac") == NULL; });
+EXO_TEST(fuse_filelist_lookup_missing, { return parse(SIMPLE) && fs_filelist_lookup(list, "Nope") == NULL; });
+EXO_TEST(fuse_filelist_lookup_missing_nested, { return parse(SIMPLE) && fs_filelist_lookup(list, "Music/nope") == NULL; });
+EXO_TEST(fuse_filelist_lookup_below_a_file, { return parse(SIMPLE) && fs_filelist_lookup(list, "readme.txt/deeper") == NULL; });
+EXO_TEST(fuse_filelist_lookup_empty, { return parse(SIMPLE) && fs_filelist_lookup(list, "") == NULL; });
+EXO_TEST(fuse_filelist_lookup_empty_component, { return parse(SIMPLE) && fs_filelist_lookup(list, "Music//song.flac") == NULL; });
 EXO_TEST(fuse_filelist_lookup_null, { return fs_filelist_lookup(NULL, "x") == NULL; });
 
 EXO_TEST(fuse_filelist_trailing_slash_is_the_directory, {
-	struct fs_filelist_node* node = fs_filelist_lookup(list, "Music/");
+	struct fs_filelist_node* node;
+	if (!parse(SIMPLE))
+		return 0;
+	node = fs_filelist_lookup(list, "Music/");
 	return node && node->is_dir;
 });
 
@@ -405,9 +420,13 @@ EXO_TEST(fuse_filelist_load_truncated_stream, {
 #endif
 });
 
-EXO_TEST(fuse_filelist_teardown, {
+EXO_TEST(fuse_filelist_destroy_null, {
+	fs_filelist_destroy(NULL);
+	return 1;
+});
+
+EXO_TEARDOWN({
 	fs_filelist_destroy(list);
 	list = NULL;
-	fs_filelist_destroy(NULL);
 	return 1;
 });

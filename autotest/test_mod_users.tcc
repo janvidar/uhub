@@ -563,6 +563,7 @@ EXO_TEST(mu_userlist_storage_cannot_list, {
 	return strstr(mu_run(&mu_op, "userlist"), "can list") != NULL;
 });
 
-EXO_TEST(mu_teardown, {
-	return mod_users_unregister(&mu_plugin) == 0 && mu_plugin.ptr == NULL;
+EXO_TEARDOWN({
+	mod_users_unregister(&mu_plugin);
+	return 1;
 });

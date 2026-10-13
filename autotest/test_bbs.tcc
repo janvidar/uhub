@@ -142,7 +142,7 @@ EXO_TEST(bbs_setup_boards, {
 });
 
 EXO_TEST(bbs_is_enabled_when_index_open, {
-	if (!(bbs_fresh()))
+	if (!bbs_fresh())
 		return 0;
 	return bbs_is_enabled(bh);
 });
@@ -150,7 +150,7 @@ EXO_TEST(bbs_is_enabled_when_index_open, {
 EXO_TEST(bbs_is_enabled_false_without_handle, {
 	struct bbs_handle* saved;
 	int enabled;
-	if (!(bbs_fresh()))
+	if (!bbs_fresh())
 		return 0;
 	saved = bh->bbs;
 	bh->bbs = 0;
@@ -165,7 +165,7 @@ EXO_TEST(bbs_is_enabled_false_without_handle, {
    exists. PE5 on general is subscribe (1) + reply (4); PE5 on announcements is
    the same, since only operators may start a thread there. */
 EXO_TEST(bbs_descriptor_guest_sees_two_boards, {
-	if (!(bbs_fresh()))
+	if (!bbs_fresh())
 		return 0;
 	tu_queue_clear(bu_guest);
 	bbs_send_board_list(bh, bu_guest);
@@ -192,7 +192,7 @@ EXO_TEST(bbs_descriptor_max_size_is_per_board, {
 });
 
 EXO_TEST(bbs_descriptor_registered_user_sees_all_three, {
-	if (!(bbs_fresh()))
+	if (!bbs_fresh())
 		return 0;
 	tu_queue_clear(bu_reg);
 	bbs_send_board_list(bh, bu_reg);
@@ -211,7 +211,7 @@ EXO_TEST(bbs_descriptor_registered_permissions, {
 
 /* PE31 is every bit: an operator moderates as well as posts. */
 EXO_TEST(bbs_descriptor_operator_permissions, {
-	if (!(bbs_fresh()))
+	if (!bbs_fresh())
 		return 0;
 	tu_queue_clear(bu_op);
 	bbs_send_board_list(bh, bu_op);
@@ -231,7 +231,7 @@ EXO_TEST(bbs_descriptor_announcements_registered_cannot_post, {
 /* A client that never offered BBS0 receives no descriptor, whatever its
    permissions: the hub's announcement in SUP is what the exchange rests on. */
 EXO_TEST(bbs_descriptor_not_sent_without_feature, {
-	if (!(bbs_fresh()))
+	if (!bbs_fresh())
 		return 0;
 	user_flag_unset(bu_op, feature_bbs);
 	tu_queue_clear(bu_op);
@@ -244,7 +244,7 @@ EXO_TEST(bbs_descriptor_not_sent_without_feature, {
 
 EXO_TEST(bbs_descriptor_reports_posts, {
 	struct bbs_entry e;
-	if (!(bbs_fresh()))
+	if (!bbs_fresh())
 		return 0;
 	memset(&e, 0, sizeof(e));
 	strcpy(e.tth, BBS_TTH_A);
@@ -284,7 +284,7 @@ EXO_TEST(bbs_descriptor_replay_days_bounds_oldest, {
 	struct bbs_board* board;
 	time_t oldest;
 	struct bbs_entry e;
-	if (!(bbs_fresh()))
+	if (!bbs_fresh())
 		return 0;
 	board = bbs_add_board("board recent replay_days=1");
 	if (!board)
@@ -493,7 +493,7 @@ EXO_TEST(bbs_subscribe_single_entry_missing, {
 });
 
 EXO_TEST(bbs_subscribe_single_entry_bad_hash, {
-	if (!(bbs_fresh()))
+	if (!bbs_fresh())
 		return 0;
 	return bbs_hbbl(bu_guest, "HBBL BDannouncements TRnothash\n") == -1
 		&& tu_queue_has(bu_guest, "ISTA 143 Invalid\\shash FCBBL FBTR\n");
@@ -502,14 +502,14 @@ EXO_TEST(bbs_subscribe_single_entry_bad_hash, {
 /* -- refusals ----------------------------------------------------------- */
 
 EXO_TEST(bbs_subscribe_missing_board, {
-	if (!(bbs_fresh()))
+	if (!bbs_fresh())
 		return 0;
 	return bbs_hbbl(bu_guest, "HBBL TS0\n") == -1
 		&& tu_queue_has(bu_guest, "ISTA 143 Missing\\sboard\\sname FCBBL FMBD\n");
 });
 
 EXO_TEST(bbs_subscribe_unknown_board, {
-	if (!(bbs_fresh()))
+	if (!bbs_fresh())
 		return 0;
 	return bbs_hbbl(bu_guest, "HBBL BDgenrel TS0\n") == -1
 		&& tu_queue_has(bu_guest, "ISTA 171 No\\ssuch\\sboard FCBBL BDgenrel\n");
@@ -518,14 +518,14 @@ EXO_TEST(bbs_subscribe_unknown_board, {
 /* A board the session cannot subscribe to is refused exactly as one that does
    not exist, so the refusal does not disclose it. */
 EXO_TEST(bbs_subscribe_invisible_board_looks_missing, {
-	if (!(bbs_fresh()))
+	if (!bbs_fresh())
 		return 0;
 	return bbs_hbbl(bu_guest, "HBBL BDmembers TS0\n") == -1
 		&& tu_queue_has(bu_guest, "ISTA 171 No\\ssuch\\sboard FCBBL BDmembers\n");
 });
 
 EXO_TEST(bbs_subscribe_visible_to_registered, {
-	if (!(bbs_fresh()))
+	if (!bbs_fresh())
 		return 0;
 	return bbs_hbbl(bu_reg, "HBBL BDmembers TS0\n") == 0
 		&& tu_queue_count(bu_reg) == 0; /* the board is empty, but it exists */
@@ -542,7 +542,7 @@ EXO_TEST(bbs_subscribe_limit, {
 	int i;
 	char line[64];
 	char name[32];
-	if (!(bbs_fresh()))
+	if (!bbs_fresh())
 		return 0;
 	/* One more board than the session is allowed to hold at once. */
 	for (i = 0; i < bh->config->bbs_max_subscriptions + 1; i++)
@@ -849,7 +849,7 @@ EXO_TEST(bbs_post_unknown_board, {
 /* An operator may post to announcements, so this gets past the permission
    check and is refused on the board's MS instead. */
 EXO_TEST(bbs_post_too_large, {
-	if (!(bbs_fresh()))
+	if (!bbs_fresh())
 		return 0;
 	tu_queue_clear(bu_op);
 	return bbs_hbbp(bu_op, "HBBP TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA SI70000 BDannouncements\n") == -1
@@ -860,7 +860,7 @@ EXO_TEST(bbs_post_too_large, {
 /* Only operators may start a thread on the announcements board; a guest may
    still reply there. */
 EXO_TEST(bbs_post_thread_denied, {
-	if (!(bbs_fresh()))
+	if (!bbs_fresh())
 		return 0;
 	tu_queue_clear(bu_guest);
 	return bbs_hbbp(bu_guest, "HBBP TRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA SI1 BDannouncements\n") == -1

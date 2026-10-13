@@ -588,4 +588,4 @@ EXO_TEST(seedconfig_no_trailing_newline, {
 	return ok;
 });
 
-EXO_TEST(seedconfig_cleanup, { unlink(sc_test_file); return 1; });
+EXO_TEARDOWN({ unlink(sc_test_file); return 1; });

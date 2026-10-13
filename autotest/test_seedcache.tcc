@@ -243,7 +243,7 @@ EXO_TEST(seedcache_open, {
 });
 
 EXO_TEST(seedcache_creates_layout, {
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 	return sc_dir_count(SC_DIR "/tmp") == 0 &&
 	       sc_dir_count(SC_DIR "/data") == 0 &&
@@ -258,7 +258,7 @@ EXO_TEST(seedcache_creates_schema_on_fresh_directory, {
 	sqlite3* db = NULL;
 	sqlite3_stmt* stmt = NULL;
 	int found = 0;
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 
 	if (sqlite3_open_v2(SC_DIR "/seedcache.db", &db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK)
@@ -279,7 +279,7 @@ EXO_TEST(seedcache_creates_schema_on_fresh_directory, {
 
 EXO_TEST(seedcache_open_rejects_missing_directory, {
 	struct seed_cache_config cfg;
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 	cfg = sc_cfg;
 	cfg.dir = NULL;
@@ -290,7 +290,7 @@ EXO_TEST(seedcache_ingest_and_lookup, {
 	enum seed_error err = SEED_OK;
 	struct seed_entry entry;
 	char expect[SEED_TTH_STR_LEN + 1];
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 
 	if (!sc_ingest(4096, 1, "CIDAAA", &err) || err != SEED_OK)
@@ -311,7 +311,7 @@ EXO_TEST(seedcache_ingest_and_lookup, {
 
 EXO_TEST(seedcache_lookup_rejects_a_non_tth, {
 	struct seed_entry entry;
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 
 	/* Nothing that is not 39 base32 characters may ever reach a path. */
@@ -367,7 +367,7 @@ EXO_TEST(seedcache_read_past_end_returns_zero, {
 
 EXO_TEST(seedcache_pin_of_unknown_content_fails, {
 	char missing[SEED_TTH_STR_LEN + 1];
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 	sc_tth(64, 9999, missing);
 	return seed_cache_pin(sc_cache, missing) == 0;
@@ -392,7 +392,7 @@ EXO_TEST(seedcache_tth_mismatch_is_rejected, {
 	char wrong[SEED_TTH_STR_LEN + 1];
 	uint8_t root[TTH_SIZE];
 	size_t before;
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 	before = sc_count();
 
@@ -423,7 +423,7 @@ EXO_TEST(seedcache_no_partial_left_in_tmp, {
 EXO_TEST(seedcache_ingest_rejects_a_non_tth_announcement, {
 	struct seed_ingest_request req;
 	enum seed_error err = SEED_OK;
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 
 	memset(&req, 0, sizeof(req));
@@ -442,7 +442,7 @@ EXO_TEST(seedcache_oversize_aborts_mid_stream, {
 	struct seed_ingest* job;
 	enum seed_error err = SEED_OK;
 	int rc;
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 
 	sc_make_png(sc_data, 8192, 5);
@@ -461,7 +461,7 @@ EXO_TEST(seedcache_oversize_aborts_mid_stream, {
 EXO_TEST(seedcache_announced_over_file_limit_refused, {
 	struct seed_ingest_request req;
 	enum seed_error err = SEED_OK;
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 	memset(&req, 0, sizeof(req));
 	req.announced_size = 64 * 1024 * 1024; /* max_file_size is 1 MiB */
@@ -473,7 +473,7 @@ EXO_TEST(seedcache_disallowed_media_type_refused, {
 	struct seed_ingest* job;
 	enum seed_error err = SEED_OK;
 	static const char zip[] = "PK\x03\x04 and then some other bytes entirely";
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 
 	memset(&req, 0, sizeof(req));
@@ -497,7 +497,7 @@ EXO_TEST(seedcache_disallowed_media_type_cut_off_early, {
 	struct seed_ingest* job;
 	enum seed_error err = SEED_OK;
 	int rc;
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 
 	memset(&req, 0, sizeof(req));
@@ -520,7 +520,7 @@ EXO_TEST(seedcache_concurrent_ingest_limit, {
 	enum seed_error err = SEED_OK;
 	int i;
 	int refused = 0;
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 
 	memset(&req, 0, sizeof(req));
@@ -578,7 +578,7 @@ EXO_TEST(seedcache_pin_blocks_eviction, {
 	char tth[SEED_TTH_STR_LEN + 1];
 	char path[1024];
 	int fd;
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 
 	if (!sc_ingest(4096, 1, "CIDPIN", &err)) return 0;
@@ -604,7 +604,7 @@ EXO_TEST(seedcache_pins_do_not_survive_a_restart, {
 	enum seed_error err = SEED_OK;
 	char tth[SEED_TTH_STR_LEN + 1];
 	struct seed_cache_stats stats;
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 
 	if (!sc_ingest(2048, 111, "CIDPIN", &err)) return 0;
@@ -678,7 +678,7 @@ EXO_TEST(seedcache_iteration_is_most_recently_used_first, {
 	char first[SEED_TTH_STR_LEN + 1];
 	struct seed_entry entry;
 	size_t seen = 0;
-	if (!(sc_lru_state()))
+	if (!sc_lru_state())
 		return 0;
 
 	sc_tth(2048, 203, first);
@@ -726,7 +726,7 @@ EXO_TEST(seedcache_hits_are_batched_into_the_sweep, {
 	char tth[SEED_TTH_STR_LEN + 1];
 	struct seed_entry entry;
 	int i;
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 
 	if (!sc_ingest(2048, 401, "CIDHIT", &err)) return 0;
@@ -750,7 +750,7 @@ EXO_TEST(seedcache_block_removes_and_refuses, {
 	char tth[SEED_TTH_STR_LEN + 1];
 	char path[1024];
 	struct seed_ingest_request req;
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 
 	if (!sc_restart_clean()) return 0;
@@ -781,7 +781,7 @@ EXO_TEST(seedcache_block_refuses_unannounced_content_at_finish, {
 	struct seed_ingest* job;
 	enum seed_error err = SEED_OK;
 	char tth[SEED_TTH_STR_LEN + 1];
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 
 	sc_tth(2048, 601, tth);
@@ -799,7 +799,7 @@ EXO_TEST(seedcache_block_refuses_unannounced_content_at_finish, {
 
 EXO_TEST(seedcache_remove_by_cid, {
 	enum seed_error err = SEED_OK;
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 
 	if (!sc_restart_clean()) return 0;
@@ -816,7 +816,7 @@ EXO_TEST(seedcache_survives_restart, {
 	enum seed_error err = SEED_OK;
 	char tth[SEED_TTH_STR_LEN + 1];
 	struct seed_entry entry;
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 
 	if (!sc_restart_clean()) return 0;
@@ -865,7 +865,7 @@ EXO_TEST(seedcache_reopen_preserves_entries_and_counters, {
 EXO_TEST(seedcache_blocklist_survives_restart, {
 	char tth[SEED_TTH_STR_LEN + 1];
 	struct seed_cache_stats stats;
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 
 	sc_tth(3000, 801, tth);
@@ -882,7 +882,7 @@ EXO_TEST(seedcache_blocklist_survives_restart, {
 
 EXO_TEST(seedcache_startup_clears_partials, {
 	char path[1024];
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 	FILE* fh;
 
@@ -898,7 +898,7 @@ EXO_TEST(seedcache_startup_clears_partials, {
 
 EXO_TEST(seedcache_rejects_foreign_file_names, {
 	char path[1024];
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 	FILE* fh;
 
@@ -922,7 +922,7 @@ EXO_TEST(seedcache_adopts_an_orphan_file, {
 	char dir[1024];
 	char path[1024];
 	struct seed_entry entry;
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 	FILE* fh;
 
@@ -951,7 +951,7 @@ EXO_TEST(seedcache_drops_a_record_without_a_file, {
 	char tth[SEED_TTH_STR_LEN + 1];
 	char path[1024];
 	size_t before;
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 
 	if (!sc_ingest(2048, 1001, "CIDGONE", &err)) return 0;
@@ -1018,7 +1018,7 @@ EXO_TEST(seedcache_unreadable_directory_degrades, {
 
 EXO_TEST(seedcache_stats, {
 	struct seed_cache_stats stats;
-	if (!(sc_fresh()))
+	if (!sc_fresh())
 		return 0;
 
 	seed_cache_get_stats(sc_cache, &stats);

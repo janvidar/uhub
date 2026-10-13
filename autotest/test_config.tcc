@@ -1,5 +1,6 @@
 #include "network/network.h"
 #include "core/config.h"
+#include "testutil_net.h"
 
 /*
  * Exercises config_parse_line() (the uhub.conf line parser in src/core/config.c)
@@ -36,7 +37,7 @@ static int cfg_expect(const char* contents, int expect)
 	return ret == expect;
 }
 
-EXO_TEST(cfg_setup, { net_initialize(); return 1; });
+EXO_SETUP({ return test_net_acquire(); });
 
 /* String, integer and boolean directives are stored on the right fields. */
 EXO_TEST(cfg_string, {
@@ -352,4 +353,4 @@ EXO_TEST(msg_missing_file_tolerated, {
 	return ok;
 });
 
-EXO_TEST(cfg_teardown, { remove(cfg_test_file); remove(msg_test_file); net_destroy(); return 1; });
+EXO_TEARDOWN({ remove(cfg_test_file); remove(msg_test_file); test_net_release(); return 1; });

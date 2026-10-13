@@ -376,7 +376,7 @@ EXO_TEST(seedcmd_access_hides_command_names, {
 
 EXO_TEST(seedcmd_refusal_is_identical_for_known_and_unknown, {
 	char refusal[SXC_LINE_MAX];
-	if (!(sxc_fresh()))
+	if (!sxc_fresh())
 		return 0;
 
 	if (sxc_run(SXC_CT_REGISTERED, "stats") != 1) return 0;
@@ -390,7 +390,7 @@ EXO_TEST(seedcmd_refusal_is_identical_for_known_and_unknown, {
 });
 
 EXO_TEST(seedcmd_guest_is_refused, {
-	if (!(sxc_fresh()))
+	if (!sxc_fresh())
 		return 0;
 	if (sxc_run(SXC_CT_GUEST, "list") != 1) return 0;
 	if (sxc_count != 1) return 0;
@@ -398,7 +398,7 @@ EXO_TEST(seedcmd_guest_is_refused, {
 });
 
 EXO_TEST(seedcmd_unknown_verb_gets_a_usage_line, {
-	if (!(sxc_fresh()))
+	if (!sxc_fresh())
 		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "frobnicate") != 1) return 0;
 	if (sxc_count != 1) return 0;
@@ -406,7 +406,7 @@ EXO_TEST(seedcmd_unknown_verb_gets_a_usage_line, {
 });
 
 EXO_TEST(seedcmd_reply_goes_to_the_asker, {
-	if (!(sxc_fresh()))
+	if (!sxc_fresh())
 		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "stats") != 1) return 0;
 	return sxc_last_sid == SXC_SID;
@@ -415,7 +415,7 @@ EXO_TEST(seedcmd_reply_goes_to_the_asker, {
 /* -- help ------------------------------------------------------------------ */
 
 EXO_TEST(seedcmd_help_for_a_guest_lists_only_help, {
-	if (!(sxc_fresh()))
+	if (!sxc_fresh())
 		return 0;
 	if (sxc_run(SXC_CT_GUEST, "help") != 1) return 0;
 	if (!sxc_has("help")) return 0;
@@ -425,7 +425,7 @@ EXO_TEST(seedcmd_help_for_a_guest_lists_only_help, {
 });
 
 EXO_TEST(seedcmd_help_for_an_operator, {
-	if (!(sxc_fresh()))
+	if (!sxc_fresh())
 		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "!help") != 1) return 0;
 	if (!sxc_has("stats")) return 0;
@@ -439,7 +439,7 @@ EXO_TEST(seedcmd_help_for_an_operator, {
 });
 
 EXO_TEST(seedcmd_help_for_an_admin, {
-	if (!(sxc_fresh()))
+	if (!sxc_fresh())
 		return 0;
 	if (sxc_run(SXC_CT_ADMIN, "help") != 1) return 0;
 	if (!sxc_has("unblock <tth>")) return 0;
@@ -450,7 +450,7 @@ EXO_TEST(seedcmd_help_for_an_admin, {
 /* -- stats and list -------------------------------------------------------- */
 
 EXO_TEST(seedcmd_stats_on_an_empty_cache, {
-	if (!(sxc_fresh()))
+	if (!sxc_fresh())
 		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "stats") != 1) return 0;
 	if (sxc_count != 1) return 0;
@@ -459,7 +459,7 @@ EXO_TEST(seedcmd_stats_on_an_empty_cache, {
 });
 
 EXO_TEST(seedcmd_list_reports_an_empty_cache, {
-	if (!(sxc_fresh()))
+	if (!sxc_fresh())
 		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "list") != 1) return 0;
 	if (!sxc_has("most recently used first")) return 0;
@@ -542,7 +542,7 @@ EXO_TEST(seedcmd_info_reports_provenance, {
 });
 
 EXO_TEST(seedcmd_info_on_a_missing_tth, {
-	if (!(sxc_fresh()))
+	if (!sxc_fresh())
 		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "info AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA") != 1) return 0;
 	if (sxc_count != 1) return 0;
@@ -551,7 +551,7 @@ EXO_TEST(seedcmd_info_on_a_missing_tth, {
 
 EXO_TEST(seedcmd_rejects_a_malformed_tth, {
 	/* Too short. */
-	if (!(sxc_fresh()))
+	if (!sxc_fresh())
 		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "info DEADBEEF") != 1) return 0;
 	if (!sxc_has("Not a valid TTH")) return 0;
@@ -707,7 +707,7 @@ EXO_TEST(seedcmd_unblock_is_admin_only, {
 
 EXO_TEST(seedcmd_admin_may_run_an_operator_command, {
 	/* The bitmask trap: admin is 16|4, so it carries the operator bit. */
-	if (!(sxc_fresh()))
+	if (!sxc_fresh())
 		return 0;
 	if (sxc_run(SXC_CT_ADMIN, "stats") != 1) return 0;
 	if (!sxc_has("Seed cache:")) return 0;
@@ -742,7 +742,7 @@ EXO_TEST(seedcmd_purge_counts_what_it_removed, {
 });
 
 EXO_TEST(seedcmd_purge_needs_a_cid, {
-	if (!(sxc_fresh()))
+	if (!sxc_fresh())
 		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "purge") != 1) return 0;
 	if (sxc_count != 1) return 0;
@@ -750,7 +750,7 @@ EXO_TEST(seedcmd_purge_needs_a_cid, {
 });
 
 EXO_TEST(seedcmd_gc_is_admin_only, {
-	if (!(sxc_fresh()))
+	if (!sxc_fresh())
 		return 0;
 	if (sxc_run(SXC_CT_OPERATOR, "gc") != 1) return 0;
 	if (!sxc_has("not allowed")) return 0;
@@ -762,7 +762,7 @@ EXO_TEST(seedcmd_gc_is_admin_only, {
 
 EXO_TEST(seedcmd_gc_expires_by_ttl, {
 	struct seed_cache_stats stats;
-	if (!(sxc_fresh()))
+	if (!sxc_fresh())
 		return 0;
 
 	if (!sxc_ingest(4096, 21, "CIDGC", "gc.png")) return 0;

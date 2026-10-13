@@ -30,6 +30,16 @@ static struct rb_tree* tree_of_three(void)
 	return tree;
 }
 
+/* rb_tree_destroy() frees the tree but not its nodes, so take out whichever of
+   the three keys are still there first. */
+static void tree_done(struct rb_tree* tree)
+{
+	rb_tree_remove(tree, "one");
+	rb_tree_remove(tree, "two");
+	rb_tree_remove(tree, "three");
+	rb_tree_destroy(tree);
+}
+
 static int test_check_search(struct rb_tree* tree, const char* key, const char* expect)
 {
 	const char* value = (const char*) rb_tree_get(tree, key);
@@ -50,28 +60,28 @@ EXO_TEST(rbtree_create_destroy, {
 EXO_TEST(rbtree_create_1, {
 	struct rb_tree* tree = tree_create();
 	int ok = tree != NULL;
-	rb_tree_destroy(tree);
+	tree_done(tree);
 	return ok;
 });
 
 EXO_TEST(rbtree_size_0, {
 	struct rb_tree* tree = tree_create();
 	int ok = rb_tree_size(tree) == 0;
-	rb_tree_destroy(tree);
+	tree_done(tree);
 	return ok;
 });
 
 EXO_TEST(rbtree_insert_1, {
 	struct rb_tree* tree = tree_create();
 	int ok = rb_tree_insert(tree, "one", "1");
-	rb_tree_destroy(tree);
+	tree_done(tree);
 	return ok;
 });
 
 EXO_TEST(rbtree_insert_2, {
 	struct rb_tree* tree = tree_create();
 	int ok = rb_tree_insert(tree, "one", "1") && rb_tree_insert(tree, "two", "2");
-	rb_tree_destroy(tree);
+	tree_done(tree);
 	return ok;
 });
 
@@ -79,7 +89,7 @@ EXO_TEST(rbtree_insert_3, {
 	struct rb_tree* tree = tree_create();
 	int ok = rb_tree_insert(tree, "one", "1") && rb_tree_insert(tree, "two", "2")
 		&& rb_tree_insert(tree, "three", "3");
-	rb_tree_destroy(tree);
+	tree_done(tree);
 	return ok;
 });
 
@@ -87,21 +97,21 @@ EXO_TEST(rbtree_insert_3, {
 EXO_TEST(rbtree_insert_3_again, {
 	struct rb_tree* tree = tree_of_three();
 	int ok = !rb_tree_insert(tree, "three", "3-again") && test_check_search(tree, "three", "3");
-	rb_tree_destroy(tree);
+	tree_done(tree);
 	return ok;
 });
 
 EXO_TEST(rbtree_size_1, {
 	struct rb_tree* tree = tree_of_three();
 	int ok = rb_tree_size(tree) == 3;
-	rb_tree_destroy(tree);
+	tree_done(tree);
 	return ok;
 });
 
 #define TREE3_SEARCH(KEY, EXPECT) \
 	struct rb_tree* tree = tree_of_three(); \
 	int ok = test_check_search(tree, KEY, EXPECT); \
-	rb_tree_destroy(tree); \
+	tree_done(tree); \
 	return ok;
 
 EXO_TEST(rbtree_search_1, { TREE3_SEARCH("one", "1") });
@@ -112,7 +122,7 @@ EXO_TEST(rbtree_search_4, { TREE3_SEARCH("four", NULL) });
 EXO_TEST(rbtree_remove_1, {
 	struct rb_tree* tree = tree_of_three();
 	int ok = rb_tree_remove(tree, "one");
-	rb_tree_destroy(tree);
+	tree_done(tree);
 	return ok;
 });
 
@@ -121,21 +131,21 @@ EXO_TEST(rbtree_size_2, {
 	int ok;
 	rb_tree_remove(tree, "one");
 	ok = rb_tree_size(tree) == 2;
-	rb_tree_destroy(tree);
+	tree_done(tree);
 	return ok;
 });
 
 EXO_TEST(rbtree_remove_2, {
 	struct rb_tree* tree = tree_of_three();
 	int ok = rb_tree_remove(tree, "one") && rb_tree_remove(tree, "two");
-	rb_tree_destroy(tree);
+	tree_done(tree);
 	return ok;
 });
 
 EXO_TEST(rbtree_remove_3, {
 	struct rb_tree* tree = tree_of_three();
 	int ok = rb_tree_remove(tree, "one") && rb_tree_remove(tree, "two") && rb_tree_remove(tree, "three");
-	rb_tree_destroy(tree);
+	tree_done(tree);
 	return ok;
 });
 
@@ -143,7 +153,7 @@ EXO_TEST(rbtree_remove_3, {
 EXO_TEST(rbtree_remove_3_again, {
 	struct rb_tree* tree = tree_of_three();
 	int ok = rb_tree_remove(tree, "three") && !rb_tree_remove(tree, "three");
-	rb_tree_destroy(tree);
+	tree_done(tree);
 	return ok;
 });
 
@@ -160,7 +170,7 @@ static struct rb_tree* tree_emptied(void)
 #define EMPTIED_SEARCH(KEY) \
 	struct rb_tree* tree = tree_emptied(); \
 	int ok = test_check_search(tree, KEY, NULL); \
-	rb_tree_destroy(tree); \
+	tree_done(tree); \
 	return ok;
 
 EXO_TEST(rbtree_search_5, { EMPTIED_SEARCH("one") });
@@ -171,7 +181,7 @@ EXO_TEST(rbtree_search_8, { EMPTIED_SEARCH("four") });
 EXO_TEST(rbtree_size_3, {
 	struct rb_tree* tree = tree_emptied();
 	int ok = rb_tree_size(tree) == 0;
-	rb_tree_destroy(tree);
+	tree_done(tree);
 	return ok;
 });
 
@@ -269,6 +279,6 @@ EXO_TEST(rbtree_remove_10000, {
 });
 
 EXO_TEST(rbtree_destroy_1, {
-	rb_tree_destroy(tree_of_three());
+	tree_done(tree_of_three());
 	return 1;
 });

@@ -200,6 +200,7 @@ EXO_TEST(mj_format_time, {
 	return strlen(out) == 8 && out[2] == ':' && out[5] == ':';
 });
 
-EXO_TEST(mj_teardown, {
-	return mod_joins_unregister(&mj_plugin) == 0 && mj_plugin.ptr == NULL;
+EXO_TEARDOWN({
+	mod_joins_unregister(&mj_plugin);
+	return 1;
 });

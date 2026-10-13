@@ -14,9 +14,10 @@ static int bbs_parse(const char* line)
 	return bbs_b != 0;
 }
 
-EXO_TEST(bbs_board_setup, {
+/* The last board parsed is still held when the file is done. */
+EXO_TEARDOWN({
+	bbs_board_free(bbs_b);
 	bbs_b = 0;
-	bbs_b_error = 0;
 	return 1;
 });
 
@@ -190,10 +191,4 @@ EXO_TEST(bbs_board_perm_guest_denied_when_reg_required, {
 
 EXO_TEST(bbs_board_perm_null_board, {
 	return bbs_board_permissions(0, auth_cred_admin) == 0;
-});
-
-EXO_TEST(bbs_board_teardown, {
-	bbs_board_free(bbs_b);
-	bbs_b = 0;
-	return 1;
 });

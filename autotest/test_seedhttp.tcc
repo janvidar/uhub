@@ -562,7 +562,9 @@ static void bh_rmtree(const char* path)
 	rmdir(path);
 }
 
-EXO_TEST(seedhttp_store_setup, {
+/* A cache for the store tests to look things up in -- empty, so a lookup in
+   it is a real miss rather than a lookup in nothing. */
+EXO_SETUP({
 	struct seed_cache_config cfg;
 
 	bh_rmtree(BH_DIR);
@@ -577,6 +579,17 @@ EXO_TEST(seedhttp_store_setup, {
 	return bh_cache != NULL;
 });
 
+EXO_TEARDOWN({
+	seed_cache_close(bh_cache);
+	bh_cache = NULL;
+	bh_rmtree(BH_DIR);
+	return 1;
+});
+
+EXO_TEST(seedhttp_store_setup, {
+	return bh_cache != NULL;
+});
+
 /* The parser accepts it, and the cache still has nothing to serve: a cache miss
    and a malformed request are answered the same way on the wire. */
 EXO_TEST(seedhttp_uncached_tth_parses, {
@@ -584,7 +597,7 @@ EXO_TEST(seedhttp_uncached_tth_parses, {
 });
 
 EXO_TEST(seedhttp_uncached_tth_lookup_misses, {
-	return seed_cache_peek(bh_cache, bh_tth, NULL) == 0;
+	return bh_cache != NULL && seed_cache_peek(bh_cache, bh_tth, NULL) == 0;
 });
 
 /* And with no cache configured at all, the same request resolves to nothing. */
@@ -605,9 +618,4 @@ EXO_TEST(seedhttp_no_uploads_in_flight, {
 	return seed_http_active_uploads() == 0;
 });
 
-EXO_TEST(seedhttp_store_cleanup, {
-	seed_cache_close(bh_cache);
-	bh_cache = NULL;
-	bh_rmtree(BH_DIR);
-	return 1;
-});
+

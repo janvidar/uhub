@@ -1,5 +1,6 @@
 #include "system.h"
 #include "network/tls.h"
+#include "testutil_net.h"
 #include "network/network.h"
 #include "network/connection.h"
 #include "network/backend.h"
@@ -290,7 +291,7 @@ EXO_TEST(tls_handshake_and_data, {
 	fds[0] = -1;
 	fds[1] = -1;
 
-	if (net_initialize() != 0)
+	if (!test_net_acquire())
 		return 0;
 
 	sctx = net_ssl_context_create("1.2", TLS_CIPHERS, "");
@@ -354,17 +355,17 @@ EXO_TEST(tls_handshake_and_data, {
 	ok = 1;
 
 done:
-	/* net_con_close() defers the free; net_destroy() -> net_backend_shutdown()
-	   -> net_cleanup_process() runs it. Pumping net_backend_process() here
-	   instead would block: with no pending event the poll waits up to
-	   TIMEOUT_QUEUE_MAX seconds. */
+	/* net_con_close() defers the free; the last test_net_release() ->
+	   net_destroy() -> net_backend_shutdown() -> net_cleanup_process() runs it.
+	   Pumping net_backend_process() here instead would block: with no pending
+	   event the poll waits up to TIMEOUT_QUEUE_MAX seconds. */
 	if (scon) net_con_close(scon);
 	if (ccon) net_con_close(ccon);
 	if (fds[0] >= 0) close(fds[0]);
 	if (fds[1] >= 0) close(fds[1]);
 	if (sctx) net_ssl_context_destroy(sctx);
 	if (cctx) net_ssl_context_destroy(cctx);
-	net_destroy();
+	test_net_release();
 	return ok;
 });
 
@@ -396,7 +397,7 @@ EXO_TEST(tls_peer_keyprint_handshake, {
 	fds[0] = fds[1] = -1;
 	pfds[0] = pfds[1] = -1;
 
-	if (net_initialize() != 0)
+	if (!test_net_acquire())
 		return 0;
 
 	sctx = net_ssl_context_create("1.2", TLS_CIPHERS, "");
@@ -468,7 +469,7 @@ done:
 	if (pfds[1] >= 0) close(pfds[1]);
 	if (sctx) net_ssl_context_destroy(sctx);
 	if (cctx) net_ssl_context_destroy(cctx);
-	net_destroy();
+	test_net_release();
 	return ok;
 });
 
@@ -498,24 +499,42 @@ static int tls_gen_keyprint(const char* cert, const char* key, char* out, size_t
 	return ok;
 }
 
-EXO_TEST(tls_generate_setup, {
+/* A freshly generated pair at TLS_GEN_CERT / TLS_GEN_KEY, for each test that
+   looks at one. */
+static int tls_gen_fresh(void)
+{
 	remove(TLS_GEN_CERT);
 	remove(TLS_GEN_KEY);
-	net_initialize();
 	return net_ssl_certificate_create(TLS_GEN_CERT, TLS_GEN_KEY, "uhub") == 1;
+}
+
+EXO_SETUP({
+	return test_net_acquire();
+});
+
+EXO_TEARDOWN({
+	remove(TLS_GEN_CERT);
+	remove(TLS_GEN_KEY);
+	test_net_release();
+	return 1;
+});
+
+EXO_TEST(tls_generate_setup, {
+	return tls_gen_fresh();
 });
 
 /* The generated pair loads, and the key matches the certificate. */
 EXO_TEST(tls_generate_usable, {
 	char kp[80];
-	return tls_gen_keyprint(TLS_GEN_CERT, TLS_GEN_KEY, kp, sizeof(kp))
+	return tls_gen_fresh()
+		&& tls_gen_keyprint(TLS_GEN_CERT, TLS_GEN_KEY, kp, sizeof(kp))
 		&& !strncmp(kp, "SHA256/", 7);
 });
 
 /* The private key must not be readable by anyone but its owner. */
 EXO_TEST(tls_generate_key_is_private, {
 	struct stat st;
-	if (stat(TLS_GEN_KEY, &st) != 0)
+	if (!tls_gen_fresh() || stat(TLS_GEN_KEY, &st) != 0)
 		return 0;
 	return (st.st_mode & (S_IRWXG | S_IRWXO)) == 0;
 });
@@ -527,7 +546,7 @@ EXO_TEST(tls_generate_key_is_private, {
 EXO_TEST(tls_generate_is_not_idempotent, {
 	char before[80];
 	char after[80];
-	if (!tls_gen_keyprint(TLS_GEN_CERT, TLS_GEN_KEY, before, sizeof(before)))
+	if (!tls_gen_fresh() || !tls_gen_keyprint(TLS_GEN_CERT, TLS_GEN_KEY, before, sizeof(before)))
 		return 0;
 	if (!net_ssl_certificate_create(TLS_GEN_CERT, TLS_GEN_KEY, "uhub"))
 		return 0;
@@ -541,9 +560,3 @@ EXO_TEST(tls_generate_bad_path, {
 	return net_ssl_certificate_create("no_such_dir/x.crt", "no_such_dir/x.key", "uhub") == 0;
 });
 
-EXO_TEST(tls_generate_teardown, {
-	remove(TLS_GEN_CERT);
-	remove(TLS_GEN_KEY);
-	net_destroy();
-	return 1;
-});
