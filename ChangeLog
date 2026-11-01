@@ -4,6 +4,10 @@ Incompatible changes (action required beyond replacing the binaries):
   plugin_funcs gained auth_list_users, which moves the hub function table that
   follows it in struct plugin_handle. Older plugins are refused at load.
 - Building with zig now needs zig 0.17.0 or newer.
+- Hub linking: the link handshake is now version 2 (an HMAC-SHA256 response
+  bound to each side's role and both nonces), and LBAN escapes the nick. Hubs
+  and workers in a cluster must be upgraded together; an older peer cannot
+  link with a newer one. See doc/linking.txt.
 
 New features:
 - mod_users: operator account management from inside the hub. !useradd,
@@ -31,6 +35,20 @@ New features:
   mod_auth_sqlite and mod_auth_simple.
 
 Fixes:
+- Security (#127): a peer without the link secret could join a linked hub by
+  reflecting the hub's own challenge, and then inject users, messages and
+  cluster bans. Affects 0.7.0 - 0.8.0 with link_secret set.
+- Security (#128): with auth_proxy, a newline in a connecting client's nick
+  injected commands into the master link before the nick was validated.
+- Security (#129): an operator's !unban argument could inject link commands,
+  and a target longer than a CID lifted the ban on the CID it began with.
+- Hub linking: a peer can no longer route messages as one of our own users
+  or another node's, answer auth queries meant for the master, or place extra
+  fields in the hub INF through a topic. A ban on a nick with a space in it
+  no longer bans the nick's first word on the other hubs, and an over-long
+  nick no longer makes a slave's password check hang.
+- mod_logging: the syslog output replaces control characters, as the file
+  output already did.
 - mod_welcome: a motd or rules text ending in a lone "%" made the formatter
   read past the end of the string.
 - Windows: an IPv4 client on a dual-stack listener (the default) was seen as

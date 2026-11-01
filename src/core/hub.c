@@ -1471,9 +1471,14 @@ void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, time
 int hub_apply_unban(struct hub_info* hub, const char* target, int propagate)
 {
 	int removed = 0;
+	size_t len;
 
-	if (!target || !*target)
+	/* A target arrives from chat (!unban) or from a link, decoded either way,
+	   and is re-sent to every linked hub as the rest of an LUBN line; a CR/LF
+	   in it would inject a command there. No identifier contains one. */
+	if (!target || !*target || strpbrk(target, "\r\n"))
 		return 0;
+	len = strlen(target);
 
 	/* The same string may be present as a banned nick, a banned CID, or a
 	   banned IP/range (a !ban records both a nick and a CID); lift it from each
@@ -1491,12 +1496,20 @@ int hub_apply_unban(struct hub_info* hub, const char* target, int propagate)
 	{
 		struct ban_info ban;
 		memset(&ban, 0, sizeof(ban));
-		ban.flags = ban_nickname | ban_cid;
-		strncpy(ban.nickname, target, MAX_NICK_LEN);
-		ban.nickname[MAX_NICK_LEN] = '\0';
-		strncpy(ban.cid, target, MAX_CID_LEN);
-		ban.cid[MAX_CID_LEN] = '\0';
-		if (plugin_ban_del(hub, &ban) == st_allow)
+		/* Offer only whole identifiers: a target cut down to fit a field names
+		   something else (a 40-character string must not lift the ban on the
+		   CID that is its first 39). */
+		if (len <= MAX_NICK_LEN)
+		{
+			ban.flags |= ban_nickname;
+			memcpy(ban.nickname, target, len + 1);
+		}
+		if (len == MAX_CID_LEN && strspn(target, "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567") == MAX_CID_LEN)
+		{
+			ban.flags |= ban_cid;
+			memcpy(ban.cid, target, len + 1);
+		}
+		if (ban.flags && plugin_ban_del(hub, &ban) == st_allow)
 			removed++;
 	}
 

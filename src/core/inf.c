@@ -1245,13 +1245,22 @@ int hub_handle_info(struct hub_info* hub, struct hub_user* user, const struct ad
 		 */
 		if (hub->config->auth_proxy && !user->auth_proxy_resolved)
 		{
-			/* The nick isn't validated/stored on the user yet (that happens in
-			   the login checks), so pull it from the BINF for the master query. */
-			char* tmp = adc_msg_get_named_argument(cmd, ADC_INF_FLAG_NICK);
-			char* nick = tmp ? adc_msg_unescape(tmp) : NULL;
-			int sent = nick ? link_auth_query(hub, user, nick) : 0;
-			hub_free(tmp);
-			hub_free(nick);
+			/* Validate the nick before it goes anywhere near the master link:
+			   it is decoded from the BINF, so an escaped "\n" in it is a real
+			   newline by now, and the master would run whatever follows as a
+			   command from a trusted hub. check_nick() also stores the result
+			   on the user (the login checks repeat it harmlessly). */
+			int sent;
+			ret = check_required_login_flags(hub, user, cmd);
+			if (ret == 0)
+				ret = check_nick(hub, user, cmd);
+			if (ret < 0)
+			{
+				on_login_failure(hub, user, ret);
+				adc_msg_free(cmd);
+				return -1;
+			}
+			sent = link_auth_query(hub, user, user->id.nick);
 			if (sent)
 			{
 				user->auth_pending_inf = adc_msg_copy(cmd);

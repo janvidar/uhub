@@ -18,6 +18,9 @@
  */
 
 #include "system.h"
+#include <limits.h>
+#include <openssl/evp.h>
+#include <openssl/hmac.h>
 #include <openssl/rand.h>
 #include "util/memory.h"
 #include "util/misc.h"
@@ -34,38 +37,51 @@ static int link_const_time_equal(const char* a, const char* b, size_t len)
 	return diff == 0;
 }
 
-void link_auth_response(const char* secret, const char* nonce, char* out)
+int link_nonce_valid(const char* nonce)
 {
-	size_t sl = secret ? strlen(secret) : 0;
-	size_t nl = nonce ? strlen(nonce) : 0;
-	uint64_t mac[3];
-	char* buf;
-
-	/* tiger() reads its input as bytes; a heap buffer is suitably aligned. */
-	buf = hub_malloc(sl + nl + 1);
-	if (!buf)
-	{
-		out[0] = 0;
-		return;
-	}
-	if (sl) memcpy(buf, secret, sl);
-	if (nl) memcpy(buf + sl, nonce, nl);
-
-	tiger((uint64_t*) buf, (uint64_t) (sl + nl), mac);
-	base32_encode((unsigned char*) mac, TIGERSIZE, out);
-	out[LINK_AUTH_RESPONSE_LEN] = 0;
-	hub_free(buf);
+	return nonce && strlen(nonce) == LINK_NONCE_LEN &&
+		strspn(nonce, "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567") == LINK_NONCE_LEN;
 }
 
-int link_auth_verify(const char* secret, const char* nonce, const char* response)
+void link_auth_response(const char* secret, const char* client_nonce,
+	const char* server_nonce, int from_client, char* out)
+{
+	unsigned char mac[EVP_MAX_MD_SIZE];
+	unsigned int mac_len = 0;
+	char context[128];
+	size_t sl = secret ? strlen(secret) : 0;
+	int n;
+
+	out[0] = 0;
+	if (!sl || sl > INT_MAX || !link_nonce_valid(client_nonce) ||
+		!link_nonce_valid(server_nonce) || strcmp(client_nonce, server_nonce) == 0)
+		return;
+
+	/* The sender's role and both nonces are bound in, so a response can be
+	   neither reflected back to its author nor replayed into another session. */
+	n = snprintf(context, sizeof(context), "uhub-link-v2 %c %s %s",
+		from_client ? 'C' : 'S', client_nonce, server_nonce);
+	if (n <= 0 || n >= (int) sizeof(context))
+		return;
+	if (!HMAC(EVP_sha256(), secret, (int) sl, (const unsigned char*) context,
+			(size_t) n, mac, &mac_len) || mac_len < LINK_AUTH_MAC_BYTES)
+		return;
+
+	base32_encode(mac, LINK_AUTH_MAC_BYTES, out);
+	out[LINK_AUTH_RESPONSE_LEN] = 0;
+}
+
+int link_auth_verify(const char* secret, const char* client_nonce,
+	const char* server_nonce, int from_client, const char* response)
 {
 	char expected[LINK_AUTH_RESPONSE_LEN + 1];
 
 	if (!response || strlen(response) != LINK_AUTH_RESPONSE_LEN)
 		return 0;
 
-	link_auth_response(secret, nonce, expected);
-	return link_const_time_equal(response, expected, LINK_AUTH_RESPONSE_LEN);
+	link_auth_response(secret, client_nonce, server_nonce, from_client, expected);
+	return expected[0] &&
+		link_const_time_equal(response, expected, LINK_AUTH_RESPONSE_LEN);
 }
 
 int link_make_nonce(char* out)
@@ -87,14 +103,18 @@ int link_make_nonce(char* out)
  *
  * Links reuse the normal hub port: the connecting hub sends "LCHA <nonce>" as
  * its first bytes, which probe.c detects (like HSUP/TLS) and hands to
- * link_accept(). Both sides then run a symmetric mutual challenge-response:
+ * link_accept(). Both sides then run a role-bound mutual challenge-response:
  *
  *   ->  LCHA <nonce>        (each side challenges the other)
- *   <-  LRES <response>     response = base32(tiger(secret || peer_nonce))
+ *   <-  LRES <response>     HMAC over the sender's role and both nonces
  *   <-  LACK                sent once we have verified the peer's LRES
  *
  * A side is "established" once it has both verified the peer's LRES (the peer
  * knows the secret) and received the peer's LACK (the peer verified ours).
+ * Each side accepts exactly one LCHA, then one valid LRES, then one LACK; any
+ * other order, a repeat, or a handshake message after establishment closes the
+ * link. Without that, a peer could replay our own challenge back to us and
+ * have us compute the answer it then presents as its own.
  * ------------------------------------------------------------------------- */
 
 #include <stdarg.h>
@@ -139,6 +159,7 @@ struct hub_link
 	int peer_verified;                      /* we verified the peer's LRES */
 	int got_ok;                             /* we received the peer's LACK */
 	char nonce[LINK_NONCE_LEN + 1];         /* the challenge WE sent */
+	char peer_nonce[LINK_NONCE_LEN + 1];    /* the challenge the peer sent us */
 	char recvbuf[LINK_RECV_MAX];
 	size_t recvlen;
 	char* peer_desc;                        /* for logging */
@@ -152,6 +173,7 @@ static struct linked_list* g_links = 0;
    awaiting a master reply (LACR/LVRS), found by SID when the reply arrives. */
 static struct linked_list* g_auth_pending = 0;
 static struct hub_user* link_auth_pending_take(const char* sidstr);
+static struct hub_link* link_master(void);
 
 /* Coordinator side (this hub is node 0 of a cluster): bitmap of which window
    indices [0, g_win_count) are in use, so we can lease free windows to members
@@ -246,12 +268,68 @@ static void link_disconnect(struct hub_link* link)
 	hub_free(link);
 }
 
+/*
+ * The link protocol is line-based and has no escaping of its own, so a CR or
+ * LF inside a field would end the line early and start another, which the
+ * peer then runs as a command from a trusted hub. Every write goes through
+ * one of the checks below, so a field that slipped past validation upstream
+ * is dropped here instead of being injected.
+ */
+
+/* `buf` is exactly one line: it ends in '\n' and has no CR/LF before that. */
+static int link_is_one_line(const char* buf, size_t len)
+{
+	return len > 0 && buf[len - 1] == '\n'
+		&& !memchr(buf, '\n', len - 1) && !memchr(buf, '\r', len - 1);
+}
+
+/* `field` contains no CR/LF at all (safe to embed in a line). */
+static int link_field_ok(const char* field)
+{
+	return field && !strpbrk(field, "\r\n");
+}
+
+static int link_send_line(struct hub_link* link, const char* buf, size_t len)
+{
+	if (!link_is_one_line(buf, len))
+	{
+		LOG_WARN("link: refusing to send a malformed line to %s", link->peer_desc);
+		return -1;
+	}
+	return (net_con_send(link->connection, buf, len) == (ssize_t) len) ? 0 : -1;
+}
+
+/* Send `prefix` followed by `body`, which must itself be one line (an ADC
+   message cache, which ends in '\n'). */
+static int link_send_prefixed(struct hub_link* link, const char* prefix, const char* body, size_t len)
+{
+	if (!link_is_one_line(body, len))
+	{
+		LOG_WARN("link: refusing to send a malformed line to %s", link->peer_desc);
+		return -1;
+	}
+	net_con_send(link->connection, prefix, strlen(prefix));
+	return (net_con_send(link->connection, body, len) == (ssize_t) len) ? 0 : -1;
+}
+
+/* Send one line to every established link. */
+static void link_send_all(const char* buf, size_t len)
+{
+	struct hub_link* link;
+	if (!g_links)
+		return;
+	LIST_FOREACH(struct hub_link*, link, g_links,
+	{
+		if (link->state == link_state_established)
+			link_send_line(link, buf, len);
+	});
+}
+
 static int link_sendf(struct hub_link* link, const char* fmt, ...)
 {
-	char buf[128];
+	char buf[LINK_RECV_MAX - 1]; /* the peer's limit, including the newline */
 	va_list ap;
 	int n;
-	ssize_t w;
 
 	va_start(ap, fmt);
 	n = vsnprintf(buf, sizeof(buf), fmt, ap);
@@ -259,10 +337,9 @@ static int link_sendf(struct hub_link* link, const char* fmt, ...)
 	if (n <= 0 || n >= (int) sizeof(buf))
 		return -1;
 
-	/* Handshake messages are tiny and the socket buffer is empty, so a single
-	   write always completes. TODO: buffer if links ever carry bulk traffic. */
-	w = net_con_send(link->connection, buf, (size_t) n);
-	return (w == n) ? 0 : -1;
+	/* Messages are small and the socket buffer is normally empty, so a single
+	   write completes. TODO: buffer if links ever carry bulk traffic. */
+	return link_send_line(link, buf, (size_t) n);
 }
 
 /* Copy the next space-delimited token from p into out, returning a pointer to
@@ -278,6 +355,18 @@ static const char* link_tok(const char* p, char* out, size_t outsz)
 	memcpy(out, p, n);
 	out[n] = 0;
 	return sp ? sp + 1 : p + strlen(p);
+}
+
+/* Both handshake responses are computed over the nonces in a fixed order --
+   the connecting side's first -- so the two ends agree on the input. */
+static const char* link_client_nonce(const struct hub_link* link)
+{
+	return link->is_client ? link->nonce : link->peer_nonce;
+}
+
+static const char* link_server_nonce(const struct hub_link* link)
+{
+	return link->is_client ? link->peer_nonce : link->nonce;
 }
 
 /* Process one complete handshake line (NUL-terminated, no newline).
@@ -310,6 +399,14 @@ static int link_process_line(struct hub_link* link, const char* line)
 		   re-propagating (loop-safe on a full mesh). */
 		if (link->state != link_state_established)
 			return -1;
+		/* The description goes into our IINF as a named argument, so it must
+		   be one ADC-escaped token: a space would add fields of the peer's
+		   choosing to the hub INF every client receives. */
+		if (strchr(line + 5, ' '))
+		{
+			LOG_WARN("link: ignoring malformed description from %s", link->peer_desc);
+			return 0;
+		}
 		hub_update_description(link->hub, line + 5, 0);
 		return 0;
 	}
@@ -329,7 +426,8 @@ static int link_process_line(struct hub_link* link, const char* line)
 		const char* sp2;
 		const char* reason;
 		char cid[MAX_CID_LEN + 1];
-		char nick[MAX_NICK_LEN + 1];
+		char enick[MAX_NICK_LEN * 2 + 1]; /* ADC-escaped: at most twice as long */
+		char* nick;
 		size_t clen, nlen;
 		if (link->state != link_state_established)
 			return -1;
@@ -341,11 +439,7 @@ static int link_process_line(struct hub_link* link, const char* line)
 		if (!sp)
 			return -1;
 		clen = (size_t) (sp - cidp);
-		if (clen > MAX_CID_LEN)
-			clen = MAX_CID_LEN;
-		memcpy(cid, cidp, clen);
-		cid[clen] = 0;
-		nickp = sp + 1;             /* <nick> (single token) */
+		nickp = sp + 1;             /* <nick> (one ADC-escaped token) */
 		sp2 = strchr(nickp, ' ');
 		if (sp2)
 		{
@@ -357,11 +451,26 @@ static int link_process_line(struct hub_link* link, const char* line)
 			nlen = strlen(nickp);
 			reason = "";
 		}
-		if (nlen > MAX_NICK_LEN)
-			nlen = MAX_NICK_LEN;
-		memcpy(nick, nickp, nlen);
-		nick[nlen] = 0;
+		/* Never truncate an identifier to fit: a cut-down nick or CID names
+		   somebody else. */
+		if (clen > MAX_CID_LEN || nlen >= sizeof(enick))
+		{
+			LOG_WARN("link: ignoring malformed ban from %s", link->peer_desc);
+			return 0;
+		}
+		memcpy(cid, cidp, clen);
+		cid[clen] = 0;
+		memcpy(enick, nickp, nlen);
+		enick[nlen] = 0;
+		nick = adc_msg_unescape(enick);
+		if (!nick || strlen(nick) > MAX_NICK_LEN)
+		{
+			LOG_WARN("link: ignoring malformed ban from %s", link->peer_desc);
+			hub_free(nick);
+			return 0;
+		}
 		hub_apply_ban(link->hub, cid, nick, (time_t) expiry, reason[0] ? reason : NULL, 0);
+		hub_free(nick);
 		return 0;
 	}
 
@@ -432,6 +541,14 @@ static int link_process_line(struct hub_link* link, const char* line)
 		enum auth_credentials cred = auth_cred_guest;
 		if (link->state != link_state_established)
 			return -1;
+		/* Only the master we asked may answer: a reply settles a pending
+		   login's credential, so from any other peer it would let that peer
+		   log a user in as whoever it liked. */
+		if (link != link_master())
+		{
+			LOG_WARN("link: ignoring LACR from %s, which is not our auth master", link->peer_desc);
+			return 0;
+		}
 		credstr = link_tok(line + 5, sid, sizeof(sid));
 		user = link_auth_pending_take(sid);
 		if (!user)
@@ -450,6 +567,14 @@ static int link_process_line(struct hub_link* link, const char* line)
 		struct hub_user* user;
 		if (link->state != link_state_established)
 			return -1;
+		/* Only the master we asked may answer: a reply settles a pending
+		   login's credential, so from any other peer it would let that peer
+		   log a user in as whoever it liked. */
+		if (link != link_master())
+		{
+			LOG_WARN("link: ignoring LVRS from %s, which is not our auth master", link->peer_desc);
+			return 0;
+		}
 		rest = link_tok(line + 5, sid, sizeof(sid));
 		link_tok(rest, okstr, sizeof(okstr));
 		user = link_auth_pending_take(sid);
@@ -537,15 +662,37 @@ static int link_process_line(struct hub_link* link, const char* line)
 		return 0;
 	}
 
+	/* Everything below is the handshake, which is over once established. */
+	if (link->state != link_state_handshake)
+	{
+		LOG_WARN("link: unexpected handshake message from %s", link->peer_desc);
+		return -1;
+	}
+
 	if (strncmp(line, "LCHA ", 5) == 0)
 	{
 		char resp[LINK_AUTH_RESPONSE_LEN + 1];
-		link_auth_response(secret, line + 5, resp);
+		/* One challenge per side, well-formed, and never our own echoed back. */
+		if (link->peer_nonce[0] || !link_nonce_valid(line + 5) ||
+			strcmp(link->nonce, line + 5) == 0)
+		{
+			LOG_WARN("link: invalid challenge from %s", link->peer_desc);
+			return -1;
+		}
+		memcpy(link->peer_nonce, line + 5, LINK_NONCE_LEN + 1);
+		link_auth_response(secret, link_client_nonce(link), link_server_nonce(link),
+			link->is_client, resp);
+		if (!resp[0])
+			return -1;
 		return link_sendf(link, "LRES %s\n", resp);
 	}
 	else if (strncmp(line, "LRES ", 5) == 0)
 	{
-		if (!link_auth_verify(secret, link->nonce, line + 5))
+		/* The peer's answer must follow its own challenge (we need both nonces)
+		   and come only once; it is computed for the peer's role, not ours. */
+		if (!link->peer_nonce[0] || link->peer_verified ||
+			!link_auth_verify(secret, link_client_nonce(link), link_server_nonce(link),
+				!link->is_client, line + 5))
 		{
 			LOG_WARN("link: authentication failed from %s", link->peer_desc);
 			link_sendf(link, "LERR\n");
@@ -557,6 +704,12 @@ static int link_process_line(struct hub_link* link, const char* line)
 	}
 	else if (strcmp(line, "LACK") == 0)
 	{
+		/* The peer cannot have verified us before it has proven itself. */
+		if (!link->peer_verified || link->got_ok)
+		{
+			LOG_WARN("link: unexpected LACK from %s", link->peer_desc);
+			return -1;
+		}
 		link->got_ok = 1;
 	}
 	else if (strcmp(line, "LERR") == 0)
@@ -674,17 +827,17 @@ static int link_begin_handshake(struct hub_link* link)
 	return link_sendf(link, "LCHA %s\n", link->nonce);
 }
 
-int link_accept(struct hub_info* hub, struct net_connection* con, struct ip_addr_encap* addr)
+int link_adopt(struct hub_info* hub, struct net_connection* con, int is_client, const char* desc)
 {
 	struct hub_link* link;
 
 	if (!*hub->config->link_secret)
 	{
-		LOG_WARN("link: rejecting link from %s (link_secret not configured)", ip_convert_to_string(addr));
+		LOG_WARN("link: rejecting link with %s (link_secret not configured)", desc ? desc : "?");
 		return 0; /* caller closes the connection */
 	}
 
-	link = link_create_internal(hub, 0, ip_convert_to_string(addr));
+	link = link_create_internal(hub, is_client, desc);
 	if (!link)
 		return 0;
 
@@ -692,11 +845,16 @@ int link_accept(struct hub_info* hub, struct net_connection* con, struct ip_addr
 	net_con_reinitialize(con, link_net_event, link, NET_EVENT_READ);
 	net_con_set_timeout(con, LINK_TIMEOUT);
 
-	/* The peer's "LCHA <nonce>" is still buffered (probe used peek), so our
-	   first read will see it; send our own challenge now. */
+	/* An accepted peer's "LCHA <nonce>" is still buffered (probe used peek),
+	   so our first read will see it; send our own challenge now. */
 	if (link_begin_handshake(link) < 0)
 		link_disconnect(link);
 	return 1; /* ownership taken (even if we just closed it) */
+}
+
+int link_accept(struct hub_info* hub, struct net_connection* con, struct ip_addr_encap* addr)
+{
+	return link_adopt(hub, con, 0, ip_convert_to_string(addr));
 }
 
 static void link_connect_callback(struct net_connect_handle* handle, enum net_connect_status status, struct net_connection* con, void* ptr)
@@ -1048,8 +1206,7 @@ static void link_send_inf(struct hub_link* link, struct hub_user* user)
 {
 	if (!user->info || !user->info->cache)
 		return;
-	net_con_send(link->connection, "LINF ", 5);
-	net_con_send(link->connection, user->info->cache, user->info->length);
+	link_send_prefixed(link, "LINF ", user->info->cache, user->info->length);
 }
 
 /* Send a snapshot of our local users to the peer (one LINF per user). Remote
@@ -1081,7 +1238,6 @@ void link_broadcast_local_inf(struct hub_info* hub, struct hub_user* user)
 /* Forward a local user's departure to every established link. */
 void link_broadcast_local_quit(struct hub_info* hub, struct hub_user* user)
 {
-	struct hub_link* link;
 	char buf[64];
 	int n;
 	(void) hub;
@@ -1090,11 +1246,7 @@ void link_broadcast_local_quit(struct hub_info* hub, struct hub_user* user)
 	n = snprintf(buf, sizeof(buf), "LQUI %s\n", sid_to_string(user->id.sid));
 	if (n <= 0 || n >= (int) sizeof(buf))
 		return;
-	LIST_FOREACH(struct hub_link*, link, g_links,
-	{
-		if (link->state == link_state_established)
-			net_con_send(link->connection, buf, (size_t) n);
-	});
+	link_send_all(buf, (size_t) n);
 }
 
 /* Propagate a hub description (topic) change to every established link. The
@@ -1102,31 +1254,29 @@ void link_broadcast_local_quit(struct hub_info* hub, struct hub_user* user)
    safe to send as a single LDSC token. */
 void link_broadcast_description(struct hub_info* hub, const char* escaped_desc)
 {
-	struct hub_link* link;
+	char buf[LINK_RECV_MAX - 1];
+	int n;
 	(void) hub;
-	if (!g_links || !escaped_desc)
+	if (!g_links || !link_field_ok(escaped_desc))
 		return;
-	LIST_FOREACH(struct hub_link*, link, g_links,
-	{
-		if (link->state == link_state_established)
-		{
-			net_con_send(link->connection, "LDSC ", 5);
-			net_con_send(link->connection, escaped_desc, strlen(escaped_desc));
-			net_con_send(link->connection, "\n", 1);
-		}
-	});
+	n = snprintf(buf, sizeof(buf), "LDSC %s\n", escaped_desc);
+	if (n <= 0 || n >= (int) sizeof(buf))
+		return;
+	link_send_all(buf, (size_t) n);
 }
 
 /* Propagate a ban to every established link. Format:
    "LBAN <expiry> <cid> <nick> <reason>", with the absolute-unix-time expiry first
-   (0 = permanent), then the CID (fixed-width base32, no spaces), the nick (a
-   single token -- ADC nicks contain no spaces), then the reason taking the rest
-   of the line (may be empty and may contain spaces, but no CR/LF). */
+   (0 = permanent), then the CID (fixed-width base32, no spaces), the nick
+   ADC-escaped so it is a single token (a nick may contain spaces, which would
+   otherwise shift the field boundary: banning "Admin x" must not ban "Admin"
+   on the peer), then the reason taking the rest of the line (may be empty and
+   may contain spaces, but no CR/LF). */
 void link_broadcast_ban(struct hub_info* hub, const char* cid, const char* nick, time_t expiry, const char* reason)
 {
-	struct hub_link* link;
 	char buf[512];
 	char safe[MAX_BAN_REASON];
+	char* enick;
 	size_t i;
 	int n;
 	(void) hub;
@@ -1142,14 +1292,14 @@ void link_broadcast_ban(struct hub_info* hub, const char* cid, const char* nick,
 			if (safe[i] == '\n' || safe[i] == '\r')
 				safe[i] = ' ';
 	}
-	n = snprintf(buf, sizeof(buf), "LBAN %lld %s %s %s\n", (long long) expiry, cid ? cid : "", nick ? nick : "", safe);
+	enick = adc_msg_escape(nick ? nick : "");
+	if (!enick)
+		return;
+	n = snprintf(buf, sizeof(buf), "LBAN %lld %s %s %s\n", (long long) expiry, cid ? cid : "", enick, safe);
+	hub_free(enick);
 	if (n <= 0 || n >= (int) sizeof(buf))
 		return;
-	LIST_FOREACH(struct hub_link*, link, g_links,
-	{
-		if (link->state == link_state_established)
-			net_con_send(link->connection, buf, (size_t) n);
-	});
+	link_send_all(buf, (size_t) n);
 }
 
 /* Propagate an unban to every established link. Format: "LUBN <target>", where
@@ -1157,20 +1307,15 @@ void link_broadcast_ban(struct hub_info* hub, const char* cid, const char* nick,
    legitimately contain spaces). */
 void link_broadcast_unban(struct hub_info* hub, const char* target)
 {
-	struct hub_link* link;
 	char buf[256];
 	int n;
 	(void) hub;
-	if (!g_links)
+	if (!g_links || !target || !*target || !link_field_ok(target))
 		return;
-	n = snprintf(buf, sizeof(buf), "LUBN %s\n", target ? target : "");
+	n = snprintf(buf, sizeof(buf), "LUBN %s\n", target);
 	if (n <= 0 || n >= (int) sizeof(buf))
 		return;
-	LIST_FOREACH(struct hub_link*, link, g_links,
-	{
-		if (link->state == link_state_established)
-			net_con_send(link->connection, buf, (size_t) n);
-	});
+	link_send_all(buf, (size_t) n);
 }
 
 /* The upstream (master) link for a slave: the first established outbound link. */
@@ -1193,25 +1338,31 @@ int link_auth_query(struct hub_info* hub, struct hub_user* user, const char* nic
 {
 	struct hub_link* master = link_master();
 	(void) hub;
-	if (!master || !nick)
+	/* The nick is the last field, so it may contain spaces, but a CR/LF would
+	   end the line and inject a command into the master link. */
+	if (!master || !nick || !*nick || !link_field_ok(nick))
+		return 0;
+	if (link_sendf(master, "LACQ %s %s\n", sid_to_string(user->id.sid), nick) < 0)
 		return 0;
 	if (g_auth_pending)
 		list_append(g_auth_pending, user);
-	link_sendf(master, "LACQ %s %s\n", sid_to_string(user->id.sid), nick);
 	return 1;
 }
 
 /* Slave: forward the password challenge-response to the master to verify
-   (LVFY). Returns 1 if sent (login should pause), 0 if no master link. */
+   (LVFY). Returns 1 if sent (login should pause), 0 if no master link or the
+   request could not be sent -- the caller then fails the login rather than
+   leaving it waiting for a reply that will never come. */
 int link_auth_proxy_verify(struct hub_info* hub, struct hub_user* user, const char* challenge, const char* response)
 {
 	struct hub_link* master = link_master();
 	(void) hub;
-	if (!master || !challenge || !response)
+	if (!master || !link_field_ok(challenge) || !link_field_ok(response) || strchr(response, ' '))
+		return 0;
+	if (link_sendf(master, "LVFY %s %s %s %s\n", sid_to_string(user->id.sid), challenge, response, user->id.nick) < 0)
 		return 0;
 	if (g_auth_pending)
 		list_append(g_auth_pending, user);
-	link_sendf(master, "LVFY %s %s %s %s\n", sid_to_string(user->id.sid), challenge, response, user->id.nick);
 	return 1;
 }
 
@@ -1322,8 +1473,7 @@ void link_forward_message(struct hub_link* link, struct adc_message* msg)
 		return;
 	LOG_DEBUG("link: forwarding directed message to %s", link->peer_desc);
 	/* "LRTE " + the full ADC message (which ends in '\n'). */
-	net_con_send(link->connection, "LRTE ", 5);
-	net_con_send(link->connection, msg->cache, msg->length);
+	link_send_prefixed(link, "LRTE ", msg->cache, msg->length);
 }
 
 /* Relay a locally-originated public chat/search broadcast to every link, once
@@ -1399,9 +1549,18 @@ static void link_handle_route(struct hub_link* link, const char* adcstr)
 	}
 
 	/* route_message() dereferences the source user for echo (E) messages, so a
-	   known sender is required; it is the remote user we learned over a link. */
+	   known sender is required -- and it must be a remote user learned over
+	   THIS link. A user's messages only ever arrive over the link to the node
+	   it is connected to, so any other source SID is a peer speaking for
+	   someone it does not own: one of our local users (an operator, say,
+	   whose PMs a bot obeys), or a user on a third node. */
 	sender = uman_get_user_by_sid(link->hub->users, msg->source);
-	if (sender)
+	if (sender && sender->origin_link != link)
+	{
+		LOG_WARN("link: %s routed a message as sid %s, which it does not own",
+			link->peer_desc, sid_to_string(msg->source));
+	}
+	else if (sender)
 	{
 		link_stamp_message(link->hub, msg);
 		LOG_DEBUG("link: delivering routed message from sid %s (via %s)",

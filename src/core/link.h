@@ -28,38 +28,57 @@
  *
  * Two hubs establish a link by proving knowledge of a shared secret
  * (the `link_secret` config) via a nonce challenge-response, rather than
- * sending the secret over the wire. The response is base32(tiger(secret ||
- * nonce)) -- the same keyed-hash construction HBRI uses for its tokens.
+ * sending the secret over the wire. The response is a truncated HMAC-SHA256
+ * keyed on the secret, over the sender's role and both sides' nonces:
+ *
+ *   base32(HMAC-SHA256(secret, "uhub-link-v2 <C|S> <client_nonce> <server_nonce>")[0:24])
+ *
+ * Binding the role is what stops a reflection: a hub's answer to its own
+ * challenge, echoed back at it, is computed for the wrong role and does not
+ * verify. This replaced v1's base32(tiger(secret || peer_nonce)); there is
+ * deliberately no fallback, so every linked hub must run the same version.
  *
  * These primitives are pure (no hub state, no networking) so they can be unit
- * tested directly; the networked handshake in link.c (B1b) is built on top.
+ * tested directly; the networked handshake in link.c is built on top.
  *
  * TODO (auth hardening): the shared `link_secret` is a plaintext config value
  * with the same drawbacks as plaintext passwords -- one secret for all peers,
  * no per-hub identity, no rotation/revocation, readable by anyone with config
- * access. Since links already run over TLS, the better long-term mechanism is
- * mutual-TLS with per-peer certificate pinning (each hub has a keypair; peers
- * pin each other's cert fingerprint) -- per-hub identity, revocable, no shared
- * secret on the wire or at rest. An asymmetric keypair challenge (e.g. ed25519
- * signed nonce) is an alternative. The shared-secret scheme here is the v1
- * baseline; see the plan's B1 note.
+ * access. The handshake also authenticates only itself: the traffic after it
+ * is neither encrypted nor integrity-protected, so the transport must be
+ * trusted. The better long-term mechanism is mutual TLS with per-peer
+ * certificate pinning -- per-hub identity, revocable, and protecting the whole
+ * session.
  */
 
-/* base32(tiger(...)) is a 39-char value, like a CID. */
+/* 24 MAC bytes (192 bits) encode to 39 base32 characters, like a CID. */
+#define LINK_AUTH_MAC_BYTES    24
 #define LINK_AUTH_RESPONSE_LEN MAX_CID_LEN
 #define LINK_NONCE_LEN         MAX_CID_LEN
 
 /**
- * Compute the auth response for (secret, nonce): base32(tiger(secret || nonce)).
- * @param out must be at least LINK_AUTH_RESPONSE_LEN + 1 bytes; NUL-terminated.
+ * Whether `nonce` is well-formed: exactly LINK_NONCE_LEN base32 characters.
  */
-extern void link_auth_response(const char* secret, const char* nonce, char* out);
+extern int link_nonce_valid(const char* nonce);
 
 /**
- * Constant-time verify that `response` matches the expected response for
- * (secret, nonce). Returns 1 if valid, 0 otherwise.
+ * Compute the auth response sent by one side of a link. from_client is 1 if
+ * the sender is the side that opened the connection, 0 for the side that
+ * accepted it; the nonces are always passed client-first. Both nonces must be
+ * valid and distinct, and the secret non-empty.
+ * @param out must be at least LINK_AUTH_RESPONSE_LEN + 1 bytes; NUL-terminated,
+ *            and the empty string if any input is invalid.
  */
-extern int link_auth_verify(const char* secret, const char* nonce, const char* response);
+extern void link_auth_response(const char* secret, const char* client_nonce,
+	const char* server_nonce, int from_client, char* out);
+
+/**
+ * Constant-time verify that `response` is what the side named by from_client
+ * would send for (secret, client_nonce, server_nonce). Returns 1 if valid,
+ * 0 otherwise (including on any invalid input).
+ */
+extern int link_auth_verify(const char* secret, const char* client_nonce,
+	const char* server_nonce, int from_client, const char* response);
 
 /**
  * Generate a fresh random nonce (base32-encoded).
@@ -141,6 +160,15 @@ extern void link_relay_broadcast(struct hub_info* hub, struct adc_message* msg);
  *         0 if the link was rejected (caller closes the connection).
  */
 extern int link_accept(struct hub_info* hub, struct net_connection* con, struct ip_addr_encap* addr);
+
+/**
+ * Run the link protocol on an already-connected connection: link_accept() is
+ * this with is_client = 0. is_client says which side of the handshake we are
+ * (1 = we opened the connection). desc names the peer in log messages.
+ *
+ * @return 1 if the connection was taken over, 0 if rejected (caller closes it).
+ */
+extern int link_adopt(struct hub_info* hub, struct net_connection* con, int is_client, const char* desc);
 
 /**
  * Start hub-to-hub linking: initiate the outbound link if link_peer is set
