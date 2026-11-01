@@ -62,6 +62,8 @@ sidebar: linking
 				A link reuses the hub's normal listening port — there is no separate link port. Both ends
 				authenticate each other with a mutual challenge-response keyed on a <strong>shared
 				secret</strong> that must match on both hubs; the secret itself is never sent over the wire.
+				Every hub in a cluster must speak the same handshake version: from 0.8.1 it is version 2,
+				so a 0.8.1 hub cannot link with 0.8.0 or older — upgrade all of them together.
 			</p>
 			<p>Because the whole cluster shares one session-ID space, each node must own a distinct slice of
 				it. For two hubs, tell each node the cluster size (<code>node_count</code>) and its own index
@@ -158,19 +160,43 @@ node_id     = 1</code></pre>
 				and forwards the password challenge-response to the master to verify — so passwords never leave
 				the master. Guests are unaffected and log in locally. The master needs no special flag.
 			</p>
+			<p>
+				If the master <em>refuses</em> a nick — its auth plug-in has <code>exclusive</code> set and
+				does not hold that nick — the slave refuses the login too (from 0.8.1). A slave that cannot
+				reach its master still logs unknown nicks in as guests; set
+				<code>registered_users_only = yes</code> on it to refuse them instead.
+			</p>
 
 			<h2 id="security">Security</h2>
 			<p>
 				A link is highly privileged: a linked peer can inject arbitrary users into the local roster.
 				Treat every link as a trust boundary and only link hubs you control.
 			</p>
+			<p>
+				The handshake (version 2) answers each challenge with an HMAC-SHA256 bound to the sender's role
+				and both sides' nonces, so a peer that does not know the secret cannot get a hub to compute an
+				answer for it. Each handshake message is accepted once and in order. Once a link is up, every
+				line written to it is refused if it would carry an embedded newline, a peer can only route
+				messages as users it introduced over that link, and an <code>auth_proxy</code> slave accepts
+				auth replies only from its master.
+			</p>
 			<div class="callout warn">
 				<p>
-					The shared-secret handshake is a v1 baseline with the weaknesses of any shared password —
-					one secret for the whole cluster, no per-hub identity, no rotation or revocation, and it
-					lives in the config file. <strong>Run links only over a trusted or private network.</strong>
-					The intended long-term posture is mutual TLS with per-peer certificate pinning; do not treat
-					the shared secret as the final mechanism.
+					<strong>Fixed in 0.8.1:</strong> the version 1 handshake of 0.7.0 – 0.8.0 could be completed
+					without the secret by reflecting the hub's own challenge
+					(<a href="https://github.com/janvidar/uhub/blob/security-advisories/doc/advisories/UHUB-2026-005.md">UHUB-2026-005</a>), and client input could inject link
+					commands through an <code>auth_proxy</code> nick
+					(<a href="https://github.com/janvidar/uhub/blob/security-advisories/doc/advisories/UHUB-2026-006.md">UHUB-2026-006</a>) or <code>!unban</code>
+					(<a href="https://github.com/janvidar/uhub/blob/security-advisories/doc/advisories/UHUB-2026-007.md">UHUB-2026-007</a>). Upgrade every linked hub to 0.8.1.
+				</p>
+			</div>
+			<div class="callout warn">
+				<p>
+					The shared secret still has the weaknesses of any shared password — one secret for the whole
+					cluster, no per-hub identity, no rotation or revocation, and it lives in the config file —
+					and the handshake authenticates the peer only: the traffic after it is neither encrypted
+					nor integrity-protected. <strong>Run links only over a trusted or private network.</strong>
+					The intended long-term posture is mutual TLS with per-peer certificate pinning.
 				</p>
 			</div>
 

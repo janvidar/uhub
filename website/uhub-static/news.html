@@ -39,6 +39,56 @@
 		<p class="section-sub">Release announcements and project updates.</p>
 
 		<article class="news-entry">
+			<h2>uhub 0.8.1 released <span class="tag">security</span></h2>
+			<div class="news-meta">2026-11-01 by Jan Vidar Krey</div>
+			<p>
+				uhub 0.8.1 is a security release for the 0.8 series. It fixes four issues, all reported by
+				<a href="https://github.com/Kcchouette">Kcchouette</a> — thank you!
+				<strong>Upgrade if you link hubs, use <code>auth_proxy</code>, or rely on
+				<code>exclusive</code> authentication.</strong>
+			</p>
+			<ul>
+				<li>
+					<a href="https://github.com/janvidar/uhub/blob/security-advisories/doc/advisories/UHUB-2026-005.md">UHUB-2026-005</a> (critical): a peer without the link
+					secret could join a <a href="doc/linking.html">linked hub</a> by reflecting the hub's own
+					challenge, then inject users, messages and cluster-wide bans. Affects 0.7.0 – 0.8.0 with
+					<code>link_secret</code> set.
+				</li>
+				<li>
+					<a href="https://github.com/janvidar/uhub/blob/security-advisories/doc/advisories/UHUB-2026-006.md">UHUB-2026-006</a> (critical): on an
+					<code>auth_proxy</code> slave, a newline in a connecting client's nick injected commands
+					into the master link. Affects 0.7.0 – 0.8.0.
+				</li>
+				<li>
+					<a href="https://github.com/janvidar/uhub/blob/security-advisories/doc/advisories/UHUB-2026-007.md">UHUB-2026-007</a> (high): an operator's
+					<code>!unban</code> argument could inject link commands, and lift a ban by CID prefix.
+					Affects 0.8.0.
+				</li>
+				<li>
+					<a href="https://github.com/janvidar/uhub/blob/security-advisories/doc/advisories/UHUB-2026-008.md">UHUB-2026-008</a> (medium): the <code>exclusive</code>
+					option of the auth plug-ins did not keep unknown nicks out — they logged in as guests.
+					Affects all releases up to 0.8.0.
+				</li>
+			</ul>
+			<p>
+				The link protocol is hardened throughout as well: no line written to a link can carry an
+				embedded newline, a peer can only route messages as users it owns, and auth replies are
+				accepted only from the auth master.
+			</p>
+			<div class="callout warn">
+				<p>
+					<strong>Two things to know before upgrading.</strong> Linked hubs must be upgraded
+					together: the link handshake is now version 2, and a 0.8.1 hub cannot link with an older
+					one. And <a href="doc/plugins/mod_auth_sqlite.html">mod_auth_sqlite</a> with
+					<code>exclusive=1</code> now refuses nicks that are not in its database, as documented.
+					Otherwise 0.8.1 is a drop-in replacement for 0.8.0 — same configuration, same plug-in API.
+					Get it from the <a href="download.html">download page</a>; the full list is in the
+					<a href="https://github.com/janvidar/uhub/blob/0.8.1/ChangeLog">ChangeLog</a>.
+				</p>
+			</div>
+		</article>
+
+		<article class="news-entry">
 			<h2>uhub 0.8.0 released <span class="tag">release</span></h2>
 			<div class="news-meta">2026-08-07 by Jan Vidar Krey</div>
 			<p>uhub 0.8.0 is now available 🎉</p>

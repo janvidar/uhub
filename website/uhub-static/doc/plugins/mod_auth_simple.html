@@ -110,6 +110,14 @@ reg   carol passw0rd</code></pre>
 				</p>
 			</div>
 
+			<div class="callout warn">
+				<p>
+					<strong>Fixed in 0.8.1:</strong> the refusal from <code>exclusive</code> was turned into a
+					guest login by the hub, so unknown nicks got in anyway
+					(<a href="https://github.com/janvidar/uhub/blob/security-advisories/doc/advisories/UHUB-2026-008.md">UHUB-2026-008</a>). It now rejects the login.
+				</p>
+			</div>
+
 			<p>
 				For a database-backed store, ban persistence and self-service registration, see
 				<a href="mod_auth_sqlite.html">mod_auth_sqlite</a>.

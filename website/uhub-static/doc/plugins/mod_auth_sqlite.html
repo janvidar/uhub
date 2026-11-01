@@ -90,9 +90,19 @@
 			<table class="table">
 				<tr><th>Option</th><th>Default</th><th>Description</th></tr>
 				<tr><td><code>file</code></td><td>—</td><td>Path to the SQLite database (required).</td></tr>
-				<tr><td><code>exclusive</code></td><td><code>no</code></td><td>When enabled, only accounts in this database may log in — any other nick is denied rather than passed on to another auth plug-in.</td></tr>
+				<tr><td><code>exclusive</code></td><td><code>no</code></td><td>When enabled, only accounts in this database may log in — any other nick is denied rather than passed on to another auth plug-in, and so is every unknown nick on an <a href="../linking.html">auth_proxy</a> slave that uses this hub as its master.</td></tr>
 			</table>
 			<p>Nicknames are matched case-insensitively when authenticating.</p>
+			<div class="callout warn">
+				<p>
+					<strong>Fixed in 0.8.1:</strong> before 0.8.1, <code>exclusive</code> had no effect on
+					logins — unknown nicks logged in as guests
+					(<a href="https://github.com/janvidar/uhub/blob/security-advisories/doc/advisories/UHUB-2026-008.md">UHUB-2026-008</a>). A hub that set it now starts refusing
+					them; remove the option to keep admitting guests. A failed database lookup now refuses the
+					login too, instead of letting a registered nick in as a guest without its password. A
+					database with no <code>users</code> table yet (a fresh install) still means "no accounts".
+				</p>
+			</div>
 
 			<h2>Ban persistence</h2>
 			<p>
