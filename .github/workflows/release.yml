@@ -55,13 +55,22 @@ jobs:
         run: |
           tag='${{ steps.tag.outputs.tag }}'
           base=${tag%%-*}          # 0.8.1-rc1 -> 0.8.1
+          suffix=${tag#"$base"}; suffix=${suffix#-}   # 0.8.1-rc1 -> rc1
           cml=$(sed -nE 's/^[[:space:]]*VERSION[[:space:]]+([0-9][0-9.]*).*/\1/p' CMakeLists.txt | head -1)
+          pre=$(sed -nE 's/^set \(UHUB_VERSION_PRERELEASE "([^"]*)"\).*/\1/p' CMakeLists.txt | head -1)
           zon=$(sed -nE 's/^[[:space:]]*\.version[[:space:]]*=[[:space:]]*"([^"]*)".*/\1/p' build.zig.zon | head -1)
+          zpre=$(sed -nE 's/^const version_pre = "([^"]*)".*/\1/p' build.zig | head -1)
           chg=$(sed -nE '1s/^([0-9][0-9.]*):.*/\1/p' ChangeLog)
-          echo "tag=$base  CMakeLists=$cml  build.zig.zon=$zon  ChangeLog=$chg"
+          full=$cml${pre:+-$pre}
+          echo "tag=$tag  CMakeLists=$full  build.zig=$zpre  build.zig.zon=$zon  ChangeLog=$chg"
           rc=0
           [ "$cml" = "$base" ] || { echo "::error::CMakeLists.txt says $cml, tag says $base"; rc=1; }
-          [ "$zon" = "$base" ] || { echo "::error::build.zig.zon says $zon, tag says $base"; rc=1; }
+          # The pre-release label is empty for a release, or the tag's own suffix
+          # for a candidate (0.9.0-rc1). Anything else -- "dev" above all -- means
+          # the bump that drops it was forgotten.
+          [ -z "$pre" ] || [ "$pre" = "$suffix" ] || { echo "::error::CMakeLists.txt UHUB_VERSION_PRERELEASE is \"$pre\", tag is $tag"; rc=1; }
+          [ "$zpre" = "$pre" ] || { echo "::error::build.zig version_pre is \"$zpre\", CMakeLists.txt says \"$pre\""; rc=1; }
+          [ "$zon" = "$full" ] || { echo "::error::build.zig.zon says $zon, CMakeLists.txt says $full"; rc=1; }
           [ "$chg" = "$base" ] || { echo "::error::ChangeLog's top section is $chg, tag says $base"; rc=1; }
           exit $rc
 

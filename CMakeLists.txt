@@ -6,7 +6,7 @@
 cmake_minimum_required (VERSION 3.21)
 
 project (uhub
-	VERSION 0.8.0
+	VERSION 0.9.0
 	LANGUAGES C)
 
 # Build everything as C23 (gnu23 - _GNU_SOURCE and friends are still needed).
@@ -15,10 +15,17 @@ set (CMAKE_C_STANDARD_REQUIRED ON)
 set (CMAKE_C_EXTENSIONS ON)
 set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# version.h.in still refers to these by their old names.
-set (UHUB_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
-set (UHUB_VERSION_MINOR ${PROJECT_VERSION_MINOR})
-set (UHUB_VERSION_PATCH ${PROJECT_VERSION_PATCH})
+# Pre-release label: "dev" on master between releases, empty for a release
+# (or e.g. "rc1" for a release candidate tagged 0.9.0-rc1). project() only takes
+# numbers, so the label lives here; build.zig (version_pre) and build.zig.zon
+# must carry the same one, and the release workflow refuses a tag it does not
+# match -- a "dev" build can never be published as a release.
+set (UHUB_VERSION_PRERELEASE "dev")
+if (UHUB_VERSION_PRERELEASE)
+	set (UHUB_VERSION_STRING "${PROJECT_VERSION}-${UHUB_VERSION_PRERELEASE}")
+else()
+	set (UHUB_VERSION_STRING "${PROJECT_VERSION}")
+endif()
 
 # Historically PROJECT_SOURCE_DIR (a built-in) was overwritten to point at
 # src/; use a dedicated variable instead of shadowing the built-in.
@@ -661,13 +668,13 @@ endif()
 # No git, but built from an archive that git stamped on its way out (see
 # .gitattributes), so the exact provenance is still known.
 if (NOT UHUB_REVISION AND UHUB_ARCHIVE_VERSION)
-	if (UHUB_ARCHIVE_VERSION STREQUAL PROJECT_VERSION)
+	if (UHUB_ARCHIVE_VERSION STREQUAL UHUB_VERSION_STRING)
 		# An archive of the release tag itself; the version says it all.
 		set (UHUB_REVISION "release")
 	else()
 		# A describe string such as "0.8.0-3-g113a125": keep only the suffix,
 		# since UHUB_GIT_VERSION prepends the version anyway.
-		string (REGEX REPLACE "^${PROJECT_VERSION}-" ""
+		string (REGEX REPLACE "^${UHUB_VERSION_STRING}-" ""
 			UHUB_REVISION "${UHUB_ARCHIVE_VERSION}")
 	endif()
 endif()
@@ -676,7 +683,13 @@ if (NOT UHUB_REVISION)
 	set (UHUB_REVISION "release")
 endif()
 
-set (UHUB_GIT_VERSION "${UHUB_VERSION_MAJOR}.${UHUB_VERSION_MINOR}.${UHUB_VERSION_PATCH}-${UHUB_REVISION}")
+# A pre-release says on its own that it is not a release: "0.9.0-dev", not
+# "0.9.0-dev-release"; a git build still gets its hash, "0.9.0-dev-git-1a2b3c4".
+if (UHUB_VERSION_PRERELEASE AND UHUB_REVISION STREQUAL "release")
+	set (UHUB_GIT_VERSION "${UHUB_VERSION_STRING}")
+else()
+	set (UHUB_GIT_VERSION "${UHUB_VERSION_STRING}-${UHUB_REVISION}")
+endif()
 message (STATUS "Configuring uhub version: ${UHUB_GIT_VERSION}")
 
 set(SSL_LIBS OpenSSL::SSL OpenSSL::Crypto)

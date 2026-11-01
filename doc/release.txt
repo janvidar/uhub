@@ -22,12 +22,22 @@ say plainly that the auto-generated links are incomplete.
 Before tagging
 --------------
 
-The version is declared in three places and .github/workflows/release.yml
-refuses to publish unless all three agree with the tag:
+The version is declared in four places and .github/workflows/release.yml
+refuses to publish unless they agree with the tag:
 
-  - CMakeLists.txt          project (uhub VERSION x.y.z)
+  - CMakeLists.txt          project (uhub VERSION x.y.z), and
+                            set (UHUB_VERSION_PRERELEASE "")
+  - build.zig               version_major/minor/patch, and version_pre = ""
   - build.zig.zon           .version = "x.y.z"
   - ChangeLog               the top section heading, "x.y.z:"
+
+Between releases master carries the next version with the pre-release label
+"dev" (0.9.0-dev; `uhub -V` reports 0.9.0-dev-git-<hash>). Releasing means
+emptying the label in CMakeLists.txt and build.zig and dropping "-dev" from
+build.zig.zon; the workflow refuses a tag while the label is still "dev". For a
+release candidate tagged x.y.z-rc1, set the label to "rc1" instead.
+
+After the release, bump master to the next x.y.z with the label back at "dev".
 
 Also decide deliberately whether to move the submodule pins
 (git submodule update --remote, then commit the changed gitlinks); they are

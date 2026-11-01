@@ -1,6 +1,6 @@
 .{
     .name = .uhub,
-    .version = "0.8.0",
+    .version = "0.9.0-dev",
     .fingerprint = 0xca9598ed47a375f0,
 
     .minimum_zig_version = "0.17.0",

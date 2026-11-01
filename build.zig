@@ -1,9 +1,15 @@
 const std = @import("std");
 
-// Keep these in sync with CMakeLists.txt (UHUB_VERSION_*).
+// Keep these in sync with CMakeLists.txt (project VERSION and
+// UHUB_VERSION_PRERELEASE) and build.zig.zon.
 const version_major = 0;
-const version_minor = 8;
+const version_minor = 9;
 const version_patch = 0;
+const version_pre = "dev"; // "" for a release
+const version_string = std.fmt.comptimePrint("{d}.{d}.{d}{s}{s}", .{
+    version_major, version_minor, version_patch,
+    if (version_pre.len > 0) "-" else "", version_pre,
+});
 
 // Shared source sets, mirroring the static libraries CMakeLists.txt builds
 // (adc / network / utils). They are compiled once into a single static
@@ -440,9 +446,7 @@ pub fn build(b: *std.Build) void {
         .style = .{ .cmake = b.path("src/version.h.in") },
         .include_path = "version.h",
     }, .{
-        .UHUB_VERSION_MAJOR = version_major,
-        .UHUB_VERSION_MINOR = version_minor,
-        .UHUB_VERSION_PATCH = version_patch,
+        .UHUB_VERSION_STRING = version_string,
         .UHUB_GIT_VERSION = git_version,
     });
 
@@ -754,7 +758,7 @@ pub fn build(b: *std.Build) void {
 // Reproduce CMake's git-revision lookup: "git-<short hash>", or "release"
 // when not in a git checkout.
 fn gitVersion(b: *std.Build) []const u8 {
-    const fallback = b.fmt("{d}.{d}.{d}-release", .{ version_major, version_minor, version_patch });
+    const fallback = if (version_pre.len > 0) version_string else version_string ++ "-release";
     var code: u8 = undefined;
     const stdout = b.runAllowFail(
         &.{ "git", "show", "-s", "--pretty=format:%h" },
@@ -763,7 +767,7 @@ fn gitVersion(b: *std.Build) []const u8 {
     ) catch return fallback;
     const hash = std.mem.trim(u8, stdout, " \t\r\n");
     if (hash.len == 0) return fallback;
-    return b.fmt("{d}.{d}.{d}-git-{s}", .{ version_major, version_minor, version_patch, hash });
+    return b.fmt("{s}-git-{s}", .{ version_string, hash });
 }
 
 /// Absolute path to a file under the build root. b.root may be the bare cwd,
