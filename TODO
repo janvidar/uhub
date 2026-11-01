@@ -1,8 +1,8 @@
 # uhub — outstanding work
 
-State: sources are 0.8.0 in CMakeLists.txt, build.zig and build.zig.zon, and
-tagged 0.8.0. The ChangeLog 0.8.0 section is reconciled against the commits
-since the 0.7.1 tag.
+State: master's sources still say 0.8.0 in CMakeLists.txt, build.zig and
+build.zig.zon. 0.8.1 (0.8.0 plus the #127 - #130 security fixes) was released
+from the 0.8.x-stable branch; master's next release is a feature release.
 
 ## HBRI
 - A failed or lost ITCP challenge is not retried within a session; the client

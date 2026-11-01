@@ -4,14 +4,9 @@ Incompatible changes (action required beyond replacing the binaries):
   plugin_funcs gained auth_list_users, which moves the hub function table that
   follows it in struct plugin_handle. Older plugins are refused at load.
 - Building with zig now needs zig 0.17.0 or newer.
-- Hub linking: the link handshake is now version 2 (an HMAC-SHA256 response
-  bound to each side's role and both nonces), and LBAN escapes the nick. Hubs
-  and workers in a cluster must be upgraded together; an older peer cannot
-  link with a newer one. See doc/linking.txt.
-- An auth plugin with "exclusive" set now really refuses nicks it does not
-  hold. A hub combining it with mod_guest_passwd admits no guests any more,
-  and mod_auth_sqlite with exclusive=1 starts refusing unknown nicks. Remove
-  "exclusive" to keep admitting guests.
+- As in 0.8.1, an auth plugin with "exclusive" set refuses nicks it does not
+  hold; that refusal also beats mod_guest_passwd, so a hub combining the two
+  admits no guests. Remove "exclusive" to keep admitting guests.
 
 New features:
 - mod_users: operator account management from inside the hub. !useradd,
@@ -39,26 +34,6 @@ New features:
   mod_auth_sqlite and mod_auth_simple.
 
 Fixes:
-- Security (#127): a peer without the link secret could join a linked hub by
-  reflecting the hub's own challenge, and then inject users, messages and
-  cluster bans. Affects 0.7.0 - 0.8.0 with link_secret set.
-- Security (#128): with auth_proxy, a newline in a connecting client's nick
-  injected commands into the master link before the nick was validated.
-- Security (#129): an operator's !unban argument could inject link commands,
-  and a target longer than a CID lifted the ban on the CID it began with.
-- Hub linking: a peer can no longer route messages as one of our own users
-  or another node's, answer auth queries meant for the master, or place extra
-  fields in the hub INF through a topic. A ban on a nick with a space in it
-  no longer bans the nick's first word on the other hubs, and an over-long
-  nick no longer makes a slave's password check hang.
-- mod_logging: the syslog output replaces control characters, as the file
-  output already did.
-- Security (#130): "exclusive" did not keep unknown nicks out. In
-  mod_auth_sqlite it never affected logins, and a refusal from any auth plugin
-  (mod_auth_simple's included) became a guest login. A refusal now rejects the
-  login, beats a guest record from another plugin, and reaches auth_proxy
-  slaves as "none". A failed account lookup in mod_auth_sqlite also refuses
-  rather than admitting a registered nick as a guest without its password.
 - mod_welcome: a motd or rules text ending in a lone "%" made the formatter
   read past the end of the string.
 - Windows: an IPv4 client on a dual-stack listener (the default) was seen as
@@ -69,6 +44,50 @@ Fixes:
   ("adc://::1") in its connect address and to registration servers.
 - The uhub_logouts_total metric stayed at 0: logouts were counted only for a
   user still logged in, which by then none is.
+
+0.8.1:
+A security release. All four issues were reported by Kcchouette. See
+doc/advisories/ on the security-advisories branch for UHUB-2026-005..008.
+
+Incompatible changes (action required beyond replacing the binaries):
+- Hub linking: the link handshake is now version 2 (an HMAC-SHA256 response
+  bound to each side's role and both nonces), and LBAN escapes the nick. Hubs
+  and workers in a cluster must be upgraded together; a 0.8.1 hub cannot link
+  with an older one. See doc/linking.txt.
+- mod_auth_sqlite with exclusive=1 now refuses nicks that are not in its
+  database, as documented. Remove "exclusive" to keep admitting guests.
+
+Security:
+- #127 (UHUB-2026-005): a peer without the link secret could join a linked hub
+  by reflecting the hub's own challenge, then inject users, messages and
+  cluster bans. Affects 0.7.0 - 0.8.0 with link_secret set.
+- #128 (UHUB-2026-006): with auth_proxy, a newline in a connecting client's
+  nick injected commands into the master link before the nick was validated.
+- #129 (UHUB-2026-007): an operator's !unban argument could inject link
+  commands, and a target longer than a CID lifted the ban on the CID it
+  began with.
+- #130 (UHUB-2026-008): "exclusive" did not keep unknown nicks out. In
+  mod_auth_sqlite it never affected logins, and a refusal from any auth plugin
+  became a guest login. A refusal now rejects the login and reaches
+  auth_proxy slaves as "none". A failed account lookup in mod_auth_sqlite
+  also refuses, rather than admitting a registered nick as a guest without
+  its password.
+
+Hardening:
+- Every line written to a hub link refuses an embedded CR/LF.
+- A linked peer can no longer route messages as one of our own users or
+  another node's, answer auth queries meant for the master, or place extra
+  fields in the hub INF through a topic. A ban on a nick with a space in it
+  no longer bans the nick's first word on the other hubs, and an over-long
+  nick no longer makes a slave's password check hang.
+- mod_logging: the syslog output replaces control characters, as the file
+  output already did.
+
+Tests:
+- Unit tests drive the link handshake over a socketpair from both sides, and
+  cover each injection path and the exclusive-auth decisions.
+- New e2e scenarios: test/e2e/run_link_security_e2e.sh and
+  test/e2e/run_auth_exclusive_e2e.sh.
 
 0.8.0:
 Incompatible changes (action required beyond replacing the binaries):
