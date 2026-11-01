@@ -7,7 +7,10 @@
 #include "core/config.h"
 #include "core/hbri.h"
 #include "core/hub.h"
+#include "core/pluginloader.h"
 #include "core/usermanager.h"
+#include "plugin_api/handle.h"
+#include "util/list.h"
 #include "testutil_net.h"
 
 #define USER_CID "GNSSMURMD7K466NGZIHU65TP3S3UZSQ6MN5B2RI"
@@ -104,6 +107,100 @@ static void inf_reset(void)
 	} while(0)
 
 EXO_TEST(inf_ok_1,  { inf_reset(); CHECK_INF("BINF AAAB NIFriend IDGNSSMURMD7K466NGZIHU65TP3S3UZSQ6MN5B2RI PD3A4545WFVGZLSGUXZLG7OS6ULQUVG3HM2T63I7Y\n", 0); });
+
+/* ---- what an auth plugin's answer does to the login (issue #130) --------- */
+
+static plugin_st inf_auth_status;
+static enum auth_credentials inf_auth_cred;
+
+static plugin_st inf_auth_lookup(struct plugin_handle* plugin, const char* nick, struct auth_info* info)
+{
+	(void) plugin;
+	memset(info, 0, sizeof(*info));
+	snprintf(info->nickname, sizeof(info->nickname), "%s", nick);
+	info->credentials = inf_auth_cred;
+	return inf_auth_status;
+}
+
+/* Log USER_NICK in against one auth plugin giving the answer (status, cred). */
+static int inf_login_with(plugin_st status, enum auth_credentials cred)
+{
+	const char* line = "BINF " USER_SID " NI" USER_NICK " ID" USER_CID " PD" USER_PID "\n";
+	struct plugin_handle plugin;
+	struct uhub_plugins plugins;
+	struct adc_message* msg;
+	int ret = 999;
+
+	memset(&plugin, 0, sizeof(plugin));
+	memset(&plugins, 0, sizeof(plugins));
+	plugins.loaded = list_create();
+	if (!plugins.loaded)
+		return ret;
+	plugin.funcs.auth_get_user = inf_auth_lookup;
+	list_append(plugins.loaded, &plugin);
+	inf_hub->plugins = &plugins;
+	inf_auth_status = status;
+	inf_auth_cred = cred;
+	msg = adc_msg_parse_verify(inf_user, line, strlen(line));
+	if (msg)
+		ret = hub_handle_info_login(inf_hub, inf_user, msg);
+	adc_msg_free(msg);
+	inf_hub->plugins = NULL;
+	list_clear(plugins.loaded, NULL);
+	list_destroy(plugins.loaded);
+	return ret;
+}
+
+/* A refusal (e.g. an exclusive plugin, for a nick it does not hold) is not
+   a guest login. */
+EXO_TEST(inf_auth_refused_not_guest, {
+	inf_reset();
+	return inf_login_with(st_deny, auth_cred_none) == status_msg_hub_registered_users_only;
+});
+
+EXO_TEST(inf_auth_unknown_is_guest, {
+	inf_reset();
+	return inf_login_with(st_default, auth_cred_none) == 0
+		&& inf_user->credentials == auth_cred_guest;
+});
+
+EXO_TEST(inf_auth_account_challenged, {
+	inf_reset();
+	return inf_login_with(st_allow, auth_cred_user) == 1
+		&& inf_user->credentials == auth_cred_user;
+});
+
+/* A guest-level record (mod_guest_passwd) still asks for the password. */
+EXO_TEST(inf_auth_guest_record_challenged, {
+	inf_reset();
+	return inf_login_with(st_allow, auth_cred_guest) == 1
+		&& inf_user->credentials == auth_cred_guest;
+});
+
+/* auth_proxy slave: the master refused the nick ("none"). */
+EXO_TEST(inf_auth_proxy_refused, {
+	inf_reset();
+	inf_hub->config->auth_proxy = 1;
+	inf_user->auth_proxy_resolved = 1;
+	inf_user->auth_proxy_cred = auth_cred_none;
+	CHECK_INF("BINF " USER_SID " NI" USER_NICK " ID" USER_CID " PD" USER_PID "\n",
+		status_msg_hub_registered_users_only);
+});
+
+EXO_TEST(inf_auth_proxy_account_challenged, {
+	inf_reset();
+	inf_hub->config->auth_proxy = 1;
+	inf_user->auth_proxy_resolved = 1;
+	inf_user->auth_proxy_cred = auth_cred_operator;
+	CHECK_INF("BINF " USER_SID " NI" USER_NICK " ID" USER_CID " PD" USER_PID "\n", 1);
+});
+
+/* No master reachable: the query was never sent, and the user is a guest. */
+EXO_TEST(inf_auth_proxy_no_master_is_guest, {
+	inf_reset();
+	inf_hub->config->auth_proxy = 1;
+	CHECK_INF("BINF " USER_SID " NI" USER_NICK " ID" USER_CID " PD" USER_PID "\n", 0);
+});
 
 /* check CID abuse */
 EXO_TEST(inf_cid_1, { inf_reset(); CHECK_INF("BINF AAAB NIFriend PD3A4545WFVGZLSGUXZLG7OS6ULQUVG3HM2T63I7Y\n", status_msg_inf_error_cid_missing); });

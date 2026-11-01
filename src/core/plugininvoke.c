@@ -226,11 +226,16 @@ plugin_st plugin_flood_detected(struct hub_info* hub, struct hub_user* who, enum
 
 /*
  * An account (credentials of a registered user or above) settles it, from
- * whichever plugin holds it. Short of that a guest-level record wins, then a
- * refusal: mod_guest_passwd answers for every nick, so without this its place
- * in the plugins file would decide whether registered users can still log in,
- * or -- behind a plugin that refuses unknown nicks -- whether guests are asked
- * for the password at all.
+ * whichever plugin holds it. Short of that a refusal wins, then a guest-level
+ * record: an auth plugin with "exclusive" set refuses every nick it does not
+ * hold, and mod_guest_passwd's guest record must not get round that. Either
+ * way the order of the plugins file decides nothing -- mod_guest_passwd
+ * answers for every nick, so with a first-answer-wins rule its place would
+ * decide whether registered users can still log in, or whether the refusal
+ * is honoured at all.
+ *
+ * st_deny means the nick may not log in; st_default means no plugin knows it
+ * (a guest, if the hub admits guests).
  */
 plugin_st plugin_auth_get_user(struct hub_info* hub, const char* nickname, struct auth_info* info)
 {
@@ -253,12 +258,14 @@ plugin_st plugin_auth_get_user(struct hub_info* hub, const char* nickname, struc
 		}
 	});
 
+	if (denied)
+		return st_deny;
 	if (have_guest)
 	{
 		memcpy(info, &guest, sizeof(*info));
 		return st_allow;
 	}
-	return denied ? st_deny : st_default;
+	return st_default;
 }
 
 plugin_st plugin_auth_register_user(struct hub_info* hub, struct auth_info* info)

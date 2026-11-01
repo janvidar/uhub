@@ -920,10 +920,10 @@ static int check_limits(struct hub_info* hub, struct hub_user* user, struct adc_
 }
 
 /*
- * Set the expected credentials, and returns 1 if authentication is needed,
- * or 0 if not.
- * If the hub is configured to allow only registered users and the user
- * is not recognized this will return 1.
+ * Set the expected credentials. Returns 1 if authentication is needed, 0 if
+ * not, or a (negative) status_msg_* code if the nick may not log in at all:
+ * an auth plugin refused it (e.g. one with "exclusive" set, for a nick it does
+ * not hold), or, on an auth_proxy slave, the master did.
  */
 static int set_credentials(struct hub_info* hub, struct hub_user* user, struct adc_message* cmd)
 {
@@ -933,23 +933,36 @@ static int set_credentials(struct hub_info* hub, struct hub_user* user, struct a
 	{
 		/* Slave: the credential was resolved by the master (LACR). A non-guest
 		   credential means the account is registered and must prove a password
-		   (verified via the master in hub_handle_password). */
+		   (verified via the master in hub_handle_password); "none" means the
+		   master refused the nick. With no master reachable the query was never
+		   sent, and the user logs in as a guest. */
 		user->credentials = user->auth_proxy_resolved ? user->auth_proxy_cred : auth_cred_guest;
+		if (user->credentials == auth_cred_none)
+			return status_msg_hub_registered_users_only;
 		ret = (user->credentials > auth_cred_guest) ? 1 : 0;
 	}
 	else
 	{
-		struct auth_info* info = acl_get_access_info(hub, user->id.nick);
-		if (info)
+		/* Ask the plugins directly rather than through acl_get_access_info(),
+		   which cannot tell "refused" from "unknown" -- and a refusal must not
+		   turn into a guest login. */
+		struct auth_info info;
+		plugin_st status;
+		memset(&info, 0, sizeof(info));
+		status = plugin_auth_get_user(hub, user->id.nick, &info);
+		if (status == st_allow)
 		{
-			user->credentials = info->credentials;
+			user->credentials = info.credentials;
 			ret = 1;
+		}
+		else if (status == st_deny)
+		{
+			return status_msg_hub_registered_users_only;
 		}
 		else
 		{
 			user->credentials = auth_cred_guest;
 		}
-		hub_free(info);
 	}
 
 	switch (user->credentials)
@@ -1128,6 +1141,8 @@ int hub_handle_info_login(struct hub_info* hub, struct hub_user* user, struct ad
 	adc_msg_remove_named_argument(cmd, ADC_INF_FLAG_PRIVATE_ID);
 
 	code = set_credentials(hub, user, cmd);
+	if (code < 0)
+		return code;
 
 	/* Note: this must be done *after* set_credentials. */
 	if (check_is_hub_full(hub, user))

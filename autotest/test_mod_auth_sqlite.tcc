@@ -58,10 +58,13 @@ static struct auth_info mas_info(const char* nick, const char* pass, enum auth_c
  * uhub-passwd creates, and the plugin registered on it -- and ends with
  * mas_stop(), so none sees what another registered or banned.
  */
-static int mas_start(void)
+/* A new database, with the users table or (as on a fresh install, before
+   uhub-passwd has run) without it, and the plugin registered on it with the
+   given extra configuration. */
+static int mas_start_with(int users_table, const char* extra)
 {
 	sqlite3* db = 0;
-	int rc;
+	int rc = SQLITE_OK;
 	char cfg[256];
 
 	remove(MAS_DB);
@@ -69,13 +72,14 @@ static int mas_start(void)
 		return 0;
 	/* The plugin opens the database but does not create the schema; mirror the
 	   one uhub-passwd creates, including the case-insensitive UNIQUE nick. */
-	rc = sqlite3_exec(db, "CREATE TABLE users (nickname CHAR COLLATE NOCASE NOT NULL UNIQUE, password TEXT, credentials TEXT);", 0, 0, 0);
+	if (users_table)
+		rc = sqlite3_exec(db, "CREATE TABLE users (nickname CHAR COLLATE NOCASE NOT NULL UNIQUE, password TEXT, credentials TEXT);", 0, 0, 0);
 	sqlite3_close(db);
 	if (rc != SQLITE_OK)
 		return 0;
 
 	memset(&mas_plugin, 0, sizeof(mas_plugin));
-	snprintf(cfg, sizeof(cfg), "file=%s", MAS_DB);
+	snprintf(cfg, sizeof(cfg), "file=%s %s", MAS_DB, extra ? extra : "");
 	/* auth_is_banned reads the user through the hub accessors, so they must be
 	   in place before any ban test runs. */
 	mas_plugin.hub.get_user_nick = mas_get_nick;
@@ -85,6 +89,21 @@ static int mas_start(void)
 		&& mas_plugin.funcs.auth_register_user
 		&& mas_plugin.funcs.auth_update_user
 		&& mas_plugin.funcs.auth_delete_user;
+}
+
+static int mas_start(void)
+{
+	return mas_start_with(1, NULL);
+}
+
+/* Run SQL against the test database behind the plugin's back. */
+static int mas_exec(const char* sql)
+{
+	sqlite3* db = 0;
+	int ok = sqlite3_open(MAS_DB, &db) == SQLITE_OK
+		&& sqlite3_exec(db, sql, 0, 0, 0) == SQLITE_OK;
+	sqlite3_close(db);
+	return ok;
 }
 
 static int mas_stop(int ok)
@@ -462,3 +481,77 @@ EXO_TEST(mas_reason_hit, {
 EXO_TEARDOWN({
 	return mas_stop(1);
 });
+
+/* ---- account lookup: unknown, refused, failed (issue #130) --------------- */
+
+/* Not exclusive: a nick the database does not hold is passed on (a guest). */
+EXO_TEST(mas_unknown_passed_on, {
+	struct auth_info info;
+	if (!mas_start())
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_get_user(&mas_plugin, "stranger", &info) == st_default);
+});
+
+/* exclusive: only accounts in this database may log in. */
+EXO_TEST(mas_exclusive_unknown_refused, {
+	struct auth_info info;
+	if (!mas_start_with(1, "exclusive=1"))
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_get_user(&mas_plugin, "stranger", &info) == st_deny);
+});
+
+EXO_TEST(mas_exclusive_account_allowed, {
+	struct auth_info info;
+	if (!mas_start_with(1, "exclusive=1")
+		|| !mas_exec("INSERT INTO users VALUES ('Boss', 'secret', 'admin');"))
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_get_user(&mas_plugin, "boss", &info) == st_allow
+		&& info.credentials == auth_cred_admin);
+});
+
+/* A fresh install has no users table: that is "no accounts", not a failure,
+   or the default plugin set would refuse every login on a new hub. */
+EXO_TEST(mas_no_users_table_passed_on, {
+	struct auth_info info;
+	if (!mas_start_with(0, NULL))
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_get_user(&mas_plugin, "stranger", &info) == st_default);
+});
+
+EXO_TEST(mas_no_users_table_exclusive_refused, {
+	struct auth_info info;
+	if (!mas_start_with(0, "exclusive=1"))
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_get_user(&mas_plugin, "stranger", &info) == st_deny);
+});
+
+/* The table appearing while the hub runs (uhub-passwd) is picked up. */
+EXO_TEST(mas_users_table_created_later, {
+	struct auth_info info;
+	if (!mas_start_with(0, NULL)
+		|| !mas_exec("CREATE TABLE users (nickname CHAR COLLATE NOCASE NOT NULL UNIQUE, password TEXT, credentials TEXT);"
+		             "INSERT INTO users VALUES ('Boss', 'secret', 'user');"))
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_get_user(&mas_plugin, "Boss", &info) == st_allow
+		&& info.credentials == auth_cred_user);
+});
+
+/* A lookup that fails must not let a registered nick in as a guest without
+   its password. Here the table is there but not one the query can use. */
+EXO_TEST(mas_lookup_failure_refused, {
+	struct auth_info info;
+	if (!mas_start()
+		|| !mas_exec("DROP TABLE users; CREATE TABLE users (something TEXT);"))
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_get_user(&mas_plugin, "Boss", &info) == st_deny);
+});
+
+/* A registered nick whose record carries no credential is refused, not
+   treated as unknown. */
+EXO_TEST(mas_record_without_credential_refused, {
+	struct auth_info info;
+	if (!mas_start() || !mas_exec("INSERT INTO users VALUES ('Boss', 'secret', NULL);"))
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_get_user(&mas_plugin, "Boss", &info) == st_deny);
+});
+

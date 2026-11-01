@@ -1054,3 +1054,78 @@ EXO_TEST(link_auth_reply_only_from_master, {
 		close(master.fd);
 	return ok;
 });
+
+/* -------------------------------------------------------------------------
+ * A refused nick stays refused across auth_proxy (issue #130)
+ * ------------------------------------------------------------------------- */
+
+static plugin_st lt_auth_get_user(struct plugin_handle* plugin, const char* nick, struct auth_info* info)
+{
+	(void) plugin;
+	memset(info, 0, sizeof(*info));
+	if (!strcmp(nick, "Boss"))
+	{
+		strcpy(info->nickname, "Boss");
+		info->credentials = auth_cred_operator;
+		return st_allow;
+	}
+	if (!strcmp(nick, "stranger"))
+		return st_default;
+	return st_deny; /* exclusive: everyone else */
+}
+
+/* Master: answer a slave's LACQ through an exclusive auth plugin. */
+EXO_TEST(link_acq_master_reply, {
+	struct uhub_plugins plugins;
+	struct plugin_handle plugin;
+	char reply[64];
+	int ok;
+	if (!lt_server_handshake())
+		return 0;
+	memset(&plugins, 0, sizeof(plugins));
+	memset(&plugin, 0, sizeof(plugin));
+	plugins.loaded = list_create();
+	if (!plugins.loaded)
+		return 0;
+	plugin.funcs.auth_get_user = lt_auth_get_user;
+	list_append(plugins.loaded, &plugin);
+	lt_hub->plugins = &plugins;
+
+	lt_send("LACQ AAAB Boss\n");
+	ok = lt_find("LACR AAAB ", reply, sizeof(reply)) && !strcmp(reply, "operator");
+	lt_clear();
+	lt_send("LACQ AAAC stranger\n");
+	ok = ok && lt_find("LACR AAAC ", reply, sizeof(reply)) && !strcmp(reply, "guest");
+	lt_clear();
+	lt_send("LACQ AAAD intruder\n");
+	ok = ok && lt_find("LACR AAAD ", reply, sizeof(reply)) && !strcmp(reply, "none");
+
+	lt_hub->plugins = NULL;
+	list_clear(plugins.loaded, NULL);
+	list_destroy(plugins.loaded);
+	return ok;
+});
+
+/* Slave: "none" is a refusal, and so is a reply it cannot read -- neither
+   may become a guest login. */
+static int lt_slave_resolves(const char* reply, enum auth_credentials expect)
+{
+	struct hub_user* u;
+	char line[64];
+	int ok;
+	if (!lt_client_handshake())
+		return 0;
+	u = lt_pending_user();
+	if (link_auth_query(lt_hub, u, "nick") != 1)
+		return 0;
+	snprintf(line, sizeof(line), "LACR AAAB %s\n", reply);
+	lt_send(line);
+	ok = u->auth_proxy_resolved && u->auth_proxy_cred == expect;
+	link_auth_pending_forget(u);
+	return ok;
+}
+
+EXO_TEST(link_acr_none_refused,   { return lt_slave_resolves("none", auth_cred_none); });
+EXO_TEST(link_acr_bogus_refused,  { return lt_slave_resolves("bogus", auth_cred_none); });
+EXO_TEST(link_acr_guest,          { return lt_slave_resolves("guest", auth_cred_guest); });
+EXO_TEST(link_acr_account,        { return lt_slave_resolves("admin", auth_cred_admin); });

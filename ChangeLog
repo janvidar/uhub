@@ -8,6 +8,10 @@ Incompatible changes (action required beyond replacing the binaries):
   bound to each side's role and both nonces), and LBAN escapes the nick. Hubs
   and workers in a cluster must be upgraded together; an older peer cannot
   link with a newer one. See doc/linking.txt.
+- An auth plugin with "exclusive" set now really refuses nicks it does not
+  hold. A hub combining it with mod_guest_passwd admits no guests any more,
+  and mod_auth_sqlite with exclusive=1 starts refusing unknown nicks. Remove
+  "exclusive" to keep admitting guests.
 
 New features:
 - mod_users: operator account management from inside the hub. !useradd,
@@ -18,7 +22,7 @@ New features:
 - mod_guest_passwd: a shared password guests must give to log in. Registered
   accounts keep their own passwords. To make that independent of plugin order,
   an account (user level or above) from any auth plugin now beats a guest-level
-  record from another, and a guest-level record beats a refusal.
+  record from another, and a refusal beats a guest-level record.
 - mod_joins: join and leave announcements in the main chat, optionally only
   to operators, with message templates read from files.
 - !kick takes an optional reason, which the kicked user is shown before being
@@ -49,6 +53,12 @@ Fixes:
   nick no longer makes a slave's password check hang.
 - mod_logging: the syslog output replaces control characters, as the file
   output already did.
+- Security (#130): "exclusive" did not keep unknown nicks out. In
+  mod_auth_sqlite it never affected logins, and a refusal from any auth plugin
+  (mod_auth_simple's included) became a guest login. A refusal now rejects the
+  login, beats a guest record from another plugin, and reaches auth_proxy
+  slaves as "none". A failed account lookup in mod_auth_sqlite also refuses
+  rather than admitting a registered nick as a guest without its password.
 - mod_welcome: a motd or rules text ending in a lone "%" made the formatter
   read past the end of the string.
 - Windows: an IPv4 client on a dual-stack listener (the default) was seen as

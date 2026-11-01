@@ -150,29 +150,55 @@ static struct sql_data *parse_config(const char *line, struct plugin_handle *plu
     return data;
 }
 
+/* Whether the users table exists. A fresh install has none until uhub-passwd
+   creates it (it may do so while the hub runs), and that is "no accounts",
+   not a failed lookup. */
+static int have_users_table(sqlite3* db) {
+    sqlite3_stmt* stmt = 0;
+    int have = 0;
+    if (sqlite3_prepare_v2(db, "SELECT 1 FROM sqlite_master WHERE type='table' AND name='users';",
+            -1, &stmt, NULL) == SQLITE_OK) {
+        have = (sqlite3_step(stmt) == SQLITE_ROW);
+        sqlite3_finalize(stmt);
+    }
+    return have;
+}
+
 static plugin_st get_user(struct plugin_handle *plugin, const char *nickname, struct auth_info *data) {
     struct sql_data *sql = (struct sql_data *)plugin->ptr;
     sqlite3_stmt *stmt;
     int rc;
     int found = 0;
+    int rows = 0;
 
     memset(data, 0, sizeof(struct auth_info));
 
     /* Match the nick case-insensitively (COLLATE NOCASE): otherwise a guest
        logging in as "boss" would miss the registered "Boss" account, dodge the
-       password challenge, and get online impersonating that identity. */
+       password challenge, and get online impersonating that identity.
+
+       A lookup that fails is a refusal, not "no such account": answering
+       st_default would let a registered nick in as a guest, without its
+       password, whenever the database is locked or broken. */
     rc = sqlite3_prepare_v2(sql->db, "SELECT nickname, password, credentials FROM users WHERE nickname=? COLLATE NOCASE;", -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        return st_default;
+        if (!have_users_table(sql->db))
+            return sql->exclusive ? st_deny : st_default;
+        fprintf(stderr, "mod_auth_sqlite: account lookup failed: %s\n", sqlite3_errmsg(sql->db));
+        return st_deny;
     }
 
-    sqlite3_bind_text(stmt, 1, nickname, -1, SQLITE_STATIC);
+    if (sqlite3_bind_text(stmt, 1, nickname, -1, SQLITE_STATIC) != SQLITE_OK) {
+        sqlite3_finalize(stmt);
+        return st_deny;
+    }
 
     while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
         const char *nick = (const char *)sqlite3_column_text(stmt, 0);
         const char *pass = (const char *)sqlite3_column_text(stmt, 1);
         const char *cred = (const char *)sqlite3_column_text(stmt, 2);
 
+        rows++;
         if (nick) {
             strncpy(data->nickname, nick, MAX_NICK_LEN);
             data->nickname[MAX_NICK_LEN] = '\0';
@@ -191,9 +217,18 @@ static plugin_st get_user(struct plugin_handle *plugin, const char *nickname, st
 
     sqlite3_finalize(stmt);
 
+    if (rc != SQLITE_DONE) {
+        fprintf(stderr, "mod_auth_sqlite: account lookup failed: %s\n", sqlite3_errmsg(sql->db));
+        return st_deny;
+    }
     if (found)
         return st_allow;
-    return st_default;
+    /* The nick is registered but its record is unusable (no credential):
+       refuse rather than let the nick in as a guest without its password. */
+    if (rows)
+        return st_deny;
+    /* exclusive: only accounts in this database may log in. */
+    return sql->exclusive ? st_deny : st_default;
 }
 
 static plugin_st register_user(struct plugin_handle *plugin, struct auth_info *user) {

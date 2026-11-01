@@ -8,8 +8,8 @@
 /*
  * Unit tests for mod_guest_passwd, and for the rule in plugin_auth_get_user
  * that makes it safe to load: a real account beats a guest-level record, and a
- * guest-level record beats a plugin refusing the nick, whatever order the
- * plugins were loaded in.
+ * plugin refusing the nick (an "exclusive" account store) beats a guest-level
+ * record, whatever order the plugins were loaded in.
  *
  * The plugin comes in through autotest/mod_guest_passwd_shim.c. For the order
  * tests a hub is put together with nothing but a plugin list, holding the real
@@ -164,12 +164,26 @@ EXO_TEST(mgp_guest_without_account, {
 		&& !strcmp(info.nickname, "stranger");
 });
 
-/* A refusal must not let a guest past the password. */
-EXO_TEST(mgp_guest_beats_refusal, {
+/* Issue #130: an exclusive account store refuses nicks it does not hold, and
+   the guest record must not get round that -- in either order. */
+EXO_TEST(mgp_refusal_beats_guest, {
 	struct plugin_handle* order[] = { &mgp_refuse, &mgp_guest };
 	struct auth_info info;
-	return mgp_lookup(order, 2, "stranger", &info) == st_allow
-		&& info.credentials == auth_cred_guest;
+	return mgp_lookup(order, 2, "stranger", &info) == st_deny;
+});
+
+EXO_TEST(mgp_refusal_beats_guest_listed_last, {
+	struct plugin_handle* order[] = { &mgp_guest, &mgp_refuse };
+	struct auth_info info;
+	return mgp_lookup(order, 2, "stranger", &info) == st_deny;
+});
+
+/* A real account still beats a refusal from another plugin. */
+EXO_TEST(mgp_account_beats_refusal, {
+	struct plugin_handle* order[] = { &mgp_refuse, &mgp_guest, &mgp_accounts };
+	struct auth_info info;
+	return mgp_lookup(order, 3, "Boss", &info) == st_allow
+		&& info.credentials == auth_cred_admin;
 });
 
 /* Without a guest record the refusal still comes through. */

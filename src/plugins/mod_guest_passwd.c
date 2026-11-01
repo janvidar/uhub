@@ -25,7 +25,8 @@
  * It answers the account lookup for every nick with a guest-level record
  * carrying the shared password. The hub challenges for a password whenever a
  * lookup finds a record, so a guest has to know it, and is still a guest once
- * in. A real account from another auth plugin always beats that record, so
+ * in. A real account from another auth plugin always beats that record, and
+ * so does a refusal (an auth plugin with "exclusive" set admits no guests), so
  * where this plugin sits in the plugins file does not matter (see
  * plugin_auth_get_user in core/plugininvoke.c).
  */
