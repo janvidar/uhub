@@ -88,7 +88,7 @@ UHUB-2026-005, -006 and -007 are in the hub-to-hub link, which first shipped in
 | UHUB-2026-006 — nick injection via `auth_proxy` (#128) | affected | affected | 0.8.1 |
 | UHUB-2026-007 — `!unban` injection / truncated CID (#129) | not affected | affected | 0.8.1 |
 
-All three are fixed by the single commit `75f0aaa`. It changes the link
+All three are fixed by a single commit: `45b0de6` on 0.8.x-stable (the 0.8.1 release), `75f0aaa` on master. Backport from the 0.8.x-stable one; it applies to 0.8.0 as is. It changes the link
 handshake, so it must be deployed on every hub and worker of a cluster at the
 same time; a patched hub cannot link with an unpatched one. On a 0.7.x base
 the `hub_apply_unban()` / `link_broadcast_unban()` hunks have no counterpart
@@ -102,8 +102,7 @@ cluster members.
 
 UHUB-2026-008 is not specific to linking: the refusal-becomes-guest collapse
 in `acl_get_access_info()` and mod_auth_sqlite's ignored `exclusive` flag are
-present in every release up to 0.8.0, including 0.4.1. The fix is commit
-`c01fe6f`. On a base without mod_guest_passwd or linking, only the
+present in every release up to 0.8.0, including 0.4.1. The fix is commit `5ff21d7` on 0.8.x-stable (`c01fe6f` on master); the 0.8.x one is the better base for a backport. On a base without mod_guest_passwd or linking, only the
 `set_credentials()` (inf.c), `plugin_auth_get_user()` (plugininvoke.c) and
 mod_auth_sqlite `get_user()` hunks apply. Mitigation without a rebuild:
 `registered_users_only = yes`.
