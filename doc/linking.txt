@@ -86,15 +86,23 @@ two unrelated hubs silently sharing a port.
 
 == Authentication handshake ==
 
-Both endpoints authenticate each other with a symmetric mutual
+Both endpoints authenticate each other with a role-bound mutual
 challenge-response keyed on a shared secret (the "link_secret" config option).
 Neither side trusts the other until both directions have been verified.
 
-  response = base32( tiger( secret || peer_nonce ) )
+  context  = "uhub-link-v2 " || role || " " || client_nonce || " " || server_nonce
+  response = base32( HMAC-SHA256( secret, context )[0:24] )
+
+role is "C" in the response sent by the side that opened the connection and
+"S" in the one sent by the side that accepted it; the nonces always appear
+client first. Each response is therefore tied to its direction and its
+session: a peer that does not know the secret cannot get a hub to compute an
+answer it could present back as its own (by echoing the hub's challenge, or
+replaying the hub's answer), nor reuse an answer from an earlier session.
 
 Each side generates a random nonce, challenges the peer with it, answers the
 peer's challenge, and acknowledges a verified answer. The exchange (shown for
-one direction; both sides do the same concurrently):
+the connecting side, A; the accepting side, B, does the same concurrently):
 
     ----------------------              ----------------------
     | connect (TCP)      |  ----------> | probe sees "LCHA",  |
@@ -103,10 +111,10 @@ one direction; both sides do the same concurrently):
               |                                   |
               |    <----  LCHA <nonceB>  ---------+   (peer challenges us)
               |                                   |
-              +----  LRES base32(tiger(secret||nonceB))  ----->
+              +----  LRES response(C, nonceA, nonceB)  ------->
               |                                   |
-              |    <----  LRES base32(tiger(secret||nonceA))
-              |          verify against nonceA    |
+              |    <----  LRES response(S, nonceA, nonceB)
+              |          verify role and both nonces
               |                                   |
               +----  LACK  (we verified peer) --------------->
               |    <----  LACK  (peer verified us)
@@ -119,8 +127,22 @@ A node is "established" only once it has BOTH verified the peer's LRES (proving
 the peer knows the secret) AND received the peer's LACK (proving the peer
 verified our answer). A failed verification sends LERR and closes the link.
 
+Each side accepts exactly one LCHA, then one valid LRES, then one LACK. A
+malformed nonce, the peer sending our own nonce back, a repeated or
+out-of-order handshake message, or any handshake message once the link is
+established closes the link.
+
 The response is compared in constant time. The nonce is drawn from the TLS
 library CSPRNG. nonce and response are base32, MAX_CID_LEN characters each.
+
+This is version 2 of the handshake. Version 1 (base32(tiger(secret ||
+peer_nonce)), uhub 0.7.0 - 0.8.0) let a peer without the secret complete the
+handshake by reflecting the hub's own challenge. There is no fallback: every
+hub and worker in a cluster must run a version with the v2 handshake.
+
+The handshake authenticates the peer only. The traffic that follows is neither
+encrypted nor integrity-protected, so links must run over a trusted network or
+transport.
 
 
 == Command reference ==
@@ -140,7 +162,8 @@ library CSPRNG. nonce and response are base32, MAX_CID_LEN characters each.
   LDSC <description>         both    Hub description (topic) changed.
   LBAN <expiry> <cid> <nick> <reason>  both  Ban a user cluster-wide (and
                                      disconnect). expiry is an absolute unix time
-                                     (0 = permanent); reason is the rest of the
+                                     (0 = permanent); nick is ADC-escaped (a
+                                     space is "\s"); reason is the rest of the
                                      line (may be empty; no CR/LF).
   LUBN <target>              both    Lift a ban cluster-wide; target is a nick,
                                      CID or IP/range (takes the rest of the line).
@@ -153,6 +176,18 @@ All post-handshake commands (everything except LCHA/LRES/LACK/LERR) are only
 accepted on an established link. Every command is a 4-character FOURCC ('L' plus
 a 3-letter code); fields that may contain spaces (a nick, a description, a
 wrapped ADC message) are always last and run to the end of the line.
+
+The protocol is line-based and has no escaping of its own, so no field may
+contain a CR or LF: one would end the line early and the rest would run as a
+separate command. A hub refuses to send such a line rather than sanitise it,
+and validates anything from a client (a nick, an !unban target) before it can
+reach a link.
+
+A peer speaks only for what it owns. A routed message (LRTE) must come from a
+remote user learned over that same link; one claiming the SID of a local user,
+or of a user on another node, is dropped. LACR and LVRS are accepted only from
+the auth master the query went to. LBAN never truncates a CID or nick to fit,
+and LDSC must be a single escaped token.
 
 
 == SID-space partitioning ==

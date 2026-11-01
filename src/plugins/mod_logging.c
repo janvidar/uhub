@@ -240,9 +240,26 @@ static void log_message(struct log_data* data, const char *format, ...)
 #ifndef WIN32
 	else
 	{
+		/* Same sanitising as the file branch: syslog daemons differ in what
+		   they do with a raw newline, and some start a new record at it. */
+		ssize_t i;
 		va_start(args, format);
-		vsyslog(LOG_INFO, format, args);
+		size = vsnprintf(logmsg, sizeof(logmsg), format, args);
 		va_end(args);
+		if (size < 0)
+			size = 0;
+		else if (size > (ssize_t) sizeof(logmsg) - 1)
+			size = sizeof(logmsg) - 1;
+		if (size > 0 && logmsg[size - 1] == '\n')
+			size--;
+		logmsg[size] = 0;
+		for (i = 0; i < size; i++)
+		{
+			unsigned char c = (unsigned char) logmsg[i];
+			if (c < 0x20 || c == 0x7f)
+				logmsg[i] = '?';
+		}
+		syslog(LOG_INFO, "%s", logmsg);
 	}
 #endif
 }

@@ -55,6 +55,23 @@ only path a ban can travel between them. Verifies cluster propagation:
 BUILD=/path/to/build test/e2e/run_link_e2e.sh [portA] [portB]
 ```
 
+## run_link_security_e2e.sh
+
+Brings up a master hub and an `auth_proxy` slave linked to it, then attacks
+the link from outside, speaking the link protocol over bash's `/dev/tcp`:
+
+1. the two hubs establish a link (the handshake works between real hubs);
+2. a peer that echoes the master's own challenge back is disconnected
+   unanswered, and finishing that attack establishes nothing (#127);
+3. a peer that plays the master's own answer back is refused with `LERR`;
+4. a nick with an embedded newline, given to the slave, injects no command into
+   its master link: the nick named in the injected `LBAN` can still log in on
+   the master (#128); an ordinary nick still logs in through the slave.
+
+```sh
+BUILD=/path/to/build test/e2e/run_link_security_e2e.sh [portA] [portS]
+```
+
 ## run_plugin_e2e.sh
 
 Loads the test-only `mod_e2e_test` plugin and verifies the plugin-facing hooks:
