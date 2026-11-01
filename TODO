@@ -1,8 +1,8 @@
 # uhub — outstanding work
 
-State: sources are 0.8.0 in CMakeLists.txt, build.zig and build.zig.zon, and
-tagged 0.8.0. The ChangeLog 0.8.0 section is reconciled against the commits
-since the 0.7.1 tag.
+State: 0.8.x-stable is 0.8.1 in CMakeLists.txt, build.zig and build.zig.zon,
+and tagged 0.8.1: 0.8.0 plus the security fixes for #127 - #130. master
+continues towards the next feature release.
 
 ## HBRI
 - A NAT-override user cannot use HBRI at all: check_network() (src/core/inf.c)
