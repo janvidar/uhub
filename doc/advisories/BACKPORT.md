@@ -90,9 +90,9 @@ UHUB-2026-005, -006 and -007 are in the hub-to-hub link, which first shipped in
 
 All three are fixed by the single commit `75f0aaa`. It changes the link
 handshake, so it must be deployed on every hub and worker of a cluster at the
-same time; a patched hub cannot link with an unpatched one. Backporting it to
-0.7.x also requires the `LUBN` / persisted-ban code from 0.8.0 to be absent
-or patched to match.
+same time; a patched hub cannot link with an unpatched one. On a 0.7.x base
+the `hub_apply_unban()` / `link_broadcast_unban()` hunks have no counterpart
+(that code arrived in 0.8.0) and can be dropped.
 
 Operator mitigations without a rebuild: leave `link_secret` empty on hubs that
 do not link, set `auth_proxy = 0`, and firewall the hub port to the other
