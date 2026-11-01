@@ -72,6 +72,22 @@ the link from outside, speaking the link protocol over bash's `/dev/tcp`:
 BUILD=/path/to/build test/e2e/run_link_security_e2e.sh [portA] [portS]
 ```
 
+## run_auth_exclusive_e2e.sh
+
+Checks that an auth plugin with `exclusive` set admits only its own accounts,
+wherever the login arrives (#130). Four hubs: an exclusive `mod_auth_sqlite`
+master, an `auth_proxy` slave of it, a standalone exclusive hub, and a
+non-exclusive control:
+
+1. an account logs in on the master, and through the slave;
+2. an unknown nick is refused on the master, on the slave, and on the plain
+   exclusive hub;
+3. on the non-exclusive hub an unknown nick still logs in as a guest.
+
+```sh
+BUILD=/path/to/build test/e2e/run_auth_exclusive_e2e.sh [portA] [portS] [portG] [portE]
+```
+
 ## run_plugin_e2e.sh
 
 Loads the test-only `mod_e2e_test` plugin and verifies the plugin-facing hooks:

@@ -119,7 +119,6 @@ cat > "$DIR/hub_s.conf" <<EOF
 server_port = $PS
 server_bind_addr = 127.0.0.1
 file_plugins = $DIR/plugins_s.conf
-plugin_defaults = no
 tls_enable = 0
 link_secret = $SECRET
 node_count = 2

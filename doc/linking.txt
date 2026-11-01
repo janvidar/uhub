@@ -168,7 +168,9 @@ transport.
   LUBN <target>              both    Lift a ban cluster-wide; target is a nick,
                                      CID or IP/range (takes the rest of the line).
   LACQ <sid> <nick>          slave   Is this nick registered? (master auth)
-  LACR <sid> <cred>          master  Reply: the nick's credential ("guest" if not).
+  LACR <sid> <cred>          master  Reply: the nick's credential; "guest" if no
+                                     account, "none" if refused (the slave
+                                     then refuses the login too).
   LVFY <sid> <chal> <resp> <nick>  slave   Verify a password challenge-response.
   LVRS <sid> <ok> <cred>     master  Reply: 1/0, and the credential on success.
 

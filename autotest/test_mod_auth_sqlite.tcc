@@ -348,3 +348,117 @@ EXO_TEST(mas_teardown, {
 	remove(MAS_DB);
 	return rc == 0;
 });
+
+/* ---- account lookup: unknown, refused, failed (issue #130) ---------------
+ *
+ * Each test builds its own database and plugin instance (mx_*), separate from
+ * the mas_* fixture above, and tears it down again.
+ */
+
+#define MX_DB "test_mod_auth_sqlite_x.db"
+#define MX_SCHEMA "CREATE TABLE users (nickname CHAR COLLATE NOCASE NOT NULL UNIQUE, password TEXT, credentials TEXT);"
+
+static struct plugin_handle mx_plugin;
+
+static int mx_exec(const char* sql)
+{
+	sqlite3* db = 0;
+	int ok = sqlite3_open(MX_DB, &db) == SQLITE_OK
+		&& (!sql || sqlite3_exec(db, sql, 0, 0, 0) == SQLITE_OK);
+	sqlite3_close(db);
+	return ok;
+}
+
+/* A new database (with the users table, or without it as on a fresh install)
+   and the plugin registered on it with the given extra configuration. */
+static int mx_start(int users_table, const char* extra)
+{
+	char cfg[256];
+	remove(MX_DB);
+	if (!mx_exec(users_table ? MX_SCHEMA : NULL))
+		return 0;
+	memset(&mx_plugin, 0, sizeof(mx_plugin));
+	snprintf(cfg, sizeof(cfg), "file=%s %s", MX_DB, extra ? extra : "");
+	mx_plugin.hub.get_user_nick = mas_get_nick;
+	mx_plugin.hub.get_user_cid = mas_get_cid;
+	return plugin_register(&mx_plugin, cfg) == 0 && mx_plugin.funcs.auth_get_user;
+}
+
+static int mx_stop(int ok)
+{
+	if (mx_plugin.ptr)
+		plugin_unregister(&mx_plugin);
+	memset(&mx_plugin, 0, sizeof(mx_plugin));
+	remove(MX_DB);
+	return ok;
+}
+
+static plugin_st mx_lookup(const char* nick, struct auth_info* info)
+{
+	return mx_plugin.funcs.auth_get_user(&mx_plugin, nick, info);
+}
+
+/* Not exclusive: a nick the database does not hold is passed on (a guest). */
+EXO_TEST(mas_unknown_passed_on, {
+	struct auth_info info;
+	if (!mx_start(1, NULL))
+		return mx_stop(0);
+	return mx_stop(mx_lookup("stranger", &info) == st_default);
+});
+
+/* exclusive: only accounts in this database may log in. */
+EXO_TEST(mas_exclusive_unknown_refused, {
+	struct auth_info info;
+	if (!mx_start(1, "exclusive=1"))
+		return mx_stop(0);
+	return mx_stop(mx_lookup("stranger", &info) == st_deny);
+});
+
+EXO_TEST(mas_exclusive_account_allowed, {
+	struct auth_info info;
+	if (!mx_start(1, "exclusive=1") || !mx_exec("INSERT INTO users VALUES ('Boss', 'secret', 'admin');"))
+		return mx_stop(0);
+	return mx_stop(mx_lookup("boss", &info) == st_allow && info.credentials == auth_cred_admin);
+});
+
+/* A fresh install has no users table: that is "no accounts", not a failure,
+   or every login on a new hub would be refused. */
+EXO_TEST(mas_no_users_table_passed_on, {
+	struct auth_info info;
+	if (!mx_start(0, NULL))
+		return mx_stop(0);
+	return mx_stop(mx_lookup("stranger", &info) == st_default);
+});
+
+EXO_TEST(mas_no_users_table_exclusive_refused, {
+	struct auth_info info;
+	if (!mx_start(0, "exclusive=1"))
+		return mx_stop(0);
+	return mx_stop(mx_lookup("stranger", &info) == st_deny);
+});
+
+/* The table appearing while the hub runs (uhub-passwd) is picked up. */
+EXO_TEST(mas_users_table_created_later, {
+	struct auth_info info;
+	if (!mx_start(0, NULL) || !mx_exec(MX_SCHEMA "INSERT INTO users VALUES ('Boss', 'secret', 'user');"))
+		return mx_stop(0);
+	return mx_stop(mx_lookup("Boss", &info) == st_allow && info.credentials == auth_cred_user);
+});
+
+/* A lookup that fails must not let a registered nick in as a guest without
+   its password. Here the table is there but not one the query can use. */
+EXO_TEST(mas_lookup_failure_refused, {
+	struct auth_info info;
+	if (!mx_start(1, NULL) || !mx_exec("DROP TABLE users; CREATE TABLE users (something TEXT);"))
+		return mx_stop(0);
+	return mx_stop(mx_lookup("Boss", &info) == st_deny);
+});
+
+/* A registered nick whose record carries no credential is refused, not
+   treated as unknown. */
+EXO_TEST(mas_record_without_credential_refused, {
+	struct auth_info info;
+	if (!mx_start(1, NULL) || !mx_exec("INSERT INTO users VALUES ('Boss', 'secret', NULL);"))
+		return mx_stop(0);
+	return mx_stop(mx_lookup("Boss", &info) == st_deny);
+});

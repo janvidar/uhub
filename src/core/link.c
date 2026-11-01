@@ -137,6 +137,7 @@ int link_make_nonce(char* out)
 #include "core/usermanager.h"
 #include "core/route.h"
 #include "core/auth.h"
+#include "core/plugininvoke.h"
 #include "util/credentials.h"
 #include "plugin_api/types.h"
 
@@ -487,20 +488,25 @@ static int link_process_line(struct hub_link* link, const char* line)
 	if (strncmp(line, "LACQ ", 5) == 0)
 	{
 		/* Auth master: a slave asks whether <nick> is registered. Reply
-		   "LACR <sid> <cred>" (cred = "guest" if unknown). sid echoes the
-		   slave's pending user so it can match the reply. */
+		   "LACR <sid> <cred>": the account's credential, "guest" if no plugin
+		   knows the nick, or "none" if one refused it (the slave then refuses
+		   the login, as we would). sid echoes the slave's pending user so it
+		   can match the reply. */
 		char sid[16];
 		const char* nick;
-		struct auth_info* info;
+		struct auth_info info;
+		plugin_st status;
 		const char* cred = auth_cred_to_string(auth_cred_guest);
 		if (link->state != link_state_established)
 			return -1;
 		nick = link_tok(line + 5, sid, sizeof(sid));
-		info = acl_get_access_info(link->hub, nick);
-		if (info)
-			cred = auth_cred_to_string(info->credentials);
+		memset(&info, 0, sizeof(info));
+		status = plugin_auth_get_user(link->hub, nick, &info);
+		if (status == st_allow)
+			cred = auth_cred_to_string(info.credentials);
+		else if (status == st_deny)
+			cred = auth_cred_to_string(auth_cred_none);
 		link_sendf(link, "LACR %s %s\n", sid, cred);
-		hub_free(info);
 		return 0;
 	}
 
@@ -538,7 +544,8 @@ static int link_process_line(struct hub_link* link, const char* line)
 		char sid[16];
 		const char* credstr;
 		struct hub_user* user;
-		enum auth_credentials cred = auth_cred_guest;
+		/* A reply we cannot read is a refusal, not a guest login. */
+		enum auth_credentials cred = auth_cred_none;
 		if (link->state != link_state_established)
 			return -1;
 		/* Only the master we asked may answer: a reply settles a pending
