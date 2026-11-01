@@ -11,6 +11,7 @@ Remotely-triggerable security issues, indexed by advisory ID.
 | [UHUB-2026-005](UHUB-2026-005.md) | Hub-link authentication bypass by challenge reflection (issue #127) | Critical | 0.7.0 – 0.8.0, linking enabled | 0.8.1 |
 | [UHUB-2026-006](UHUB-2026-006.md) | Link command injection through a nick on an `auth_proxy` slave (issue #128) | Critical | 0.7.0 – 0.8.0, `auth_proxy` enabled | 0.8.1 |
 | [UHUB-2026-007](UHUB-2026-007.md) | Link command injection and ban removal through `!unban` (issue #129) | High | 0.8.0 | 0.8.1 |
+| [UHUB-2026-008](UHUB-2026-008.md) | `exclusive` auth mode does not keep unknown nicks out (issue #130) | Medium | <= 0.8.0 | 0.8.1 |
 
 See [BACKPORT.md](BACKPORT.md) for per-release exposure (incl. Debian's 0.4.1)
 and downstream cherry-pick guidance.

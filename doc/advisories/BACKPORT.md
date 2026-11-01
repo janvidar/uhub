@@ -98,3 +98,13 @@ Operator mitigations without a rebuild: leave `link_secret` empty on hubs that
 do not link, set `auth_proxy = 0`, and firewall the hub port to the other
 cluster members.
 
+## Exclusive authentication (all releases <= 0.8.0)
+
+UHUB-2026-008 is not specific to linking: the refusal-becomes-guest collapse
+in `acl_get_access_info()` and mod_auth_sqlite's ignored `exclusive` flag are
+present in every release up to 0.8.0, including 0.4.1. The fix is commit
+`c01fe6f`. On a base without mod_guest_passwd or linking, only the
+`set_credentials()` (inf.c), `plugin_auth_get_user()` (plugininvoke.c) and
+mod_auth_sqlite `get_user()` hunks apply. Mitigation without a rebuild:
+`registered_users_only = yes`.
+
