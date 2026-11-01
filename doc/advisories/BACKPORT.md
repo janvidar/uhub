@@ -76,3 +76,25 @@ Until a fixed package is available:
 - Restrict network reach (allowlist) — the OOB reads and the heap write both
   trigger before authentication, so config-level controls inside uhub cannot
   block them.
+
+## Hub linking (0.7.0 – 0.8.0)
+
+UHUB-2026-005, -006 and -007 are in the hub-to-hub link, which first shipped in
+0.7.0. Releases before 0.7.0 have no linking and are not affected.
+
+| Issue | 0.7.x | 0.8.0 | Fixed in |
+|-------|:-----:|:-----:|----------|
+| UHUB-2026-005 — link auth bypass by reflection (#127) | affected | affected | 0.8.1 |
+| UHUB-2026-006 — nick injection via `auth_proxy` (#128) | affected | affected | 0.8.1 |
+| UHUB-2026-007 — `!unban` injection / truncated CID (#129) | not affected | affected | 0.8.1 |
+
+All three are fixed by the single commit `75f0aaa`. It changes the link
+handshake, so it must be deployed on every hub and worker of a cluster at the
+same time; a patched hub cannot link with an unpatched one. Backporting it to
+0.7.x also requires the `LUBN` / persisted-ban code from 0.8.0 to be absent
+or patched to match.
+
+Operator mitigations without a rebuild: leave `link_secret` empty on hubs that
+do not link, set `auth_proxy = 0`, and firewall the hub port to the other
+cluster members.
+
