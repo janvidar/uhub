@@ -207,3 +207,60 @@ EXO_TEST(netbackend_close_deregister, {
 	/* Backend survived the deregister and still delivers to the live connection. */
 	return nb_state.reads >= 1;
 });
+
+/*
+ * Regression: a descriptor closed and handed to a new connection before the
+ * next poll. The kernel gives socketpair() the lowest free numbers, so the new
+ * pair reuses the closed one's, and kqueue saw that fd twice in one change
+ * list: the first entry registered the new connection and the second disabled
+ * both of its filters, so it never heard from its peer again. A live hub hits
+ * this when one user leaves and the next connection is accepted in the same
+ * loop iteration. nb_con is kept readable so no poll blocks; a broken backend
+ * simply never delivers c3's READ.
+ */
+EXO_TEST(netbackend_fd_reuse_before_poll, {
+	int sv2[2];
+	int sv3[2];
+	int i;
+	int reused;
+	struct net_connection* c2;
+	struct net_connection* c3;
+	struct nb_probe p3;
+	if (!nb_baseline())
+		return 0;
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv2) != 0)
+		return 0;
+	c2 = net_con_create();
+	net_con_initialize(c2, sv2[0], nb_callback, &nb_state, NET_EVENT_READ);
+	if (write(nb_sv[1], "a", 1) != 1)
+		return 0;
+	net_backend_process(); /* c2 is registered */
+
+	/* Close it and reuse its descriptor, with no poll in between. */
+	net_con_close(c2);
+	close(sv2[1]);
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv3) != 0)
+		return 0;
+	reused = (sv3[0] == sv2[0]);
+	c3 = net_con_create();
+	nb_reset(&p3);
+	net_con_initialize(c3, sv3[0], nb_callback, &p3, NET_EVENT_READ);
+	if (write(sv3[1], "c", 1) != 1)
+		return 0;
+
+	for (i = 0; i < 5 && p3.reads == 0; i++)
+	{
+		if (write(nb_sv[1], "b", 1) != 1)
+			return 0;
+		net_backend_process();
+	}
+
+	/* Close c3 and flush its deregistration, so nothing is left pending. */
+	net_con_close(c3);
+	close(sv3[1]);
+	if (write(nb_sv[1], "d", 1) != 1)
+		return 0;
+	net_backend_process();
+
+	return reused && p3.reads >= 1;
+});

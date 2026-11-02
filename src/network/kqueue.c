@@ -278,6 +278,14 @@ static size_t create_change_list(struct net_backend_kqueue* backend)
 		if (sd < 0 || (size_t) sd >= backend->common->max)
 			continue;
 		con = backend->conns[sd];
+		/* A descriptor can be listed twice in one cycle: net_con_close() queues
+		   the old connection's fd, and a new connection that is given the same
+		   fd before the next poll queues it again. conns[] already points at the
+		   new connection, so the first entry applies its change and clears it;
+		   the second must not then be read as "disable both filters", which
+		   left the new connection deaf. */
+		if (con && !con->change)
+			continue;
 		if (con)
 		{
 			flags_r = 0;

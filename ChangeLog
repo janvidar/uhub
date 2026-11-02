@@ -44,6 +44,9 @@ Fixes:
   ("adc://::1") in its connect address and to registration servers.
 - The uhub_logouts_total metric stayed at 0: logouts were counted only for a
   user still logged in, which by then none is.
+- FreeBSD, macOS and other kqueue systems: a connection given the descriptor
+  of one closed in the same loop iteration never received any events, so a
+  client that connected as another left could hang until its login timeout.
 
 0.8.1:
 A security release. All four issues were reported by Kcchouette. See
