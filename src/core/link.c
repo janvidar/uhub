@@ -1081,6 +1081,11 @@ static void link_connect(struct hub_info* hub, const char* peer)
 void link_start(struct hub_info* hub)
 {
 	struct hub_config* cfg = hub->config;
+
+	/* The link state is process-wide; starting again (a second hub in the same
+	   process, as the tests do) replaces it rather than leaking it. */
+	link_stop(hub);
+
 	g_links = list_create();
 	g_auth_pending = list_create();
 

@@ -1,3 +1,9 @@
+Unreleased:
+Fixes:
+- FreeBSD, macOS and other kqueue systems: a connection given the descriptor
+  of one closed in the same loop iteration never received any events, so a
+  client that connected as another left could hang until its login timeout.
+
 0.8.1:
 A security release. All four issues were reported by Kcchouette. See
 doc/advisories/ on the security-advisories branch for UHUB-2026-005..008.

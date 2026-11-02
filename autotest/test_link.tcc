@@ -563,6 +563,20 @@ EXO_TEST(link_hs_ack_after_established_closes, {
 	return lt_p.closed;
 });
 
+/* Starting the link layer again replaces what was there: the old link is
+   dropped (not leaked), and a new one can still be established. A second
+   hub_start_service() in the same process does exactly this. */
+EXO_TEST(link_restart_replaces_state, {
+	if (!lt_server_handshake())
+		return 0;
+	link_start(lt_hub);
+	lt_drain();
+	if (!lt_p.closed)
+		return 0;
+	lt_peer_close();
+	return lt_server_handshake_add();
+});
+
 EXO_TEST(link_hs_oversized_line_closes, {
 	char big[1100];
 	lt_fresh();
