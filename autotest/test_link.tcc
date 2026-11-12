@@ -11,9 +11,12 @@
 #include "network/connection.h"
 #include "core/auth.h"
 #include "core/config.h"
+#include "core/eventid.h"
+#include "core/eventqueue.h"
 #include "core/hub.h"
 #include "core/link.h"
 #include "core/pluginloader.h"
+#include "core/route.h"
 #include "core/user.h"
 #include "core/usermanager.h"
 #include "plugin_api/handle.h"
@@ -1143,3 +1146,111 @@ EXO_TEST(link_acr_none_refused,   { return lt_slave_resolves("none", auth_cred_n
 EXO_TEST(link_acr_bogus_refused,  { return lt_slave_resolves("bogus", auth_cred_none); });
 EXO_TEST(link_acr_guest,          { return lt_slave_resolves("guest", auth_cred_guest); });
 EXO_TEST(link_acr_account,        { return lt_slave_resolves("admin", auth_cred_admin); });
+
+/* A client can repeat HPAS (or the login re-query) while the master has yet to
+   answer. It is registered once: the disconnect forgets it once, so a second
+   entry would outlive the user and a late reply would land on freed memory. */
+static int lt_repeat_then_forget(int verify)
+{
+	struct hub_user* u;
+	int sent;
+	if (!lt_client_handshake())
+		return 0;
+	u = lt_pending_user();
+	strcpy(u->id.nick, "nick");
+	if (verify)
+		sent = link_auth_proxy_verify(lt_hub, u, "CHAL", "RESP")
+			+ link_auth_proxy_verify(lt_hub, u, "CHAL", "RESP");
+	else
+		sent = link_auth_query(lt_hub, u, "nick")
+			+ link_auth_query(lt_hub, u, "nick");
+	link_auth_pending_forget(u);
+	lt_send("LACR AAAB admin\n");
+	return sent == 2 && !lt_p.closed && !u->auth_proxy_resolved;
+}
+
+EXO_TEST(link_vfy_repeated_forgotten, { return lt_repeat_then_forget(1); });
+EXO_TEST(link_acq_repeated_forgotten, { return lt_repeat_then_forget(0); });
+
+/* ... and the first reply settles it, the second finds nothing. */
+EXO_TEST(link_acq_repeated_answered_once, {
+	struct hub_user* u;
+	int ok;
+	if (!lt_client_handshake())
+		return 0;
+	u = lt_pending_user();
+	if (link_auth_query(lt_hub, u, "nick") + link_auth_query(lt_hub, u, "nick") != 2)
+		return 0;
+	lt_send("LACR AAAB admin\n");
+	ok = u->auth_proxy_resolved && u->auth_proxy_cred == auth_cred_admin;
+	u->auth_proxy_resolved = 0;
+	lt_send("LACR AAAB user\n");
+	ok = ok && !u->auth_proxy_resolved;
+	link_auth_pending_forget(u);
+	return ok;
+});
+
+/* -------------------------------------------------------------------------
+ * A remote user disconnected on this hub
+ * ------------------------------------------------------------------------- */
+
+/* The parts of hub_event_dispatcher() that free users. */
+static void lt_dispatch(void* data, struct event_data* ev)
+{
+	struct hub_info* hub = (struct hub_info*) data;
+	struct hub_user* user = (struct hub_user*) ev->ptr;
+	if (ev->id == UHUB_EVENT_USER_QUIT)
+	{
+		uman_remove(hub->users, user);
+		hub_schedule_destroy_user(hub, user);
+	}
+	else if (ev->id == UHUB_EVENT_USER_DESTROY)
+	{
+		route_clear_dirty(hub, user);
+		user_destroy(user);
+	}
+}
+
+/* Kick the remote user AAAD here (an operator's !kick, a plugin's
+   user_disconnect), then let the peer report it gone -- `after`, or the link
+   dropping if NULL -- before the event queue runs. The link frees remote users
+   on the spot, so the kick must already have unlinked it: otherwise the queued
+   events unlink and free it a second time. */
+static int lt_kick_remote(const char* after)
+{
+	struct hub_user* remote;
+	int ok;
+	if (!lt_server_handshake() || !lt_add_local_users()
+		|| event_queue_initialize(&lt_hub->queue, lt_dispatch, lt_hub) == -1)
+	{
+		lt_remove_local_users();
+		return 0;
+	}
+	lt_hub->status = hub_status_running;
+	lt_send(LT_REMOTE_INF);
+	remote = uman_get_user_by_sid(lt_hub->users, string_to_sid("AAAD"));
+	ok = remote && user_is_remote(remote);
+	if (ok)
+	{
+		hub_disconnect_user(lt_hub, remote, quit_kicked);
+		ok = !uman_get_user_by_sid(lt_hub->users, string_to_sid("AAAD"))
+			&& !uman_get_user_by_nick(lt_hub->users, "remote")
+			&& lt_queued(lt_local_target, "IQUI AAAD");
+		if (after)
+			lt_send(after);
+		else
+			link_stop(lt_hub);
+		ok = ok && (!after || !lt_p.closed);
+	}
+	event_queue_process(lt_hub->queue);
+	ok = ok && event_queue_size(lt_hub->queue) == 0;
+	event_queue_shutdown(lt_hub->queue);
+	lt_hub->queue = 0;
+	lt_hub->status = hub_status_uninitialized;
+	link_stop(lt_hub);
+	lt_remove_local_users();
+	return ok;
+}
+
+EXO_TEST(link_kicked_remote_then_quit, { return lt_kick_remote("LQUI AAAD\n"); });
+EXO_TEST(link_kicked_remote_then_link_lost, { return lt_kick_remote(NULL); });

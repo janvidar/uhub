@@ -170,6 +170,7 @@ const tcc_sources = [_][]const u8{
     "test_mod_users.tcc",
     "test_mod_welcome.tcc",
     "test_netbackend.tcc",
+    "test_netevent.tcc",
     "test_probe.tcc",
     "test_rbtree.tcc",
     "test_regserver.tcc",

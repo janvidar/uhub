@@ -2031,6 +2031,27 @@ void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason
 	user->quit_reason = reason;
 	user_set_state(user, state_cleanup);
 
+	if (user_is_remote(user))
+	{
+		/* A remote user (kicked here, or disconnected by a plugin) must leave
+		   the user manager now, not from UHUB_EVENT_USER_QUIT. Until it does,
+		   the link layer can still find it by SID or in the user list, and an
+		   LQUI or a lost link frees it on the spot -- leaving the queued QUIT
+		   and DESTROY events to unlink and free it a second time. Once
+		   unlinked only the DESTROY event holds it, and user_destroy() never
+		   touches origin_link, so the link may go away first. Like a remote
+		   user leaving over the link, this skips on_logout_user() and the LQUI
+		   broadcast, which are for local users. */
+		if (was_logged_in)
+		{
+			uman_remove(hub->users, user);
+			if (hub->status == hub_status_running)
+				uman_send_quit_message(hub, hub->users, user);
+		}
+		hub_schedule_destroy_user(hub, user);
+		return;
+	}
+
 	if (need_notify)
 	{
 		memset(&post, 0, sizeof(post));
