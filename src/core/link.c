@@ -1344,6 +1344,32 @@ static struct hub_link* link_master(void)
 	return 0;
 }
 
+/* Is `user` waiting on the master? Compared by pointer: the registry never
+   dereferences an entry it has not matched. */
+static int link_auth_pending_has(struct hub_user* user)
+{
+	struct hub_user* entry;
+	struct node* cursor;
+	if (!g_auth_pending)
+		return 0;
+	LIST_FOREACH_SAFE(struct hub_user*, entry, g_auth_pending, cursor,
+	{
+		if (entry == user)
+			return 1;
+	});
+	return 0;
+}
+
+/* Register `user` as waiting on the master, at most once. A client can repeat
+   HPAS while its first LVFY is in flight; a second entry would outlive the user,
+   since link_auth_pending_forget() runs once per disconnect, and a later reply
+   would then match the freed user. */
+static void link_auth_pending_add(struct hub_user* user)
+{
+	if (g_auth_pending && !link_auth_pending_has(user))
+		list_append(g_auth_pending, user);
+}
+
 /* Slave: ask the master whether `user`'s nick is registered (LACQ). Returns 1
    if sent (login should pause), 0 if no master link is available. */
 int link_auth_query(struct hub_info* hub, struct hub_user* user, const char* nick)
@@ -1356,8 +1382,7 @@ int link_auth_query(struct hub_info* hub, struct hub_user* user, const char* nic
 		return 0;
 	if (link_sendf(master, "LACQ %s %s\n", sid_to_string(user->id.sid), nick) < 0)
 		return 0;
-	if (g_auth_pending)
-		list_append(g_auth_pending, user);
+	link_auth_pending_add(user);
 	return 1;
 }
 
@@ -1373,15 +1398,16 @@ int link_auth_proxy_verify(struct hub_info* hub, struct hub_user* user, const ch
 		return 0;
 	if (link_sendf(master, "LVFY %s %s %s %s\n", sid_to_string(user->id.sid), challenge, response, user->id.nick) < 0)
 		return 0;
-	if (g_auth_pending)
-		list_append(g_auth_pending, user);
+	link_auth_pending_add(user);
 	return 1;
 }
 
 /* Remove a user from the pending-auth registry (on disconnect/destroy). */
 void link_auth_pending_forget(struct hub_user* user)
 {
-	if (g_auth_pending)
+	/* list_remove() drops one match; the registry holds at most one per user,
+	   but forgetting all of them keeps a freed user out of it regardless. */
+	while (link_auth_pending_has(user))
 		list_remove(g_auth_pending, user);
 }
 

@@ -112,6 +112,12 @@ int handle_net_read(struct hub_user* user)
 int handle_net_write(struct hub_user* user)
 {
 	int ret = 0;
+
+	/* hub_disconnect_user() drops the connection before the user is freed;
+	   whatever is still queued has nowhere to go. */
+	if (!user->connection)
+		return 0;
+
 	while (ioq_send_get_bytes(user->send_queue))
 	{
 		ret = ioq_send_send(user->send_queue, user->connection);
@@ -164,6 +170,13 @@ void net_event(struct net_connection* con, int event, void *arg)
 			hub_disconnect_user(user->hub, user, flag_close);
 			return;
 		}
+
+		/* A handler can disconnect the sender and still succeed (a flood
+		   plugin's kick, a failed SUP negotiation), and if that was the last
+		   line read nothing reports it. The connection is gone by then, so do
+		   not go on to service a write event for it. */
+		if (user_is_disconnecting(user))
+			return;
 	}
 
 	if (event & NET_EVENT_WRITE)
