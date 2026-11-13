@@ -7,6 +7,14 @@ Incompatible changes (action required beyond replacing the binaries):
 - As in 0.8.1, an auth plugin with "exclusive" set refuses nicks it does not
   hold; that refusal also beats mod_guest_passwd, so a hub combining the two
   admits no guests. Remove "exclusive" to keep admitting guests.
+- Hub linking: a hub with tls_enable (the default) now dials its peers over
+  TLS and refuses plain-text links on its port. Every node in a cluster needs
+  the same tls_enable setting, and the nodes must be upgraded together.
+  Unix-socket links between workers are unchanged. See doc/linking.txt.
+- Hub linking: a user a peer announces with a SID from this hub's own window
+  is refused, with an error in the log. This catches two nodes sharing a
+  node_id; a cluster linked with node_count = 1, which the hub already warned
+  about, now refuses the users a peer announces from this hub's SID range.
 
 New features:
 - mod_users: operator account management from inside the hub. !useradd,
@@ -47,6 +55,50 @@ Fixes:
 - FreeBSD, macOS and other kqueue systems: a connection given the descriptor
   of one closed in the same loop iteration never received any events, so a
   client that connected as another left could hang until its login timeout.
+- auth_proxy: a client repeating HPAS (or its login query) while the master
+  had yet to answer was queued twice; a late answer then reached the freed
+  user. A repeated HPAS is now ignored until the master answers.
+- auth_proxy: a late master reply for a login that had left settled the next
+  user to hold its SID -- a "guest" answer could let a registered nick in
+  without its password. Replies now carry the login's SID and connection id,
+  which older masters echo unchanged.
+- auth_proxy: a login waiting on a master link that dropped waited out the
+  login timeout, and could be answered by another outbound link that became
+  master meanwhile. It is now refused as soon as the link drops.
+- A remote user kicked on this hub was freed twice when its own hub then
+  reported it gone, or the link dropped.
+- A handler that disconnected the sender (mod_flood, a failed SUP) followed
+  by a write on the same wakeup dereferenced a NULL connection.
+- A node with an empty or full SID window (still waiting for its lease, or
+  exhausted) gave new users the hub's own SID, AAAA. The login now fails as
+  "hub full".
+- SID windows: the pool kept a stale count when its window changed, and could
+  then refuse every login; a window grant was accepted from any peer at any
+  time; a static node, or a member that already held a lease, could start
+  granting windows of its own; a repeated request leaked a window; two
+  coordinators that met merged rosters with colliding SIDs. A member now also
+  reclaims its window when it links to the coordinator again.
+- A renamed remote user kept its old nick in this hub's records while clients
+  saw the new one, so two users could show one nick.
+- HTCP sent after the login started ran an HBRI validation that closed the
+  user's own connection; it is now accepted only as the first command.
+- Plugin unload (!reload): per-user data on a user still logging in outlived
+  the plugin, whose cleanup then ran from unloaded code; a command the plugin
+  left registered sent the hub through a wild pointer.
+- Reload and a disabled hub (hub_enabled = no): a user leaving was dropped
+  without a quit, so clients and linked hubs kept a ghost of it; BBS
+  subscriptions could follow a freed board to whatever board took its place.
+- A user disconnected while the hub walked the user list (keepalive, a
+  plugin broadcast) as a reload or shutdown began left the walk on freed
+  memory; a plugin that looked up a
+  command from inside a command walk could loop forever; chat from a sender a
+  plugin kicked while handling it was still relayed.
+- An inbound hub link over TLS stalled until the peer sent more data.
+
+Hardening:
+- Hub linking: a peer may route only chat, searches and directed traffic,
+  and a roster entry (LINF) must be a BINF; an update that changes a user's
+  CID is ignored.
 
 0.8.1:
 A security release. All four issues were reported by Kcchouette. See
