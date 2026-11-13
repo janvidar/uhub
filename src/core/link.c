@@ -1694,6 +1694,43 @@ static void link_stamp_message(struct hub_info* hub, struct adc_message* msg)
 	}
 }
 
+/* Whether a peer may route this message for one of its users: what a uhub
+   peer relays and nothing else. Broadcasts are chat and searches
+   (link_relay_broadcast). Directed messages are whatever the hub routes for
+   its own users -- except presence and quits, which travel as LINF/LQUI, user
+   commands, and the echoed search replies the hub drops (see
+   hub_handle_message). */
+static int link_route_allowed(const struct adc_message* msg)
+{
+	switch (msg->cache[0])
+	{
+		case 'B':
+		case 'F':
+			return msg->cmd == ADC_CMD_BMSG || msg->cmd == ADC_CMD_FMSG ||
+				msg->cmd == ADC_CMD_BSCH || msg->cmd == ADC_CMD_FSCH;
+
+		case 'D':
+		case 'E':
+			switch (msg->cmd)
+			{
+				case ADC_CMD_DINF:
+				case ADC_CMD_EINF:
+				case ADC_CMD_DQUI:
+				case ADC_CMD_EQUI:
+				case ADC_CMD_DCMD:
+				case ADC_CMD_ECMD:
+				case ADC_CMD_ERES:
+				case ADC_CMD_EPSR:
+					return 0;
+				default:
+					return 1;
+			}
+
+		default:
+			return 0;
+	}
+}
+
 /* A peer forwarded a directed message whose target is on our side: re-route it
    locally. The original sender is a remote user we already hold. */
 static void link_handle_route(struct hub_link* link, const char* adcstr)
@@ -1704,6 +1741,15 @@ static void link_handle_route(struct hub_link* link, const char* adcstr)
 	if (!msg)
 	{
 		LOG_WARN("link: malformed routed message from %s", link->peer_desc);
+		return;
+	}
+
+	/* A BINF here would show clients a nick, a CID or operator flags the hub
+	   never recorded for the user; the others are refused from our own users. */
+	if (!link_route_allowed(msg))
+	{
+		LOG_WARN("link: %s routed a %.4s, which peers do not relay", link->peer_desc, msg->cache);
+		adc_msg_free(msg);
 		return;
 	}
 

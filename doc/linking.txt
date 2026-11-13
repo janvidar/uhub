@@ -188,7 +188,9 @@ reach a link.
 
 A peer speaks only for what it owns. A routed message (LRTE) must come from a
 remote user learned over that same link; one claiming the SID of a local user,
-or of a user on another node, is dropped. LACR and LVRS are accepted only from
+or of a user on another node, is dropped. So is one a uhub peer never relays:
+a broadcast other than chat or a search, and any presence (INF), quit (QUI)
+or user command (CMD), which the hub refuses from its own users. LACR and LVRS are accepted only from
 the auth master the query went to, and only when they echo the tag of a login
 still waiting: the slave's SID and connection id ("AAAB.0000001f"), so a late
 reply never settles whoever holds that SID next. The master echoes the tag

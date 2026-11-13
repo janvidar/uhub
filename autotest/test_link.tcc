@@ -1031,6 +1031,35 @@ EXO_TEST(link_route_other_links_user_dropped, {
 	return ok;
 });
 
+/* A peer routes chat, searches and directed traffic for its users, nothing
+   more. Presence travels as LINF, and the commands the hub refuses from its
+   own users are refused from a peer's: a routed BINF would show clients an
+   operator flag and a nick the hub never recorded. */
+EXO_TEST(link_route_only_relayed_commands, {
+	int ok;
+	if (!lt_server_handshake() || !lt_add_local_users())
+	{
+		lt_remove_local_users();
+		return 0;
+	}
+	lt_send(LT_REMOTE_INF);
+	tu_queue_clear(lt_local_target);
+	lt_send("LRTE BINF AAAD NIoperator CT4\n");
+	lt_send("LRTE DINF AAAD AAAB NIoperator\n");
+	lt_send("LRTE BQUI AAAD\n");
+	lt_send("LRTE DCMD AAAD AAAB Menu TTBMSG\\s%[myNI]\n");
+	lt_send("LRTE BRES AAAD SIfile\n");
+	lt_send("LRTE ERES AAAD AAAB SIfile\n");
+	ok = !lt_p.closed && tu_queue_count(lt_local_target) == 0;
+	lt_send("LRTE BMSG AAAD hello\n");
+	lt_send("LRTE DRES AAAD AAAB SIfile\n");
+	ok = ok && lt_queued(lt_local_target, "BMSG AAAD hello")
+		&& lt_queued(lt_local_target, "DRES AAAD AAAB SIfile");
+	link_stop(lt_hub);
+	lt_remove_local_users();
+	return ok;
+});
+
 /* A description is one escaped token; a space would add fields to the hub
    INF that every client receives. */
 EXO_TEST(link_description_with_space_ignored, {
