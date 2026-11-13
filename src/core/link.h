@@ -127,6 +127,7 @@ struct hub_user;
  * nick is registered; link_auth_proxy_verify() forwards a password
  * challenge-response to the master to verify. Both return 1 if the request was
  * sent over a master link (the login should pause), 0 if no master is reachable.
+ * Only that link may answer, and if it drops first the login is refused.
  * link_auth_pending_forget() drops a user from the pending registry when it is
  * disconnected before the master replies.
  */

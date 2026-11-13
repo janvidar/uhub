@@ -367,8 +367,10 @@ A login on the slave is proxied in two steps; passwords never leave the master:
         |  (admit with that credential, or reject)
 
 The slave pauses the login while waiting for each reply (a pending-auth registry
-keyed by the tag -- SID and connection id -- tracks the held login; the existing login timeout covers an
-unreachable master). Guests are unaffected and log in locally. The master needs
+keyed by the tag -- SID and connection id -- tracks the held login and the link
+the request went out on; the existing login timeout covers an unreachable
+master). Only that link's reply settles the login, and if the link drops first
+the login is refused at once. Guests are unaffected and log in locally. The master needs
 no special flag -- it simply answers from its auth plugin -- so it is just a
 normal hub that loads the account database (mod_auth_simple / mod_auth_sqlite).
 

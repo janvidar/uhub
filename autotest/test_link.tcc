@@ -1734,6 +1734,37 @@ EXO_TEST(link_auth_untagged_reply_ignored, {
 	return ok;
 });
 
+/* A login waits on the master it asked. When that link drops, the login is
+   refused there and then: left waiting, it could be settled by whichever
+   outbound link became master next -- here a second one, granting admin. */
+EXO_TEST(link_auth_master_lost_refuses_pending, {
+	struct lt_peer other;
+	struct hub_user* u;
+	int ok;
+	memset(&other, 0, sizeof(other));
+	other.fd = -1;
+	if (!lt_client_handshake())
+		return 0;
+	u = lt_pending_user();
+	ok = link_auth_query(lt_hub, u, "Boss") == 1;
+	lt_swap(&other);                  /* keep the master; open a second link out */
+	ok = ok && lt_client_handshake_add();
+	lt_swap(&other);
+	close(lt_p.fd);                   /* the master goes away */
+	lt_p.fd = -1;
+	net_con_callback(lt_p.con, NET_EVENT_READ);
+	lt_p.con = 0;
+	ok = ok && u->auth_proxy_resolved && u->auth_proxy_cred == auth_cred_none
+		&& !link_auth_pending_has(u);
+	u->auth_proxy_resolved = 0;
+	lt_swap(&other);
+	lt_send("LACR " LT_TAG " admin\n");
+	ok = ok && !lt_p.closed && !u->auth_proxy_resolved;
+	link_auth_pending_forget(u);
+	link_stop(lt_hub);
+	return ok;
+});
+
 /* One answer per challenge: a repeated HPAS while the master has yet to reply
    is not forwarded again. */
 EXO_TEST(link_vfy_repeated_hpas_sent_once, {

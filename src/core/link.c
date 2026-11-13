@@ -174,7 +174,8 @@ static struct linked_list* g_links = 0;
 /* Slave side of master-slave auth: connecting users whose login is paused
    awaiting a master reply (LACR/LVRS), found by SID when the reply arrives. */
 static struct linked_list* g_auth_pending = 0;
-static struct hub_user* link_auth_pending_take(const char* sidstr);
+static struct hub_user* link_auth_pending_take(struct hub_link* link, const char* tagstr);
+static void link_auth_pending_fail(struct hub_link* link);
 static struct hub_link* link_master(void);
 
 /* Coordinator side (this hub is node 0 of a cluster): bitmap of which window
@@ -270,6 +271,9 @@ static void link_disconnect(struct hub_link* link)
 	/* Netsplit: drop every remote user we learned over this link before the
 	   link struct goes away, telling local clients those users have quit. */
 	link_remove_remote_users(link);
+
+	/* Auth slave: logins waiting on this link will get no answer. */
+	link_auth_pending_fail(link);
 
 	/* Coordinator side: return this member's leased window to the free pool. */
 	link_release_window(link->granted_node_id);
@@ -573,15 +577,13 @@ static int link_process_line(struct hub_link* link, const char* line)
 		/* Only the master we asked may answer: a reply settles a pending
 		   login's credential, so from any other peer it would let that peer
 		   log a user in as whoever it liked. */
-		if (link != link_master())
-		{
-			LOG_WARN("link: ignoring LACR from %s, which is not our auth master", link->peer_desc);
-			return 0;
-		}
 		credstr = link_tok(line + 5, sid, sizeof(sid));
-		user = link_auth_pending_take(sid);
+		user = link_auth_pending_take(link, sid);
 		if (!user)
-			return 0; /* user gone */
+		{
+			LOG_DEBUG("link: ignoring LACR from %s for a login it was not asked about", link->peer_desc);
+			return 0; /* user gone, or asked of another link */
+		}
 		auth_string_to_cred(credstr, &cred);
 		hub_auth_proxy_resolve(link->hub, user, cred);
 		return 0;
@@ -596,19 +598,15 @@ static int link_process_line(struct hub_link* link, const char* line)
 		struct hub_user* user;
 		if (link->state != link_state_established)
 			return -1;
-		/* Only the master we asked may answer: a reply settles a pending
-		   login's credential, so from any other peer it would let that peer
-		   log a user in as whoever it liked. */
-		if (link != link_master())
-		{
-			LOG_WARN("link: ignoring LVRS from %s, which is not our auth master", link->peer_desc);
-			return 0;
-		}
+		/* Only the master we asked may answer (see LACR). */
 		rest = link_tok(line + 5, sid, sizeof(sid));
 		link_tok(rest, okstr, sizeof(okstr));
-		user = link_auth_pending_take(sid);
+		user = link_auth_pending_take(link, sid);
 		if (!user)
+		{
+			LOG_DEBUG("link: ignoring LVRS from %s for a login it was not asked about", link->peer_desc);
 			return 0;
+		}
 		hub_auth_proxy_verified(link->hub, user, atoi(okstr));
 		return 0;
 	}
@@ -1283,18 +1281,21 @@ void link_stop(struct hub_info* hub)
 	if (!g_links)
 		return;
 
+	/* Shutting down (or restarting the link layer): drop the logins waiting
+	   on a master first, so closing the links does not refuse each of them
+	   while the hub is being torn down. The users are owned elsewhere. */
+	if (g_auth_pending)
+	{
+		list_clear(g_auth_pending, hub_free_handle);
+		list_destroy(g_auth_pending);
+		g_auth_pending = 0;
+	}
+
 	while ((link = (struct hub_link*) list_get_first(g_links)) != NULL)
 		link_disconnect(link); /* removes itself from g_links */
 
 	list_destroy(g_links);
 	g_links = 0;
-
-	if (g_auth_pending)
-	{
-		list_clear(g_auth_pending, NULL); /* entries are users owned elsewhere */
-		list_destroy(g_auth_pending);
-		g_auth_pending = 0;
-	}
 
 #ifndef WINSOCK
 	if (g_uds_listen)
@@ -1446,30 +1447,75 @@ static struct hub_link* link_master(void)
 	return 0;
 }
 
-/* Is `user` waiting on the master? Compared by pointer: the registry never
-   dereferences an entry it has not matched. */
-int link_auth_pending_has(struct hub_user* user)
+/* One login waiting on the master: the user, the link the request went out on
+   (only that link may answer it), and which request it was. */
+struct link_auth_wait
 {
-	struct hub_user* entry;
+	struct hub_user* user;
+	struct hub_link* link;
+	int verify;             /* 1: LVFY (a password check), 0: LACQ */
+};
+
+/* The entry for `user`, or for the first login waiting on `link` when user is
+   NULL. Users are compared by pointer: the registry never dereferences a user
+   it has not matched. */
+static struct link_auth_wait* link_auth_pending_find(struct hub_user* user, struct hub_link* link)
+{
+	struct link_auth_wait* entry;
 	struct node* cursor;
 	if (!g_auth_pending)
 		return 0;
-	LIST_FOREACH_SAFE(struct hub_user*, entry, g_auth_pending, cursor,
+	LIST_FOREACH_SAFE(struct link_auth_wait*, entry, g_auth_pending, cursor,
 	{
-		if (entry == user)
-			return 1;
+		if (user ? entry->user == user : entry->link == link)
+			return entry;
 	});
 	return 0;
 }
 
-/* Register `user` as waiting on the master, at most once. A client can repeat
+/* Is `user` waiting on the master? */
+int link_auth_pending_has(struct hub_user* user)
+{
+	return link_auth_pending_find(user, NULL) != NULL;
+}
+
+/* Register `user` as waiting on `link`, at most once. A client can repeat
    HPAS while its first LVFY is in flight; a second entry would outlive the user,
    since link_auth_pending_forget() runs once per disconnect, and a later reply
    would then match the freed user. */
-static void link_auth_pending_add(struct hub_user* user)
+static void link_auth_pending_add(struct hub_user* user, struct hub_link* link, int verify)
 {
-	if (g_auth_pending && !link_auth_pending_has(user))
-		list_append(g_auth_pending, user);
+	struct link_auth_wait* entry;
+	if (!g_auth_pending || link_auth_pending_has(user))
+		return;
+	entry = hub_malloc_zero(sizeof(struct link_auth_wait));
+	if (!entry)
+		return;
+	entry->user = user;
+	entry->link = link;
+	entry->verify = verify;
+	list_append(g_auth_pending, entry);
+}
+
+/* The link to the master is gone, and with it every answer still owed over it.
+   Refuse those logins now, as the master would have: waiting for the login
+   timeout leaves them for whichever link is master next to settle. A refusal
+   can disconnect the user, which forgets it, so look the next one up afresh. */
+static void link_auth_pending_fail(struct hub_link* link)
+{
+	struct link_auth_wait* entry;
+	while ((entry = link_auth_pending_find(NULL, link)) != NULL)
+	{
+		struct hub_user* user = entry->user;
+		int verify = entry->verify;
+		list_remove(g_auth_pending, entry);
+		hub_free(entry);
+		LOG_WARN("link: lost %s while %s waited on it; refusing the login", link->peer_desc, user->id.nick);
+		if (verify)
+			hub_auth_proxy_verified(link->hub, user, 0);
+		else
+			hub_auth_proxy_resolve(link->hub, user, auth_cred_none);
+	}
 }
 
 /* The tag a request to the master carries in its first field: the user's SID
@@ -1500,7 +1546,7 @@ int link_auth_query(struct hub_info* hub, struct hub_user* user, const char* nic
 	link_auth_tag(user, tag);
 	if (link_sendf(master, "LACQ %s %s\n", tag, nick) < 0)
 		return 0;
-	link_auth_pending_add(user);
+	link_auth_pending_add(user, master, 0);
 	return 1;
 }
 
@@ -1518,41 +1564,50 @@ int link_auth_proxy_verify(struct hub_info* hub, struct hub_user* user, const ch
 	link_auth_tag(user, tag);
 	if (link_sendf(master, "LVFY %s %s %s %s\n", tag, challenge, response, user->id.nick) < 0)
 		return 0;
-	link_auth_pending_add(user);
+	link_auth_pending_add(user, master, 1);
 	return 1;
 }
 
 /* Remove a user from the pending-auth registry (on disconnect/destroy). */
 void link_auth_pending_forget(struct hub_user* user)
 {
-	/* list_remove() drops one match; the registry holds at most one per user,
-	   but forgetting all of them keeps a freed user out of it regardless. */
-	while (link_auth_pending_has(user))
-		list_remove(g_auth_pending, user);
+	/* The registry holds at most one entry per user, but forgetting all of
+	   them keeps a freed user out of it regardless. */
+	struct link_auth_wait* entry;
+	while ((entry = link_auth_pending_find(user, NULL)) != NULL)
+	{
+		list_remove(g_auth_pending, entry);
+		hub_free(entry);
+	}
 }
 
 /* Find and remove the pending user matching `tagstr` (the tag echoed in the
-   master's reply, see link_auth_tag). NULL if it is gone (e.g. disconnected
-   meanwhile). */
-static struct hub_user* link_auth_pending_take(const char* tagstr)
+   master's reply, see link_auth_tag) whose request went out on `link`. NULL if
+   it is gone (e.g. disconnected meanwhile), or was asked of another link. */
+static struct hub_user* link_auth_pending_take(struct hub_link* link, const char* tagstr)
 {
 	char tag[LINK_AUTH_TAG_LEN + 1];
+	struct link_auth_wait* entry;
+	struct link_auth_wait* found = 0;
 	struct hub_user* user;
-	struct hub_user* found = 0;
+	struct node* cursor;
 	if (!g_auth_pending || strlen(tagstr) != LINK_AUTH_TAG_LEN)
 		return 0;
-	LIST_FOREACH(struct hub_user*, user, g_auth_pending,
+	LIST_FOREACH_SAFE(struct link_auth_wait*, entry, g_auth_pending, cursor,
 	{
-		link_auth_tag(user, tag);
-		if (!strcmp(tag, tagstr))
+		link_auth_tag(entry->user, tag);
+		if (entry->link == link && !strcmp(tag, tagstr))
 		{
-			found = user;
+			found = entry;
 			break;
 		}
 	});
-	if (found)
-		list_remove(g_auth_pending, found);
-	return found;
+	if (!found)
+		return 0;
+	user = found->user;
+	list_remove(g_auth_pending, found);
+	hub_free(found);
+	return user;
 }
 
 /* Reconcile a remote user's updated INF with what the hub has on record. The
