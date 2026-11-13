@@ -46,8 +46,10 @@ Phase 2 -- hub links fully authenticated:
   certificate, so renewing a certificate on the same key keeps links up.
   Replaces the shared link_secret over TCP, and with it the handshake relay
   that TLS without channel binding still allows.
-- The accepting side must ask for a client certificate on the shared port
-  without requiring one. Check that ADC clients are unaffected.
+- The accepting side asks every connection on the shared port for a client
+  certificate without requiring one. ADC clients generally offer none and are
+  unaffected; the handshake accepts any certificate, and link_accept then
+  requires one whose key is pinned (ADC and HTTP ignore it).
 - Remove the plain-TCP link path.
 
 Phase 3 -- remove the off switches:
