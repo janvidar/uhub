@@ -708,10 +708,16 @@ EXO_TEST(link_route_one_line_only, {
 
 static struct hub_user lt_user;
 
+/* The slave tags a request with the user's SID and connection id, and only a
+   reply carrying the same tag settles it. */
+#define LT_CONN_ID 0x1f
+#define LT_TAG "AAAB.0000001f"
+
 static struct hub_user* lt_pending_user(void)
 {
 	memset(&lt_user, 0, sizeof(lt_user));
 	lt_user.id.sid = string_to_sid("AAAB");
+	lt_user.connection_id = LT_CONN_ID;
 	return &lt_user;
 }
 
@@ -737,7 +743,7 @@ EXO_TEST(link_acq_sent, {
 	sent = link_auth_query(lt_hub, u, "Good Nick");
 	link_auth_pending_forget(u);
 	lt_drain();
-	return sent == 1 && !strcmp(lt_p.out, "LACQ AAAB Good Nick\n");
+	return sent == 1 && !strcmp(lt_p.out, "LACQ " LT_TAG " Good Nick\n");
 });
 
 EXO_TEST(link_acq_crlf_not_sent, {
@@ -771,7 +777,7 @@ EXO_TEST(link_vfy_long_nick_sent, {
 	sent = link_auth_proxy_verify(lt_hub, u, chal, resp);
 	link_auth_pending_forget(u);
 	lt_drain();
-	snprintf(expect, sizeof(expect), "LVFY AAAB %s %s %s\n", chal, resp, u->id.nick);
+	snprintf(expect, sizeof(expect), "LVFY " LT_TAG " %s %s %s\n", chal, resp, u->id.nick);
 	return sent == 1 && !strcmp(lt_p.out, expect);
 });
 
@@ -1054,14 +1060,14 @@ EXO_TEST(link_auth_reply_only_from_master, {
 	ok = lt_server_handshake_add();
 	if (ok)
 	{
-		lt_send("LACR AAAB admin\n");
-		lt_send("LVRS AAAB 1 admin\n");
+		lt_send("LACR " LT_TAG " admin\n");
+		lt_send("LVRS " LT_TAG " 1 admin\n");
 		ok = !lt_p.closed && !u->auth_proxy_resolved;
 	}
 	lt_swap(&master);
 	if (ok)
 	{
-		lt_send("LACR AAAB user\n");
+		lt_send("LACR " LT_TAG " user\n");
 		ok = u->auth_proxy_resolved && u->auth_proxy_cred == auth_cred_user;
 	}
 	link_auth_pending_forget(u);
@@ -1134,7 +1140,7 @@ static int lt_slave_resolves(const char* reply, enum auth_credentials expect)
 	u = lt_pending_user();
 	if (link_auth_query(lt_hub, u, "nick") != 1)
 		return 0;
-	snprintf(line, sizeof(line), "LACR AAAB %s\n", reply);
+	snprintf(line, sizeof(line), "LACR " LT_TAG " %s\n", reply);
 	lt_send(line);
 	ok = u->auth_proxy_resolved && u->auth_proxy_cred == expect;
 	link_auth_pending_forget(u);
@@ -1164,7 +1170,7 @@ static int lt_repeat_then_forget(int verify)
 		sent = link_auth_query(lt_hub, u, "nick")
 			+ link_auth_query(lt_hub, u, "nick");
 	link_auth_pending_forget(u);
-	lt_send("LACR AAAB admin\n");
+	lt_send("LACR " LT_TAG " admin\n");
 	return sent == 2 && !lt_p.closed && !u->auth_proxy_resolved;
 }
 
@@ -1180,10 +1186,10 @@ EXO_TEST(link_acq_repeated_answered_once, {
 	u = lt_pending_user();
 	if (link_auth_query(lt_hub, u, "nick") + link_auth_query(lt_hub, u, "nick") != 2)
 		return 0;
-	lt_send("LACR AAAB admin\n");
+	lt_send("LACR " LT_TAG " admin\n");
 	ok = u->auth_proxy_resolved && u->auth_proxy_cred == auth_cred_admin;
 	u->auth_proxy_resolved = 0;
-	lt_send("LACR AAAB user\n");
+	lt_send("LACR " LT_TAG " user\n");
 	ok = ok && !u->auth_proxy_resolved;
 	link_auth_pending_forget(u);
 	return ok;
@@ -1253,3 +1259,40 @@ static int lt_kick_remote(const char* after)
 
 EXO_TEST(link_kicked_remote_then_quit, { return lt_kick_remote("LQUI AAAD\n"); });
 EXO_TEST(link_kicked_remote_then_link_lost, { return lt_kick_remote(NULL); });
+
+/* A SID is handed to the next user once its holder leaves. A late reply for
+   the old login names the old connection, and must not settle the new one --
+   which may be waiting on the master for a different nick. */
+EXO_TEST(link_auth_reply_for_previous_sid_holder_ignored, {
+	struct hub_user* u;
+	int ok;
+	if (!lt_client_handshake())
+		return 0;
+	u = lt_pending_user();            /* AAAB, connection 0x1f: asks, leaves */
+	ok = link_auth_query(lt_hub, u, "unregistered") == 1;
+	link_auth_pending_forget(u);
+	u = lt_pending_user();            /* AAAB again, a later connection */
+	u->connection_id = LT_CONN_ID + 1;
+	ok = ok && link_auth_query(lt_hub, u, "Boss") == 1;
+	lt_send("LACR " LT_TAG " guest\n");    /* the old login's answer */
+	ok = ok && !u->auth_proxy_resolved;
+	lt_send("LACR AAAB.00000020 operator\n");
+	ok = ok && u->auth_proxy_resolved && u->auth_proxy_cred == auth_cred_operator;
+	link_auth_pending_forget(u);
+	return ok;
+});
+
+/* A reply naming only the SID settles nothing. */
+EXO_TEST(link_auth_untagged_reply_ignored, {
+	struct hub_user* u;
+	int ok;
+	if (!lt_client_handshake())
+		return 0;
+	u = lt_pending_user();
+	ok = link_auth_query(lt_hub, u, "nick") == 1;
+	lt_send("LACR AAAB admin\n");
+	lt_send("LVRS AAAB 1 admin\n");
+	ok = ok && !lt_p.closed && !u->auth_proxy_resolved;
+	link_auth_pending_forget(u);
+	return ok;
+});
