@@ -263,18 +263,22 @@ void* list_get_prev(struct linked_list* list)
 }
 
 
+/* The cursor holds the node AFTER the one returned, read before the caller's
+   loop body runs, so the body may remove (and free) the element it is on. */
 void* list_iterator_first(struct linked_list* list, struct node** cursor)
 {
-	*cursor = list->first;
-	return *cursor ? (*cursor)->ptr : NULL;
+	struct node* node = list->first;
+	*cursor = node ? node->next : NULL;
+	return node ? node->ptr : NULL;
 }
 
 void* list_iterator_next(struct node** cursor)
 {
-	if (*cursor == NULL)
+	struct node* node = *cursor;
+	if (node == NULL)
 		return NULL;
 
-	*cursor = (*cursor)->next;
-	return *cursor ? (*cursor)->ptr : NULL;
+	*cursor = node->next;
+	return node->ptr;
 }
 

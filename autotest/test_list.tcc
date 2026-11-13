@@ -384,6 +384,49 @@ EXO_TEST(list_iterator_basic, {
 	return ok && n == 3;
 });
 
+/* The body may remove the element it is on -- here every one of them, which
+   frees each node the walk is standing on (ASan would say so) -- and the walk
+   still visits every element once. */
+EXO_TEST(list_iterator_remove_current, {
+	struct linked_list* l = list_create();
+	struct node* cur;
+	char* item;
+	int n = 0;
+	list_append(l, A);
+	list_append(l, B);
+	list_append(l, C);
+	LIST_FOREACH_SAFE(char*, item, l, cur, {
+		list_remove(l, item);
+		n++;
+	});
+	n = (n == 3 && list_size(l) == 0) ? n : -1;
+	list_destroy(l);
+	return n == 3;
+});
+
+/* Removing the middle element while on it leaves the rest of the walk intact. */
+EXO_TEST(list_iterator_remove_middle, {
+	struct linked_list* l = list_create();
+	struct node* cur;
+	char* item;
+	int seen_c = 0;
+	int n = 0;
+	list_append(l, A);
+	list_append(l, B);
+	list_append(l, C);
+	LIST_FOREACH_SAFE(char*, item, l, cur, {
+		if (item == B)
+			list_remove(l, item);
+		if (item == C)
+			seen_c = 1;
+		n++;
+	});
+	n = (n == 3 && seen_c && list_size(l) == 2) ? n : -1;
+	list_clear(l, &null_free);
+	list_destroy(l);
+	return n == 3;
+});
+
 /*
  * The reason the reentrant iterator exists: a walk nested inside another walk of
  * the SAME list must not disturb the outer walk. With the old shared-cursor

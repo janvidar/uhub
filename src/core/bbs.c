@@ -653,7 +653,6 @@ void bbs_subscriptions_reattach(struct hub_info* hub)
 
 	LIST_FOREACH_SAFE(struct hub_user*, user, hub->users->list, ucur,
 	{
-		int dropped = 0;
 		if (!user->bbs_subs)
 			continue;
 		LIST_FOREACH_SAFE(struct bbs_subscription*, sub, user->bbs_subs, scur,
@@ -666,26 +665,15 @@ void bbs_subscriptions_reattach(struct hub_info* hub)
 			   this session may no longer subscribe to, takes the
 			   subscription with it. */
 			if (board && (bbs_board_permissions(board, user->credentials) & (1 << bbs_perm_subscribe)))
-				sub->board = board;
-			else
-				dropped = 1;
-		});
-		/* Removed after the walk: the cursor is the current node, so freeing
-		   it mid-walk would leave the walk on freed memory. */
-		while (dropped)
-		{
-			dropped = 0;
-			LIST_FOREACH_SAFE(struct bbs_subscription*, sub, user->bbs_subs, scur,
 			{
-				if (!sub->board)
-				{
-					list_remove(user->bbs_subs, sub);
-					hub_free(sub);
-					dropped = 1;
-					break;
-				}
-			});
-		}
+				sub->board = board;
+			}
+			else
+			{
+				list_remove(user->bbs_subs, sub);
+				hub_free(sub);
+			}
+		});
 	});
 }
 

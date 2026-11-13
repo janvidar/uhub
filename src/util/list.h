@@ -73,8 +73,10 @@ extern struct node* list_get_last_node(struct linked_list*);
  * the first (e.g. a plugin hook invoked mid-dispatch that itself triggers
  * plugin dispatch). Use LIST_FOREACH_SAFE with a local cursor variable.
  *
- * Removing the current node during the walk still invalidates the cursor, just
- * as it does for the shared-cursor variant; do not mutate the list mid-walk.
+ * The cursor already points past the element being visited, so the loop body
+ * may remove that element -- a disconnect inside a walk of the user list, say.
+ * Removing any OTHER element, the next one in particular, still invalidates
+ * the cursor.
  */
 extern void* list_iterator_first(struct linked_list* list, struct node** cursor);
 extern void* list_iterator_next(struct node** cursor);
