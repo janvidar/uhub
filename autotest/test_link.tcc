@@ -1060,6 +1060,95 @@ EXO_TEST(link_route_only_relayed_commands, {
 	return ok;
 });
 
+#define LT_REMOTE_ID "IDBN7ZMSLIEBL53OPTM7WXGSTXUS3XOY6KQS5LBGX"
+
+/* Presence is a BINF. Another message carrying a nick and a CID used to become
+   the user's INF, and so what every client was sent for that user. */
+EXO_TEST(link_inf_not_binf_ignored, {
+	int ok;
+	if (!lt_server_handshake() || !lt_add_local_users())
+	{
+		lt_remove_local_users();
+		return 0;
+	}
+	tu_queue_clear(lt_local_target);
+	lt_send("LINF BMSG AAAD " LT_REMOTE_ID " NIremote\n");
+	lt_send("LINF DCTM AAAD AAAB " LT_REMOTE_ID " NIremote\n");
+	ok = !lt_p.closed && !uman_get_user_by_sid(lt_hub->users, string_to_sid("AAAD"))
+		&& !uman_get_user_by_nick(lt_hub->users, "remote")
+		&& tu_queue_count(lt_local_target) == 0;
+	link_stop(lt_hub);
+	lt_remove_local_users();
+	return ok;
+});
+
+/* Send an update for the remote user AAAD; return it, as the hub now has it. */
+static struct hub_user* lt_remote_update(const char* fields)
+{
+	lt_send(LT_REMOTE_INF);
+	lt_sendf("LINF BINF AAAD %s\n", fields);
+	return uman_get_user_by_sid(lt_hub->users, string_to_sid("AAAD"));
+}
+
+/* A nick changed on the peer (a plugin may allow it) is re-indexed: the new
+   nick finds the user, and the old one is free again. */
+EXO_TEST(link_inf_update_renames, {
+	struct hub_user* remote;
+	int ok;
+	if (!lt_server_handshake())
+		return 0;
+	remote = lt_remote_update(LT_REMOTE_ID " NIrenamed");
+	ok = remote && !strcmp(remote->id.nick, "renamed")
+		&& uman_get_user_by_nick(lt_hub->users, "renamed") == remote
+		&& !uman_get_user_by_nick(lt_hub->users, "remote");
+	link_stop(lt_hub);
+	return ok;
+});
+
+/* A rename to a nick taken here keeps the old nick, in the hub's record and
+   in the INF clients see: two users must not show one nick. */
+EXO_TEST(link_inf_update_rename_taken_kept, {
+	struct hub_user* remote;
+	char* ni = NULL;
+	int ok;
+	if (!lt_server_handshake() || !lt_add_local_users())
+	{
+		lt_remove_local_users();
+		return 0;
+	}
+	remote = lt_remote_update(LT_REMOTE_ID " NIoperator SS42");
+	if (remote)
+		ni = adc_msg_get_named_argument(remote->info, ADC_INF_FLAG_NICK);
+	ok = !lt_p.closed && remote && !strcmp(remote->id.nick, "remote")
+		&& ni && !strcmp(ni, "remote")
+		&& adc_msg_has_named_argument(remote->info, "SS")
+		&& uman_get_user_by_nick(lt_hub->users, "remote") == remote
+		&& uman_get_user_by_nick(lt_hub->users, "operator") == lt_local_op;
+	hub_free(ni);
+	link_stop(lt_hub);
+	lt_remove_local_users();
+	return ok;
+});
+
+/* A CID never changes. An update naming another is not applied: clients
+   would see a CID the hub has no record of. */
+EXO_TEST(link_inf_update_cid_change_ignored, {
+	struct hub_user* remote;
+	char* id = NULL;
+	int ok;
+	if (!lt_server_handshake())
+		return 0;
+	remote = lt_remote_update("ID" LT_CID " NIremote SS42");
+	if (remote)
+		id = adc_msg_get_named_argument(remote->info, ADC_INF_FLAG_CLIENT_ID);
+	ok = !lt_p.closed && remote && id && !strcmp(id, LT_REMOTE_ID + 2)
+		&& !adc_msg_has_named_argument(remote->info, "SS")
+		&& !uman_get_user_by_cid(lt_hub->users, LT_CID);
+	hub_free(id);
+	link_stop(lt_hub);
+	return ok;
+});
+
 /* A description is one escaped token; a space would add fields to the hub
    INF that every client receives. */
 EXO_TEST(link_description_with_space_ignored, {

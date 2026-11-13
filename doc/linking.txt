@@ -283,7 +283,10 @@ Live changes propagate as deltas over the same commands:
   - a local user leaving                        -> LQUI <sid> to every link
 
 An LINF for a SID already known on the receiver is treated as an update; an
-LQUI removes the remote user and tells local clients it quit.
+LQUI removes the remote user and tells local clients it quit. An LINF must
+carry a BINF. An update that names another CID is ignored; one that renames
+the user is applied, unless the new nick is taken on the receiver, which then
+keeps the old nick in the INF it shows its clients.
 
 
 == Message routing across links ==

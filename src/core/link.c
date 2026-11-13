@@ -1554,15 +1554,58 @@ static struct hub_user* link_auth_pending_take(const char* tagstr)
 	return found;
 }
 
+/* Reconcile a remote user's updated INF with what the hub has on record. The
+   peer sends the full INF each time, so it names the user's CID and nick. A
+   CID never changes: an update naming another is refused (-1). A nick may,
+   where a plugin allows it on the peer; it is re-indexed here, or, if the new
+   nick is not valid or is taken on this side, the old one is put back in the
+   INF so clients keep seeing the nick the hub knows the user by. */
+static int link_remote_inf_update(struct hub_link* link, struct hub_user* user, struct adc_message* info)
+{
+	char* cid = adc_msg_get_named_argument(info, ADC_INF_FLAG_CLIENT_ID);
+	char* nick_raw = adc_msg_get_named_argument(info, ADC_INF_FLAG_NICK);
+	char* nick = nick_raw ? adc_msg_unescape(nick_raw) : NULL;
+	int ret = 0;
+
+	if (!cid || strcmp(cid, user->id.cid))
+	{
+		LOG_WARN("link: %s changed the CID of remote user %s; ignoring the update",
+			link->peer_desc, user->id.nick);
+		ret = -1;
+	}
+	else if (!nick || strcmp(nick, user->id.nick))
+	{
+		if (!nick || !*nick || strlen(nick) > MAX_NICK_LEN
+			|| uman_change_nick(link->hub->users, user, nick) != 0)
+		{
+			char* old = adc_msg_escape(user->id.nick);
+			LOG_WARN("link: %s renamed remote user %s to a nick that is invalid or taken; keeping the old one",
+				link->peer_desc, user->id.nick);
+			if (!old || adc_msg_replace_named_argument(info, ADC_INF_FLAG_NICK, old) < 0)
+				ret = -1;
+			hub_free(old);
+		}
+	}
+
+	hub_free(cid);
+	hub_free(nick_raw);
+	hub_free(nick);
+	return ret;
+}
+
 /* Inject a remote user from a peer's INF, and announce it to local clients. */
 static void link_handle_remote_inf(struct hub_link* link, const char* binf)
 {
 	struct adc_message* info = adc_msg_parse(binf, strlen(binf));
 	struct hub_user* user;
 
-	if (!info)
+	/* Presence is a BINF. Anything else carrying a nick and a CID would become
+	   the user's INF: sent to every client as it logs in, and a directed one
+	   forwarded over every link once per remote user there. */
+	if (!info || info->cmd != ADC_CMD_BINF)
 	{
 		LOG_WARN("link: malformed remote INF from %s", link->peer_desc);
+		adc_msg_free(info);
 		return;
 	}
 
@@ -1573,6 +1616,11 @@ static void link_handle_remote_inf(struct hub_link* link, const char* binf)
 		if (user->origin_link != link)
 		{
 			/* SID owned by a local user or another link -- ignore (B5). */
+			adc_msg_free(info);
+			return;
+		}
+		if (link_remote_inf_update(link, user, info) < 0)
+		{
 			adc_msg_free(info);
 			return;
 		}
