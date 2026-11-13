@@ -349,6 +349,12 @@ the same config and therefore the same files. Cross-machine nodes do not share
 a filesystem; authentication for them is handled by the master-slave scheme
 below, and ban/topic state by the propagation above.
 
+The ACL file (file_acl, users.conf) is not propagated, and every node must
+load the same one. A login is checked against the ACL of the node the user
+connects to; the other nodes accept that user as announced and do not check
+it against their own. A node with a shorter deny list is therefore a way in
+for everyone it leaves out.
+
 Note: only live changes propagate today. A node that links in *later* does not
 yet receive the existing bans or the current topic (an initial snapshot on link
 establish is a follow-up). The topic is also seeded consistently from each
