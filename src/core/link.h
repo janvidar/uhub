@@ -44,9 +44,10 @@
  * TODO (auth hardening): the shared `link_secret` is a plaintext config value
  * with the same drawbacks as plaintext passwords -- one secret for all peers,
  * no per-hub identity, no rotation/revocation, readable by anyone with config
- * access. The handshake also authenticates only itself: the traffic after it
- * is neither encrypted nor integrity-protected, so the transport must be
- * trusted. The better long-term mechanism is mutual TLS with per-peer
+ * access. The handshake also authenticates only itself: it is not bound to the
+ * TLS session a hub with tls_enable dials its peers over, and without TLS the
+ * traffic after it is neither encrypted nor integrity-protected, so the
+ * transport must be trusted. The better long-term mechanism is mutual TLS with per-peer
  * certificate pinning -- per-hub identity, revocable, and protecting the whole
  * session.
  */
@@ -167,7 +168,8 @@ extern int link_accept(struct hub_info* hub, struct net_connection* con, struct 
 /**
  * Run the link protocol on an already-connected connection: link_accept() is
  * this with is_client = 0. is_client says which side of the handshake we are
- * (1 = we opened the connection). desc names the peer in log messages.
+ * (1 = we opened the connection); a side that opened it starts TLS first when
+ * tls_enable is set. desc names the peer in log messages.
  *
  * @return 1 if the connection was taken over, 0 if rejected (caller closes it).
  */

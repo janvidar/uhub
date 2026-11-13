@@ -166,10 +166,15 @@ struct hub_link
 	char* peer_desc;                        /* for logging */
 	int granted_node_id;                    /* coordinator side: window index granted to this link, or -1 */
 	int window_requested;                   /* member side: we sent LWRQ here and await LWIN */
+	int tls_pending;                        /* outbound: TLS handshake under way, LCHA not sent yet */
 };
 
 /* All active links (singleton hub), for teardown. */
 static struct linked_list* g_links = 0;
+
+/* Client TLS context for dialling peers, made on first use. Identity comes
+   from the link handshake, so the peer's certificate is not verified here. */
+static struct ssl_context_handle* g_link_tls = 0;
 
 /* Slave side of master-slave auth: connecting users whose login is paused
    awaiting a master reply (LACR/LVRS), found by SID when the reply arrives. */
@@ -259,6 +264,7 @@ static void link_become_coordinator(struct hub_info* hub)
 	LOG_INFO("link: won SID-window election -> coordinator (window 0 of %d)", g_win_count);
 }
 
+static int  link_begin_handshake(struct hub_link* link);
 static void link_send_inf(struct hub_link* link, struct hub_user* user);
 static void link_send_roster(struct hub_link* link);
 static void link_handle_remote_inf(struct hub_link* link, const char* binf);
@@ -899,11 +905,23 @@ static void link_net_event(struct net_connection* con, int events, void* arg)
 	}
 	if (events & NET_EVENT_ERROR)
 	{
+		if (link->tls_pending)
+			LOG_WARN("link: TLS handshake with %s failed", link->peer_desc);
 		link_disconnect(link);
 		return;
 	}
 	if (events & NET_EVENT_READ)
 	{
+		/* Our outbound TLS handshake has completed: the link protocol starts. */
+		if (link->tls_pending)
+		{
+			link->tls_pending = 0;
+			if (link_begin_handshake(link) < 0)
+			{
+				link_disconnect(link);
+				return;
+			}
+		}
 		if (link_handle_read(link) < 0)
 			link_disconnect(link);
 	}
@@ -931,6 +949,40 @@ static int link_begin_handshake(struct hub_link* link)
 	return link_sendf(link, "LCHA %s\n", link->nonce);
 }
 
+/* Start the link protocol on a link we dialled over TCP. A hub with tls_enable
+   speaks TLS to its peers -- and accepts nothing else from them -- so it first
+   runs a TLS handshake and sends LCHA once that completes (link_net_event).
+   Returns -1 if the link cannot start. */
+static int link_open_outbound(struct hub_link* link)
+{
+	struct hub_config* cfg = link->hub->config;
+	ssize_t ret;
+
+	if (!cfg->tls_enable)
+		return link_begin_handshake(link);
+
+	if (!g_link_tls)
+		g_link_tls = net_ssl_context_create(cfg->tls_version, cfg->tls_ciphersuite, cfg->tls_ciphersuites);
+	if (!g_link_tls)
+	{
+		LOG_ERROR("link: could not create a TLS context to connect to %s", link->peer_desc);
+		return -1;
+	}
+
+	link->tls_pending = 1;
+	net_con_update(link->connection, NET_EVENT_READ | NET_EVENT_WRITE);
+	ret = net_con_ssl_handshake(link->connection, net_con_ssl_mode_client, g_link_tls);
+	if (ret < 0)
+		return -1;
+	if (ret > 0)
+	{
+		/* Completed at once; no event will say so. */
+		link->tls_pending = 0;
+		return link_begin_handshake(link);
+	}
+	return 0;
+}
+
 int link_adopt(struct hub_info* hub, struct net_connection* con, int is_client, const char* desc)
 {
 	struct hub_link* link;
@@ -948,6 +1000,13 @@ int link_adopt(struct hub_info* hub, struct net_connection* con, int is_client, 
 	link->connection = con;
 	net_con_reinitialize(con, link_net_event, link, NET_EVENT_READ);
 	net_con_set_timeout(con, LINK_TIMEOUT);
+
+	if (is_client)
+	{
+		if (link_open_outbound(link) < 0)
+			link_disconnect(link);
+		return 1;
+	}
 
 	/* An accepted peer's "LCHA <nonce>" is still buffered (probe used peek),
 	   so our first read will see it; send our own challenge now. */
@@ -987,7 +1046,7 @@ static void link_connect_callback(struct net_connect_handle* handle, enum net_co
 	link->connection = con;
 	net_con_reinitialize(con, link_net_event, link, NET_EVENT_READ);
 	net_con_set_timeout(con, LINK_TIMEOUT);
-	if (link_begin_handshake(link) < 0)
+	if (link_open_outbound(link) < 0)
 		link_disconnect(link);
 }
 
@@ -1323,6 +1382,12 @@ void link_stop(struct hub_info* hub)
 	hub_free(g_win_used);
 	g_win_used = 0;
 	g_win_count = 0;
+
+	if (g_link_tls)
+	{
+		net_ssl_context_destroy(g_link_tls);
+		g_link_tls = 0;
+	}
 }
 
 /* Send one user's INF to the peer as "LINF <binf>". user->info->cache is a

@@ -40,6 +40,12 @@ first bytes. The probe in src/core/probe.c recognises this prefix -- exactly as
 it recognises "HSUP" for an ADC client or a TLS ClientHello -- and hands the
 connection to link_accept() instead of the client login path.
 
+A hub with tls_enable set (the default) dials its TCP peers over TLS. The
+probe recognises the TLS ClientHello, completes the handshake and finds "LCHA"
+in the decrypted stream, as it does for ADC and HTTP. The link handshake below
+then runs inside TLS. The peer's certificate is not checked: the link
+handshake is what authenticates the peer.
+
 Messages are newline-terminated text. Every command is a four-character code
 ("FOURCC"), mirroring ADC's framing of one context character ('L' for link)
 plus a three-letter command, optionally followed by a space and arguments.
@@ -140,9 +146,13 @@ peer_nonce)), uhub 0.7.0 - 0.8.0) let a peer without the secret complete the
 handshake by reflecting the hub's own challenge. There is no fallback: every
 hub and worker in a cluster must run a version with the v2 handshake.
 
-The handshake authenticates the peer only. The traffic that follows is neither
-encrypted nor integrity-protected, so links must run over a trusted network or
-transport.
+The handshake authenticates the peer only. Over TLS (see "Transport and
+detection") the traffic that follows is encrypted and integrity-protected, but
+the handshake is not bound to the TLS session: an attacker who can intercept
+the connection could end one TLS session at each hub and relay the handshake
+between them. Without TLS -- a hub with tls_enable off -- the traffic is
+neither encrypted nor integrity-protected. Either way, links must run over a
+trusted network or transport.
 
 
 == Command reference ==
@@ -435,7 +445,7 @@ treat the shared secret as the recommended long-term mechanism.
 
 Implemented and tested (two nodes / star-to-a-coordinator, and multi-process):
   - probe-based link detection and the mutual LCHA/LRES/LACK handshake, over
-    TCP or a Unix socket
+    TCP (TLS when tls_enable is set) or a Unix socket
   - static and dynamic SID partitioning; window leasing (LWRQ/LWIN)
   - coordinator election (LELC)
   - roster snapshot and live join/update/quit deltas (LINF/LQUI)
@@ -459,8 +469,6 @@ Not yet implemented:
     propagate). Runtime bans are in-memory (not written to file_acl).
   - The auth slave proxies to its first established upstream link (single-master
     topology); there is no auth-master election or failover.
-  - TLS-wrapped links: detection is plaintext-only; a TLS link needs a
-    post-handshake re-probe.
   - Reconnect/backoff: a failed outbound link is attempted once.
   - Cluster-wide nick/CID collision precedence (the propagation-window race),
     and aggregate hub counts across nodes.

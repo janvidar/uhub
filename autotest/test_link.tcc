@@ -214,6 +214,7 @@ static void lt_fresh(void)
 	lt_hub->config->link_secret = hub_strdup(LT_SECRET);
 	lt_hub->config->node_count = 2;
 	lt_hub->config->node_id = lt_node_id;
+	lt_hub->config->tls_enable = 0; /* the socketpair peer speaks plain text; see "Links over TLS" */
 	acl_initialize(lt_hub->config, lt_hub->acl);
 	link_start(lt_hub);
 }
@@ -1926,5 +1927,77 @@ EXO_TEST(link_tls_accepted_reads_buffered_challenge, {
 	ok = strstr(lt_t.in, "LCHA ") && strstr(lt_t.in, "\nLRES ");
 done:
 	lt_tls_close(owned);
+	return ok;
+});
+
+/* The first line the test received that starts with prefix; the rest of it
+   (without the newline) goes to out. */
+static int lt_tls_find(const char* prefix, char* out, size_t outsz)
+{
+	const char* p = lt_t.in;
+	size_t plen = strlen(prefix);
+	while (p && *p)
+	{
+		const char* nl = strchr(p, '\n');
+		size_t len = nl ? (size_t) (nl - p) : strlen(p);
+		if (len >= plen && !strncmp(p, prefix, plen))
+		{
+			size_t rest = len - plen;
+			if (rest >= outsz)
+				rest = outsz - 1;
+			memcpy(out, p + plen, rest);
+			out[rest] = 0;
+			return 1;
+		}
+		p = nl ? nl + 1 : NULL;
+	}
+	return 0;
+}
+
+static void lt_tls_send(const char* line)
+{
+	net_con_send(lt_t.con, line, strlen(line));
+	lt_tls_pump();
+}
+
+/* A hub with tls_enable dials its peers over TLS: the first bytes on the wire
+   are a TLS record, not "LCHA", and the whole link handshake runs inside it. */
+EXO_TEST(link_tls_dialled_over_tls, {
+	char raw[1];
+	char client_nonce[LINK_NONCE_LEN + 8];
+	char resp[LINK_AUTH_RESPONSE_LEN + 8];
+	char expect[LINK_AUTH_RESPONSE_LEN + 1];
+	char line[128];
+	int i;
+	int ok = 0;
+	int owned = 0;
+	lt_fresh();
+	lt_hub->config->tls_enable = 1;
+	if (!lt_tls_open())
+		goto done;
+	owned = link_adopt(lt_hub, lt_t.link_con, 1, "test-peer");
+	if (!owned)
+		goto done;
+	for (i = 0; i < 50 && recv(lt_t.raw_fd, raw, 1, MSG_PEEK) != 1; i++)
+		net_con_callback(lt_t.link_con, NET_EVENT_READ);
+	if (i == 50 || raw[0] != 0x16)   /* a TLS handshake record */
+		goto done;
+	net_con_ssl_handshake(lt_t.con, net_con_ssl_mode_server, lt_t.server_ctx);
+	lt_tls_pump();
+	if (!lt_tls_find("LCHA ", client_nonce, sizeof(client_nonce)))
+		goto done;
+	snprintf(line, sizeof(line), "LCHA %s\n", LT_PEER_NONCE);
+	lt_tls_send(line);
+	link_auth_response(LT_SECRET, client_nonce, LT_PEER_NONCE, 1, expect);
+	if (!lt_tls_find("LRES ", resp, sizeof(resp)) || strcmp(resp, expect))
+		goto done;
+	link_auth_response(LT_SECRET, client_nonce, LT_PEER_NONCE, 0, resp);
+	snprintf(line, sizeof(line), "LRES %s\n", resp);
+	lt_tls_send(line);
+	lt_tls_send("LACK\n");
+	ok = lt_tls_find("LACK", line, sizeof(line)) && lt_tls_find("LELC ", line, sizeof(line));
+done:
+	lt_tls_close(owned);
+	lt_hub->config->tls_enable = 0;
 	return ok;
 });
