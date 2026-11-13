@@ -1392,3 +1392,35 @@ EXO_TEST(link_member_does_not_coordinate, {
 		close(coordinator.fd);
 	return ok;
 });
+
+/* -------------------------------------------------------------------------
+ * SID window lease, coordinator side (node_id = 0)
+ * ------------------------------------------------------------------------- */
+
+/* Count the lines the link sent that start with prefix. */
+static int lt_count(const char* prefix)
+{
+	const char* p = lt_p.out;
+	size_t plen = strlen(prefix);
+	int n = 0;
+	while (p && *p)
+	{
+		const char* nl = strchr(p, '\n');
+		if (!strncmp(p, prefix, plen))
+			n++;
+		p = nl ? nl + 1 : NULL;
+	}
+	return n;
+}
+
+/* A link holds one lease. A repeated request is ignored; it used to take a
+   second window and lose track of the first, which then never returned to the
+   pool. With node_count 2 there is one window to lease, so the second grant
+   was a refusal that closed the link. */
+EXO_TEST(link_window_one_lease_per_link, {
+	if (!lt_server_handshake())
+		return 0;
+	lt_send("LWRQ\n");
+	lt_send("LWRQ\n");
+	return !lt_p.closed && lt_count("LWIN ") == 1 && !lt_find("LERR", NULL, 0);
+});

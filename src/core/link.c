@@ -652,6 +652,14 @@ static int link_process_line(struct hub_link* link, const char* line)
 			LOG_DEBUG("link: ignoring window request from %s; not a coordinator", link->peer_desc);
 			return 0;
 		}
+		if (link->granted_node_id > 0)
+		{
+			/* One lease per link: granting another would overwrite the record
+			   of the first, which would then never return to the pool. */
+			LOG_WARN("link: %s already holds window %d; ignoring repeated request",
+				link->peer_desc, link->granted_node_id);
+			return 0;
+		}
 		idx = link_grant_window();
 		if (idx < 0)
 		{
