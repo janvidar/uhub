@@ -40,9 +40,11 @@ first bytes. The probe in src/core/probe.c recognises this prefix -- exactly as
 it recognises "HSUP" for an ADC client or a TLS ClientHello -- and hands the
 connection to link_accept() instead of the client login path.
 
-A hub with tls_enable set (the default) dials its TCP peers over TLS. The
-probe recognises the TLS ClientHello, completes the handshake and finds "LCHA"
-in the decrypted stream, as it does for ADC and HTTP. The link handshake below
+A hub with tls_enable set (the default) dials its TCP peers over TLS, and
+refuses a plain-text link on its port. The probe recognises the TLS
+ClientHello, completes the handshake and finds "LCHA" in the decrypted stream,
+as it does for ADC and HTTP. Every node in a cluster therefore needs the same
+tls_enable setting. Unix-socket links are not wrapped, on either side. The link handshake below
 then runs inside TLS. The peer's certificate is not checked: the link
 handshake is what authenticates the peer.
 

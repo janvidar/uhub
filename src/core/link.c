@@ -1027,6 +1027,15 @@ int link_adopt(struct hub_info* hub, struct net_connection* con, int is_client, 
 
 int link_accept(struct hub_info* hub, struct net_connection* con, struct ip_addr_encap* addr)
 {
+	/* A hub with tls_enable dials its peers over TLS, so a plain-text link
+	   on its port is a peer that is out of date or misconfigured -- or not
+	   one of ours. Unix-socket links do not come through here. */
+	if (hub->config->tls_enable && !net_con_is_ssl(con))
+	{
+		LOG_WARN("link: refusing a plain-text link from %s; this hub requires TLS (tls_enable)",
+			ip_convert_to_string(addr));
+		return 0;
+	}
 	return link_adopt(hub, con, 0, ip_convert_to_string(addr));
 }
 

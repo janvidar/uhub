@@ -9,6 +9,7 @@
 #include "adc/sid.h"
 #include "network/network.h"
 #include "network/connection.h"
+#include "network/ipcalc.h"
 #include "core/auth.h"
 #include "core/config.h"
 #include "core/eventid.h"
@@ -1893,11 +1894,14 @@ static void lt_tls_pump(void)
    probe has peeked at it, where no read event will announce it. The link reads
    it straight away and answers. */
 EXO_TEST(link_tls_accepted_reads_buffered_challenge, {
+	struct ip_addr_encap addr;
 	char peek[8];
 	int i;
 	int ok = 0;
 	int owned = 0;
 	lt_fresh();
+	lt_hub->config->tls_enable = 1;
+	ip_convert_to_binary("127.0.0.1", &addr);
 	if (!lt_tls_open())
 		goto done;
 	net_con_ssl_handshake(lt_t.link_con, net_con_ssl_mode_server, lt_t.server_ctx);
@@ -1908,7 +1912,7 @@ EXO_TEST(link_tls_accepted_reads_buffered_challenge, {
 	net_con_send(lt_t.con, "LCHA " LT_CLIENT_NONCE "\n", 5 + LINK_NONCE_LEN + 1);
 	for (i = 0; i < 50 && net_con_peek(lt_t.link_con, peek, 4) < 4; i++)
 		;                             /* what probe.c does to classify it */
-	owned = link_adopt(lt_hub, lt_t.link_con, 0, "test-peer");
+	owned = link_accept(lt_hub, lt_t.link_con, &addr);
 	if (!owned)
 		goto done;
 	/* Only the test's end runs from here: the link has to have answered
@@ -1927,6 +1931,7 @@ EXO_TEST(link_tls_accepted_reads_buffered_challenge, {
 	ok = strstr(lt_t.in, "LCHA ") && strstr(lt_t.in, "\nLRES ");
 done:
 	lt_tls_close(owned);
+	lt_hub->config->tls_enable = 0;
 	return ok;
 });
 
@@ -2000,4 +2005,51 @@ done:
 	lt_tls_close(owned);
 	lt_hub->config->tls_enable = 0;
 	return ok;
+});
+
+/* Offer link_accept() a plain-text connection; return what it said, and
+   whether the link sent anything back. The test owns a refused connection. */
+static int lt_accept_plain(int* answered)
+{
+	struct ip_addr_encap addr;
+	struct net_connection* con;
+	char buf[64];
+	int sv[2];
+	int taken;
+	*answered = 0;
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0)
+		return -1;
+	net_set_nonblocking(sv[0], 1);
+	net_set_nonblocking(sv[1], 1);
+	con = net_con_create();
+	if (!con)
+		return -1;
+	net_con_initialize(con, sv[0], NULL, NULL, 0);
+	ip_convert_to_binary("127.0.0.1", &addr);
+	taken = link_accept(lt_hub, con, &addr);
+	*answered = read(sv[1], buf, sizeof(buf)) > 0;
+	if (!taken)
+		net_con_close(con);
+	link_stop(lt_hub);
+	close(sv[1]);
+	return taken;
+}
+
+/* A hub with tls_enable dials its peers over TLS and takes nothing else from
+   them: a plain-text link is refused before the hub says a word. */
+EXO_TEST(link_plaintext_refused_on_tls_hub, {
+	int answered;
+	int taken;
+	lt_fresh();
+	lt_hub->config->tls_enable = 1;
+	taken = lt_accept_plain(&answered);
+	lt_hub->config->tls_enable = 0;
+	return taken == 0 && !answered;
+});
+
+/* Without tls_enable, plain text is all there is. */
+EXO_TEST(link_plaintext_accepted_without_tls, {
+	int answered;
+	lt_fresh();
+	return lt_accept_plain(&answered) == 1 && answered;
 });
