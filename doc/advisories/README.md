@@ -12,6 +12,9 @@ Remotely-triggerable security issues, indexed by advisory ID.
 | [UHUB-2026-006](UHUB-2026-006.md) | Link command injection through a nick on an `auth_proxy` slave (issue #128) | Critical | 0.7.0 – 0.8.0, `auth_proxy` enabled | 0.8.1 |
 | [UHUB-2026-007](UHUB-2026-007.md) | Link command injection and ban removal through `!unban` (issue #129) | High | 0.8.0 | 0.8.1 |
 | [UHUB-2026-008](UHUB-2026-008.md) | `exclusive` auth mode does not keep unknown nicks out (issue #130) | Medium | <= 0.8.0 | 0.8.1 |
+| [UHUB-2026-009](UHUB-2026-009.md) | Use-after-free in the `auth_proxy` slave's pending-login registry | Critical | 0.7.0 – 0.8.1, `auth_proxy` enabled | 0.8.2 |
+| [UHUB-2026-010](UHUB-2026-010.md) | `auth_proxy` slave applies a late master reply to the next login on the same SID | Medium | 0.7.0 – 0.8.1, `auth_proxy` enabled | 0.8.2 |
+| [UHUB-2026-011](UHUB-2026-011.md) | NULL dereference when a client is disconnected by its own message | Medium | <= 0.8.1 | 0.8.2 |
 
 See [BACKPORT.md](BACKPORT.md) for per-release exposure (incl. Debian's 0.4.1)
 and downstream cherry-pick guidance.

@@ -98,6 +98,29 @@ Operator mitigations without a rebuild: leave `link_secret` empty on hubs that
 do not link, set `auth_proxy = 0`, and firewall the hub port to the other
 cluster members.
 
+## 0.8.2 (auth_proxy and the write path)
+
+| Issue | 0.6.x | 0.7.x | 0.8.0 – 0.8.1 | Fixed in |
+|-------|:-----:|:-----:|:-------------:|----------|
+| UHUB-2026-009 — `auth_proxy` pending-login use-after-free | not affected | affected | affected | 0.8.2 |
+| UHUB-2026-010 — late `auth_proxy` reply settles the next SID holder | not affected | affected | affected | 0.8.2 |
+| UHUB-2026-011 — NULL dereference after a self-inflicted disconnect | affected | affected | affected | 0.8.2 |
+
+Two commits, both on 0.8.x-stable and applying to 0.8.1 as they are:
+
+- `f9cfeb8` (`7d31e16` on master): UHUB-2026-009 and UHUB-2026-011. The
+  `netevent.c` hunks are the whole fix for UHUB-2026-011 and stand alone, so
+  they are the part to take on a base without linking (0.6.x and older). The
+  `hub.c` hunk (remote users) and the `link.c` hunks need 0.7.0 or later.
+- `7dcd698` (`d20a976` on master): UHUB-2026-010. It extends the
+  `LACQ`/`LVFY` field to `<sid>.<connid>`. The master echoes that field without
+  reading it, so a patched slave works with an unpatched master. No
+  coordinated cluster upgrade is needed.
+
+Operator mitigations without a rebuild: `auth_proxy = 0` (UHUB-2026-009,
+-010); `registered_users_only = yes` narrows UHUB-2026-011 to registered
+users.
+
 ## Exclusive authentication (all releases <= 0.8.0)
 
 UHUB-2026-008 is not specific to linking: the refusal-becomes-guest collapse
