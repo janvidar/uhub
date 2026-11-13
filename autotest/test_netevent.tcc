@@ -28,12 +28,17 @@
 
 static struct hub_info* ne_hub = 0;
 
-/* The part of hub_event_dispatcher() that frees users. */
+/* The parts of hub_event_dispatcher() that unlink and free users. */
 static void ne_dispatch(void* data, struct event_data* ev)
 {
 	struct hub_info* hub = (struct hub_info*) data;
 	struct hub_user* user = (struct hub_user*) ev->ptr;
-	if (ev->id == UHUB_EVENT_USER_DESTROY)
+	if (ev->id == UHUB_EVENT_USER_QUIT)
+	{
+		uman_remove(hub->users, user);
+		hub_schedule_destroy_user(hub, user);
+	}
+	else if (ev->id == UHUB_EVENT_USER_DESTROY)
 	{
 		route_clear_dirty(hub, user);
 		user_destroy(user);
@@ -203,5 +208,35 @@ EXO_TEST(netevent_no_free_sid_refuses_login, {
 	ne_hub->command_support = NULL;
 	uman_shutdown(ne_hub->users);
 	ne_hub->users = users;
+	return ok;
+});
+
+/* A disabled hub (hub_enabled = no) keeps the users it has, and one of them
+   leaving goes through the quit like on a running hub: the others are told,
+   linked hubs and plugins hear of it. It used to be dropped on the spot as if
+   the hub were going down, and every client kept a ghost of it. */
+EXO_TEST(netevent_disabled_hub_announces_quit, {
+	struct hub_user* user;
+	int peer = -1;
+	int ok;
+
+	user = ne_user(&peer);
+	if (!user)
+		return 0;
+	strcpy(user->id.nick, "leaver");
+	strcpy(user->id.cid, "GNSSMURMD7K466NGZIHU65TP3S3UZSQ6MN5B2RI");
+	user_set_state(user, state_normal);
+	ok = uman_add(ne_hub->users, user) == 0;
+
+	ne_hub->status = hub_status_disabled;
+	hub_disconnect_user(ne_hub, user, quit_disconnected);
+	/* Still listed: the quit event is what unlinks and announces it. */
+	ok = ok && uman_get_user_by_nick(ne_hub->users, "leaver") == user
+		&& event_queue_size(ne_hub->queue) == 1;
+	event_queue_process(ne_hub->queue); /* QUIT */
+	ok = ok && uman_get_user_by_nick(ne_hub->users, "leaver") == NULL;
+	event_queue_process(ne_hub->queue); /* DESTROY */
+	ne_hub->status = hub_status_running;
+	close(peer);
 	return ok;
 });
