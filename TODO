@@ -50,6 +50,11 @@ Phase 2 -- hub links fully authenticated:
   certificate without requiring one. ADC clients generally offer none and are
   unaffected; the handshake accepts any certificate, and link_accept then
   requires one whose key is pinned (ADC and HTTP ignore it).
+- Until then, link_secret is the only link credential, and anyone who can
+  reach the hub's port can get the hub's answer to a challenge of their own
+  and guess the secret offline. A long random secret is the mitigation;
+  making the accepting side answer only after the connector has proved
+  itself would close it, if Phase 2 is far off.
 - Remove the plain-TCP link path.
 
 Phase 3 -- remove the off switches:
