@@ -14,6 +14,46 @@ security fixes) was released from the 0.8.x-stable branch.
   the same-second SID takeover the seconds-granular timestamp allowed. Covered
   at both levels (autotest/test_hbri.tcc, run_hbri_e2e.sh phase 8).
 
+## Retiring plain text
+Goal: every network connection uhub makes or accepts is TLS. Unix-domain
+sockets (worker links) are host-local and stay unwrapped.
+
+Done:
+- Hub links: a hub with tls_enable dials its TCP peers over TLS and refuses
+  plain-text links (doc/linking.txt).
+
+Phase 1 -- TLS by default, plain text only on request:
+- tls_require defaults to on. Warn at startup when tls_enable or tls_require
+  is off.
+- Metrics: plain HTTP only from localhost; anything else over HTTPS with the
+  hub's certificate. http_redirect_addr redirects to https://.
+- reg_server_url refuses http://; the hub advertises only adcs:// addresses
+  (regserver.c, hub.c).
+- !redirect accepts only adcs:// (adc:// goes, and dchub:// is NMDC).
+
+Phase 2 -- hub links fully authenticated:
+- Per-node keys pinned inside TLS (WireGuard-style: each node holds its own
+  private key and its peers' public keys). Replaces the shared link_secret
+  over TCP, and with it the handshake relay that TLS without channel binding
+  still allows. Open: which certificate the accepting side presents, since
+  links share the client port; LibreSSL Ed25519 support at our floor.
+- Remove the plain-TCP link path.
+
+Phase 3 -- remove the off switches:
+- Retire tls_enable and tls_require; the probe refuses plain ADC and plain
+  HTTP (metrics on localhost excepted). Open: answer a plain ADC client with a
+  one-line redirect to adcs://, or close without a word.
+- Client-to-client: stop relaying CTM/RCM that ask for plain ADC/1.0; the
+  seeder and uhub-fuse refuse plain transfers. Most likely to break real
+  clients -- consider shipping it as an option first.
+- Tools (adcclient, adcrush, linktest, uhub-seeder, uhub-fuse) drop adc://.
+- Integration tests move to TLS; unit tests of internal APIs may keep plain
+  socketpairs.
+- Docs and packaging: doc/uhub.conf, README, uhub.spec, uhub.ebuild.
+
+TLS versions: 1.2 is the default floor (tls_version, configurable to 1.3), and
+TLS 1.3 is always offered -- openssl.c sets a minimum version only. Keep it so.
+
 ## Networking / platform
 - Windows: the WINSOCK paths in src/network/network.c are done (readable
   error text, keepalive tuning, inet_ntop/inet_pton, the local address family).
