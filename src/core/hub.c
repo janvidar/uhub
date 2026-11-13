@@ -363,7 +363,8 @@ int hub_handle_support(struct hub_info* hub, struct hub_user* u, struct adc_mess
 			if (user_flag_get(u, feature_tiger))
 			{
 				hub_send_handshake(hub, u);
-				net_con_set_timeout(u->connection, TIMEOUT_HANDSHAKE);
+				if (u->connection)
+					net_con_set_timeout(u->connection, TIMEOUT_HANDSHAKE);
 			}
 			else
 			{
@@ -377,7 +378,8 @@ int hub_handle_support(struct hub_info* hub, struct hub_user* u, struct adc_mess
 			if (hub->config->obsolete_clients)
 			{
 				hub_send_handshake(hub, u);
-				net_con_set_timeout(u->connection, TIMEOUT_HANDSHAKE);
+				if (u->connection)
+					net_con_set_timeout(u->connection, TIMEOUT_HANDSHAKE);
 			}
 			else
 			{
@@ -623,6 +625,17 @@ void hub_send_sid(struct hub_info* hub, struct hub_user* u)
 		if (!command)
 			return; /* OOM */
 		sid = uman_get_free_sid(hub->users, u);
+		if (!sid)
+		{
+			/* No SID to give: the local window is full, or this node has yet
+			   to lease one. SID 0 (AAAA) is the hub's own, and a user holding
+			   it would share it with every other such user and slip past the
+			   source-SID check, so refuse the login instead. */
+			adc_msg_free(command);
+			LOG_WARN("No free SID for a new user; refusing the login");
+			on_login_failure(hub, u, status_msg_hub_full);
+			return;
+		}
 		adc_msg_add_argument(command, (const char*) sid_to_string(sid));
 		route_to_user(hub, u, command);
 		adc_msg_free(command);
@@ -730,6 +743,8 @@ void hub_send_handshake(struct hub_info* hub, struct hub_user* u)
 	user_flag_set(u, flag_pipeline);
 	hub_send_support(hub, u);
 	hub_send_sid(hub, u);
+	if (user_is_disconnecting(u))
+		return;
 	hub_send_hubinfo(hub, u);
 	route_flush_pipeline(hub, u);
 

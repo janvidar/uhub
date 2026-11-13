@@ -1,3 +1,4 @@
+#include <fcntl.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include "system.h"
@@ -6,6 +7,8 @@
 #include "network/connection.h"
 #include "network/ipcalc.h"
 #include "network/network.h"
+#include "adc/message.h"
+#include "adc/sid.h"
 #include "core/auth.h"
 #include "core/config.h"
 #include "core/eventid.h"
@@ -150,5 +153,55 @@ EXO_TEST(netevent_write_without_connection, {
 	ok = user->connection == NULL && handle_net_write(user) == 0;
 	event_queue_process(ne_hub->queue);
 	close(peer);
+	return ok;
+});
+
+/* Everything the hub has written to the client end so far. */
+static size_t ne_read(int peer, char* buf, size_t size)
+{
+	size_t len = 0;
+	ssize_t n;
+	fcntl(peer, F_SETFL, fcntl(peer, F_GETFL) | O_NONBLOCK);
+	while (len < size - 1 && (n = read(peer, buf + len, size - 1 - len)) > 0)
+		len += (size_t) n;
+	buf[len] = 0;
+	return len;
+}
+
+/* A node that leases its SID window has none until the lease arrives, and a
+   full window has none to give either. The login is refused rather than handed
+   SID 0 -- AAAA, the hub's own, which every such user would share. */
+EXO_TEST(netevent_no_free_sid_refuses_login, {
+	const char* sup = "HSUP ADBASE ADTIGR\n";
+	struct hub_user_manager* users = ne_hub->users;
+	struct hub_user* user;
+	char out[1024];
+	int peer = -1;
+	int ok;
+
+	ne_hub->users = uman_init(-1, 2); /* pending dynamic lease: empty window */
+	ne_hub->command_support = adc_msg_create("ISUP ADBASE ADTIGR\n");
+	user = ne_hub->users ? ne_user(&peer) : NULL;
+	ok = user != NULL;
+	if (ok)
+		ok = write(peer, sup, strlen(sup)) == (ssize_t) strlen(sup);
+	if (ok)
+	{
+		net_event(user->connection, NET_EVENT_READ, user);
+		ne_read(peer, out, sizeof(out));
+		ok = user_is_disconnecting(user) && user->id.sid == 0
+			&& strstr(out, "ISUP ") && strstr(out, "ISTA ") && !strstr(out, "ISID");
+	}
+	else if (user)
+	{
+		hub_disconnect_user(ne_hub, user, quit_disconnected);
+	}
+	event_queue_process(ne_hub->queue);
+	if (peer != -1)
+		close(peer);
+	adc_msg_free(ne_hub->command_support);
+	ne_hub->command_support = NULL;
+	uman_shutdown(ne_hub->users);
+	ne_hub->users = users;
 	return ok;
 });
