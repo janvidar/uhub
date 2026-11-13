@@ -1447,7 +1447,7 @@ static struct hub_link* link_master(void)
 
 /* Is `user` waiting on the master? Compared by pointer: the registry never
    dereferences an entry it has not matched. */
-static int link_auth_pending_has(struct hub_user* user)
+int link_auth_pending_has(struct hub_user* user)
 {
 	struct hub_user* entry;
 	struct node* cursor;

@@ -133,6 +133,8 @@ struct hub_user;
 extern int link_auth_query(struct hub_info* hub, struct hub_user* user, const char* nick);
 extern int link_auth_proxy_verify(struct hub_info* hub, struct hub_user* user, const char* challenge, const char* response);
 extern void link_auth_pending_forget(struct hub_user* user);
+/* 1 while `user` has a request to the master that is still unanswered. */
+extern int link_auth_pending_has(struct hub_user* user);
 
 struct adc_message;
 struct hub_link;

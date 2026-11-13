@@ -417,6 +417,15 @@ int hub_handle_password(struct hub_info* hub, struct hub_user* u, struct adc_mes
 	{
 		if (hub->config->auth_proxy)
 		{
+			/* One answer per challenge: while the master has yet to reply, a
+			   repeated HPAS is ignored rather than forwarded. Only the first
+			   reply would count, and each one costs the master a check. */
+			if (link_auth_pending_has(u))
+			{
+				hub_free(password);
+				return 0;
+			}
+
 			/* Slave: forward the challenge-response to the master to verify
 			   (the master holds the password). The login completes in
 			   hub_auth_proxy_verified() when the master replies (LVRS). */

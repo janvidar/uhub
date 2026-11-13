@@ -1600,3 +1600,27 @@ EXO_TEST(link_auth_untagged_reply_ignored, {
 	link_auth_pending_forget(u);
 	return ok;
 });
+
+/* One answer per challenge: a repeated HPAS while the master has yet to reply
+   is not forwarded again. */
+EXO_TEST(link_vfy_repeated_hpas_sent_once, {
+	struct adc_message* hpas;
+	struct hub_user* u;
+	int ok;
+	if (!lt_client_handshake())
+		return 0;
+	lt_hub->config->auth_proxy = 1;
+	u = lt_pending_user();
+	strcpy(u->id.nick, "Boss");
+	u->state = state_verify;
+	hpas = adc_msg_create("HPAS RESPONSERESPONSERESPONSERESPONSERESPONS\n");
+	ok = hpas != NULL
+		&& hub_handle_password(lt_hub, u, hpas) == 0
+		&& hub_handle_password(lt_hub, u, hpas) == 0;
+	lt_drain();
+	ok = ok && lt_count("LVFY ") == 1;
+	adc_msg_free(hpas);
+	link_auth_pending_forget(u);
+	lt_hub->config->auth_proxy = 0;
+	return ok;
+});
