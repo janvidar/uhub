@@ -553,6 +553,38 @@ static int inf_hbri_check_info(const char* expect6, const char* expect_u6)
 	return ok;
 }
 
+/* HTCP is a validation connection's first command, and nothing else's: sent
+   after SUP, or by a logged-in user, it is ignored instead of validating (and
+   closing the connection it arrived on). As the first command it still works. */
+EXO_TEST(inf_hbri_htcp_only_first_command, {
+	char token[HBRI_TOKEN_LEN + 1];
+	char text[256];
+	struct hub_user* vuser;
+	int ok;
+	inf_reset();
+	ok = inf_hbri_login("U612345");
+	hbri_token_make(inf_hub, inf_user, token);
+	snprintf(text, sizeof(text), "HTCP TO%s", token);
+	vuser = (struct hub_user*) hub_malloc_zero(sizeof(struct hub_user));
+	ok = ok && vuser && ip_convert_to_binary("2001:db8::5", &vuser->id.addr);
+	if (ok)
+	{
+		vuser->state = state_identify;      /* sent SUP first */
+		ok = hub_handle_message(inf_hub, vuser, text, strlen(text)) == 0
+			&& hub_handle_message(inf_hub, inf_user, text, strlen(text)) == 0
+			&& inf_hbri_check_info(NULL, NULL);
+	}
+	if (ok)
+	{
+		vuser->state = state_protocol;      /* a fresh connection */
+		ok = hub_handle_message(inf_hub, vuser, text, strlen(text)) == -1
+			&& inf_hbri_check_info("2001:db8::5", "12345");
+	}
+	hub_free(vuser);
+	inf_hbri_logout();
+	return ok;
+});
+
 /* The reply carries no U6, so the port remembered from the login INF is used.
    This is the regression the whole change is about. */
 EXO_TEST(inf_hbri_port_from_login, {

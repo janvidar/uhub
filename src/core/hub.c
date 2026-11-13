@@ -144,6 +144,11 @@ int hub_handle_message(struct hub_info* hub, struct hub_user* u, const char* lin
 				   the other pre-login commands: the peer is unauthenticated
 				   here and each reply costs a token verification. */
 				CHECK_FLOOD(extras, 0);
+				/* Only as a connection's first command: once it has sent SUP
+				   it is a login, not a validation connection, and the reply
+				   would close it. */
+				if (u->state != state_protocol)
+					break;
 				ret = hbri_handle_validation(hub, u, cmd);
 				break;
 
