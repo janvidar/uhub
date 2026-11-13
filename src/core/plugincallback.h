@@ -37,9 +37,10 @@ extern void plugin_unregister_callback_functions(struct plugin_handle* plugin);
    user_destroy so a plugin's per-user cleanup always fires. */
 extern void plugin_user_data_destroy(struct hub_user* user);
 
-/* Run and remove every per-user plugin-data entry owned by a given plugin across
-   all connected users. Called when a plugin is unloaded while users remain, so
-   its cleanup callbacks fire before its code is unmapped. */
+/* Run and remove every per-user plugin-data entry owned by a given plugin, on
+   every user that holds one -- logged in or not. Called when a plugin is
+   unloaded while users remain, so its cleanup callbacks fire before its code is
+   unmapped. */
 extern void plugin_user_data_purge_owner(struct hub_info* hub, struct plugin_handle* owner);
 
 #endif /* HAVE_UHUB_PLUGIN_CALLBACK_H */

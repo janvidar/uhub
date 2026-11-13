@@ -36,6 +36,11 @@
 struct plugin_callback_data
 {
 	struct linked_list* commands;
+	/* Every user holding a per-user data entry owned by this plugin, logged in
+	   or not, so the entries can all be released when the plugin is unloaded.
+	   The user list would miss a user still logging in, or one that has left
+	   it but is not destroyed yet. */
+	struct linked_list* users;
 };
 
 static struct plugin_callback_data* get_callback_data(struct plugin_handle* plugin)
@@ -471,8 +476,11 @@ static void cbfunc_set_user_data(struct plugin_handle* plugin, struct plugin_use
 		}
 		else
 		{
+			struct plugin_callback_data* cd = get_callback_data(plugin);
 			list_remove(huser->plugin_data, e);
 			hub_free(e);
+			if (cd && cd->users)
+				list_remove(cd->users, huser);
 		}
 		return;
 	}
@@ -494,6 +502,11 @@ static void cbfunc_set_user_data(struct plugin_handle* plugin, struct plugin_use
 	e->data = data;
 	e->cleanup = cleanup;
 	list_append(huser->plugin_data, e);
+	{
+		struct plugin_callback_data* cd = get_callback_data(plugin);
+		if (cd && cd->users)
+			list_append(cd->users, huser);
+	}
 }
 
 static void* cbfunc_get_user_data(struct plugin_handle* plugin, struct plugin_user* user)
@@ -520,10 +533,13 @@ void plugin_user_data_destroy(struct hub_user* user)
 		return;
 	while ((e = (struct plugin_user_data_entry*) list_get_first(user->plugin_data)))
 	{
+		struct plugin_callback_data* cd = get_callback_data(e->owner);
 		if (e->cleanup)
 			e->cleanup(e->owner, e->data);
 		list_remove(user->plugin_data, e);
 		hub_free(e);
+		if (cd && cd->users)
+			list_remove(cd->users, user);
 	}
 	list_destroy(user->plugin_data);
 	user->plugin_data = NULL;
@@ -531,13 +547,19 @@ void plugin_user_data_destroy(struct hub_user* user)
 
 void plugin_user_data_purge_owner(struct hub_info* hub, struct plugin_handle* owner)
 {
+	struct plugin_callback_data* cd = get_callback_data(owner);
 	struct hub_user* huser;
-	struct node* ucur;
-	if (!hub || !hub->users || !hub->users->list)
+	(void) hub;
+	if (!cd || !cd->users)
 		return;
-	LIST_FOREACH_SAFE(struct hub_user*, huser, hub->users->list, ucur,
+	/* The owner's own record of its users, not the hub's user list: an entry
+	   left on a user that list does not hold would outlive the plugin, and its
+	   cleanup would later run from unmapped code, with a freed owner that a
+	   plugin loaded at the same address would then match. */
+	while ((huser = (struct hub_user*) list_get_first(cd->users)))
 	{
 		struct plugin_user_data_entry* e = find_user_data_entry(huser, owner);
+		list_remove(cd->users, huser);
 		if (e)
 		{
 			if (e->cleanup)
@@ -545,7 +567,7 @@ void plugin_user_data_purge_owner(struct hub_info* hub, struct plugin_handle* ow
 			list_remove(huser->plugin_data, e);
 			hub_free(e);
 		}
-	});
+	}
 }
 
 /*
@@ -729,6 +751,7 @@ struct plugin_callback_data* plugin_callback_data_create()
 	struct plugin_callback_data* data = (struct plugin_callback_data*) hub_malloc_zero(sizeof(struct plugin_callback_data));
 	LOG_PLUGIN("plugin_callback_data_create()");
 	data->commands = list_create();
+	data->users = list_create();
 	return data;
 }
 
@@ -742,6 +765,14 @@ void plugin_callback_data_destroy(struct plugin_handle* plugin, struct plugin_ca
 		while ( (cmd = list_get_first(data->commands)) )
 			cbfunc_command_del(plugin, cmd);
 		list_destroy(data->commands);
+	}
+
+	if (data->users)
+	{
+		/* Emptied by plugin_user_data_purge_owner() at unload; the users are
+		   not ours to free either way. */
+		list_clear(data->users, NULL);
+		list_destroy(data->users);
 	}
 
 	hub_free(data);
