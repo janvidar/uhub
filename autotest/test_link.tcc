@@ -1788,3 +1788,143 @@ EXO_TEST(link_vfy_repeated_hpas_sent_once, {
 	lt_hub->config->auth_proxy = 0;
 	return ok;
 });
+
+/* -------------------------------------------------------------------------
+ * Links over TLS
+ *
+ * The test's end and the link's end of a socketpair each get a TLS
+ * connection, and the test pumps both by hand (net_con_callback), so nothing
+ * here goes through the shared event loop.
+ * ------------------------------------------------------------------------- */
+
+#define LT_TLS_CERT UHUB_TEST_DIR "/tls-test-cert.pem"
+#define LT_TLS_KEY  UHUB_TEST_DIR "/tls-test-key.pem"
+
+struct lt_tls_end { int connected; int error; };
+
+/* Until the link takes its end over, a handshake reports here. */
+static void lt_tls_cb(struct net_connection* con, int events, void* ptr)
+{
+	struct lt_tls_end* end = (struct lt_tls_end*) ptr;
+	(void) con;
+	if (events & (NET_EVENT_ERROR | NET_EVENT_TIMEOUT))
+		end->error = 1;
+	else
+		end->connected = 1;
+}
+
+struct lt_tls
+{
+	struct ssl_context_handle* server_ctx;
+	struct ssl_context_handle* client_ctx;
+	struct net_connection* con;       /* the test's end */
+	struct net_connection* link_con;  /* the link's end */
+	struct lt_tls_end end;
+	struct lt_tls_end link_end;
+	int raw_fd;                       /* the test's descriptor, for peeking at raw bytes */
+	char in[4096];                    /* decrypted bytes the test received */
+	size_t inlen;
+};
+
+static struct lt_tls lt_t;
+
+/* Contexts and a connected socketpair; neither end has started TLS. */
+static int lt_tls_open(void)
+{
+	int sv[2];
+	memset(&lt_t, 0, sizeof(lt_t));
+	lt_t.server_ctx = net_ssl_context_create("1.2", "DEFAULT", "");
+	lt_t.client_ctx = net_ssl_context_create("1.2", "DEFAULT", "");
+	if (!lt_t.server_ctx || !lt_t.client_ctx
+		|| ssl_load_certificate(lt_t.server_ctx, LT_TLS_CERT) != 1
+		|| ssl_load_private_key(lt_t.server_ctx, LT_TLS_KEY) != 1
+		|| socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0)
+		return 0;
+	net_set_nonblocking(sv[0], 1);
+	net_set_nonblocking(sv[1], 1);
+	lt_t.raw_fd = sv[1];
+	lt_t.link_con = net_con_create();
+	lt_t.con = net_con_create();
+	if (!lt_t.link_con || !lt_t.con)
+		return 0;
+	net_con_initialize(lt_t.link_con, sv[0], lt_tls_cb, &lt_t.link_end, NET_EVENT_READ);
+	net_con_initialize(lt_t.con, sv[1], lt_tls_cb, &lt_t.end, NET_EVENT_READ);
+	return 1;
+}
+
+/* The link's end is closed by the link (link_stop) once it owns it. */
+static void lt_tls_close(int link_owns_its_end)
+{
+	link_stop(lt_hub);
+	if (lt_t.con)
+		net_con_close(lt_t.con);
+	if (lt_t.link_con && !link_owns_its_end)
+		net_con_close(lt_t.link_con);
+	if (lt_t.server_ctx)
+		net_ssl_context_destroy(lt_t.server_ctx);
+	if (lt_t.client_ctx)
+		net_ssl_context_destroy(lt_t.client_ctx);
+	memset(&lt_t, 0, sizeof(lt_t));
+}
+
+/* Run both ends' events a few times: handshakes, then whatever the link sends.
+   Collect what reaches the test's end. */
+static void lt_tls_pump(void)
+{
+	int i;
+	for (i = 0; i < 50; i++)
+	{
+		ssize_t n;
+		net_con_callback(lt_t.link_con, NET_EVENT_READ);
+		net_con_callback(lt_t.con, NET_EVENT_READ);
+		if (!lt_t.end.connected || lt_t.inlen >= sizeof(lt_t.in) - 1)
+			continue;
+		n = net_con_recv(lt_t.con, lt_t.in + lt_t.inlen, sizeof(lt_t.in) - 1 - lt_t.inlen);
+		if (n > 0)
+		{
+			lt_t.inlen += (size_t) n;
+			lt_t.in[lt_t.inlen] = 0;
+		}
+	}
+}
+
+/* An LCHA from a peer that connected over TLS sits in the TLS buffer once the
+   probe has peeked at it, where no read event will announce it. The link reads
+   it straight away and answers. */
+EXO_TEST(link_tls_accepted_reads_buffered_challenge, {
+	char peek[8];
+	int i;
+	int ok = 0;
+	int owned = 0;
+	lt_fresh();
+	if (!lt_tls_open())
+		goto done;
+	net_con_ssl_handshake(lt_t.link_con, net_con_ssl_mode_server, lt_t.server_ctx);
+	net_con_ssl_handshake(lt_t.con, net_con_ssl_mode_client, lt_t.client_ctx);
+	lt_tls_pump();
+	if (!lt_t.end.connected || !lt_t.link_end.connected)
+		goto done;
+	net_con_send(lt_t.con, "LCHA " LT_CLIENT_NONCE "\n", 5 + LINK_NONCE_LEN + 1);
+	for (i = 0; i < 50 && net_con_peek(lt_t.link_con, peek, 4) < 4; i++)
+		;                             /* what probe.c does to classify it */
+	owned = link_adopt(lt_hub, lt_t.link_con, 0, "test-peer");
+	if (!owned)
+		goto done;
+	/* Only the test's end runs from here: the link has to have answered
+	   already, without another event of its own. */
+	for (i = 0; i < 50; i++)
+	{
+		ssize_t n;
+		net_con_callback(lt_t.con, NET_EVENT_READ);
+		n = net_con_recv(lt_t.con, lt_t.in + lt_t.inlen, sizeof(lt_t.in) - 1 - lt_t.inlen);
+		if (n > 0)
+		{
+			lt_t.inlen += (size_t) n;
+			lt_t.in[lt_t.inlen] = 0;
+		}
+	}
+	ok = strstr(lt_t.in, "LCHA ") && strstr(lt_t.in, "\nLRES ");
+done:
+	lt_tls_close(owned);
+	return ok;
+});

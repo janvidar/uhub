@@ -952,8 +952,18 @@ int link_adopt(struct hub_info* hub, struct net_connection* con, int is_client, 
 	/* An accepted peer's "LCHA <nonce>" is still buffered (probe used peek),
 	   so our first read will see it; send our own challenge now. */
 	if (link_begin_handshake(link) < 0)
+	{
 		link_disconnect(link);
-	return 1; /* ownership taken (even if we just closed it) */
+		return 1; /* ownership taken (even if we just closed it) */
+	}
+
+	/* Over TLS the probe's peek (SSL_peek) drained the socket into the TLS
+	   buffer, so no read event announces the LCHA waiting there: read it now,
+	   as probe.c does for an ADC or HTTP connection. A plain peek leaves the
+	   bytes in the kernel, where the next poll finds them. */
+	if (net_con_is_ssl(con))
+		net_con_callback(con, NET_EVENT_READ);
+	return 1;
 }
 
 int link_accept(struct hub_info* hub, struct net_connection* con, struct ip_addr_encap* addr)
