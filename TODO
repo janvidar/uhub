@@ -21,10 +21,17 @@ sockets (worker links) are host-local and stay unwrapped.
 Done:
 - Hub links: a hub with tls_enable dials its TCP peers over TLS and refuses
   plain-text links (doc/linking.txt).
+- A hub with no tls_certificate / tls_private_key creates a self-signed EC
+  P-256 pair in UHUB_STATE_DIR on first start and keeps it, so ADCS needs no
+  setup (resolve_ssl_certificates in hub.c). The pair is never regenerated: its
+  key is the hub's identity to every client that pinned it, and to its peers.
 
 Phase 1 -- TLS by default, plain text only on request:
-- tls_require defaults to on. Warn at startup when tls_enable or tls_require
-  is off.
+- tls_require defaults to on: a plain ADC client gets a redirect to adcs://
+  (tls_require_redirect_addr, defaulting to this hub's own adcs:// address).
+  Warn at startup when tls_enable or tls_require is off.
+- A certificate that cannot be created is fatal once TLS is required. Today
+  the hub warns and runs without TLS -- in plain text.
 - Metrics: plain HTTP only from localhost; anything else over HTTPS with the
   hub's certificate. http_redirect_addr redirects to https://.
 - reg_server_url refuses http://; the hub advertises only adcs:// addresses
@@ -32,17 +39,21 @@ Phase 1 -- TLS by default, plain text only on request:
 - !redirect accepts only adcs:// (adc:// goes, and dchub:// is NMDC).
 
 Phase 2 -- hub links fully authenticated:
-- Per-node keys pinned inside TLS (WireGuard-style: each node holds its own
-  private key and its peers' public keys). Replaces the shared link_secret
-  over TCP, and with it the handshake relay that TLS without channel binding
-  still allows. Open: which certificate the accepting side presents, since
-  links share the client port; LibreSSL Ed25519 support at our floor.
+- Links authenticate with the hub's own certificate, on both sides: the
+  accepting side already presents it, and the dialling side presents it as a
+  client certificate. Each node pins its peers' public keys (WireGuard-style:
+  a node knows only its peers' public keys). Pin the key, not the
+  certificate, so renewing a certificate on the same key keeps links up.
+  Replaces the shared link_secret over TCP, and with it the handshake relay
+  that TLS without channel binding still allows.
+- The accepting side must ask for a client certificate on the shared port
+  without requiring one. Check that ADC clients are unaffected.
 - Remove the plain-TCP link path.
 
 Phase 3 -- remove the off switches:
 - Retire tls_enable and tls_require; the probe refuses plain ADC and plain
-  HTTP (metrics on localhost excepted). Open: answer a plain ADC client with a
-  one-line redirect to adcs://, or close without a word.
+  HTTP (metrics on localhost excepted). A plain ADC client still gets its
+  one-line redirect to adcs://, the only plain text the hub sends.
 - Client-to-client: stop relaying CTM/RCM that ask for plain ADC/1.0; the
   seeder and uhub-fuse refuse plain transfers. Most likely to break real
   clients -- consider shipping it as an option first.
