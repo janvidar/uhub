@@ -591,6 +591,12 @@ int hub_handle_chat_message(struct hub_info* hub, struct hub_user* u, struct adc
 			relay = 0;
 	}
 
+	/* A plugin hook, or the command the message carried, may have disconnected
+	   the sender -- a kick for what it just said -- and still let the message
+	   through. It is not relayed then. */
+	if (relay && user_is_disconnecting(u))
+		relay = 0;
+
 	if (relay)
 	{
 		/* adc_msg_remove_named_argument(cmd, "PM"); */

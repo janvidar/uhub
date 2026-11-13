@@ -15,10 +15,13 @@
 #include "core/eventqueue.h"
 #include "core/hub.h"
 #include "core/netevent.h"
+#include "core/pluginloader.h"
 #include "core/route.h"
 #include "core/user.h"
 #include "core/usermanager.h"
 #include "testutil_net.h"
+#include "testutil_user.h"
+#include "plugin_api/handle.h"
 
 /*
  * net_event(), the per-user socket callback, against a real user on a
@@ -249,3 +252,67 @@ EXO_TEST(netevent_disabled_hub_announces_quit, { return ne_quit_announced(hub_st
 
 /* So does a reloading one: users stay connected across a reload. */
 EXO_TEST(netevent_reloading_hub_announces_quit, { return ne_quit_announced(hub_status_restart); });
+
+/* A chat plugin that kicks the sender for what it said, but leaves the verdict
+   to the hub (st_default) -- what a script calling user.disconnect() and
+   returning nothing does. */
+static plugin_st ne_kick_on_chat(struct plugin_handle* plugin, struct plugin_user* from, const char* message)
+{
+	(void) plugin; (void) message;
+	hub_disconnect_user(ne_hub, (struct hub_user*) from, quit_kicked);
+	return st_default;
+}
+
+/* The message that got its sender kicked is not relayed. */
+EXO_TEST(netevent_kicked_sender_not_relayed, {
+	struct uhub_plugins plugins;
+	struct plugin_handle plugin;
+	struct adc_message* msg;
+	struct hub_user* sender;
+	struct hub_user* listener;
+	int peer = -1;
+	int ok;
+
+	memset(&plugins, 0, sizeof(plugins));
+	memset(&plugin, 0, sizeof(plugin));
+	plugins.loaded = list_create();
+	plugin.funcs.on_chat_msg = ne_kick_on_chat;
+	list_append(plugins.loaded, &plugin);
+
+	sender = ne_user(&peer);
+	listener = tu_user_create(ne_hub, string_to_sid("AAAC"), "listener",
+		"AN7ZMSLIEBL53OPTM7WXGSTXUS3XOY6KQS5LBGX", auth_cred_guest);
+	ok = sender && listener;
+	if (ok)
+	{
+		sender->id.sid = string_to_sid("AAAB");
+		strcpy(sender->id.nick, "sender");
+		strcpy(sender->id.cid, "GNSSMURMD7K466NGZIHU65TP3S3UZSQ6MN5B2RI");
+		user_set_state(sender, state_normal);
+		ok = uman_add(ne_hub->users, sender) == 0 && uman_add(ne_hub->users, listener) == 0;
+	}
+	msg = ok ? adc_msg_parse_verify(sender, "BMSG AAAB spam\n", 15) : NULL;
+	ok = ok && msg;
+	if (ok)
+	{
+		ne_hub->plugins = &plugins;
+		hub_handle_chat_message(ne_hub, sender, msg);
+		ne_hub->plugins = NULL;
+		ok = user_is_disconnecting(sender) && tu_queue_find(listener, "BMSG AAAB") < 0;
+	}
+	adc_msg_free(msg);
+	if (sender && !user_is_disconnecting(sender))
+		hub_disconnect_user(ne_hub, sender, quit_disconnected);
+	event_queue_process(ne_hub->queue); /* QUIT */
+	event_queue_process(ne_hub->queue); /* DESTROY */
+	if (listener)
+	{
+		uman_remove(ne_hub->users, listener);
+		tu_user_destroy(listener);
+	}
+	list_clear(plugins.loaded, NULL);
+	list_destroy(plugins.loaded);
+	if (peer != -1)
+		close(peer);
+	return ok;
+});
