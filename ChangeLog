@@ -52,26 +52,9 @@ Fixes:
   ("adc://::1") in its connect address and to registration servers.
 - The uhub_logouts_total metric stayed at 0: logouts were counted only for a
   user still logged in, which by then none is.
-- FreeBSD, macOS and other kqueue systems: a connection given the descriptor
-  of one closed in the same loop iteration never received any events, so a
-  client that connected as another left could hang until its login timeout.
-- auth_proxy: a client repeating HPAS (or its login query) while the master
-  had yet to answer was queued twice; a late answer then reached the freed
-  user. A repeated HPAS is now ignored until the master answers.
-- auth_proxy: a late master reply for a login that had left settled the next
-  user to hold its SID -- a "guest" answer could let a registered nick in
-  without its password. Replies now carry the login's SID and connection id,
-  which older masters echo unchanged.
 - auth_proxy: a login waiting on a master link that dropped waited out the
   login timeout, and could be answered by another outbound link that became
   master meanwhile. It is now refused as soon as the link drops.
-- A remote user kicked on this hub was freed twice when its own hub then
-  reported it gone, or the link dropped.
-- A handler that disconnected the sender (mod_flood, a failed SUP) followed
-  by a write on the same wakeup dereferenced a NULL connection.
-- A node with an empty or full SID window (still waiting for its lease, or
-  exhausted) gave new users the hub's own SID, AAAA. The login now fails as
-  "hub full".
 - SID windows: the pool kept a stale count when its window changed, and could
   then refuse every login; a window grant was accepted from any peer at any
   time; a static node, or a member that already held a lease, could start
@@ -90,15 +73,47 @@ Fixes:
   subscriptions could follow a freed board to whatever board took its place.
 - A user disconnected while the hub walked the user list (keepalive, a
   plugin broadcast) as a reload or shutdown began left the walk on freed
-  memory; a plugin that looked up a
-  command from inside a command walk could loop forever; chat from a sender a
-  plugin kicked while handling it was still relayed.
+  memory; a plugin that looked up a command from inside a command walk could
+  loop forever.
 - An inbound hub link over TLS stalled until the peer sent more data.
 
 Hardening:
 - Hub linking: a peer may route only chat, searches and directed traffic,
   and a roster entry (LINF) must be a BINF; an update that changes a user's
   CID is ignored.
+
+0.8.2:
+A security release. See doc/advisories/ on the security-advisories branch for
+UHUB-2026-009..011. No configuration changes; a 0.8.2 auth slave works with a
+0.8.1 master and the other way round, so nodes can be upgraded one at a time.
+
+Security:
+- UHUB-2026-009: on an auth_proxy slave, a client that sent its password
+  twice was queued twice for the master's answer, and only one entry was
+  dropped when it left. The master's reply then used the freed user. Affects
+  0.7.0 - 0.8.1 with auth_proxy. Also on linked hubs: kicking a remote user
+  freed it twice if its LQUI arrived or the link dropped first.
+- UHUB-2026-010: on an auth_proxy slave, the master's reply was matched to a
+  waiting login by SID alone. A late answer for a login that had left could
+  settle the next login to get that SID, letting it use a registered nick
+  without the password. Requests now carry a tag of SID and connection id.
+  Affects 0.7.0 - 0.8.1 with auth_proxy.
+- UHUB-2026-011: when a client was disconnected by the handler of its own
+  message (send-queue overflow, a flood kick) and its socket was reported
+  writable in the same wakeup, the hub dereferenced the closed connection and
+  crashed. Affects all releases up to 0.8.1.
+
+Fixes:
+- FreeBSD, macOS and other kqueue systems: a connection given the descriptor
+  of one closed in the same loop iteration never received any events, so a
+  client that connected as another left could hang until its login timeout.
+- A chat message that got its sender kicked (by a plugin hook, or the
+  command it carried) was still relayed to everyone else.
+
+Hardening:
+- A node with no SID to give (a cluster member still waiting for its SID
+  window, or one whose window is full) handed new users the hub's own SID,
+  AAAA, which they then shared. Such a login now fails as "hub full".
 
 0.8.1:
 A security release. All four issues were reported by Kcchouette. See
