@@ -201,6 +201,23 @@ static int link_grant_window(void)
 	return -1;
 }
 
+/* The index of the leasable window that is exactly [lo, hi], or -1. Window 0
+   is the coordinator's own and never leased. */
+static int link_window_index(unsigned long lo, unsigned long hi)
+{
+	sid_t w;
+	unsigned long idx;
+	if (!g_win_used || g_win_count < 2)
+		return -1;
+	w = SID_MAX / (sid_t) g_win_count;
+	idx = lo / w;
+	if (idx < 1 || idx >= (unsigned long) g_win_count)
+		return -1;
+	if (lo != idx * w || hi != idx * w + w - 1)
+		return -1;
+	return (int) idx;
+}
+
 static void link_release_window(int idx)
 {
 	if (g_win_used && idx > 0 && idx < g_win_count)
@@ -214,6 +231,8 @@ static void link_release_window(int idx)
 static uint64_t g_election_id = 0;
 static int      g_window_set  = 0;
 static int      g_window_leased = 0; /* our window came from a coordinator: we are a member */
+static unsigned long g_lease_lo = 0;  /* the leased window, while g_window_leased */
+static unsigned long g_lease_hi = 0;
 
 /* This node won the election: ensure it owns window 0 and can grant windows. */
 static void link_become_coordinator(struct hub_info* hub)
@@ -634,10 +653,18 @@ static int link_process_line(struct hub_link* link, const char* line)
 			if (link_sendf(link, "LWRQ\n") >= 0)
 				link->window_requested = 1;
 		}
+		else if (g_window_leased)
+		{
+			/* We hold a window leased earlier, and are linking to the winner
+			   again: after our link to it dropped (it returned the window to
+			   its pool) or after it restarted (it forgot every lease). Tell it
+			   which window is ours, so it is not leased to anyone else. */
+			link_sendf(link, "LWRQ %lu %lu\n", g_lease_lo, g_lease_hi);
+		}
 		return 0;
 	}
 
-	if (strcmp(line, "LWRQ") == 0)
+	if (strcmp(line, "LWRQ") == 0 || strncmp(line, "LWRQ ", 5) == 0)
 	{
 		/* Coordinator: a member is requesting a SID window lease. */
 		int idx;
@@ -658,6 +685,25 @@ static int link_process_line(struct hub_link* link, const char* line)
 			   of the first, which would then never return to the pool. */
 			LOG_WARN("link: %s already holds window %d; ignoring repeated request",
 				link->peer_desc, link->granted_node_id);
+			return 0;
+		}
+		if (line[4] == ' ')
+		{
+			/* "LWRQ <min> <max>": a member reclaiming the window it holds. */
+			char* end;
+			unsigned long rlo = strtoul(line + 5, &end, 10);
+			unsigned long rhi = strtoul(end, &end, 10);
+			idx = link_window_index(rlo, rhi);
+			if (idx < 0 || g_win_used[idx])
+			{
+				LOG_ERROR("link: %s holds SID window [%lu, %lu], which %s; refusing the link",
+					link->peer_desc, rlo, rhi, idx < 0 ? "is not one we lease" : "is in use elsewhere");
+				link_sendf(link, "LERR\n");
+				return -1;
+			}
+			g_win_used[idx] = 1;
+			link->granted_node_id = idx;
+			LOG_INFO("link: %s reclaimed SID window [%lu, %lu] (node %d)", link->peer_desc, rlo, rhi, idx);
 			return 0;
 		}
 		idx = link_grant_window();
@@ -704,6 +750,8 @@ static int link_process_line(struct hub_link* link, const char* line)
 		uman_set_sid_window(link->hub->users, (sid_t) lo, (sid_t) hi);
 		g_window_set = 1;
 		g_window_leased = 1;
+		g_lease_lo = lo;
+		g_lease_hi = hi;
 		LOG_INFO("link: leased SID window [%lu, %lu] from %s", lo, hi, link->peer_desc);
 		return 0;
 	}
@@ -1135,6 +1183,7 @@ void link_start(struct hub_info* hub)
 	   >= 0); an electing node starts pending until it wins or leases. */
 	g_window_set = (cfg->node_id >= 0) ? 1 : 0;
 	g_window_leased = 0;
+	g_lease_lo = g_lease_hi = 0;
 	g_election_id = 0;
 	if (cfg->node_id < 0)
 		RAND_bytes((unsigned char*) &g_election_id, sizeof(g_election_id));

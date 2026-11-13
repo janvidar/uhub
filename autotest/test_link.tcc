@@ -358,14 +358,14 @@ static void lt_swap(struct lt_peer* other)
 	*other = tmp;
 }
 
-/* The hub opened the connection; the test is the accepting peer. */
-static int lt_client_handshake(void)
+/* The hub opened the connection; the test is the accepting peer. Adds a link
+   to whatever is already there. */
+static int lt_client_handshake_add(void)
 {
 	char client_nonce[LINK_NONCE_LEN + 8];
 	char resp[LINK_AUTH_RESPONSE_LEN + 8];
 	char expect[LINK_AUTH_RESPONSE_LEN + 1];
 
-	lt_fresh();
 	if (!lt_attach(1) || !lt_find("LCHA ", client_nonce, sizeof(client_nonce)))
 		return 0;
 	lt_sendf("LCHA %s\n", LT_PEER_NONCE);
@@ -381,6 +381,12 @@ static int lt_client_handshake(void)
 		return 0;
 	lt_clear();
 	return 1;
+}
+
+static int lt_client_handshake(void)
+{
+	lt_fresh();
+	return lt_client_handshake_add();
 }
 
 /* -------------------------------------------------------------------------
@@ -1423,4 +1429,93 @@ EXO_TEST(link_window_one_lease_per_link, {
 	lt_send("LWRQ\n");
 	lt_send("LWRQ\n");
 	return !lt_p.closed && lt_count("LWIN ") == 1 && !lt_find("LERR", NULL, 0);
+});
+
+/* With node_count 2 the one window a coordinator leases is window 1. */
+#define LT_W1_LO "524288"
+#define LT_W1_HI "1048575"
+
+/* A member that held window 1 before the coordinator lost track of it (the
+   link dropped, or the coordinator restarted) reclaims it, and it is not
+   leased to anyone else. */
+EXO_TEST(link_window_reclaimed, {
+	struct lt_peer member;
+	int ok;
+	memset(&member, 0, sizeof(member));
+	member.fd = -1;
+	if (!lt_server_handshake())
+		return 0;
+	lt_send("LWRQ " LT_W1_LO " " LT_W1_HI "\n");
+	ok = !lt_p.closed && !lt_find("LERR", NULL, 0);
+	lt_swap(&member);                 /* keep it; a pending node asks for one */
+	ok = ok && lt_server_handshake_add();
+	if (ok)
+	{
+		lt_send("LWRQ\n");
+		ok = !lt_find("LWIN ", NULL, 0) && lt_find("LERR", NULL, 0);
+	}
+	link_stop(lt_hub);
+	if (member.fd != -1)
+		close(member.fd);
+	return ok;
+});
+
+/* A window already leased to another node cannot be claimed: the link is
+   refused rather than two nodes handing out the same SIDs. */
+EXO_TEST(link_window_reclaim_conflict_refused, {
+	struct lt_peer first;
+	int ok;
+	memset(&first, 0, sizeof(first));
+	first.fd = -1;
+	if (!lt_server_handshake())
+		return 0;
+	lt_send("LWRQ\n");
+	ok = lt_find("LWIN " LT_W1_LO " " LT_W1_HI, NULL, 0);
+	lt_swap(&first);
+	ok = ok && lt_server_handshake_add();
+	if (ok)
+	{
+		lt_send("LWRQ " LT_W1_LO " " LT_W1_HI "\n");
+		ok = lt_p.closed;
+	}
+	link_stop(lt_hub);
+	if (first.fd != -1)
+		close(first.fd);
+	return ok;
+});
+
+/* A claim that is not exactly a leasable window is refused too. */
+EXO_TEST(link_window_reclaim_misaligned_refused, {
+	if (!lt_server_handshake())
+		return 0;
+	lt_send("LWRQ 1 524287\n");      /* window 0: the coordinator's own */
+	return lt_p.closed;
+});
+
+/* Member side: linking to a coordinator again, a node holding a leased window
+   says which one, instead of asking for another or saying nothing. */
+EXO_TEST(link_member_reclaims_its_window, {
+	struct lt_peer first;
+	char claim[64];
+	int ok;
+	memset(&first, 0, sizeof(first));
+	first.fd = -1;
+	ok = lt_member_handshake();
+	if (ok)
+	{
+		lt_send("LELC 0000000000000000\n");
+		lt_send("LWIN " LT_W1_LO " " LT_W1_HI "\n");
+		ok = !lt_p.closed;
+	}
+	lt_swap(&first);                  /* the coordinator again, over a new link */
+	ok = ok && lt_client_handshake_add();
+	if (ok)
+	{
+		lt_send("LELC 0000000000000000\n");
+		ok = lt_find("LWRQ ", claim, sizeof(claim)) && !strcmp(claim, LT_W1_LO " " LT_W1_HI);
+	}
+	lt_member_done();
+	if (first.fd != -1)
+		close(first.fd);
+	return ok;
 });

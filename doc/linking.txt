@@ -155,6 +155,7 @@ transport.
   LERR                       both    Authentication failed / request refused.
   LELC <id>                  both    Election id (16 hex digits); lower wins.
   LWRQ                       member  Request a SID-window lease.
+  LWRQ <min> <max>           member  Reclaim the window [min,max] it holds.
   LWIN <min> <max>           coord   Grant the SID window [min,max] (decimal).
   LINF <binf>                both    Roster entry / presence: a user's BINF.
   LQUI <sid>                 both    A user left (4-char base32 SID).
@@ -223,6 +224,14 @@ and leases free ones to members:
          |  apply window; accept logins      |
          |                                   |
          (on link drop, the coordinator returns window k to the free pool)
+
+The member keeps its window across a link drop, since its users hold SIDs from
+it. When it links to the coordinator again -- or the coordinator restarts and
+has forgotten every lease -- the member loses the election once more and sends
+"LWRQ <min> <max>" instead of a fresh request. The coordinator marks that
+window used again; if it is not a leasable window, or meanwhile went to another
+node, the coordinator answers LERR and refuses the link rather than let two
+nodes hand out the same SIDs.
 
 If no window is free the coordinator answers LERR and the member stays pending.
 
@@ -422,7 +431,9 @@ Not yet implemented:
     loop-safe today).
   - Globally consistent election across a mesh (election is per-link).
   - Coordinator failover: window leases are held in memory, so a coordinator
-    restart forgets them; there is no lease persistence or re-lease protocol.
+    restart forgets them. Members reclaim theirs as they link back in (LWRQ
+    <min> <max>), but a pending node asking first can be leased a window whose
+    holder has yet to return; that holder's link is then refused.
   - Initial-state snapshot on link establish: a node that links in later does
     not receive existing bans or the current topic (only live changes
     propagate). Runtime bans are in-memory (not written to file_acl).
