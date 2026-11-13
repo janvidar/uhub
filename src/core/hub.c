@@ -2059,11 +2059,12 @@ void hub_disconnect_user(struct hub_info* hub, struct hub_user* user, int reason
 	/* Capture "logged in" (i.e. present in the user manager) before the cleanup
 	   state transition below flips it. */
 	was_logged_in = user_is_logged_in(user);
-	/* A disabled hub refuses new logins but keeps serving the users it has, so
-	   one leaving is announced as on a running hub. Only a hub going down
-	   skips the quit. */
+	/* A disabled hub refuses new logins but keeps serving the users it has,
+	   and a reloading one keeps them too, so one leaving is announced as on a
+	   running hub. Only a hub going down skips the quit. */
 	need_notify = was_logged_in &&
-		(hub->status == hub_status_running || hub->status == hub_status_disabled);
+		(hub->status == hub_status_running || hub->status == hub_status_disabled
+		 || hub->status == hub_status_restart);
 	user->quit_reason = reason;
 	user_set_state(user, state_cleanup);
 

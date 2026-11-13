@@ -211,11 +211,13 @@ EXO_TEST(netevent_no_free_sid_refuses_login, {
 	return ok;
 });
 
-/* A disabled hub (hub_enabled = no) keeps the users it has, and one of them
-   leaving goes through the quit like on a running hub: the others are told,
-   linked hubs and plugins hear of it. It used to be dropped on the spot as if
-   the hub were going down, and every client kept a ghost of it. */
-EXO_TEST(netevent_disabled_hub_announces_quit, {
+/* Log a user in, have it leave while the hub is in `status`, and check that
+   the quit event -- what unlinks it and tells the others, linked hubs and
+   plugins -- is what removes it, rather than an unannounced drop on the spot.
+   That drop also restarted, or ran a reentrant walk off, any walk of the user
+   list the departure happened in. */
+static int ne_quit_announced(enum hub_state status)
+{
 	struct hub_user* user;
 	int peer = -1;
 	int ok;
@@ -228,7 +230,7 @@ EXO_TEST(netevent_disabled_hub_announces_quit, {
 	user_set_state(user, state_normal);
 	ok = uman_add(ne_hub->users, user) == 0;
 
-	ne_hub->status = hub_status_disabled;
+	ne_hub->status = status;
 	hub_disconnect_user(ne_hub, user, quit_disconnected);
 	/* Still listed: the quit event is what unlinks and announces it. */
 	ok = ok && uman_get_user_by_nick(ne_hub->users, "leaver") == user
@@ -239,4 +241,11 @@ EXO_TEST(netevent_disabled_hub_announces_quit, {
 	ne_hub->status = hub_status_running;
 	close(peer);
 	return ok;
-});
+}
+
+/* A disabled hub (hub_enabled = no) keeps the users it has; one leaving used
+   to vanish from every other client's view without a quit. */
+EXO_TEST(netevent_disabled_hub_announces_quit, { return ne_quit_announced(hub_status_disabled); });
+
+/* So does a reloading one: users stay connected across a reload. */
+EXO_TEST(netevent_reloading_hub_announces_quit, { return ne_quit_announced(hub_status_restart); });
