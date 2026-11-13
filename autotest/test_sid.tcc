@@ -458,3 +458,55 @@ EXO_TEST(sid_lease_destroy, {
 	sid_pool_destroy(lease_pool_create());
 	return 1;
 });
+
+/* Changing the window recounts what it holds. A full window moved to an empty
+   range has room again... */
+EXO_TEST(sid_window_change_recounts, {
+	struct sid_fixture fx;
+	sid_t s;
+	int ok = fx_part_full(&fx);       /* [256,511], all taken */
+	sid_pool_set_window(fx.pool, 512, 767);
+	s = fx_alloc(&fx);
+	fx_done(&fx);
+	return ok && s >= 512 && s <= 767;
+});
+
+/* ... and a slot the window gains (a remote user) is freed without the count
+   wrapping, which would leave the pool refusing every allocation. */
+EXO_TEST(sid_window_gains_remote_slot, {
+	struct sid_fixture fx;
+	sid_t s;
+	int ok;
+	fx_init(&fx, lease_pool_create());
+	ok = fx_insert_remote(&fx, 300) != NULL;
+	sid_pool_set_window(fx.pool, 256, 511);
+	fx_free(&fx, 300);
+	s = fx_alloc(&fx);
+	fx_done(&fx);
+	return ok && s >= 256 && s <= 511;
+});
+
+/* A remote user inserted inside the window is counted, so freeing it does not
+   wrap the count either. */
+EXO_TEST(sid_insert_in_window_counted, {
+	struct sid_fixture fx;
+	sid_t s;
+	int ok;
+	fx_part(&fx);
+	ok = fx_insert_remote(&fx, 300) != NULL;
+	fx_free(&fx, 300);
+	s = fx_alloc(&fx);
+	fx_done(&fx);
+	return ok && s >= 256 && s <= 511;
+});
+
+/* A window given backwards is empty rather than one that wraps past the map. */
+EXO_TEST(sid_window_backwards_is_empty, {
+	struct sid_fixture fx;
+	sid_t s;
+	fx_init(&fx, lease_pool_create());
+	sid_pool_set_window(fx.pool, 500, 10);
+	s = fx_alloc(&fx);
+	fx_done(&fx);
+	return s == 0;
+});

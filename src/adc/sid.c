@@ -137,11 +137,24 @@ void sid_pool_set_window(struct sid_pool* pool, sid_t min, sid_t max)
 {
 	/* Apply a SID window obtained dynamically (a lease from the cluster
 	   coordinator). The map already spans the whole space; this only sets which
-	   slice this node allocates local SIDs from. Intended for a pool created
-	   with an empty window, before any local users have been allocated. */
+	   slice this node allocates local SIDs from. */
+	sid_t sid;
+
 	pool->min    = (min < 1) ? 1 : min;
 	pool->max    = (max >= pool->map_size) ? (pool->map_size - 1) : max;
+	if (pool->max < pool->min)
+		pool->max = pool->min - 1; /* empty, not a window that wraps around */
 	pool->cursor = 0;
+
+	/* count is the number of taken slots inside the window. Whatever already
+	   holds a SID -- local users from an earlier window, remote users -- may
+	   fall in or out of the new one, so count it afresh: a stale count would
+	   either report the window full, or wrap below zero when an uncounted
+	   slot inside it is freed. */
+	pool->count = 0;
+	for (sid = pool->min; sid <= pool->max; sid++)
+		if (pool->map[sid])
+			pool->count++;
 }
 
 void sid_pool_destroy(struct sid_pool* pool)
@@ -175,13 +188,16 @@ sid_t sid_alloc(struct sid_pool* pool, struct hub_user* user)
 int sid_pool_insert(struct sid_pool* pool, sid_t sid, struct hub_user* user)
 {
 	/* Register a user at a specific, already-assigned SID -- used for remote
-	   users learned over a link, whose SID comes from the peer node's window
-	   (outside this node's local [min, max], so pool->count is untouched). */
+	   users learned over a link, whose SID comes from the peer node's window.
+	   That is normally outside this node's local [min, max]; when it is not,
+	   the slot is counted like a local one, since sid_free() uncounts it. */
 	if (!sid || sid >= pool->map_size)
 		return 0; /* out of range */
 	if (pool->map[sid])
 		return 0; /* SID already in use */
 	pool->map[sid] = user;
+	if (sid >= pool->min && sid <= pool->max)
+		pool->count++;
 	return 1;
 }
 
