@@ -256,6 +256,12 @@ A node that has already leased its window is a member from then on: it never
 coordinates, even when it wins a later election, and it ignores a window
 request (LWRQ), so the requester leases from the coordinator instead.
 
+Election is per link, so two pending nodes can each win somewhere before they
+meet. Both then hold window 0 and lease from pools of their own; when one of
+them loses an election it refuses that link with LERR (and an error in the
+log) rather than merge rosters whose SIDs collide. A cluster that cannot afford
+this at startup should give one node node_id = 0.
+
 
 == Roster synchronisation and remote users ==
 
@@ -429,7 +435,8 @@ Implemented and tested (two nodes / star-to-a-coordinator, and multi-process):
 Not yet implemented:
   - Multi-hop relay and loop tags for a 3+ node mesh (only 2 hops are
     loop-safe today).
-  - Globally consistent election across a mesh (election is per-link).
+  - Globally consistent election across a mesh (election is per-link): two
+    coordinators that meet refuse the link between them.
   - Coordinator failover: window leases are held in memory, so a coordinator
     restart forgets them. Members reclaim theirs as they link back in (LWRQ
     <min> <max>), but a pending node asking first can be leased a window whose

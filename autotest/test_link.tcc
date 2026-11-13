@@ -1519,3 +1519,41 @@ EXO_TEST(link_member_reclaims_its_window, {
 		close(first.fd);
 	return ok;
 });
+
+/* Two coordinators meeting -- here the forced one, outbound, losing the tie to
+   another forced one -- would both hand out window 0 and every window after
+   it. The link is refused instead. */
+EXO_TEST(link_second_coordinator_refused, {
+	int ok;
+	if (!lt_client_handshake())
+		return 0;
+	lt_send("LELC 0000000000000000\n");
+	ok = lt_p.closed && lt_find("LERR", NULL, 0);
+	link_stop(lt_hub);
+	return ok;
+});
+
+/* A pending node that won elsewhere first and now meets a lower id: the same. */
+EXO_TEST(link_pending_coordinator_refused, {
+	struct lt_peer first;
+	int ok;
+	memset(&first, 0, sizeof(first));
+	first.fd = -1;
+	ok = lt_member_handshake();
+	if (ok)
+	{
+		lt_send("LELC ffffffffffffffff\n"); /* we win: coordinator, window 0 */
+		ok = !lt_p.closed && lt_next_sid() != 0;
+	}
+	lt_swap(&first);
+	ok = ok && lt_client_handshake_add();
+	if (ok)
+	{
+		lt_send("LELC 0000000000000000\n"); /* the forced coordinator */
+		ok = lt_p.closed;
+	}
+	lt_member_done();
+	if (first.fd != -1)
+		close(first.fd);
+	return ok;
+});

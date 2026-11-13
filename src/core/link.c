@@ -647,6 +647,17 @@ static int link_process_line(struct hub_link* link, const char* line)
 			if (!g_window_leased)
 				link_become_coordinator(link->hub);
 		}
+		else if (g_win_used)
+		{
+			/* Two coordinators: both claimed window 0 and lease from their own
+			   pools. Election is per link, so two pending nodes that won
+			   elsewhere first can meet like this. Merging their rosters would
+			   collide SIDs; refuse the link and say why. */
+			LOG_ERROR("link: %s is a coordinator too; refusing the link (SID windows would "
+				"collide -- give the cluster one node_id = 0)", link->peer_desc);
+			link_sendf(link, "LERR\n");
+			return -1;
+		}
 		else if (!g_window_set)
 		{
 			/* We lost and still need a window: lease one from the winner. */
