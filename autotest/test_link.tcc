@@ -1062,7 +1062,8 @@ EXO_TEST(link_route_only_relayed_commands, {
 	return ok;
 });
 
-#define LT_REMOTE_ID "IDBN7ZMSLIEBL53OPTM7WXGSTXUS3XOY6KQS5LBGX"
+#define LT_REMOTE_CID "BN7ZMSLIEBL53OPTM7WXGSTXUS3XOY6KQS5LBGX"
+#define LT_REMOTE_ID "ID" LT_REMOTE_CID
 
 /* A peer allocates SIDs from its own window. A user from ours is refused: it
    would take a SID this node hands out, and a peer could fill the window. */
@@ -1158,7 +1159,7 @@ EXO_TEST(link_inf_update_cid_change_ignored, {
 	remote = lt_remote_update("ID" LT_CID " NIremote SS42");
 	if (remote)
 		id = adc_msg_get_named_argument(remote->info, ADC_INF_FLAG_CLIENT_ID);
-	ok = !lt_p.closed && remote && id && !strcmp(id, LT_REMOTE_ID + 2)
+	ok = !lt_p.closed && remote && id && !strcmp(id, LT_REMOTE_CID)
 		&& !adc_msg_has_named_argument(remote->info, "SS")
 		&& !uman_get_user_by_cid(lt_hub->users, LT_CID);
 	hub_free(id);
