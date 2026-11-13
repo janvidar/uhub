@@ -998,3 +998,69 @@ EXO_TEST(bbs_withdraw_missing_post, {
 		&& tu_queue_has(bu_guest,
 			"ISTA 176 No\\ssuch\\spost FCBBP TRZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ\n");
 });
+
+/* -- reload ------------------------------------------------------------- */
+
+/* Free every board and build a new set, the way a reload does, with the
+   subscriptions detached before and reattached after. */
+static int bbs_reload(const char* const* lines)
+{
+	struct bbs_board* board;
+	bbs_subscriptions_detach(bh);
+	while ((board = (struct bbs_board*) list_get_first(bh->bbs->boards)))
+	{
+		list_remove(bh->bbs->boards, board);
+		bbs_board_free(board);
+	}
+	for (; *lines; lines++)
+		if (!bbs_add_board(*lines))
+			return 0;
+	bbs_subscriptions_reattach(bh);
+	return 1;
+}
+
+/* A reload frees the boards while sessions stay subscribed. Subscriptions
+   follow their board to its new incarnation by name, and go with it when the
+   new configuration removes the board or no longer lets the session
+   subscribe -- rather than pointing at freed memory that a new board, which
+   the session may not read, could be allocated at. */
+EXO_TEST(bbs_reload_carries_subscriptions, {
+	static const char* const boards[] = {
+		"board secret subscribe=operator",
+		"board members subscribe=operator",
+		"board general",
+		NULL,
+	};
+	int ok;
+	if (!bbs_fresh())
+		return 0;
+	ok = uman_add(bh->users, bu_reg) == 0 && uman_add(bh->users, bu_guest) == 0
+		&& bbs_hbbl(bu_reg, "HBBL BDgeneral TS0\n") == 0
+		&& bbs_hbbl(bu_reg, "HBBL BDmembers TS0\n") == 0
+		&& bbs_hbbl(bu_guest, "HBBL BDgeneral TS0\n") == 0
+		&& bbs_reload(boards);
+	return ok
+		&& bbs_user_subscription(bu_reg, bbs_board_find(bh->bbs, "general"))
+		&& bbs_user_subscription(bu_guest, bbs_board_find(bh->bbs, "general"))
+		&& !bbs_user_subscription(bu_reg, bbs_board_find(bh->bbs, "members"))
+		&& !bbs_user_subscription(bu_reg, bbs_board_find(bh->bbs, "secret"))
+		&& !bbs_user_subscription(bu_guest, bbs_board_find(bh->bbs, "secret"))
+		&& list_size(bu_reg->bbs_subs) == 1
+		&& list_size(bu_guest->bbs_subs) == 1;
+});
+
+/* A reload that turns the BBS off drops every subscription. */
+EXO_TEST(bbs_reload_disabled_drops_subscriptions, {
+	struct bbs_handle* handle;
+	int ok;
+	if (!bbs_fresh())
+		return 0;
+	ok = uman_add(bh->users, bu_guest) == 0
+		&& bbs_hbbl(bu_guest, "HBBL BDgeneral TS0\n") == 0;
+	bbs_subscriptions_detach(bh);
+	handle = bh->bbs;
+	bh->bbs = NULL;
+	bbs_subscriptions_reattach(bh);
+	bh->bbs = handle;
+	return ok && list_size(bu_guest->bbs_subs) == 0;
+});

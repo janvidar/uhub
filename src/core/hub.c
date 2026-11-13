@@ -1577,6 +1577,8 @@ void hub_set_variables(struct hub_info* hub, struct acl_handle* acl)
 		LOG_FATAL("Unable to load the bulletin board configuration.");
 		hub->status = hub_status_shutdown;
 	}
+	/* After a reload: carry subscriptions over to the new boards. */
+	bbs_subscriptions_reattach(hub);
 
 	/* Reserve room for the base features plus the four runtime-appended,
 	 * optional ones (" ADHBRI", " ADUCMD", " ADRTF0" and " ADBBS0", 7 bytes
@@ -1636,6 +1638,7 @@ void hub_free_variables(struct hub_info* hub)
 {
 	hub_plugins_unload(hub);
 
+	bbs_subscriptions_detach(hub);
 	bbs_shutdown(hub->bbs);
 	hub->bbs = NULL;
 

@@ -188,6 +188,7 @@ extern void bbs_send_board_list(struct hub_info* hub, struct hub_user* user);
 struct bbs_subscription
 {
 	struct bbs_board* board;
+	char name[BBS_MAX_BOARD_NAME + 1]; /**<< The board's name, to find it again after a reload. */
 	time_t cursor;
 };
 
@@ -233,5 +234,14 @@ extern void bbs_send_entry(struct hub_info* hub, struct hub_user* user,
  * or a session loses the permission to read it.
  */
 extern void bbs_cancel_subscriptions(struct hub_info* hub, const struct bbs_board* board);
+
+/**
+ * A reload frees the boards and builds new ones while sessions stay connected.
+ * Before the old boards go, detach every subscription from its board (keeping
+ * the board's name); once the new ones exist, reattach each to the board of the
+ * same name if the session may still subscribe to it, and drop the rest.
+ */
+extern void bbs_subscriptions_detach(struct hub_info* hub);
+extern void bbs_subscriptions_reattach(struct hub_info* hub);
 
 #endif /* HAVE_UHUB_BBS_H */

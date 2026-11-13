@@ -617,6 +617,78 @@ void bbs_cancel_subscriptions(struct hub_info* hub, const struct bbs_board* boar
 	});
 }
 
+void bbs_subscriptions_detach(struct hub_info* hub)
+{
+	struct hub_user* user;
+	struct bbs_subscription* sub;
+	struct node* ucur;
+	struct node* scur;
+
+	if (!hub || !hub->users)
+		return;
+
+	/* Matched by address, a subscription left pointing at a freed board would
+	   be taken for whichever new board is allocated there -- one the session
+	   may not read. */
+	LIST_FOREACH_SAFE(struct hub_user*, user, hub->users->list, ucur,
+	{
+		if (!user->bbs_subs)
+			continue;
+		LIST_FOREACH_SAFE(struct bbs_subscription*, sub, user->bbs_subs, scur,
+		{
+			sub->board = NULL;
+		});
+	});
+}
+
+void bbs_subscriptions_reattach(struct hub_info* hub)
+{
+	struct hub_user* user;
+	struct bbs_subscription* sub;
+	struct node* ucur;
+	struct node* scur;
+
+	if (!hub || !hub->users)
+		return;
+
+	LIST_FOREACH_SAFE(struct hub_user*, user, hub->users->list, ucur,
+	{
+		int dropped = 0;
+		if (!user->bbs_subs)
+			continue;
+		LIST_FOREACH_SAFE(struct bbs_subscription*, sub, user->bbs_subs, scur,
+		{
+			struct bbs_board* board;
+			if (sub->board)
+				continue;
+			board = bbs_is_enabled(hub) ? bbs_board_find(hub->bbs, sub->name) : NULL;
+			/* The new configuration decides: a board that is gone, or that
+			   this session may no longer subscribe to, takes the
+			   subscription with it. */
+			if (board && (bbs_board_permissions(board, user->credentials) & (1 << bbs_perm_subscribe)))
+				sub->board = board;
+			else
+				dropped = 1;
+		});
+		/* Removed after the walk: the cursor is the current node, so freeing
+		   it mid-walk would leave the walk on freed memory. */
+		while (dropped)
+		{
+			dropped = 0;
+			LIST_FOREACH_SAFE(struct bbs_subscription*, sub, user->bbs_subs, scur,
+			{
+				if (!sub->board)
+				{
+					list_remove(user->bbs_subs, sub);
+					hub_free(sub);
+					dropped = 1;
+					break;
+				}
+			});
+		}
+	});
+}
+
 /* The replay burst reuses the send-queue bypass that the user list at login
    uses: a subscription from the start of a board is one large, bounded batch,
    and bbs_max_posts_per_board is what bounds it. */
@@ -781,6 +853,7 @@ int bbs_handle_subscribe(struct hub_info* hub, struct hub_user* user, struct adc
 		if (!sub)
 			goto done;
 		sub->board = board;
+		memcpy(sub->name, board->name, sizeof(sub->name));
 		list_append(user->bbs_subs, sub);
 	}
 
