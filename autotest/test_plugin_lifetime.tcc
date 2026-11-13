@@ -1,6 +1,7 @@
 #include "system.h"
 #include "util/list.h"
 #include "util/memory.h"
+#include "core/commands.h"
 #include "core/hub.h"
 #include "core/plugincallback.h"
 #include "core/pluginloader.h"
@@ -8,9 +9,11 @@
 #include "plugin_api/handle.h"
 
 /*
- * Per-user plugin data (set_user_data / get_user_data) against the real hub
- * callback table, through a plugin handle that is wired up the way the loader
- * does it but has no shared object behind it.
+ * What a plugin leaves behind in the hub, and how it is released when the
+ * plugin goes: per-user data (set_user_data / get_user_data) and registered
+ * commands. Tested against the real hub callback table, through a plugin handle
+ * that is wired up the way the loader does it but has no shared object behind
+ * it.
  *
  * The users here are not in any user list on purpose: a user still logging in,
  * or one that has quit and awaits destruction, is not either, and the data a
@@ -144,5 +147,75 @@ EXO_TEST(plugin_data_purge_only_own, {
 	ok = ok && pd_cleanups == 2;
 	pd_plugin_destroy(a);
 	pd_plugin_destroy(b);
+	return ok;
+});
+
+/* -------------------------------------------------------------------------
+ * Commands
+ * ------------------------------------------------------------------------- */
+
+static int pd_command(struct plugin_handle* plugin, struct plugin_user* user, struct plugin_command* cmd)
+{
+	(void) plugin; (void) user; (void) cmd;
+	return 0;
+}
+
+static struct plugin_command_handle* pd_command_create(const char* prefix)
+{
+	struct plugin_command_handle* cmdh = (struct plugin_command_handle*) hub_malloc_zero(sizeof(*cmdh));
+	if (!cmdh)
+		return NULL;
+	cmdh->prefix = prefix;
+	cmdh->length = strlen(prefix);
+	cmdh->args = "";
+	cmdh->cred = auth_cred_guest;
+	cmdh->handler = pd_command;
+	cmdh->description = "test";
+	cmdh->origin = "test";
+	return cmdh;
+}
+
+/* A plugin that unloads with a command still registered -- its unregister
+   forgot command_del and freed the handle with the rest of its state -- has
+   the command dropped from the hub without the hub touching that freed handle
+   (ASan would say so), or the hub's handle being mistaken for the shared
+   object's. */
+EXO_TEST(plugin_unload_drops_leftover_command, {
+	struct plugin_handle* plugin;
+	struct plugin_command_handle* cmdh;
+	int ok;
+	pd_hub.commands = command_initialize(&pd_hub);
+	plugin = pd_plugin_create();
+	cmdh = pd_command_create("pdleftover");
+	ok = pd_hub.commands && plugin && cmdh
+		&& plugin->hub.command_add(plugin, cmdh) == 0
+		&& command_handler_lookup(pd_hub.commands, "pdleftover") != NULL;
+	hub_free(cmdh);                  /* the plugin's unregister, minus command_del */
+	if (plugin)
+		plugin_unload(plugin);
+	ok = ok && command_handler_lookup(pd_hub.commands, "pdleftover") == NULL;
+	command_shutdown(pd_hub.commands);
+	pd_hub.commands = NULL;
+	return ok;
+});
+
+/* A command the plugin removes itself is gone, and removing it twice is
+   refused rather than freeing anything again. */
+EXO_TEST(plugin_command_del, {
+	struct plugin_handle* plugin;
+	struct plugin_command_handle* cmdh;
+	int ok;
+	pd_hub.commands = command_initialize(&pd_hub);
+	plugin = pd_plugin_create();
+	cmdh = pd_command_create("pdremoved");
+	ok = pd_hub.commands && plugin && cmdh
+		&& plugin->hub.command_add(plugin, cmdh) == 0
+		&& plugin->hub.command_del(plugin, cmdh) == 0
+		&& command_handler_lookup(pd_hub.commands, "pdremoved") == NULL
+		&& plugin->hub.command_del(plugin, cmdh) != 0;
+	hub_free(cmdh);
+	pd_plugin_destroy(plugin);
+	command_shutdown(pd_hub.commands);
+	pd_hub.commands = NULL;
 	return ok;
 });

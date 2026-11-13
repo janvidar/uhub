@@ -33,9 +33,19 @@
 #include "core/usermanager.h"
 #include "plugin_api/command_api.h"
 
+/* A command a plugin registered: the hub's own entry, and the plugin's handle
+   that dispatch calls through. Owned by the hub, so a command the plugin never
+   removed can still be dropped at unload without touching plugin memory, which
+   its unregister has usually freed by then. */
+struct plugin_command_record
+{
+	struct command_handle* command;
+	struct plugin_command_handle* cmdh;
+};
+
 struct plugin_callback_data
 {
-	struct linked_list* commands;
+	struct linked_list* commands; /* struct plugin_command_record */
 	/* Every user holding a per-user data entry owned by this plugin, logged in
 	   or not, so the entries can all be released when the plugin is unloaded.
 	   The user list would miss a user still logging in, or one that has left
@@ -99,7 +109,7 @@ static int plugin_command_dispatch(struct command_base* cbase, struct hub_user* 
 	(void) cbase;
 	struct plugin_handle* plugin = (struct plugin_handle*) cmd->ptr;
 	struct plugin_callback_data* data = get_callback_data(plugin);
-	struct plugin_command_handle* cmdh;
+	struct plugin_command_record* rec;
 	struct plugin_user* puser = as_plugin_user(user);
 	struct plugin_command* pcommand = as_plugin_command(cmd);
 
@@ -108,10 +118,10 @@ static int plugin_command_dispatch(struct command_base* cbase, struct hub_user* 
 	if (!data)
 		return 0;
 
-	LIST_FOREACH(struct plugin_command_handle*, cmdh, data->commands,
+	LIST_FOREACH(struct plugin_command_record*, rec, data->commands,
 	{
-		if (strcmp(cmdh->prefix, cmd->prefix) == 0)
-			return cmdh->handler(plugin, puser, pcommand);
+		if (strcmp(rec->cmdh->prefix, cmd->prefix) == 0)
+			return rec->cmdh->handler(plugin, puser, pcommand);
 	});
 	return 0;
 }
@@ -344,14 +354,20 @@ static int cbfunc_auth_list_users(struct plugin_handle* plugin, auth_list_users_
 static int cbfunc_command_add(struct plugin_handle* plugin, struct plugin_command_handle* cmdh)
 {
 	struct plugin_callback_data* data = get_callback_data(plugin);
+	struct plugin_command_record* rec;
 	struct command_handle* command;
 
 	if (!data || !cmdh)
 		return -1;
 
 	command = (struct command_handle*) hub_malloc_zero(sizeof(struct command_handle));
-	if (!command)
+	rec = (struct plugin_command_record*) hub_malloc_zero(sizeof(struct plugin_command_record));
+	if (!command || !rec)
+	{
+		hub_free(command);
+		hub_free(rec);
 		return -1;
+	}
 
 	command->prefix = cmdh->prefix;
 	command->length = cmdh->length;
@@ -362,7 +378,9 @@ static int cbfunc_command_add(struct plugin_handle* plugin, struct plugin_comman
 	command->handler = plugin_command_dispatch;
 
 	cmdh->internal_handle = command;
-	list_append(data->commands, cmdh);
+	rec->command = command;
+	rec->cmdh = cmdh;
+	list_append(data->commands, rec);
 	command_add(plugin_get_hub(plugin)->commands, command, (void*) plugin);
 	return 0;
 }
@@ -370,15 +388,27 @@ static int cbfunc_command_add(struct plugin_handle* plugin, struct plugin_comman
 static int cbfunc_command_del(struct plugin_handle* plugin, struct plugin_command_handle* cmdh)
 {
 	struct plugin_callback_data* data = get_callback_data(plugin);
-	struct command_handle* command;
+	struct plugin_command_record* rec;
+	struct plugin_command_record* found = NULL;
 
 	if (!data || !cmdh)
 		return -1;
 
-	command = (struct command_handle*) cmdh->internal_handle;
-	list_remove(data->commands, cmdh);
-	command_del(plugin_get_hub(plugin)->commands, command);
-	hub_free(command);
+	LIST_FOREACH(struct plugin_command_record*, rec, data->commands,
+	{
+		if (rec->cmdh == cmdh)
+		{
+			found = rec;
+			break;
+		}
+	});
+	if (!found)
+		return -1;
+
+	list_remove(data->commands, found);
+	command_del(plugin_get_hub(plugin)->commands, found->command);
+	hub_free(found->command);
+	hub_free(found);
 	cmdh->internal_handle = NULL;
 	return 0;
 }
@@ -758,12 +788,25 @@ struct plugin_callback_data* plugin_callback_data_create()
 void plugin_callback_data_destroy(struct plugin_handle* plugin, struct plugin_callback_data* data)
 {
 	LOG_PLUGIN("plugin_callback_data_destroy()");
+	if (!data)
+		return;
 	if (data->commands)
 	{
-		// delete commands not deleted by the plugin itself:
-		struct plugin_command_handle* cmd;
-		while ( (cmd = list_get_first(data->commands)) )
-			cbfunc_command_del(plugin, cmd);
+		/* Drop commands the plugin did not remove itself. Its unregister has
+		   run, so its command handles may be gone: only the hub's records are
+		   touched. */
+		struct plugin_command_record* rec;
+		size_t left = 0;
+		while ((rec = (struct plugin_command_record*) list_get_first(data->commands)))
+		{
+			list_remove(data->commands, rec);
+			command_del(plugin_get_hub(plugin)->commands, rec->command);
+			hub_free(rec->command);
+			hub_free(rec);
+			left++;
+		}
+		if (left)
+			LOG_WARN("A plugin left " PRINTF_SIZE_T " command(s) registered at unload", left);
 		list_destroy(data->commands);
 	}
 

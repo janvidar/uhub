@@ -131,20 +131,27 @@ struct uhub_plugin* plugin_open(const char* filename)
 	return plugin;
 }
 
-void plugin_close(struct uhub_plugin* plugin)
+void plugin_close(struct uhub_plugin* plugin, struct plugin_handle* handle)
 {
 	struct plugin_hub_internals* internals = (struct plugin_hub_internals*) plugin->internals;
 
 	LOG_PLUGIN("plugin_close: \"%s\"", plugin->filename);
-	plugin_callback_data_destroy(plugin->handle, internals->callback_data);
+	/* The callback data belongs to the plugin handle, not to the shared
+	   object: plugin->handle is the dlopen() handle. It does not exist yet if
+	   the load failed before the handle was set up. */
+	if (internals && internals->callback_data)
+		plugin_callback_data_destroy(handle, internals->callback_data);
 	hub_free(internals);
 	plugin->internals = NULL;
 
+	if (plugin->handle)
+	{
 #ifdef HAVE_DLOPEN
-	dlclose(plugin->handle);
+		dlclose(plugin->handle);
 #else
-	FreeLibrary((HMODULE) plugin->handle);
+		FreeLibrary((HMODULE) plugin->handle);
 #endif
+	}
 	hub_free(plugin->filename);
 	hub_free(plugin);
 }
@@ -176,7 +183,7 @@ struct plugin_handle* plugin_load(const char* filename, const char* config, stru
 	handle = (struct plugin_handle*) hub_malloc_zero(sizeof(struct plugin_handle));
 	if (!handle)
 	{
-		plugin_close(plugin);
+		plugin_close(plugin, NULL);
 		return NULL;
 	}
 
@@ -227,7 +234,7 @@ struct plugin_handle* plugin_load(const char* filename, const char* config, stru
 		}
 	}
 
-	plugin_close(plugin);
+	plugin_close(plugin, handle);
 	hub_free(handle);
 	return NULL;
 }
@@ -246,7 +253,7 @@ void plugin_unload(struct plugin_handle* plugin)
 			internals->unregister(plugin);
 	}
 	plugin_unregister_callback_functions(plugin);
-	plugin_close(plugin->handle);
+	plugin_close(plugin->handle, plugin);
 	hub_free(plugin);
 }
 

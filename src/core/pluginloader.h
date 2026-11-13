@@ -57,7 +57,7 @@ extern void plugin_shutdown(struct uhub_plugins* handle);
 
 // Low level plugin loader code (used internally)
 extern struct uhub_plugin* plugin_open(const char* filename);
-extern void plugin_close(struct uhub_plugin*);
+extern void plugin_close(struct uhub_plugin*, struct plugin_handle*);
 extern void* plugin_lookup_symbol(struct uhub_plugin*, const char* symbol);
 
 // Used internally only
