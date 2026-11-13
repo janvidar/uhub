@@ -511,8 +511,9 @@ static int link_process_line(struct hub_link* link, const char* line)
 		/* Auth master: a slave asks whether <nick> is registered. Reply
 		   "LACR <sid> <cred>": the account's credential, "guest" if no plugin
 		   knows the nick, or "none" if one refused it (the slave then refuses
-		   the login, as we would). sid echoes the slave's pending user so it
-		   can match the reply. */
+		   the login, as we would). The first field is echoed verbatim: it
+		   names the slave's pending login (a SID, tagged by newer slaves), so
+		   the slave can match the reply. */
 		char sid[16];
 		const char* nick;
 		struct auth_info info;
@@ -1470,17 +1471,33 @@ static void link_auth_pending_add(struct hub_user* user)
 		list_append(g_auth_pending, user);
 }
 
+/* The tag a request to the master carries in its first field: the user's SID
+   and its connection id, "AAAB.0000001f". The master echoes the field verbatim
+   in its reply (as older masters do), and the reply is matched on the whole
+   tag. A SID alone is reused once its user leaves, so a late reply could
+   otherwise land on the next user to hold it -- one that may be waiting on the
+   master for a different nick. */
+#define LINK_AUTH_TAG_LEN (4 + 1 + 8)
+
+static void link_auth_tag(struct hub_user* user, char out[LINK_AUTH_TAG_LEN + 1])
+{
+	snprintf(out, LINK_AUTH_TAG_LEN + 1, "%s.%08x", sid_to_string(user->id.sid),
+		(unsigned) (user->connection_id & 0xffffffffu));
+}
+
 /* Slave: ask the master whether `user`'s nick is registered (LACQ). Returns 1
    if sent (login should pause), 0 if no master link is available. */
 int link_auth_query(struct hub_info* hub, struct hub_user* user, const char* nick)
 {
 	struct hub_link* master = link_master();
+	char tag[LINK_AUTH_TAG_LEN + 1];
 	(void) hub;
 	/* The nick is the last field, so it may contain spaces, but a CR/LF would
 	   end the line and inject a command into the master link. */
 	if (!master || !nick || !*nick || !link_field_ok(nick))
 		return 0;
-	if (link_sendf(master, "LACQ %s %s\n", sid_to_string(user->id.sid), nick) < 0)
+	link_auth_tag(user, tag);
+	if (link_sendf(master, "LACQ %s %s\n", tag, nick) < 0)
 		return 0;
 	link_auth_pending_add(user);
 	return 1;
@@ -1493,10 +1510,12 @@ int link_auth_query(struct hub_info* hub, struct hub_user* user, const char* nic
 int link_auth_proxy_verify(struct hub_info* hub, struct hub_user* user, const char* challenge, const char* response)
 {
 	struct hub_link* master = link_master();
+	char tag[LINK_AUTH_TAG_LEN + 1];
 	(void) hub;
 	if (!master || !link_field_ok(challenge) || !link_field_ok(response) || strchr(response, ' '))
 		return 0;
-	if (link_sendf(master, "LVFY %s %s %s %s\n", sid_to_string(user->id.sid), challenge, response, user->id.nick) < 0)
+	link_auth_tag(user, tag);
+	if (link_sendf(master, "LVFY %s %s %s %s\n", tag, challenge, response, user->id.nick) < 0)
 		return 0;
 	link_auth_pending_add(user);
 	return 1;
@@ -1511,18 +1530,20 @@ void link_auth_pending_forget(struct hub_user* user)
 		list_remove(g_auth_pending, user);
 }
 
-/* Find and remove the pending user matching `sidstr` (the SID echoed in the
-   master's reply). NULL if it is gone (e.g. disconnected meanwhile). */
-static struct hub_user* link_auth_pending_take(const char* sidstr)
+/* Find and remove the pending user matching `tagstr` (the tag echoed in the
+   master's reply, see link_auth_tag). NULL if it is gone (e.g. disconnected
+   meanwhile). */
+static struct hub_user* link_auth_pending_take(const char* tagstr)
 {
-	sid_t sid = string_to_sid(sidstr);
+	char tag[LINK_AUTH_TAG_LEN + 1];
 	struct hub_user* user;
 	struct hub_user* found = 0;
-	if (!g_auth_pending)
+	if (!g_auth_pending || strlen(tagstr) != LINK_AUTH_TAG_LEN)
 		return 0;
 	LIST_FOREACH(struct hub_user*, user, g_auth_pending,
 	{
-		if (user->id.sid == sid)
+		link_auth_tag(user, tag);
+		if (!strcmp(tag, tagstr))
 		{
 			found = user;
 			break;

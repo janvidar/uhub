@@ -168,12 +168,12 @@ transport.
                                      line (may be empty; no CR/LF).
   LUBN <target>              both    Lift a ban cluster-wide; target is a nick,
                                      CID or IP/range (takes the rest of the line).
-  LACQ <sid> <nick>          slave   Is this nick registered? (master auth)
-  LACR <sid> <cred>          master  Reply: the nick's credential; "guest" if no
+  LACQ <tag> <nick>          slave   Is this nick registered? (master auth)
+  LACR <tag> <cred>          master  Reply: the nick's credential; "guest" if no
                                      account, "none" if refused (the slave
                                      then refuses the login too).
-  LVFY <sid> <chal> <resp> <nick>  slave   Verify a password challenge-response.
-  LVRS <sid> <ok> <cred>     master  Reply: 1/0, and the credential on success.
+  LVFY <tag> <chal> <resp> <nick>  slave   Verify a password challenge-response.
+  LVRS <tag> <ok> <cred>     master  Reply: 1/0, and the credential on success.
 
 All post-handshake commands (everything except LCHA/LRES/LACK/LERR) are only
 accepted on an established link. Every command is a 4-character FOURCC ('L' plus
@@ -189,7 +189,10 @@ reach a link.
 A peer speaks only for what it owns. A routed message (LRTE) must come from a
 remote user learned over that same link; one claiming the SID of a local user,
 or of a user on another node, is dropped. LACR and LVRS are accepted only from
-the auth master the query went to. LBAN never truncates a CID or nick to fit,
+the auth master the query went to, and only when they echo the tag of a login
+still waiting: the slave's SID and connection id ("AAAB.0000001f"), so a late
+reply never settles whoever holds that SID next. The master echoes the tag
+without reading it. LBAN never truncates a CID or nick to fit,
 and LDSC must be a single escaped token.
 
 
@@ -348,16 +351,16 @@ A login on the slave is proxied in two steps; passwords never leave the master:
 
     slave (auth_proxy)                 master (has accounts)
         |                                   |
-   BINF |  --------  LACQ <sid> <nick>  --> |  look up the nick
-        |  <-------  LACR <sid> <cred>  --- |  reply credential ("guest" if none)
+   BINF |  --------  LACQ <tag> <nick>  --> |  look up the nick
+        |  <-------  LACR <tag> <cred>  --- |  reply credential ("guest" if none)
         |  (guest -> admit; registered -> challenge with IGPA)
         |                                   |
-   HPAS |  -- LVFY <sid> <chal> <resp> <nick> -->  verify against stored password
-        |  <-------  LVRS <sid> <ok> <cred> ----   reply pass/fail + credential
+   HPAS |  -- LVFY <tag> <chal> <resp> <nick> -->  verify against stored password
+        |  <-------  LVRS <tag> <ok> <cred> ----   reply pass/fail + credential
         |  (admit with that credential, or reject)
 
 The slave pauses the login while waiting for each reply (a pending-auth registry
-keyed by SID tracks the held login; the existing login timeout covers an
+keyed by the tag -- SID and connection id -- tracks the held login; the existing login timeout covers an
 unreachable master). Guests are unaffected and log in locally. The master needs
 no special flag -- it simply answers from its auth plugin -- so it is just a
 normal hub that loads the account database (mod_auth_simple / mod_auth_sqlite).
