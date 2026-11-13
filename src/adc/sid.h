@@ -60,6 +60,11 @@ extern sid_t sid_alloc(struct sid_pool*, struct hub_user*);
  */
 extern int sid_pool_insert(struct sid_pool*, sid_t sid, struct hub_user*);
 
+/**
+ * Whether sid falls in this node's own allocation window, [min, max].
+ */
+extern int sid_pool_in_window(struct sid_pool*, sid_t sid);
+
 extern void sid_free(struct sid_pool*, sid_t);
 extern struct hub_user* sid_lookup(struct sid_pool*, sid_t);
 

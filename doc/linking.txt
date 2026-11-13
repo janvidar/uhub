@@ -205,7 +205,9 @@ local SIDs from a disjoint slice ("window") so that two nodes never hand out
 the same SID. The space is divided into "node_count" equal windows of
 SID_MAX / node_count SIDs each; window 0 starts at SID 1 (SID 0 is reserved).
 A node's lookup map still spans the whole space, so remote users from other
-windows resolve through the same table.
+windows resolve through the same table. A remote user whose SID falls in the
+node's own window is refused, with an error in the log: a peer never allocates
+from it, unless two nodes share a node_id.
 
 There are three ways a node obtains its window, selected by the "node_id"
 config option:
@@ -407,7 +409,8 @@ elect and lease. For a single multi-core machine, set workers and let the master
 configure the rest.
 
 If linking is configured but node_count is 1 (and node_id >= 0), the hub warns
-at start-up that SIDs are not partitioned and will collide.
+at start-up that SIDs are not partitioned: users a peer announces from this
+node's SID range are refused.
 
 
 == Security ==

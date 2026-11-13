@@ -167,7 +167,7 @@ EXO_SETUP({
 	lt_hub = (struct hub_info*) hub_malloc_zero(sizeof(struct hub_info));
 	if (!lt_hub)
 		return 0;
-	lt_hub->users = uman_init(0, 1);
+	lt_hub->users = uman_init(0, 2); /* node 0 of 2: SIDs below QAAA are ours */
 	lt_hub->acl = (struct acl_handle*) hub_malloc_zero(sizeof(struct acl_handle));
 	lt_hub->config = (struct hub_config*) hub_malloc_zero(sizeof(struct hub_config));
 	if (!lt_hub->users || !lt_hub->acl || !lt_hub->config)
@@ -923,7 +923,7 @@ EXO_TEST(link_unban_nick_with_spaces_propagates, {
  * A peer speaks only for what it owns
  * ------------------------------------------------------------------------- */
 
-#define LT_REMOTE_INF "LINF BINF AAAD IDBN7ZMSLIEBL53OPTM7WXGSTXUS3XOY6KQS5LBGX NIremote\n"
+#define LT_REMOTE_INF "LINF BINF QAAD IDBN7ZMSLIEBL53OPTM7WXGSTXUS3XOY6KQS5LBGX NIremote\n"
 
 /* Local users AAAB (the recipient) and AAAE (an operator), routable by SID. */
 static struct hub_user* lt_local_target = 0;
@@ -982,8 +982,8 @@ EXO_TEST(link_route_from_owned_user_delivered, {
 		return 0;
 	}
 	lt_send(LT_REMOTE_INF);
-	lt_send("LRTE DMSG AAAD AAAB hello\n");
-	ok = !lt_p.closed && lt_queued(lt_local_target, "DMSG AAAD AAAB hello");
+	lt_send("LRTE DMSG QAAD AAAB hello\n");
+	ok = !lt_p.closed && lt_queued(lt_local_target, "DMSG QAAD AAAB hello");
 	link_stop(lt_hub); /* drops the remote user while the local ones exist */
 	lt_remove_local_users();
 	return ok;
@@ -1015,13 +1015,13 @@ EXO_TEST(link_route_other_links_user_dropped, {
 		lt_remove_local_users();
 		return 0;
 	}
-	lt_send(LT_REMOTE_INF);          /* AAAD belongs to the first link */
+	lt_send(LT_REMOTE_INF);          /* QAAD belongs to the first link */
 	lt_swap(&first);
 	if (!lt_server_handshake_add())
 		ok = 0;
 	else
 	{
-		lt_send("LRTE DMSG AAAD AAAB hello\n");
+		lt_send("LRTE DMSG QAAD AAAB hello\n");
 		ok = !lt_p.closed && !lt_queued(lt_local_target, "DMSG");
 	}
 	link_stop(lt_hub);
@@ -1044,23 +1044,38 @@ EXO_TEST(link_route_only_relayed_commands, {
 	}
 	lt_send(LT_REMOTE_INF);
 	tu_queue_clear(lt_local_target);
-	lt_send("LRTE BINF AAAD NIoperator CT4\n");
-	lt_send("LRTE DINF AAAD AAAB NIoperator\n");
-	lt_send("LRTE BQUI AAAD\n");
-	lt_send("LRTE DCMD AAAD AAAB Menu TTBMSG\\s%[myNI]\n");
-	lt_send("LRTE BRES AAAD SIfile\n");
-	lt_send("LRTE ERES AAAD AAAB SIfile\n");
+	lt_send("LRTE BINF QAAD NIoperator CT4\n");
+	lt_send("LRTE DINF QAAD AAAB NIoperator\n");
+	lt_send("LRTE BQUI QAAD\n");
+	lt_send("LRTE DCMD QAAD AAAB Menu TTBMSG\\s%[myNI]\n");
+	lt_send("LRTE BRES QAAD SIfile\n");
+	lt_send("LRTE ERES QAAD AAAB SIfile\n");
 	ok = !lt_p.closed && tu_queue_count(lt_local_target) == 0;
-	lt_send("LRTE BMSG AAAD hello\n");
-	lt_send("LRTE DRES AAAD AAAB SIfile\n");
-	ok = ok && lt_queued(lt_local_target, "BMSG AAAD hello")
-		&& lt_queued(lt_local_target, "DRES AAAD AAAB SIfile");
+	lt_send("LRTE BMSG QAAD hello\n");
+	lt_send("LRTE DRES QAAD AAAB SIfile\n");
+	ok = ok && lt_queued(lt_local_target, "BMSG QAAD hello")
+		&& lt_queued(lt_local_target, "DRES QAAD AAAB SIfile");
 	link_stop(lt_hub);
 	lt_remove_local_users();
 	return ok;
 });
 
 #define LT_REMOTE_ID "IDBN7ZMSLIEBL53OPTM7WXGSTXUS3XOY6KQS5LBGX"
+
+/* A peer allocates SIDs from its own window. A user from ours is refused: it
+   would take a SID this node hands out, and a peer could fill the window. */
+EXO_TEST(link_remote_sid_in_own_window_refused, {
+	int ok;
+	if (!lt_server_handshake())
+		return 0;
+	lt_send("LINF BINF AAAC " LT_REMOTE_ID " NIsquatter\n");
+	ok = !lt_p.closed && !uman_get_user_by_sid(lt_hub->users, string_to_sid("AAAC"))
+		&& !uman_get_user_by_nick(lt_hub->users, "squatter");
+	lt_send(LT_REMOTE_INF);
+	ok = ok && uman_get_user_by_sid(lt_hub->users, string_to_sid("QAAD"));
+	link_stop(lt_hub);
+	return ok;
+});
 
 /* Presence is a BINF. Another message carrying a nick and a CID used to become
    the user's INF, and so what every client was sent for that user. */
@@ -1072,9 +1087,9 @@ EXO_TEST(link_inf_not_binf_ignored, {
 		return 0;
 	}
 	tu_queue_clear(lt_local_target);
-	lt_send("LINF BMSG AAAD " LT_REMOTE_ID " NIremote\n");
-	lt_send("LINF DCTM AAAD AAAB " LT_REMOTE_ID " NIremote\n");
-	ok = !lt_p.closed && !uman_get_user_by_sid(lt_hub->users, string_to_sid("AAAD"))
+	lt_send("LINF BMSG QAAD " LT_REMOTE_ID " NIremote\n");
+	lt_send("LINF DCTM QAAD AAAB " LT_REMOTE_ID " NIremote\n");
+	ok = !lt_p.closed && !uman_get_user_by_sid(lt_hub->users, string_to_sid("QAAD"))
 		&& !uman_get_user_by_nick(lt_hub->users, "remote")
 		&& tu_queue_count(lt_local_target) == 0;
 	link_stop(lt_hub);
@@ -1082,12 +1097,12 @@ EXO_TEST(link_inf_not_binf_ignored, {
 	return ok;
 });
 
-/* Send an update for the remote user AAAD; return it, as the hub now has it. */
+/* Send an update for the remote user QAAD; return it, as the hub now has it. */
 static struct hub_user* lt_remote_update(const char* fields)
 {
 	lt_send(LT_REMOTE_INF);
-	lt_sendf("LINF BINF AAAD %s\n", fields);
-	return uman_get_user_by_sid(lt_hub->users, string_to_sid("AAAD"));
+	lt_sendf("LINF BINF QAAD %s\n", fields);
+	return uman_get_user_by_sid(lt_hub->users, string_to_sid("QAAD"));
 }
 
 /* A nick changed on the peer (a plugin may allow it) is re-indexed: the new
@@ -1350,7 +1365,7 @@ static void lt_dispatch(void* data, struct event_data* ev)
 	}
 }
 
-/* Kick the remote user AAAD here (an operator's !kick, a plugin's
+/* Kick the remote user QAAD here (an operator's !kick, a plugin's
    user_disconnect), then let the peer report it gone -- `after`, or the link
    dropping if NULL -- before the event queue runs. The link frees remote users
    on the spot, so the kick must already have unlinked it: otherwise the queued
@@ -1367,14 +1382,14 @@ static int lt_kick_remote(const char* after)
 	}
 	lt_hub->status = hub_status_running;
 	lt_send(LT_REMOTE_INF);
-	remote = uman_get_user_by_sid(lt_hub->users, string_to_sid("AAAD"));
+	remote = uman_get_user_by_sid(lt_hub->users, string_to_sid("QAAD"));
 	ok = remote && user_is_remote(remote);
 	if (ok)
 	{
 		hub_disconnect_user(lt_hub, remote, quit_kicked);
-		ok = !uman_get_user_by_sid(lt_hub->users, string_to_sid("AAAD"))
+		ok = !uman_get_user_by_sid(lt_hub->users, string_to_sid("QAAD"))
 			&& !uman_get_user_by_nick(lt_hub->users, "remote")
-			&& lt_queued(lt_local_target, "IQUI AAAD");
+			&& lt_queued(lt_local_target, "IQUI QAAD");
 		if (after)
 			lt_send(after);
 		else
@@ -1391,7 +1406,7 @@ static int lt_kick_remote(const char* after)
 	return ok;
 }
 
-EXO_TEST(link_kicked_remote_then_quit, { return lt_kick_remote("LQUI AAAD\n"); });
+EXO_TEST(link_kicked_remote_then_quit, { return lt_kick_remote("LQUI QAAD\n"); });
 EXO_TEST(link_kicked_remote_then_link_lost, { return lt_kick_remote(NULL); });
 
 /* -------------------------------------------------------------------------

@@ -201,6 +201,11 @@ int sid_pool_insert(struct sid_pool* pool, sid_t sid, struct hub_user* user)
 	return 1;
 }
 
+int sid_pool_in_window(struct sid_pool* pool, sid_t sid)
+{
+	return sid >= pool->min && sid <= pool->max;
+}
+
 void sid_free(struct sid_pool* pool, sid_t sid)
 {
 	if (!sid || sid >= pool->map_size)

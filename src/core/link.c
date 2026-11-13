@@ -1208,7 +1208,8 @@ void link_start(struct hub_info* hub)
 	   separately in uman_init.) */
 	if ((*cfg->link_peer || *cfg->link_secret) && cfg->node_count <= 1 && cfg->node_id >= 0)
 		LOG_WARN("Hub linking is configured but node_count is 1: SIDs are not "
-		         "partitioned and will collide across linked hubs. Set node_count "
+		         "partitioned, so the users a linked hub announces from this hub's "
+		         "SID range are refused. Set node_count "
 		         "to the cluster size and a unique node_id on each node "
 		         "(or node_id = -1 to lease a window dynamically).");
 
@@ -1628,6 +1629,19 @@ static void link_handle_remote_inf(struct hub_link* link, const char* binf)
 		user->info = adc_msg_incref(info);
 		adc_msg_free(info);
 		route_info_message(link->hub, user); /* relay the update to local clients */
+		return;
+	}
+
+	/* A peer allocates from its own window, never ours, so a user from ours
+	   means two nodes allocate from one window: a misconfigured node_id. Left
+	   alone, it surfaces only when both pick the same SID, and the peer's
+	   users take SIDs this node would hand out next. */
+	if (sid_pool_in_window(link->hub->users->sids, info->source))
+	{
+		LOG_ERROR("link: %s announced a user with SID %s, from this node's own SID window; "
+			"refusing it (does every node have its own node_id?)",
+			link->peer_desc, sid_to_string(info->source));
+		adc_msg_free(info);
 		return;
 	}
 
