@@ -196,6 +196,10 @@ EXO_TEARDOWN({
 	return 1;
 });
 
+/* The node_id the next lt_fresh() configures; a test that changes it puts the
+   default back. */
+static int lt_node_id = 0;
+
 /* Every link test starts here: no links, a fresh ACL, no plugins, and the
    shared secret configured. */
 static void lt_fresh(void)
@@ -209,6 +213,7 @@ static void lt_fresh(void)
 	hub_free(lt_hub->config->link_secret);
 	lt_hub->config->link_secret = hub_strdup(LT_SECRET);
 	lt_hub->config->node_count = 2;
+	lt_hub->config->node_id = lt_node_id;
 	acl_initialize(lt_hub->config, lt_hub->acl);
 	link_start(lt_hub);
 }
@@ -1254,3 +1259,85 @@ static int lt_kick_remote(const char* after)
 
 EXO_TEST(link_kicked_remote_then_quit, { return lt_kick_remote("LQUI AAAD\n"); });
 EXO_TEST(link_kicked_remote_then_link_lost, { return lt_kick_remote(NULL); });
+
+/* -------------------------------------------------------------------------
+ * SID window lease, member side (node_id = -1)
+ * ------------------------------------------------------------------------- */
+
+static struct hub_user_manager* lt_saved_users = 0;
+
+/* A node that leases its window: no window until a coordinator grants one.
+   The test plays the peer the hub connected out to. */
+static int lt_member_handshake(void)
+{
+	lt_saved_users = lt_hub->users;
+	lt_hub->users = uman_init(-1, 2);
+	if (!lt_hub->users)
+	{
+		lt_hub->users = lt_saved_users;
+		lt_saved_users = 0;
+		return 0;
+	}
+	lt_node_id = -1;
+	return lt_client_handshake();
+}
+
+static void lt_member_done(void)
+{
+	link_stop(lt_hub);
+	lt_node_id = 0;
+	if (lt_saved_users)
+	{
+		uman_shutdown(lt_hub->users);
+		lt_hub->users = lt_saved_users;
+		lt_saved_users = 0;
+	}
+}
+
+/* The SID the next local user would get (0: none), handed straight back. */
+static sid_t lt_next_sid(void)
+{
+	struct hub_user u;
+	sid_t sid;
+	memset(&u, 0, sizeof(u));
+	sid = uman_get_free_sid(lt_hub->users, &u);
+	if (sid)
+		sid_free(lt_hub->users->sids, sid);
+	return sid;
+}
+
+/* A grant nobody asked for is refused, and the window stays empty. */
+EXO_TEST(link_window_unrequested_refused, {
+	int ok;
+	if (!lt_member_handshake())
+	{
+		lt_member_done();
+		return 0;
+	}
+	lt_send("LWIN 1000 1999\n");
+	ok = lt_p.closed && lt_next_sid() == 0;
+	lt_member_done();
+	return ok;
+});
+
+/* Losing the election asks the winner for a window, and its answer is
+   applied -- once. A second grant would move the window under live users. */
+EXO_TEST(link_window_requested_applied_once, {
+	sid_t sid;
+	int ok;
+	if (!lt_member_handshake())
+	{
+		lt_member_done();
+		return 0;
+	}
+	lt_send("LELC 0000000000000000\n"); /* a forced coordinator: we lose */
+	ok = lt_find("LWRQ", NULL, 0);
+	lt_send("LWIN 1000 1999\n");
+	sid = lt_next_sid();
+	ok = ok && !lt_p.closed && sid >= 1000 && sid <= 1999;
+	lt_send("LWIN 3000 3999\n");
+	sid = lt_next_sid();
+	ok = ok && lt_p.closed && sid >= 1000 && sid <= 1999;
+	lt_member_done();
+	return ok;
+});

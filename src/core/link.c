@@ -165,6 +165,7 @@ struct hub_link
 	size_t recvlen;
 	char* peer_desc;                        /* for logging */
 	int granted_node_id;                    /* coordinator side: window index granted to this link, or -1 */
+	int window_requested;                   /* member side: we sent LWRQ here and await LWIN */
 };
 
 /* All active links (singleton hub), for teardown. */
@@ -619,7 +620,8 @@ static int link_process_line(struct hub_link* link, const char* line)
 		else if (!g_window_set)
 		{
 			/* We lost and still need a window: lease one from the winner. */
-			link_sendf(link, "LWRQ\n");
+			if (link_sendf(link, "LWRQ\n") >= 0)
+				link->window_requested = 1;
 		}
 		return 0;
 	}
@@ -656,6 +658,15 @@ static int link_process_line(struct hub_link* link, const char* line)
 		unsigned long lo, hi;
 		if (link->state != link_state_established)
 			return -1;
+		/* Only an answer to our own request, and only while we have no
+		   window: a grant from anywhere else, or a second one, would move the
+		   window under users who already hold SIDs from it. */
+		if (!link->window_requested || g_window_set)
+		{
+			LOG_WARN("link: unrequested window grant from %s", link->peer_desc);
+			return -1;
+		}
+		link->window_requested = 0;
 		lo = strtoul(line + 5, &end, 10);
 		hi = strtoul(end, &end, 10);
 		if (hi <= lo)
