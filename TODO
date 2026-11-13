@@ -1,8 +1,8 @@
 # uhub — outstanding work
 
-State: 0.8.x-stable is 0.8.1 in CMakeLists.txt, build.zig and build.zig.zon,
-and tagged 0.8.1: 0.8.0 plus the security fixes for #127 - #130. master
-continues towards the next feature release.
+State: 0.8.x-stable is 0.8.2 in CMakeLists.txt, build.zig and build.zig.zon:
+0.8.1 plus the security fixes for UHUB-2026-009..011, the kqueue fd-reuse
+fix and two smaller fixes. master continues towards the next feature release.
 
 ## HBRI
 - A NAT-override user cannot use HBRI at all: check_network() (src/core/inf.c)
