@@ -323,3 +323,35 @@ EXO_TEST(command_kick_spec_long_reason, { as(auth_cred_guest, 1); return kick_sp
 
 
 
+
+/* A command_foreach callback that looks a command up -- a plugin callback can,
+   through the plugin API -- does not disturb the walk. With the cursor kept in
+   the list, the lookup moved it back to the command found and the walk went
+   round forever; here a visit cap stands in for "forever". */
+struct cf_state
+{
+	int visits;
+};
+
+static void cf_visit_and_lookup(struct command_handle* command, void* ptr)
+{
+	struct cf_state* st = (struct cf_state*) ptr;
+	(void) command;
+	if (++st->visits > 1000)
+		return;
+	command_handler_lookup(cbase, "test1");
+}
+
+static void cf_count(struct command_handle* command, void* ptr)
+{
+	(void) command;
+	((struct cf_state*) ptr)->visits++;
+}
+
+EXO_TEST(command_foreach_survives_nested_lookup, {
+	struct cf_state plain = { 0 };
+	struct cf_state nested = { 0 };
+	command_foreach(cbase, auth_cred_admin, cf_count, &plain);
+	command_foreach(cbase, auth_cred_admin, cf_visit_and_lookup, &nested);
+	return plain.visits > 0 && nested.visits == plain.visits;
+});

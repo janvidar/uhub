@@ -110,9 +110,10 @@ int command_is_available(struct command_handle* handle, enum auth_credentials cr
 struct command_handle* command_handler_lookup(struct command_base* cbase, const char* prefix)
 {
 	struct command_handle* handler = NULL;
+	struct node* cursor;
 	size_t prefix_len = strlen(prefix);
 
-	LIST_FOREACH(struct command_handle*, handler, cbase->handlers,
+	LIST_FOREACH_SAFE(struct command_handle*, handler, cbase->handlers, cursor,
 	{
 		if (prefix_len != handler->length)
 			continue;
@@ -127,7 +128,11 @@ struct command_handle* command_handler_lookup(struct command_base* cbase, const 
 void command_foreach(struct command_base* cbase, enum auth_credentials credentials, command_handle_enum handler, void* ptr)
 {
 	struct command_handle* command = NULL;
-	LIST_FOREACH(struct command_handle*, command, cbase->handlers,
+	struct node* cursor;
+	/* A private cursor: the callback (a plugin's, through the plugin API) may
+	   look commands up, add or remove its own, which would move a cursor kept
+	   in the list and send this walk round again. */
+	LIST_FOREACH_SAFE(struct command_handle*, command, cbase->handlers, cursor,
 	{
 		if (command_is_available(command, credentials))
 			handler(command, ptr);
@@ -344,12 +349,13 @@ void command_help_rich(struct command_base* cbase, struct hub_user* user, struct
 	if (!command)
 	{
 		struct command_handle* handle;
+		struct node* cursor;
 
 		cbuf_append(buf, "**Available commands**\n\n");
 		cbuf_append(buf, "| Command | Description |\n");
 		cbuf_append(buf, "| --- | --- |\n");
 
-		LIST_FOREACH(struct command_handle*, handle, cbase->handlers,
+		LIST_FOREACH_SAFE(struct command_handle*, handle, cbase->handlers, cursor,
 		{
 			if (command_is_available(handle, user->credentials))
 			{
@@ -382,6 +388,7 @@ static int command_help(struct command_base* cbase, struct hub_user* user, struc
 	struct cbuffer* buf = cbuf_create(MAX_HELP_LINE);
 	struct hub_command_arg_data* data = hub_command_arg_next(cmd, type_command);
 	struct command_handle* command;
+	struct node* cursor;
 
 	if (command_rich_text_ok(cbase, user))
 	{
@@ -394,7 +401,7 @@ static int command_help(struct command_base* cbase, struct hub_user* user, struc
 	{
 		cbuf_append(buf, "Available commands:\n");
 
-		LIST_FOREACH(struct command_handle*, command, cbase->handlers,
+		LIST_FOREACH_SAFE(struct command_handle*, command, cbase->handlers, cursor,
 		{
 			if (command_is_available(command, user->credentials))
 			{
