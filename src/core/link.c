@@ -213,6 +213,7 @@ static void link_release_window(int idx)
    leases. g_window_set is 1 once this node holds a usable SID window. */
 static uint64_t g_election_id = 0;
 static int      g_window_set  = 0;
+static int      g_window_leased = 0; /* our window came from a coordinator: we are a member */
 
 /* This node won the election: ensure it owns window 0 and can grant windows. */
 static void link_become_coordinator(struct hub_info* hub)
@@ -608,6 +609,11 @@ static int link_process_line(struct hub_link* link, const char* line)
 		int i_win;
 		if (link->state != link_state_established)
 			return -1;
+		/* A static node (node_id > 0) does not take part: it owns a fixed
+		   window, and its election id of 0 would otherwise win every time and
+		   make it grant windows that overlap the static ones. */
+		if (link->hub->config->node_id > 0)
+			return 0;
 		peerid = strtoull(line + 5, NULL, 16);
 		myid = (link->hub->config->node_id == 0) ? 0 : g_election_id;
 		/* Lower id wins; an exact tie (astronomically unlikely) is broken by
@@ -615,7 +621,12 @@ static int link_process_line(struct hub_link* link, const char* line)
 		i_win = (myid < peerid) || (myid == peerid && link->is_client == 0);
 		if (i_win)
 		{
-			link_become_coordinator(link->hub);
+			/* A member already leased its window from a coordinator, and
+			   granting from a bitmap of its own would hand out windows the
+			   real coordinator also grants -- its own included. The loser
+			   leases from the coordinator instead. */
+			if (!g_window_leased)
+				link_become_coordinator(link->hub);
 		}
 		else if (!g_window_set)
 		{
@@ -633,6 +644,14 @@ static int link_process_line(struct hub_link* link, const char* line)
 		sid_t w, lo, hi;
 		if (link->state != link_state_established)
 			return -1;
+		if (!g_win_used)
+		{
+			/* Not a coordinator (we won this link's election as a member):
+			   the peer gets its window from the coordinator. Not an error, so
+			   the link stays. */
+			LOG_DEBUG("link: ignoring window request from %s; not a coordinator", link->peer_desc);
+			return 0;
+		}
 		idx = link_grant_window();
 		if (idx < 0)
 		{
@@ -676,6 +695,7 @@ static int link_process_line(struct hub_link* link, const char* line)
 		}
 		uman_set_sid_window(link->hub->users, (sid_t) lo, (sid_t) hi);
 		g_window_set = 1;
+		g_window_leased = 1;
 		LOG_INFO("link: leased SID window [%lu, %lu] from %s", lo, hi, link->peer_desc);
 		return 0;
 	}
@@ -1106,6 +1126,7 @@ void link_start(struct hub_info* hub)
 	   for any node that already holds a window (statically configured node_id
 	   >= 0); an electing node starts pending until it wins or leases. */
 	g_window_set = (cfg->node_id >= 0) ? 1 : 0;
+	g_window_leased = 0;
 	g_election_id = 0;
 	if (cfg->node_id < 0)
 		RAND_bytes((unsigned char*) &g_election_id, sizeof(g_election_id));

@@ -243,6 +243,10 @@ election time, then grants the other windows. This lets an entire cluster come
 up with NO node designated as coordinator: give every node node_id = -1,
 node_count = N and a shared link_secret, and they elect among themselves.
 
+A node that has already leased its window is a member from then on: it never
+coordinates, even when it wins a later election, and it ignores a window
+request (LWRQ), so the requester leases from the coordinator instead.
+
 
 == Roster synchronisation and remote users ==
 

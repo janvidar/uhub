@@ -305,6 +305,10 @@ static int lt_find(const char* prefix, char* out, size_t outsz)
 
 static int lt_established(void)
 {
+	/* An electing or coordinating node announces LELC once established; a
+	   static member (node_id > 0) announces nothing, so its LACK is the sign. */
+	if (lt_hub->config->node_id > 0)
+		return !lt_p.closed && lt_find("LACK", NULL, 0);
 	return !lt_p.closed && lt_find("LELC ", NULL, 0);
 }
 
@@ -1339,5 +1343,52 @@ EXO_TEST(link_window_requested_applied_once, {
 	sid = lt_next_sid();
 	ok = ok && lt_p.closed && sid >= 1000 && sid <= 1999;
 	lt_member_done();
+	return ok;
+});
+
+/* A static node (node_id > 0) takes no part in the election. Its election id
+   is 0, so it used to win every LELC and start granting windows of its own --
+   overlapping the static ones. */
+EXO_TEST(link_static_node_does_not_coordinate, {
+	int ok;
+	lt_node_id = 1;
+	ok = lt_client_handshake();
+	if (ok)
+	{
+		lt_send("LELC ffffffffffffffff\n");
+		lt_send("LWRQ\n");
+		ok = !lt_p.closed && !lt_find("LWIN ", NULL, 0) && !lt_find("LERR", NULL, 0);
+	}
+	link_stop(lt_hub);
+	lt_node_id = 0;
+	return ok;
+});
+
+/* A member that leased its window does not coordinate when it wins a later
+   election against another pending node: that node leases from the real
+   coordinator, and the member neither grants nor drops the link. */
+EXO_TEST(link_member_does_not_coordinate, {
+	struct lt_peer coordinator;
+	int ok;
+	memset(&coordinator, 0, sizeof(coordinator));
+	coordinator.fd = -1;
+	ok = lt_member_handshake();
+	if (ok)
+	{
+		lt_send("LELC 0000000000000000\n");
+		lt_send("LWIN 1000 1999\n");
+		ok = !lt_p.closed && lt_next_sid() >= 1000;
+	}
+	lt_swap(&coordinator);             /* keep it; a pending node connects to us */
+	ok = ok && lt_server_handshake_add();
+	if (ok)
+	{
+		lt_send("LELC ffffffffffffffff\n"); /* we win this one */
+		lt_send("LWRQ\n");
+		ok = !lt_p.closed && !lt_find("LWIN ", NULL, 0) && !lt_find("LERR", NULL, 0);
+	}
+	lt_member_done();
+	if (coordinator.fd != -1)
+		close(coordinator.fd);
 	return ok;
 });
