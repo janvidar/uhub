@@ -796,7 +796,10 @@
 	<option name="tls_enable" type="boolean" default="1">
 		<short>Enable SSL/TLS support</short>
 		<description><![CDATA[
-			Enables/disables TLS/SSL support. tls_certificate and tls_private_key must be set if this is enabled.
+			Enables/disables TLS/SSL support. With neither tls_certificate nor tls_private_key set, the hub
+			creates a self-signed certificate in its state directory on first start and keeps using it.
+			A hub with TLS enabled also links to its peers over TLS and refuses plain-text links, so every
+			node of a cluster needs the same setting.
 		]]></description>
 		<since>0.3.0</since>
 	</option>

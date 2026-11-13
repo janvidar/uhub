@@ -148,13 +148,9 @@ peer_nonce)), uhub 0.7.0 - 0.8.0) let a peer without the secret complete the
 handshake by reflecting the hub's own challenge. There is no fallback: every
 hub and worker in a cluster must run a version with the v2 handshake.
 
-The handshake authenticates the peer only. Over TLS (see "Transport and
-detection") the traffic that follows is encrypted and integrity-protected, but
-the handshake is not bound to the TLS session: an attacker who can intercept
-the connection could end one TLS session at each hub and relay the handshake
-between them. Without TLS -- a hub with tls_enable off -- the traffic is
-neither encrypted nor integrity-protected. Either way, links must run over a
-trusted network or transport.
+The handshake authenticates the peer only. Over TLS the traffic that follows
+is encrypted and integrity-protected; without it -- a hub with tls_enable off
+-- it is neither. See "Security" for what the handshake does not cover.
 
 
 == Command reference ==
@@ -435,18 +431,29 @@ node's SID range are refused.
 
 == Security ==
 
-A link is highly privileged: a peer can inject arbitrary users into the local
-roster. Treat the link as a trust boundary.
+The nodes of a cluster are one hub, run as one: each holds the others'
+credentials and may act for the whole hub -- inject users, ban anyone, answer
+for the accounts. No node is less trusted than another, and a node you would
+not trust with that does not belong in the cluster. What keeps others out is
+the link credential and who can reach the port links arrive on.
 
-The shared-secret handshake is a v1 baseline with the same weaknesses as a
-shared password: one secret for the whole cluster, no per-hub identity, no
-rotation or revocation, and it sits in the config file. Run links only over a
-trusted/private network.
+That credential is a shared secret today, with the weaknesses of a shared
+password: one secret for the whole cluster, no per-node identity, no rotation
+or revocation, and it sits in every node's config file. It also gives away an
+offline guess: anyone who can reach the hub's port can send a challenge and
+receive the hub's answer to it, so a weak link_secret can be cracked without
+further contact. Use a long random one.
 
-The intended production posture is mutual TLS with per-peer certificate pinning
-(each hub has a keypair; peers pin each other's fingerprint), giving per-node
-identity and revocation with nothing secret on the wire or at rest. Do not
-treat the shared secret as the recommended long-term mechanism.
+Over TLS (see "Transport and detection") link traffic is encrypted and
+integrity-protected, but the handshake is not bound to the TLS session: an
+attacker in the middle could run one TLS session with each hub and relay the
+handshake between them. Run links over a network you trust until links
+authenticate with keys.
+
+The planned replacement (see TODO): links authenticate with each hub's own
+certificate on both sides, and every node pins its peers' public keys, as in
+WireGuard. That gives per-node identity and revocation with nothing secret on
+the wire or shared between nodes.
 
 
 == Status and limitations ==
