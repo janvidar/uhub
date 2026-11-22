@@ -121,6 +121,17 @@ static enum command_parse_status command_extract_arguments(struct hub_info* hub,
 			break;
 		}
 
+		/* '?' and '+' consume no token. Let go of the one just looked at before
+		   moving on: a greedy token is ours to free, any other is still owned by
+		   the token list -- left in 'token', a trailing '+' would have it freed
+		   here after the loop and again by the list. */
+		if (arg_code == '?' || arg_code == '+')
+		{
+			if (greedy)
+				hub_free(token);
+			token = NULL;
+		}
+
 		switch (arg_code)
 		{
 			case '?':

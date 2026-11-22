@@ -321,6 +321,31 @@ EXO_TEST(command_kick_spec_no_reason,   { as(auth_cred_guest, 1); return kick_sp
 EXO_TEST(command_kick_spec_reason,      { as(auth_cred_guest, 1); return kick_spec_parse("!kickspec tester spamming", "spamming"); });
 EXO_TEST(command_kick_spec_long_reason, { as(auth_cred_guest, 1); return kick_spec_parse("!kickspec tester spamming the main chat", "spamming the main chat"); });
 
+/* Parse a line against a one-off command with the given argument spec. */
+static int spec_parse(const char* args, const char* line, enum command_parse_status expected)
+{
+	struct command_handle* h = create_handler("specparse", args, auth_cred_guest);
+	struct hub_command* parsed;
+	int ok;
+
+	if (!command_add(cbase, h, NULL))
+		return 0;
+	parsed = command_parse(cbase, hub, &user, line);
+	ok = parsed && parsed->status == expected;
+	command_free(parsed);
+	command_del(cbase, h);
+	hub_free(h);
+	return ok;
+}
+
+/* A '+' with nothing after it consumes nothing. The token it was looking at is
+   still the token list's: it was freed after the loop and then again with the
+   list. No shipped command ends in '+', but a plugin can register one. */
+EXO_TEST(command_spec_trailing_greedy,       { as(auth_cred_guest, 1); return spec_parse("m+", "!specparse one two three", cmd_status_ok); });
+EXO_TEST(command_spec_only_greedy,           { as(auth_cred_guest, 1); return spec_parse("+", "!specparse one two", cmd_status_ok); });
+/* A '?' after '+' threw away the greedy token it had just built, unfreed. */
+EXO_TEST(command_spec_greedy_then_optional,  { as(auth_cred_guest, 1); return spec_parse("+?m", "!specparse one two", cmd_status_ok); });
+
 
 
 
