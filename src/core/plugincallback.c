@@ -132,6 +132,8 @@ static int cbfunc_send_message(struct plugin_handle* plugin, struct plugin_user*
 	if (!user || !message)
 		return 0;
 	buffer = adc_msg_escape(message);
+	if (!buffer)
+		return 0;
 	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
 	adc_msg_add_argument(command, buffer);
 	route_to_user(plugin_get_hub(plugin), as_hub_user(user), command);
@@ -163,6 +165,8 @@ static int cbfunc_send_rich_message(struct plugin_handle* plugin, struct plugin_
 		return cbfunc_send_message(plugin, user, message);
 
 	buffer = adc_msg_escape(message);
+	if (!buffer)
+		return 0;
 	command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 10);
 	adc_msg_add_argument(command, buffer);
 	adc_msg_add_named_argument(command, ADC_MSG_FLAG_RICH_TEXT, "1");
@@ -178,6 +182,8 @@ static int cbfunc_send_broadcast(struct plugin_handle* plugin, const char* messa
 	if (!message)
 		return 0;
 	buffer = adc_msg_escape(message);
+	if (!buffer)
+		return 0;
 	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
 	adc_msg_add_argument(command, buffer);
 	route_to_all(plugin_get_hub(plugin), command);
@@ -199,6 +205,8 @@ static int cbfunc_send_chat(struct plugin_handle* plugin, enum auth_credentials 
 		return 0;
 
 	buffer = adc_msg_escape(message);
+	if (!buffer)
+		return 0;
 	command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
 	adc_msg_add_argument(command, buffer);
 	LIST_FOREACH_SAFE(struct hub_user*, user, hub->users->list, cursor,
@@ -222,6 +230,8 @@ static int cbfunc_send_status(struct plugin_handle* plugin, struct plugin_user* 
 	if (!user || !message)
 		return 0;
 	buffer = adc_msg_escape(message);
+	if (!buffer)
+		return 0;
 	struct adc_message* command = adc_msg_construct(ADC_CMD_ISTA, strlen(buffer) + 10);
 	snprintf(code_str, sizeof(code_str), "%03d", code);
 	adc_msg_add_argument(command, code_str);
@@ -246,6 +256,8 @@ static int cbfunc_send_user_command(struct plugin_handle* plugin, struct plugin_
 		return 0;
 
 	esc_name = adc_msg_escape(name);
+	if (!esc_name)
+		return 0;
 	struct adc_message* msg = adc_msg_construct(ADC_CMD_ICMD, strlen(esc_name) + (command ? strlen(command) : 0) + 32);
 	adc_msg_add_argument(msg, esc_name);                 /* positional: menu name (submenus split by '/') */
 	if (command)
@@ -707,6 +719,8 @@ static void cbfunc_set_hub_name(struct plugin_handle* plugin, const char* str)
 	struct hub_info* hub = plugin_get_hub(plugin);
 	struct adc_message* command;
 	char* new_str = adc_msg_escape(str ? str : hub->config->hub_name);
+	if (!new_str)
+		return;
 
 	adc_msg_replace_named_argument(hub->command_info, ADC_INF_FLAG_NICK, new_str);
 
@@ -723,6 +737,8 @@ static void cbfunc_set_hub_description(struct plugin_handle* plugin, const char*
 {
 	struct hub_info* hub = plugin_get_hub(plugin);
 	char* new_str = adc_msg_escape(str ? str : hub->config->hub_description);
+	if (!new_str)
+		return;
 
 	/* Update the local IINF + announce to local clients, and propagate the topic
 	   to linked hubs so the whole logical hub shows the same description. */

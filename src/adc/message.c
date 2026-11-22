@@ -1167,6 +1167,8 @@ char* adc_msg_escape(const char* string)
 	char* str = hub_malloc(adc_msg_escape_length(string)+1);
 	size_t n = 0;
 	size_t i = 0;
+	if (!str)
+		return NULL; /* OOM */
 	for (i = 0; i < strlen(string); i++)
 	{
 		switch (string[i]) {

@@ -183,7 +183,13 @@ void command_get_syntax(struct command_handle* handler, struct cbuffer* buf)
 void send_message(struct command_base* cbase, struct hub_user* user, struct cbuffer* buf)
 {
 	char* buffer = adc_msg_escape(cbuf_get(buf));
-	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
+	struct adc_message* command;
+	if (!buffer)
+	{
+		cbuf_destroy(buf);
+		return;
+	}
+	command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
 	adc_msg_add_argument(command, buffer);
 	route_to_user(cbase->hub, user, command);
 	adc_msg_free(command);
@@ -208,7 +214,13 @@ static int command_rich_text_ok(struct command_base* cbase, struct hub_user* use
 static void send_rich_message(struct command_base* cbase, struct hub_user* user, struct cbuffer* buf)
 {
 	char* buffer = adc_msg_escape(cbuf_get(buf));
-	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 10);
+	struct adc_message* command;
+	if (!buffer)
+	{
+		cbuf_destroy(buf);
+		return;
+	}
+	command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 10);
 	adc_msg_add_argument(command, buffer);
 	adc_msg_add_named_argument(command, ADC_MSG_FLAG_RICH_TEXT, "1");
 	route_to_user(cbase->hub, user, command);
