@@ -795,7 +795,7 @@ EXO_TEST(link_vfy_long_nick_sent, {
 	sent = link_auth_proxy_verify(lt_hub, u, chal, resp);
 	link_auth_pending_forget(u);
 	lt_drain();
-	snprintf(expect, sizeof(expect), "LVFY " LT_TAG " %s %s %s\n", chal, resp, u->id.nick);
+	snprintf(expect, sizeof(expect), "LVFY " LT_TAG " %s %s %.*s\n", chal, resp, MAX_NICK_LEN, u->id.nick);
 	return sent == 1 && !strcmp(lt_p.out, expect);
 });
 
