@@ -15,6 +15,7 @@ configured with `-DFUZZING=ON` and run for a short time on every CI run.
 | `fuzz_metrics`        | `src/tools/fuzz_metrics.c`        | `metrics_classify_request()` (HTTP method/path/bearer-token validation) | raw network bytes on the metrics endpoint |
 | `fuzz_login`          | `src/tools/fuzz_login.c`          | `hub_handle_info_login()` -- the connect-time INF checks (CID/nick/network/user-agent/ACL) | INF from a not-yet-trusted client, **pre-auth** |
 | `fuzz_bbs`            | `src/tools/fuzz_bbs.c`            | `bbs_handle_subscribe()` / `bbs_handle_post()` -- the BBS0 board name, hash, size and subject handling | HBBL/HBBP from a logged-in but untrusted session |
+| `fuzz_bbs_post`       | `src/tools/fuzz_bbs_post.c`       | the seeder's BBS0 post document parse and attachment extraction | a post fetched from another user |
 | `fuzz_filelist`       | `src/tools/fuzz_filelist.c`       | `fs_filelist_parse()` / `fs_filelist_load()` -- uhub-fuse's file list XML and bzip2 handling | a peer's `files.xml.bz2`, whose names become path components in a mount |
 
 `fuzz_adc_escape` also checks a property: `escape()` followed by `unescape()`
@@ -35,8 +36,8 @@ wire to other users, so it lasts rather than passing through.
 ## Build
 
 ```sh
-CC=clang cmake -B build-fuzz -DFUZZING=ON -DSSL_SUPPORT=OFF -DRELEASE=ON .
-cmake --build build-fuzz --target fuzz_message fuzz_adc_escape fuzz_ipcalc fuzz_config_token fuzz_command_parser fuzz_metrics fuzz_login -j
+CC=clang cmake -B build-fuzz -DFUZZING=ON -DRELEASE=ON .
+cmake --build build-fuzz --target fuzz_message fuzz_adc_escape fuzz_ipcalc fuzz_config_token fuzz_command_parser fuzz_metrics fuzz_login fuzz_bbs fuzz_bbs_post fuzz_filelist -j
 ```
 
 ## Run
@@ -53,6 +54,8 @@ export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
 ./build-fuzz/fuzz_command_parser                            autotest/fuzz/corpus/command_parser
 ./build-fuzz/fuzz_metrics      -dict=autotest/fuzz/metrics.dict autotest/fuzz/corpus/metrics
 ./build-fuzz/fuzz_login        -dict=autotest/fuzz/login.dict   autotest/fuzz/corpus/login
+./build-fuzz/fuzz_bbs                                       autotest/fuzz/corpus/bbs
+./build-fuzz/fuzz_bbs_post                                  autotest/fuzz/corpus/bbs_post
 ./build-fuzz/fuzz_filelist                                  autotest/fuzz/corpus/filelist
 ```
 
@@ -65,6 +68,14 @@ writes a `crash-<hash>` reproducer to the working directory; replay it with
 `corpus/<target>/` holds hand-written seed inputs, one per file. libFuzzer
 writes newly-discovered inputs back into the directory it is given, so a local
 run will leave untracked `corpus/<target>/<hash>` files behind — `git clean`
-them, or commit genuinely interesting ones back as permanent seeds. When you
+them, or commit genuinely interesting ones back as permanent seeds. To keep
+only the ones that add coverage, merge them into a copy of the tracked seeds:
+
+```sh
+mkdir merged && cp $(git ls-files autotest/fuzz/corpus/<target>) merged/
+./build-fuzz/fuzz_<target> -merge=1 merged <dir with the new inputs>
+```
+
+and commit what `merged/` gained. When you
 fix a parser bug, add the crashing reproducer to the relevant corpus directory
 so it becomes a regression seed.
