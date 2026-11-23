@@ -172,47 +172,62 @@ static size_t get_next_timeout_evt()
 
 
 
+/* Each sender hands its message to the send queue, which takes a reference of
+   its own, and then drops ours. */
+static void perf_send(struct ADC_client* client, struct adc_message* cmd)
+{
+	if (!cmd)
+		return; /* OOM */
+	ADC_client_send(client, cmd);
+	adc_msg_free(cmd);
+}
+
 static void perf_chat(struct ADC_client* client, int priv)
 {
 	size_t r = get_wait_rand(MAX_CHAT_MSGS-1);
 	char* msg = adc_msg_escape(chat_messages[r]);
 	struct adc_message* cmd = NULL;
 
+	if (!msg)
+		return; /* OOM */
+
 	if (priv)
 		cmd = adc_msg_construct_source_dest(ADC_CMD_DMSG, ADC_client_get_sid(client), ADC_client_get_sid(client), strlen(msg));
 	else
 		cmd = adc_msg_construct_source(ADC_CMD_BMSG, ADC_client_get_sid(client), strlen(msg));
+	if (cmd)
+		adc_msg_add_argument(cmd, msg);
 	hub_free(msg);
 
-	ADC_client_send(client, cmd);
+	perf_send(client, cmd);
 }
 
 static void perf_search(struct ADC_client* client)
 {
 	size_t r = get_wait_rand(MAX_SEARCH_MSGS-1);
 	size_t pst = get_wait_rand(100);
-	struct adc_message* cmd = NULL;
+	fourcc_t type = pst > 80 ? ADC_CMD_FSCH : ADC_CMD_BSCH;
+	struct adc_message* cmd = adc_msg_construct_source(type, ADC_client_get_sid(client), strlen(search_messages[r]) + 6);
 
-	if (pst > 80)
+	if (cmd)
 	{
-		cmd = adc_msg_construct_source(ADC_CMD_FSCH, ADC_client_get_sid(client), strlen(search_messages[r]) + 6);
-		adc_msg_add_argument(cmd, "+TCP4");
+		if (type == ADC_CMD_FSCH)
+			adc_msg_add_argument(cmd, "+TCP4");
+		adc_msg_add_argument(cmd, search_messages[r]);
 	}
-	else
-	{
-		cmd = adc_msg_construct_source(ADC_CMD_BSCH, ADC_client_get_sid(client), strlen(search_messages[r]) + 6);
-		adc_msg_add_argument(cmd, "+TCP4");
-	}
-	ADC_client_send(client, cmd);
+	perf_send(client, cmd);
 }
 
 static void perf_ctm(struct ADC_client* client)
 {
 	struct adc_message* cmd = adc_msg_construct_source_dest(ADC_CMD_DCTM, ADC_client_get_sid(client), ADC_client_get_sid(client), 32);
-	adc_msg_add_argument(cmd, "ADC/1.0");
-	adc_msg_add_argument(cmd, "TOKEN123456");
-	adc_msg_add_argument(cmd, sid_to_string(ADC_client_get_sid(client)));
-	ADC_client_send(client, cmd);
+	if (cmd)
+	{
+		adc_msg_add_argument(cmd, "ADC/1.0");
+		adc_msg_add_argument(cmd, "TOKEN123456");
+		adc_msg_add_argument(cmd, sid_to_string(ADC_client_get_sid(client)));
+	}
+	perf_send(client, cmd);
 }
 
 
@@ -222,8 +237,9 @@ static void perf_update(struct ADC_client* client)
 	int n = (int) get_wait_rand(10)+1;
 	struct adc_message* cmd = adc_msg_construct_source(ADC_CMD_BINF, ADC_client_get_sid(client), 32);
 	snprintf(buf, sizeof(buf), "HN%d", n);
-	adc_msg_add_argument(cmd, buf);
-	ADC_client_send(client, cmd);
+	if (cmd)
+		adc_msg_add_argument(cmd, buf);
+	perf_send(client, cmd);
 }
 
 static void client_disconnect(struct AdcFuzzUser* c)
