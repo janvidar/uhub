@@ -22,6 +22,20 @@
 
 #include <stddef.h>
 
+/*
+ * Allocation never fails: running out of memory logs a fatal message and
+ * aborts. Every allocator below (hub_malloc, hub_malloc_zero, hub_realloc,
+ * hub_strdup, hub_strndup) returns non-NULL, so callers need not check -- a
+ * NULL check that is already there is harmless, it just never fires.
+ *
+ * This is deliberate. The alternative was a NULL check, and an untested error
+ * branch, after each of several hundred allocations, and the hub had a few
+ * hundred places that had none: an allocation failure crashed it somewhere
+ * arbitrary instead. Every allocation sized by a peer is capped well below
+ * anything that could fail, so no client can steer the hub into this.
+ */
+extern void hub_out_of_memory(size_t size) __attribute__((noreturn));
+
 #ifdef MEMORY_DEBUG
 
 #define hub_malloc     debug_mem_malloc
@@ -37,12 +51,11 @@ extern char* debug_mem_strndup(const char* s, size_t n);
 
 #else
 
-#define hub_malloc     malloc
 #define hub_free       free
-#define hub_realloc    realloc
-#define hub_strdup     strdup
-#define hub_strndup    strndup
-
+extern void* hub_malloc(size_t size);
+extern void* hub_realloc(void* ptr, size_t size);
+extern char* hub_strdup(const char* s);
+extern char* hub_strndup(const char* s, size_t n);
 
 #endif
 

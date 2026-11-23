@@ -21,6 +21,16 @@
 #include "util/memory.h"
 #include "util/log.h" /* LOG_MEMORY, used throughout the MEMORY_DEBUG allocator */
 
+void hub_out_of_memory(size_t size)
+{
+	/* hub_log() formats into stack buffers and writes to an already open log,
+	   so it needs no memory of its own. abort() flushes nothing: flush first,
+	   or the one line that says why the hub stopped is the one that is lost. */
+	LOG_FATAL("Out of memory allocating " PRINTF_SIZE_T " bytes, aborting", size);
+	fflush(NULL);
+	abort();
+}
+
 #ifdef MEMORY_DEBUG
 
 #define REALTIME_MALLOC_TRACKING
@@ -68,7 +78,10 @@ void internal_debug_print_leaks()
 void* internal_debug_mem_malloc(size_t size, const char* where)
 {
 	size_t n = 0;
-	char* ptr = malloc(size);
+	char* ptr = malloc(size ? size : 1);
+
+	if (!ptr)
+		hub_out_of_memory(size);
 
 #ifdef REALTIME_MALLOC_TRACKING
 
@@ -205,13 +218,9 @@ void* debug_mem_realloc(void* ptr, size_t size)
 		{
 			if (hub_allocs[n].ptr == ptr)
 			{
-				void* newptr = realloc(ptr, size);
+				void* newptr = realloc(ptr, size ? size : 1);
 				if (!newptr)
-				{
-					LOG_MEMORY("realloc *** OOM for %d bytes", (int) size);
-					hub_alloc_oom++;
-					return 0; /* original ptr still valid and tracked */
-				}
+					hub_out_of_memory(size);
 				hub_alloc_size += size - hub_allocs[n].size;
 				hub_allocs[n].ptr  = newptr;
 				hub_allocs[n].size = size;
@@ -225,12 +234,52 @@ void* debug_mem_realloc(void* ptr, size_t size)
 		return 0;
 	}
 #else
-	return realloc(ptr, size);
+	{
+		void* newptr = realloc(ptr, size ? size : 1);
+		if (!newptr)
+			hub_out_of_memory(size);
+		return newptr;
+	}
 #endif /* REALTIME_MALLOC_TRACKING */
 }
 
+#else /* MEMORY_DEBUG */
 
-#endif
+/* A zero-byte request may legitimately come back NULL; asking for one byte
+   instead keeps "NULL means out of memory" true without exception. */
+void* hub_malloc(size_t size)
+{
+	void* ptr = malloc(size ? size : 1);
+	if (!ptr)
+		hub_out_of_memory(size);
+	return ptr;
+}
+
+void* hub_realloc(void* ptr, size_t size)
+{
+	void* newptr = realloc(ptr, size ? size : 1);
+	if (!newptr)
+		hub_out_of_memory(size);
+	return newptr;
+}
+
+char* hub_strdup(const char* s)
+{
+	char* copy = strdup(s);
+	if (!copy)
+		hub_out_of_memory(strlen(s) + 1);
+	return copy;
+}
+
+char* hub_strndup(const char* s, size_t n)
+{
+	char* copy = strndup(s, n);
+	if (!copy)
+		hub_out_of_memory(strnlen(s, n) + 1);
+	return copy;
+}
+
+#endif /* MEMORY_DEBUG */
 
 void* hub_malloc_zero(size_t size)
 {
