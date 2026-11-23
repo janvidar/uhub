@@ -21,12 +21,14 @@
 #include "util/log.h"
 #include "util/memory.h"
 #include "network/connection.h"
+#include "network/network.h"
 #include "core/config.h"
 #include "core/hub.h"
 #include "core/ipcount.h"
 #include "core/link.h"
 #include "core/metrics.h"
 #include "core/probe.h"
+#include "core/regserver.h"
 #include "core/user.h"
 #include "probe.h"
 
@@ -55,6 +57,59 @@ enum probe_protocol probe_classify(const char* buf, size_t len)
 		return probe_protocol_http;
 
 	return probe_protocol_unsupported;
+}
+
+/*
+ * Where to send a plain ADC client when TLS is required: tls_require_redirect_addr
+ * if set, else this hub's own adcs:// address with its keyprint -- hub_address
+ * when configured, otherwise the address and port the client actually reached,
+ * which is right even for a hub bound to a wildcard address or an alt port.
+ */
+static int probe_tls_redirect_address(struct hub_probe* probe, char* out, size_t out_size)
+{
+	struct hub_config* config = probe->hub->config;
+	int sd = net_con_get_sd(probe->connection);
+	int port = net_get_local_port(sd);
+
+	if (*config->tls_require_redirect_addr)
+	{
+		int n = snprintf(out, out_size, "%s", config->tls_require_redirect_addr);
+		return n > 0 && (size_t) n < out_size;
+	}
+
+	if (port < 1)
+		port = config->server_port;
+
+	if (*config->hub_address &&
+	    regserver_hub_url(config->hub_address, 1, port, probe->hub->tls_keyprint, out, out_size))
+		return 1;
+
+	return regserver_hub_url(net_get_local_address(sd), 1, port, probe->hub->tls_keyprint, out, out_size);
+}
+
+/* Tell a plain ADC client to come back over TLS: a SUP, a SID and a QUI that
+   carries the redirect, which is all a client reads before it has logged in. */
+static void probe_send_tls_redirect(struct hub_probe* probe)
+{
+	char addr[512];
+	char buf[1024];
+	char* escaped;
+	int len;
+
+	if (!probe_tls_redirect_address(probe, addr, sizeof(addr)))
+	{
+		LOG_TRACE("Not TLS connection - no redirect address, closing connection.");
+		return;
+	}
+
+	escaped = adc_msg_escape(addr);
+	len = snprintf(buf, sizeof(buf),
+		"ISUP " ADC_PROTO_SUPPORT "\nISID AAAB\nIINF NIRedirecting...\n"
+		"IQUI AAAB MSThis\\shub\\srequires\\san\\sencrypted\\s(adcs://)\\sconnection. RD%s\n", escaped);
+	hub_free(escaped);
+	if (len > 0 && (size_t) len < sizeof(buf))
+		net_con_send(probe->connection, buf, (size_t) len);
+	LOG_TRACE("Not TLS connection - Redirecting to %s.", addr);
 }
 
 static void probe_net_event(struct net_connection* con, int events, void *arg)
@@ -116,18 +171,7 @@ static void probe_net_event(struct net_connection* con, int events, void *arg)
 				LOG_TRACE("Probed ADC");
 				if (!probe->tls && probe->hub->config->tls_enable && probe->hub->config->tls_require)
 				{
-					if (*probe->hub->config->tls_require_redirect_addr)
-					{
-						char buf[512];
-						ssize_t len = snprintf(buf, sizeof(buf), "ISUP " ADC_PROTO_SUPPORT "\nISID AAAB\nIINF NIRedirecting...\nIQUI AAAB RD%s\n", probe->hub->config->tls_require_redirect_addr);
-						if (len > 0 && (size_t) len < sizeof(buf))
-							net_con_send(con, buf, (size_t) len);
-						LOG_TRACE("Not TLS connection - Redirecting to %s.", probe->hub->config->tls_require_redirect_addr);
-					}
-					else
-					{
-						LOG_TRACE("Not TLS connection - closing connection.");
-					}
+					probe_send_tls_redirect(probe);
 				}
 				else
 				{

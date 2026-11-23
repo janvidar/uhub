@@ -17,8 +17,11 @@ as before.
 
 Because it shares the server port, the endpoint is reachable:
 
-  * over plain HTTP on the server port, and
-  * over HTTPS on the SAME port when the hub has tls_enable set.
+  * over HTTPS on the SAME port when the hub has tls_enable set (the default),
+  * over plain HTTP from loopback (127.0.0.0/8, ::1) only, on such a hub: a
+    plain-text request for metrics_path from anywhere else is refused with
+    403, whether or not its token is right, and
+  * over plain HTTP from anywhere on a hub with tls_enable off.
 
 A single TLS-enabled port therefore serves ADC-over-TLS and HTTPS metrics at
 once; the handler uses TLS transparently whenever the connection is encrypted.
@@ -55,16 +58,17 @@ Generate a token with, for example:
 
 Verify the endpoint by hand:
 
-  # plain HTTP
-  % curl -H "Authorization: Bearer <token>" http://<host>:1511/metrics
-
-  # HTTPS on the same port (when tls_enable is set; -k skips cert checks)
+  # HTTPS on the same port (-k skips the certificate check)
   % curl -k -H "Authorization: Bearer <token>" https://<host>:1511/metrics
+
+  # plain HTTP, from the hub's own host
+  % curl -H "Authorization: Bearer <token>" http://127.0.0.1:1511/metrics
 
 Responses:
 
   * 200  authorized GET for metrics_path -- the document
-  * 403  Forbidden -- missing or wrong bearer token
+  * 403  Forbidden -- missing or wrong bearer token, or plain HTTP from off
+         the host on a hub with TLS
   * 404  Not Found -- path did not match metrics_path
   * 405  Method Not Allowed -- only GET is served
 
@@ -73,12 +77,15 @@ Responses:
 -----------
 
 The token travels in the Authorization header in cleartext over plain HTTP. On
-an untrusted network, anyone who can see the traffic can capture it. Therefore:
+an untrusted network, anyone who can see the traffic can capture it. That is
+why a hub with TLS serves plain HTTP to loopback only. A scraper still
+configured for http:// gets 403 and fails visibly -- but by then it has sent
+the token once in the clear, so switch it to https:// and rotate the token.
 
-  * Scrape over HTTPS (tls_enable), or
-  * Restrict scraping to loopback / a trusted management network, e.g. by
-    binding Prometheus and uhub on the same host or a private subnet, and
-    firewalling the server port from the public internet for HTTP clients.
+On a hub with tls_enable off, plain HTTP is all there is: restrict scraping to
+loopback / a trusted management network, e.g. by binding Prometheus and uhub on
+the same host or a private subnet, and firewalling the server port from the
+public internet for HTTP clients.
 
 The token is compared in length-aware constant time, so it cannot be recovered
 byte-by-byte by timing the response. Treat the token as a secret: rotate it by
@@ -91,7 +98,7 @@ changing metrics_token and sending SIGHUP, and keep it out of version control.
 Add a job to prometheus.yml. The bearer token is supplied with
 authorization.credentials (Prometheus sends it as "Authorization: Bearer ...").
 
-Plain HTTP:
+Plain HTTP (from the hub's own host, or a hub with tls_enable off):
 
   scrape_configs:
     - job_name: uhub
@@ -100,7 +107,7 @@ Plain HTTP:
         type: Bearer
         credentials: "change-me-to-a-long-random-secret"
       static_configs:
-        - targets: ["hub.example.org:1511"]
+        - targets: ["127.0.0.1:1511"]
 
 HTTPS on the same port (hub has tls_enable):
 

@@ -71,11 +71,19 @@ extern enum metrics_result http_classify_request(const char* req, const char* me
 
 /**
  * Returns 1 if url can go into a Location header and an HTML attribute as it
- * is: http:// or https://, then at least one character and no whitespace,
+ * is: https://, then at least one character and no whitespace,
  * control characters, quotes or angle brackets. The config check says the
  * same, but is skipped on builds without POSIX regex.
  */
 extern int http_redirect_valid_url(const char* url);
+
+/**
+ * Returns 1 if a metrics request may be answered on this connection. A hub
+ * with TLS on serves its metrics in plain text to loopback only: anywhere
+ * else the bearer token would cross the network in the clear, and HTTPS is on
+ * the same port. With tls_enable off there is nothing else to offer.
+ */
+extern int metrics_plain_text_allowed(int tls_enable, int is_tls, const struct ip_addr_encap* peer);
 
 /**
  * Returns 1 if the hub answers HTTP on its port at all: the metrics endpoint

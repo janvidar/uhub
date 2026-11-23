@@ -222,3 +222,26 @@ EXO_TEST(regserver_hh_kp_with_added_port, {
 });
 
 #undef KP
+
+/* A hub with TLS advertises only adcs://: an adc:// hub_address is upgraded
+   (TLS shares the port) and gets the keyprint. */
+#define KP "SHA256/G3PJC4F4MQ5KOXGE2MPYJW5EW63IC6M7RN7OS663JLLWN2M5I6FQ"
+EXO_TEST(regserver_hh_adc_upgraded_with_tls, {
+	return regserver_hub_url("adc://hub.example.org:1511", 1, 411, KP, hh, sizeof(hh))
+		&& strcmp(hh, "adcs://hub.example.org:1511/?kp=" KP) == 0;
+});
+#undef KP
+
+/* reg_server_url: https:// only. */
+EXO_TEST(regserver_check_url_https, {
+	return regserver_check_url("https://hub.example.org/register", &u) == 1 && u.use_tls == 1;
+});
+
+EXO_TEST(regserver_check_url_http_refused, {
+	return regserver_check_url("http://hub.example.org/register", &u) == -1;
+});
+
+EXO_TEST(regserver_check_url_malformed, {
+	return regserver_check_url("ftp://hub.example.org/", &u) == 0
+		&& regserver_check_url("https://", &u) == 0;
+});

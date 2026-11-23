@@ -267,6 +267,12 @@ extern const char* net_get_peer_address(int fd);
 extern const char* net_get_local_address(int fd);
 
 /**
+ * @return the local port the socket is bound to (for an accepted connection,
+ *         the port the peer connected to), or -1 on error.
+ */
+extern int net_get_local_port(int fd);
+
+/**
  * Work out which local address this host would use as the source when talking
  * to @p remote -- "our address in that address family", as the far end would
  * see it before any NAT.

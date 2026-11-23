@@ -834,3 +834,39 @@ EXO_TEST(ip_convert_to_string_no_alias, {
 	sb = ip_convert_to_string(&b);
 	return sa != sb && strcmp(sa, "10.0.0.1") == 0 && strcmp(sb, "10.0.0.2") == 0;
 });
+
+/* ip_is_loopback(): 127.0.0.0/8, ::1, and 127/8 mapped into IPv6. */
+static int loopback_of(const char* text)
+{
+	struct ip_addr_encap a;
+	memset(&a, 0, sizeof(a));
+	if (ip_convert_to_binary(text, &a) == -1)
+		return -1;
+	return ip_is_loopback(&a);
+}
+
+EXO_TEST(ip_loopback_ipv4, {
+	return loopback_of("127.0.0.1") == 1 && loopback_of("127.255.0.9") == 1
+		&& loopback_of("128.0.0.1") == 0 && loopback_of("10.0.0.1") == 0;
+});
+
+EXO_TEST(ip_loopback_ipv6, {
+	if (!ipv6) EXO_SKIP("no IPv6");
+	return loopback_of("::1") == 1 && loopback_of("::2") == 0
+		&& loopback_of("2001:db8::1") == 0 && loopback_of("::") == 0;
+});
+
+/* A dual-stack listener may hand over a mapped address; it is still local. */
+EXO_TEST(ip_loopback_mapped, {
+	struct ip_addr_encap a;
+	memset(&a, 0, sizeof(a));
+	a.af = AF_INET6;
+	((unsigned char*) &a.internal_ip_data.in6)[10] = 0xff;
+	((unsigned char*) &a.internal_ip_data.in6)[11] = 0xff;
+	((unsigned char*) &a.internal_ip_data.in6)[12] = 127;
+	((unsigned char*) &a.internal_ip_data.in6)[15] = 1;
+	if (!ip_is_loopback(&a))
+		return 0;
+	((unsigned char*) &a.internal_ip_data.in6)[12] = 10;
+	return !ip_is_loopback(&a) && !ip_is_loopback(NULL);
+});

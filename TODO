@@ -26,17 +26,12 @@ Done:
   setup (resolve_ssl_certificates in hub.c). The pair is never regenerated: its
   key is the hub's identity to every client that pinned it, and to its peers.
 
-Phase 1 -- TLS by default, plain text only on request:
-- tls_require defaults to on: a plain ADC client gets a redirect to adcs://
-  (tls_require_redirect_addr, defaulting to this hub's own adcs:// address).
-  Warn at startup when tls_enable or tls_require is off.
-- A certificate that cannot be created is fatal once TLS is required. Today
-  the hub warns and runs without TLS -- in plain text.
-- Metrics: plain HTTP only from localhost; anything else over HTTPS with the
-  hub's certificate. http_redirect_addr redirects to https://.
-- reg_server_url refuses http://; the hub advertises only adcs:// addresses
-  (regserver.c, hub.c).
-- !redirect accepts only adcs:// (adc:// goes, and dchub:// is NMDC).
+Phase 1 -- TLS by default, plain text only on request: done. tls_require
+defaults to on, with plain clients redirected to the hub's own adcs://
+address; a certificate failure is fatal while TLS is required; metrics answer
+plain HTTP from loopback only; http_redirect_addr, tls_require_redirect_addr,
+!redirect and reg_server_url refuse plain-text targets, and an adc://
+hub_address is advertised as adcs://.
 
 Phase 2 -- hub links fully authenticated:
 - Links authenticate with the hub's own certificate, on both sides: the

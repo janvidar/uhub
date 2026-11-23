@@ -375,6 +375,26 @@ void ip_mask_apply_OR(struct ip_addr_encap* addr, struct ip_addr_encap* mask, st
 }
 
 
+int ip_is_loopback(const struct ip_addr_encap* addr)
+{
+	if (!addr)
+		return 0;
+
+	if (addr->af == AF_INET)
+		return (ntohl(addr->internal_ip_data.in.s_addr) >> 24) == 127;
+
+	if (addr->af == AF_INET6)
+	{
+		const unsigned char* b = (const unsigned char*) &addr->internal_ip_data.in6;
+		static const unsigned char loopback6[16] = { 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1 };
+		static const unsigned char mapped_prefix[12] = { 0,0,0,0, 0,0,0,0, 0,0,0xff,0xff };
+		if (!memcmp(b, loopback6, 16))
+			return 1;
+		return !memcmp(b, mapped_prefix, 12) && b[12] == 127;
+	}
+	return 0;
+}
+
 int ip_compare(struct ip_addr_encap* a, struct ip_addr_encap* b)
 {
 	int ret = 0;

@@ -57,7 +57,7 @@ and unmounting leaves nothing behind.
 2. Reading it
 -------------
 
-    $ uhub-fuse --hub=adc://hub.example.org:1511 /mnt/hub
+    $ uhub-fuse --hub=adcs://hub.example.org:1511 /mnt/hub
 
     $ cat /mnt/hub/hub/users
     42
@@ -93,7 +93,7 @@ chat/main is the hub's main chat. Reading it gives the recent history; writing
 to it says something:
 
     $ tail -f /mnt/hub/chat/main
-    2026-08-21T00:27:44Z -- connected to adc://hub.example.org:1511
+    2026-08-21T00:27:44Z -- connected to adcs://hub.example.org:1511
     2026-08-21T00:28:02Z <alice> anyone got the new release?
     2026-08-21T00:28:19Z * bob waves
 
@@ -232,7 +232,8 @@ transient fault, so it is not retried: hub/state reads "failed" and stays there.
 7. Connecting to it
 -------------------
 
-    adc://host:port                 plaintext
+    adc://host:port                 plaintext (a hub admits it only with
+                                    tls_require off)
     adcs://host:port                TLS, unauthenticated
     adcs://host:port/?kp=SHA256/... TLS, with the hub's certificate pinned
 

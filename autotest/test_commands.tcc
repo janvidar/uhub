@@ -274,25 +274,35 @@ EXO_TEST(command_argument_cred_6, {
 /* !redirect: registration, access level and argument parsing. */
 EXO_TEST(command_redirect_parse_ok,      { as(auth_cred_operator, 1); return verify("!redirect tester adc://host.example:411", cmd_status_ok); });
 EXO_TEST(command_redirect_missing_addr,  { as(auth_cred_operator, 1); return verify("!redirect tester", cmd_status_missing_args); });
-EXO_TEST(command_redirect_unknown_nick,  { as(auth_cred_operator, 1); return verify("!redirect nosuchuser adc://host:411", cmd_status_arg_nick); });
-EXO_TEST(command_redirect_access,        { as(auth_cred_guest, 1); return verify("!redirect tester adc://host:411", cmd_status_access_error); });
+EXO_TEST(command_redirect_unknown_nick,  { as(auth_cred_operator, 1); return verify("!redirect nosuchuser adcs://host:411", cmd_status_arg_nick); });
+EXO_TEST(command_redirect_access,        { as(auth_cred_guest, 1); return verify("!redirect tester adcs://host:411", cmd_status_access_error); });
 
-/* !redirect: address validation (command_redirect_valid_address). */
-EXO_TEST(command_redirect_addr_adc,          { return command_redirect_valid_address("adc://host.example:411") == 1; });
+/* !redirect: address validation (command_redirect_valid_address). adcs://
+   only, optionally with the keyprint a client pins. */
+#define RD_KP "SHA256/G3PJC4F4MQ5KOXGE2MPYJW5EW63IC6M7RN7OS663JLLWN2M5I6FQ"
 EXO_TEST(command_redirect_addr_adcs,         { return command_redirect_valid_address("adcs://host.example:412") == 1; });
-EXO_TEST(command_redirect_addr_dchub,        { return command_redirect_valid_address("dchub://old.example:411") == 1; });
-EXO_TEST(command_redirect_addr_ipv6,         { return command_redirect_valid_address("adc://[::1]:411") == 1; });
-EXO_TEST(command_redirect_addr_ipv4_maxport, { return command_redirect_valid_address("adc://1.2.3.4:65535") == 1; });
+EXO_TEST(command_redirect_addr_adcs_kp,      { return command_redirect_valid_address("adcs://host.example:412/?kp=" RD_KP) == 1; });
+EXO_TEST(command_redirect_addr_ipv6,         { return command_redirect_valid_address("adcs://[::1]:411") == 1; });
+EXO_TEST(command_redirect_addr_ipv6_kp,      { return command_redirect_valid_address("adcs://[::1]:411/?kp=" RD_KP) == 1; });
+EXO_TEST(command_redirect_addr_ipv4_maxport, { return command_redirect_valid_address("adcs://1.2.3.4:65535") == 1; });
+EXO_TEST(command_redirect_addr_adc,          { return command_redirect_valid_address("adc://host.example:411") == 0; });
+EXO_TEST(command_redirect_addr_dchub,        { return command_redirect_valid_address("dchub://old.example:411") == 0; });
 EXO_TEST(command_redirect_addr_bad_scheme,   { return command_redirect_valid_address("http://host:411") == 0; });
 EXO_TEST(command_redirect_addr_no_scheme,    { return command_redirect_valid_address("host:411") == 0; });
-EXO_TEST(command_redirect_addr_no_port,      { return command_redirect_valid_address("adc://host") == 0; });
-EXO_TEST(command_redirect_addr_empty_host,   { return command_redirect_valid_address("adc://:411") == 0; });
-EXO_TEST(command_redirect_addr_port_zero,    { return command_redirect_valid_address("adc://host:0") == 0; });
-EXO_TEST(command_redirect_addr_port_high,    { return command_redirect_valid_address("adc://host:99999") == 0; });
-EXO_TEST(command_redirect_addr_port_nan,     { return command_redirect_valid_address("adc://host:abc") == 0; });
-EXO_TEST(command_redirect_addr_space,        { return command_redirect_valid_address("adc://ho st:411") == 0; });
+EXO_TEST(command_redirect_addr_no_port,      { return command_redirect_valid_address("adcs://host") == 0; });
+EXO_TEST(command_redirect_addr_no_port_kp,   { return command_redirect_valid_address("adcs://host/?kp=" RD_KP) == 0; });
+EXO_TEST(command_redirect_addr_empty_host,   { return command_redirect_valid_address("adcs://:411") == 0; });
+EXO_TEST(command_redirect_addr_port_zero,    { return command_redirect_valid_address("adcs://host:0") == 0; });
+EXO_TEST(command_redirect_addr_port_high,    { return command_redirect_valid_address("adcs://host:99999") == 0; });
+EXO_TEST(command_redirect_addr_port_nan,     { return command_redirect_valid_address("adcs://host:abc") == 0; });
+EXO_TEST(command_redirect_addr_space,        { return command_redirect_valid_address("adcs://ho st:411") == 0; });
+EXO_TEST(command_redirect_addr_kp_empty,     { return command_redirect_valid_address("adcs://host:411/?kp=") == 0; });
+EXO_TEST(command_redirect_addr_kp_space,     { return command_redirect_valid_address("adcs://host:411/?kp=SHA256/A B") == 0; });
+EXO_TEST(command_redirect_addr_kp_escape,    { return command_redirect_valid_address("adcs://host:411/?kp=SHA256\\sA") == 0; });
+EXO_TEST(command_redirect_addr_path,         { return command_redirect_valid_address("adcs://host:411/other") == 0; });
 EXO_TEST(command_redirect_addr_plain,        { return command_redirect_valid_address("justtext") == 0; });
 EXO_TEST(command_redirect_addr_empty,        { return command_redirect_valid_address("") == 0; });
+#undef RD_KP
 
 /* !kick takes "u?+m": a user, then an optional reason that keeps its spaces. */
 static int kick_spec_parse(const char* line, const char* expected_reason)

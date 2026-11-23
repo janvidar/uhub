@@ -564,37 +564,54 @@ static int command_loglevel(struct command_base* cbase, struct hub_user* user, s
 	return command_status(cbase, user, cmd, buf);
 }
 
-/* Accept only adc://host:port, adcs://host:port or dchub://host:port, with a
- * non-empty host (hostname / IPv4 / bracketed IPv6) and a numeric port in
- * 1..65535. Restricting the character set keeps the value safe to place in an
- * ADC RD flag without further escaping. */
+/* Accept only adcs://host:port, optionally followed by the certificate
+ * keyprint ADC clients pin ("/?kp=SHA256/<base32>"), with a non-empty host
+ * (hostname / IPv4 / bracketed IPv6) and a numeric port in 1..65535. adc://
+ * would send the user on in plain text, and dchub:// is NMDC. Restricting the
+ * character set keeps the value safe to place in an ADC RD flag without
+ * further escaping. */
 int command_redirect_valid_address(const char* addr)
 {
-	static const char* const schemes[] = { "adc://", "adcs://", "dchub://", NULL };
-	const char* host = NULL;
+	static const char scheme[] = "adcs://";
+	const char* host;
+	const char* end;
 	const char* colon;
+	const char* kp;
 	const char* p;
-	size_t i;
+	char* port_end;
 	long port;
 
 	if (!addr || !*addr || strlen(addr) > 255)
 		return 0;
 
-	for (i = 0; schemes[i]; i++)
+	if (strncmp(addr, scheme, sizeof(scheme) - 1))
+		return 0;
+	host = addr + sizeof(scheme) - 1;
+
+	/* The keyprint, if any, ends the address. */
+	kp = strstr(host, "/?kp=");
+	end = kp ? kp : host + strlen(host);
+	if (kp)
 	{
-		size_t len = strlen(schemes[i]);
-		if (!strncmp(addr, schemes[i], len))
+		p = kp + 5;
+		if (!*p)
+			return 0;
+		for (; *p; p++)
 		{
-			host = addr + len;
-			break;
+			char c = *p;
+			if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+			      (c >= '0' && c <= '9') || c == '/'))
+				return 0;
 		}
 	}
-	if (!host)
-		return 0;
 
-	/* Rightmost ':' splits host from port, so bracketed IPv6 ([::1]:411) works. */
-	colon = strrchr(host, ':');
-	if (!colon || colon == host)
+	/* Rightmost ':' before the keyprint splits host from port, so bracketed
+	   IPv6 ([::1]:411) works. */
+	colon = NULL;
+	for (p = host; p < end; p++)
+		if (*p == ':')
+			colon = p;
+	if (!colon || colon == host || colon + 1 == end)
 		return 0;
 
 	for (p = host; p < colon; p++)
@@ -606,12 +623,12 @@ int command_redirect_valid_address(const char* addr)
 			return 0;
 	}
 
-	for (p = colon + 1; *p; p++)
+	for (p = colon + 1; p < end; p++)
 		if (*p < '0' || *p > '9')
 			return 0;
 
-	port = strtol(colon + 1, NULL, 10);
-	if (port < 1 || port > 65535)
+	port = strtol(colon + 1, &port_end, 10);
+	if (port_end != end || port < 1 || port > 65535)
 		return 0;
 
 	return 1;
@@ -631,7 +648,7 @@ static int command_redirect(struct command_base* cbase, struct hub_user* user, s
 	}
 	else if (!command_redirect_valid_address(address))
 	{
-		cbuf_append_format(buf, "Invalid redirect address \"%s\". Expected adc://host:port, adcs://host:port or dchub://host:port.", address);
+		cbuf_append_format(buf, "Invalid redirect address \"%s\". Expected adcs://host:port, optionally followed by /?kp=<keyprint>.", address);
 	}
 	else
 	{

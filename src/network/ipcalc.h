@@ -112,5 +112,11 @@ extern void ip_mask_apply_OR(struct ip_addr_encap* address, struct ip_addr_encap
  */
 extern int ip_compare(struct ip_addr_encap* a, struct ip_addr_encap* b);
 
+/**
+ * @return 1 if the address is a loopback address (127.0.0.0/8, ::1, or
+ *         127.0.0.0/8 mapped into IPv6), 0 otherwise.
+ */
+extern int ip_is_loopback(const struct ip_addr_encap* addr);
+
 #endif /* HAVE_UHUB_IPCALC_H */
 

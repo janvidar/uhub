@@ -51,11 +51,14 @@ start_hub() {
 }
 
 # Plaintext and TLS on the same port, as the probe demultiplexes them.
+# tls_require is off so step 4 can show plain ADC still gets through; the
+# default, which redirects it, is run_tls_require_e2e.sh's business.
 cat > "$DIR/uhub.conf" <<EOF
 server_port = $PORT
 server_bind_addr = 127.0.0.1
 plugin_defaults = no
 tls_enable = 1
+tls_require = 0
 tls_certificate = $REPO/autotest/tls-test-cert.pem
 tls_private_key = $REPO/autotest/tls-test-key.pem
 metrics_enable = 1

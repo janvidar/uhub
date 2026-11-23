@@ -1108,8 +1108,8 @@ static void server_alt_port_stop(struct hub_info* hub)
  * pin the key fingerprint -- is the one thing that must not happen by accident.
  *
  * Returns 1 when a pair is ready to load, 0 when the hub must not start, and
- * -1 when TLS was only on by default and could not be set up -- the caller
- * then runs without it.
+ * -1 when TLS was on by default but optional (tls_require off) and could not
+ * be set up -- the caller then runs without it.
  */
 static int resolve_ssl_certificates(struct hub_config* config, const char** cert, const char** key)
 {
@@ -1141,10 +1141,16 @@ static int resolve_ssl_certificates(struct hub_config* config, const char** cert
 	LOG_INFO("No TLS certificate yet, creating a self-signed one: %s", *cert);
 	if (!net_ssl_certificate_create(*cert, *key, PRODUCT))
 	{
-		/* Not fatal. TLS is on by default, so this is a hub that never asked
-		   for it by name -- the same rule as the built-in plugin set: a default
-		   that cannot be honoured is reported and skipped, and only something
-		   the operator configured explicitly stops the hub from starting. */
+		/* With TLS required -- the default -- running without it would turn
+		   every client away, so this is fatal. Only a hub that has made TLS
+		   optional falls back to plain text, and says so. */
+		if (config->tls_require)
+		{
+			LOG_FATAL("Unable to create a TLS certificate in %s, and tls_require is on. "
+				"Set tls_certificate and tls_private_key to use your own, or "
+				"tls_require=no to allow running in plain text.", UHUB_STATE_DIR);
+			return 0;
+		}
 		LOG_WARN("Unable to create a TLS certificate in %s -- continuing without TLS. "
 			"Set tls_certificate and tls_private_key to use your own, or "
 			"tls_enable=no to stop offering it.", UHUB_STATE_DIR);
@@ -1267,6 +1273,12 @@ struct hub_info* hub_start_service(struct hub_config* config)
 		if (regserver_hub_url(addr, config->tls_enable, config->server_port, hub->tls_keyprint, url, sizeof(url)))
 			LOG_INFO("Connect address: %s", url);
 	}
+
+	/* Plain text only on request: say so when it was asked for. */
+	if (!config->tls_enable)
+		LOG_WARN("TLS is off: clients, their passwords and hub links travel in plain text.");
+	else if (!config->tls_require)
+		LOG_WARN("TLS is optional (tls_require=no): clients may still connect in plain text.");
 
 	/* The metrics endpoint checks its bearer token over whatever transport the
 	 * request arrives on. With TLS off, a scrape (token included) crosses the

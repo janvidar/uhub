@@ -169,7 +169,9 @@ int regserver_hub_url(const char* hub_address, int use_tls, int server_port, con
 
 	if (!strncasecmp(hub_address, "adc://", 6))
 	{
-		scheme = "adc://";
+		/* TLS shares the port, so on a hub that offers it the same address
+		   works as adcs://, and that is the only one it advertises. */
+		scheme = use_tls ? "adcs://" : "adc://";
 		hostport = hub_address + 6;
 	}
 	else if (!strncasecmp(hub_address, "adcs://", 7))
@@ -440,6 +442,13 @@ static void regserver_connect_cb(struct net_connect_handle* handle, enum net_con
 	}
 }
 
+int regserver_check_url(const char* url, struct regserver_url* out)
+{
+	if (!regserver_parse_url(url, out))
+		return 0;
+	return out->use_tls ? 1 : -1;
+}
+
 void regserver_announce(struct hub_info* hub)
 {
 	struct regserver* rs;
@@ -456,12 +465,20 @@ void regserver_announce(struct hub_info* hub)
 		return;
 	rs->hub = hub;
 
-	if (!regserver_parse_url(hub->config->reg_server_url, &rs->url))
+	switch (regserver_check_url(hub->config->reg_server_url, &rs->url))
 	{
-		LOG_ERROR("regserver: invalid reg_server_url \"%s\"; expected http(s)://host[:port][/path].",
-			hub->config->reg_server_url);
-		hub_free(rs);
-		return;
+		case 1:
+			break;
+		case -1:
+			LOG_ERROR("regserver: refusing plain-text reg_server_url \"%s\"; use https://.",
+				hub->config->reg_server_url);
+			hub_free(rs);
+			return;
+		default:
+			LOG_ERROR("regserver: invalid reg_server_url \"%s\"; expected https://host[:port][/path].",
+				hub->config->reg_server_url);
+			hub_free(rs);
+			return;
 	}
 
 	body = regserver_build_payload(hub);

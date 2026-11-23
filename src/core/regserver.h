@@ -63,12 +63,22 @@ struct regserver_url
 extern int regserver_parse_url(const char* url, struct regserver_url* out);
 
 /**
+ * Check a configured reg_server_url: parse it into 'out' and refuse plain
+ * http://, which would send the announce in clear text.
+ *
+ * @return 1 if usable, 0 if malformed, -1 if it is an http:// URL.
+ */
+extern int regserver_check_url(const char* url, struct regserver_url* out);
+
+/**
  * Normalize a configured hub_address into the adc:// or adcs:// URL advertised
  * in the "HH" field, both to a registration server and to PING-capable clients.
  * Consumers need a reachable ADC URL that includes the port, so this fills in
  * whatever the admin left out:
- *   - the scheme: kept if hub_address already starts with adc:// or adcs://,
- *     otherwise defaulted to adcs:// when use_tls is set, else adc://;
+ *   - the scheme: adcs:// when use_tls is set -- an adc:// in hub_address is
+ *     upgraded, since TLS shares the port and a hub that offers it advertises
+ *     only adcs:// -- otherwise the configured adc:// or adcs://, or adc://
+ *     when none is given;
  *   - the port: appended as ":server_port" when the host carries none.
  * A bracketed IPv6 literal ([::1]) is recognized when deciding whether a port
  * is already present.

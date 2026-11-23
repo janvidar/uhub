@@ -2,6 +2,7 @@
 #include "core/auth.h"
 #include "core/config.h"
 #include "core/hub.h"
+#include "util/memory.h"
 #include "testutil_net.h"
 
 /*
@@ -22,6 +23,13 @@ static void hub_test_config(struct hub_config* config)
 {
 	config_defaults(config);
 	config->server_port = 65111;
+	/* TLS is required by default, and a hub that cannot create its own
+	   certificate (no state directory in a build tree) then refuses to start.
+	   Hand it the test pair instead. */
+	hub_free(config->tls_certificate);
+	hub_free(config->tls_private_key);
+	config->tls_certificate = hub_strdup(UHUB_TEST_DIR "/tls-test-cert.pem");
+	config->tls_private_key = hub_strdup(UHUB_TEST_DIR "/tls-test-key.pem");
 }
 
 EXO_TEST(hub_config_initialize, {

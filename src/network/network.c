@@ -754,6 +754,25 @@ const char* net_get_local_address(int fd)
 	return "0.0.0.0";
 }
 
+int net_get_local_port(int fd)
+{
+	struct sockaddr_storage storage;
+	socklen_t namelen = sizeof(storage);
+
+	memset(&storage, 0, sizeof(storage));
+	if (getsockname(fd, (struct sockaddr*) &storage, &namelen) == -1)
+	{
+		net_error_out(fd, "net_get_local_port");
+		net_stats_add_error();
+		return -1;
+	}
+	if (storage.ss_family == AF_INET6)
+		return ntohs(((struct sockaddr_in6*) &storage)->sin6_port);
+	if (storage.ss_family == AF_INET)
+		return ntohs(((struct sockaddr_in*) &storage)->sin_port);
+	return -1;
+}
+
 
 
 ssize_t net_recv(int fd, void* buf, size_t len, int flags)

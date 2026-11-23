@@ -79,11 +79,11 @@
 			required; if no token is configured the endpoint stays disabled.
 			</p>
 			<p>
-			The endpoint is served on the same port(s) as ADC, both over plain HTTP and, when
-			<code>tls_enable</code> is set, over HTTPS (scrape with <code>https://</code>). Use
-			HTTPS to keep the bearer token confidential: plain HTTP is also accepted on the same
-			port, so over plain HTTP the token is exposed on an untrusted network -- scrape over
-			loopback/a trusted network, or use HTTPS.
+			The endpoint is served on the same port(s) as ADC. When <code>tls_enable</code> is
+			set (the default), scrape it with <code>https://</code>: a plain HTTP request for
+			the metrics path is answered only from loopback, and refused with 403 from anywhere
+			else, since the bearer token would cross the network in the clear. With TLS off,
+			plain HTTP is all there is, and the token is exposed on an untrusted network.
 			</p>
 		]]></description>
 		<since>0.7.0</since>
@@ -112,14 +112,15 @@
 	</option>
 
 	<option name="http_redirect_addr" type="string" default="">
-		<check regexp="(https?://[^[:space:][:cntrl:]&quot;&lt;&gt;]+)?" />
+		<check regexp="(https://[^[:space:][:cntrl:]&quot;&lt;&gt;]+)?" />
 		<short>Send web browsers that connect to the hub port to this URL</short>
 		<description><![CDATA[
 			Someone who opens the hub address in a web browser gets an HTTP
 			redirect (307) to this URL, the hub's web site for instance, instead
 			of a closed connection. When the metrics endpoint is enabled it is
 			still served on metrics_path; every other request is redirected.
-			Works on a TLS-enabled hub over HTTPS too. Leave empty to turn it off.
+			Works on a TLS-enabled hub over HTTPS too. Only https:// URLs are
+			accepted. Leave empty to turn it off.
 		]]></description>
 		<since>0.8.1</since>
 		<example><![CDATA[
@@ -522,16 +523,18 @@
 	<option name="reg_server_url" type="string" default="">
 		<short>ADC registration server URL to announce this hub to at startup.</short>
 		<description><![CDATA[
-		The HTTP/HTTPS URL of an ADC hub-list registration server. When set, the
+		The HTTPS URL of an ADC hub-list registration server. When set, the
 		hub sends a single POST request to this URL at startup with its own IINF
 		line as the body, expecting a "202 Accepted" reply, so hub lists can pick
 		the hub up automatically. Leave empty (the default) to disable; this is
 		the on/off switch, so leave it empty for private hubs. The path defaults
-		to /register and the port defaults to 80 (http) or 443 (https). For the
+		to /register and the port to 443. A plain http:// URL is refused, and the
+		hub does not announce itself. For the
 		announce to carry a usable address, also configure hub_address (the HH
-		field): it is normalized to an adc:// or adcs:// URL including the port,
-		so a missing scheme (adcs:// when tls_enable is set, otherwise adc://)
-		and a missing port (server_port) are filled in automatically. No retries
+		field): it is normalized to an adcs:// URL with the certificate keyprint
+		and the port when tls_enable is set (an adc:// address is upgraded, since
+		TLS shares the port), and to adc:// only on a hub without TLS. A missing
+		port (server_port) is filled in automatically. No retries
 		are attempted; the outcome is logged.
 		]]></description>
 		<since>0.7.0</since>
@@ -804,22 +807,27 @@
 		<since>0.3.0</since>
 	</option>
 
-	<option name="tls_require" type="boolean" default="0">
+	<option name="tls_require" type="boolean" default="1">
 		<short>If SSL/TLS enabled, should it be required</short>
 		<description><![CDATA[
-			If TLS/SSL support is enabled it can either be optional or mandatory.
-			If this option is disabled then SSL/TLS is not required to enter the hub, however it is possible to enter either with or without.
+			With this on (the default), a client that connects in plain text (adc://) is
+			redirected to the hub's adcs:// address -- tls_require_redirect_addr, or the hub's
+			own -- and never logs in. Turn it off to also admit plain-text clients; the hub
+			warns at startup when it is off. While it is on, a self-signed certificate the hub
+			cannot create stops the hub from starting rather than letting it run without TLS.
 			This option has no effect unless tls_enable is enabled.
 		]]></description>
 		<since>0.3.0</since>
 	</option>
 
 	<option name="tls_require_redirect_addr" type="string" default="">
-		<check regexp="((adcs?|dchub)://.*)?" />
+		<check regexp="(adcs://.*)?" />
 		<short>A redirect address in case a client connects using "adc://" when "adcs://" is required.</short>
 		<description><![CDATA[
-		This is the redirect address used when the hub wants to redirect a client for not using ADCS.
-		For instance a hub at adc://adc.example.com might redirect to adcs://adc.example.com
+		The adcs:// address a plain-text client is sent to when tls_require is on. Leave it
+		empty (the default) to send the client to this hub's own adcs:// address with its
+		certificate keyprint: hub_address if it is set, otherwise the address and port the
+		client connected to. Only adcs:// addresses are accepted.
 		]]></description>
 		<since>0.3.3</since>
 	</option>

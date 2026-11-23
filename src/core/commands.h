@@ -113,8 +113,8 @@ void command_help_rich(struct command_base* cbase, struct hub_user* user, struct
 int command_is_available(struct command_handle* handle, enum auth_credentials credentials);
 
 /**
- * Returns 1 if @p addr is a valid hub redirect address (adc://host:port,
- * adcs://host:port or dchub://host:port), 0 otherwise. Exposed for testing.
+ * Returns 1 if @p addr is a valid hub redirect address (adcs://host:port,
+ * optionally followed by "/?kp=<keyprint>"), 0 otherwise. Exposed for testing.
  */
 int command_redirect_valid_address(const char* addr);
 

@@ -1,4 +1,5 @@
 #include "system.h"
+#include "network/ipcalc.h"
 #include "core/metrics.h"
 
 /*
@@ -159,12 +160,14 @@ EXO_TEST(http_route_no_redirect_unchanged, {
 /* --- http_redirect_valid_url --------------------------------------------- */
 
 EXO_TEST(http_redirect_url_ok, {
-	return http_redirect_valid_url("http://www.example.com/")
+	return http_redirect_valid_url("https://www.example.com/")
 		&& http_redirect_valid_url("https://example.com/hub?a=1&b=2");
 });
 
+/* https:// only: http:// would send the browser on in plain text. */
 EXO_TEST(http_redirect_url_scheme, {
-	return !http_redirect_valid_url("ftp://example.com/")
+	return !http_redirect_valid_url("http://www.example.com/")
+		&& !http_redirect_valid_url("ftp://example.com/")
 		&& !http_redirect_valid_url("adc://example.com:1511")
 		&& !http_redirect_valid_url("example.com");
 });
@@ -180,6 +183,42 @@ EXO_TEST(http_redirect_url_injection, {
 		&& !http_redirect_valid_url("https://example.com/\"onload=\"x")
 		&& !http_redirect_valid_url("https://example.com/<script>")
 		&& !http_redirect_valid_url("https://example.com/\x7f");
+});
+
+/* --- plain-text metrics: loopback only on a TLS hub ----------------------- */
+
+static struct ip_addr_encap mp_addr(const char* text)
+{
+	struct ip_addr_encap a;
+	memset(&a, 0, sizeof(a));
+	ip_convert_to_binary(text, &a);
+	return a;
+}
+
+EXO_TEST(metrics_plain_loopback_allowed, {
+	struct ip_addr_encap v4 = mp_addr("127.0.0.1");
+	struct ip_addr_encap v4b = mp_addr("127.10.20.30");
+	struct ip_addr_encap v6 = mp_addr("::1");
+	return metrics_plain_text_allowed(1, 0, &v4)
+		&& metrics_plain_text_allowed(1, 0, &v4b)
+		&& metrics_plain_text_allowed(1, 0, &v6);
+});
+
+EXO_TEST(metrics_plain_remote_refused, {
+	struct ip_addr_encap v4 = mp_addr("192.0.2.10");
+	struct ip_addr_encap v6 = mp_addr("2001:db8::1");
+	return !metrics_plain_text_allowed(1, 0, &v4) && !metrics_plain_text_allowed(1, 0, &v6);
+});
+
+EXO_TEST(metrics_tls_remote_allowed, {
+	struct ip_addr_encap v4 = mp_addr("192.0.2.10");
+	return metrics_plain_text_allowed(1, 1, &v4);
+});
+
+/* A hub without TLS has nothing else to offer. */
+EXO_TEST(metrics_plain_without_tls_allowed, {
+	struct ip_addr_encap v4 = mp_addr("192.0.2.10");
+	return metrics_plain_text_allowed(0, 0, &v4);
 });
 
 /* --- the logout counter -------------------------------------------------- */

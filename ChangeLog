@@ -32,6 +32,23 @@ Incompatible changes (action required beyond replacing the binaries):
 - The register_self and max_chat_history options were removed. Neither had had
   any effect for some time: use mod_selfregister and mod_chat_history's
   history_max= parameter respectively. A leftover line is a startup error.
+- TLS is required by default (tls_require now defaults to 1). A client that
+  connects with plaintext adc:// is redirected to the hub's adcs:// address --
+  tls_require_redirect_addr if set, otherwise the hub's own address with its
+  certificate keyprint, taken from hub_address or from the address the client
+  reached -- and does not log in. Set tls_require=0 to admit plaintext clients
+  as well; the hub warns at startup when TLS is optional or off.
+- While TLS is required, a self-signed certificate the hub cannot create stops
+  it from starting; before, it warned and ran in plain text. With tls_require
+  off it still falls back, with the warning.
+- The metrics endpoint on a TLS hub answers plain HTTP from loopback only. A
+  plain-text request for metrics_path from anywhere else gets 403, whatever its
+  token; scrape over https:// on the same port.
+- Plain-text addresses are refused where the hub sends someone else:
+  http_redirect_addr takes only https://, tls_require_redirect_addr and
+  !redirect only adcs:// (adc:// and dchub:// go; !redirect now also accepts the
+  /?kp= keyprint), and an http:// reg_server_url is not announced to. A hub with
+  TLS advertises only adcs://: an adc:// hub_address is upgraded.
 - Plugin authors: hub_malloc() and the other allocators never return NULL;
   running out of memory logs a fatal line and aborts the hub. The
   MEMORY_DEBUG allocator is gone.
@@ -62,10 +79,7 @@ New features:
   plaintext transfer or none. When enabled the hub puts the protocol field of
   every relayed CTM, RCM, NAT and RNT, and the PR field of the status message
   refusing one, into the spelling its recipient announced. Off by default.
-- TLS is enabled by default. Plaintext adc:// keeps working on the same port,
-  so this only adds adcs://; set tls_require=1 to refuse plaintext or
-  tls_enable=0 to turn it off. A hub that cannot create or load a certificate
-  logs a warning and runs without TLS rather than refusing to start.
+- TLS is enabled and required by default; see the incompatible changes above.
 - The hub creates a self-signed TLS certificate for itself when it has not
   been given one, in its state directory, so adcs:// works without preparing
   key material. ECDSA P-256, valid for ten years, written once: ADC clients pin

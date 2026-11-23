@@ -70,7 +70,7 @@ EOF
 printf 'plugin_dir %s/lib\nplugin mod_joins\n' "$DIR" > "$DIR/plugins.conf"
 start_hub ds.conf "$PORT" 127.0.0.1 || exit 1
 
-"$ADC" "adc://127.0.0.1:$PORT" --nick alice --send "!myip" --linger 2 --timeout 10 >"$DIR/v4.log" 2>&1
+"$ADC" "adcs://127.0.0.1:$PORT" --nick alice --send "!myip" --linger 2 --timeout 10 >"$DIR/v4.log" 2>&1
 if grep -q 'Your address is "127.0.0.1"' "$DIR/v4.log"; then
 	ok "IPv4 client on a dual-stack listener keeps its address"; else bad "IPv4 client address (see $DIR/v4.log)"; fi
 

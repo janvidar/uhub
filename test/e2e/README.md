@@ -129,6 +129,22 @@ the link from outside, speaking the link protocol over bash's `/dev/tcp`:
 BUILD=/path/to/build test/e2e/run_link_security_e2e.sh [portA] [portS]
 ```
 
+## run_tls_require_e2e.sh
+
+TLS by default, against a live hub: with the defaults a plain-text ADC client
+is redirected to the hub's own `adcs://` address (keyprint included) and never
+logs in, while ADCS works; `hub_address` and `tls_require_redirect_addr` pick
+the redirect target; `tls_require = no` admits plain text again, with a startup
+warning; the metrics endpoint answers plain HTTP from loopback only and HTTPS
+from anywhere; `http://` redirect targets and an `http://` `reg_server_url` are
+refused; and a hub that cannot create its certificate refuses to start
+(skipped where the compiled-in state directory is writable). The remote-scrape
+checks need a non-loopback IPv4 address on the host, and are skipped without one.
+
+```sh
+BUILD=/path/to/build test/e2e/run_tls_require_e2e.sh [port]
+```
+
 ## run_auth_exclusive_e2e.sh
 
 Checks that an auth plugin with `exclusive` set admits only its own accounts,

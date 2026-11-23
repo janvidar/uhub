@@ -462,12 +462,11 @@ int http_redirect_valid_url(const char* url)
 
 	if (!url)
 		return 0;
-	if (!strncmp(url, "http://", 7))
-		p = url + 7;
-	else if (!strncmp(url, "https://", 8))
-		p = url + 8;
-	else
+	/* https:// only: a browser sent to an http:// site leaves the hub's
+	   address for one in plain text. */
+	if (strncmp(url, "https://", 8))
 		return 0;
+	p = url + 8;
 	if (!*p)
 		return 0;
 	for (; *p; p++)
@@ -477,6 +476,11 @@ int http_redirect_valid_url(const char* url)
 			return 0;
 	}
 	return 1;
+}
+
+int metrics_plain_text_allowed(int tls_enable, int is_tls, const struct ip_addr_encap* peer)
+{
+	return is_tls || !tls_enable || ip_is_loopback(peer);
 }
 
 int metrics_http_wanted(struct hub_info* hub)
@@ -494,8 +498,20 @@ static void metrics_handle_request(struct metrics_connection* m)
 	struct hub_config* config = m->hub->config;
 	const char* token = (config->metrics_enable && *config->metrics_token) ? config->metrics_token : NULL;
 	int redirect = http_redirect_valid_url(config->http_redirect_addr);
+	enum metrics_result result = http_classify_request(m->req, config->metrics_path, token, redirect);
 
-	switch (http_classify_request(m->req, config->metrics_path, token, redirect))
+	/* The metrics path in plain text from off this host: refuse it whether or
+	   not the token was right, so a scraper set up over http:// fails
+	   visibly instead of working while it leaks the token. */
+	if ((result == METRICS_OK || result == METRICS_FORBIDDEN) &&
+	    !metrics_plain_text_allowed(config->tls_enable, net_con_is_ssl(m->connection), &m->addr))
+	{
+		LOG_DEBUG("metrics: refused a plain-text request from %s; use https://", ip_convert_to_string(&m->addr));
+		metrics_send_error(m, 403, "Forbidden: use https://", NULL);
+		return;
+	}
+
+	switch (result)
 	{
 		case METRICS_REDIRECT:
 		{
