@@ -40,6 +40,8 @@ static struct rb_node* tree_search(struct rb_tree* tree, const void* key)
 static struct rb_node* create_node(struct rb_tree* tree, const void* key, const void* value)
 {
 	struct rb_node* node = tree->alloc(sizeof(struct rb_node));
+	if (!node)
+		return NULL;
 	node->key = key;
 	node->value = value;
 	node->red = 1;
@@ -117,11 +119,14 @@ static struct rb_node* rb_tree_rotate_double(struct rb_node* node, int dir)
 	return rb_tree_rotate_single(node, dir);
 }
 
-static struct rb_node* rb_tree_insert_r(struct rb_tree* tree, struct rb_node* node, const void* key, const void* value)
+/* Links the already allocated @p fresh in below @p node, rebalancing on the way
+   back up. The caller has ruled out a duplicate key. */
+static struct rb_node* rb_tree_insert_r(struct rb_tree* tree, struct rb_node* node, struct rb_node* fresh)
 {
 	int res;
+	const void* key = fresh->key;
 	if (!node)
-		return create_node(tree, key, value);
+		return fresh;
 
 	res = tree->compare(node->key, key);
 	if (!res)
@@ -132,7 +137,7 @@ static struct rb_node* rb_tree_insert_r(struct rb_tree* tree, struct rb_node* no
 	else
 	{
 		int dir = res < 0;
-		node->link[dir] = rb_tree_insert_r(tree, node->link[dir], key, value);
+		node->link[dir] = rb_tree_insert_r(tree, node->link[dir], fresh);
 
 		if (is_red(node->link[dir]))
 		{
@@ -160,6 +165,8 @@ static struct rb_node* rb_tree_insert_r(struct rb_tree* tree, struct rb_node* no
 struct rb_tree* rb_tree_create(rb_tree_compare compare, rb_tree_alloc a, rb_tree_free f)
 {
 	struct rb_tree* tree = a ? a(sizeof(struct rb_tree)) : hub_malloc(sizeof(struct rb_tree));
+	if (!tree)
+		return NULL;
 	tree->compare = compare;
 	tree->alloc = a ? a : hub_malloc;
 	tree->free = f ? f : hub_free;
@@ -167,6 +174,11 @@ struct rb_tree* rb_tree_create(rb_tree_compare compare, rb_tree_alloc a, rb_tree
 	tree->elements = 0;
 	tree->iterator.node = NULL;
 	tree->iterator.stack = list_create();
+	if (!tree->iterator.stack)
+	{
+		tree->free(tree);
+		return NULL;
+	}
 	return tree;
 }
 
@@ -180,9 +192,17 @@ void rb_tree_destroy(struct rb_tree* tree)
 int rb_tree_insert(struct rb_tree* tree, const void* key, const void* value)
 {
 	struct rb_node* node;
+	struct rb_node* fresh;
 	if (tree_search(tree, key))
 		return 0;
-	node = rb_tree_insert_r(tree, tree->root, key, value);
+
+	/* Allocated before the walk, so a failure leaves the tree as it was and
+	   is reported: it used to be dropped silently and counted as inserted. */
+	fresh = create_node(tree, key, value);
+	if (!fresh)
+		return 0;
+
+	node = rb_tree_insert_r(tree, tree->root, fresh);
 	tree->root = node;
 	tree->root->red = 0;
 	tree->elements++;
