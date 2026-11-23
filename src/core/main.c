@@ -242,6 +242,7 @@ static int run_master(int n)
 	unsigned char rnd[16];
 	struct sigaction act;
 	int i;
+	int failed = 0;
 
 	if (read_config(arg_config, &cfg, !arg_have_config) == -1)
 		return -1;
@@ -294,6 +295,18 @@ static int run_master(int n)
 		{
 			if (g_worker_pids[i] == dead)
 			{
+				/* A worker that reports failure failed to start -- its plugins
+				   or boards did not load -- and so will every replacement:
+				   they all run the same configuration. Respawning it would
+				   only spin. A crash, or a clean exit, is still restarted. */
+				if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
+				{
+					LOG_FATAL("worker %d (pid %d) failed to start; stopping the hub", i, (int) dead);
+					g_worker_pids[i] = 0;
+					g_master_stop = 1;
+					failed = 1;
+					break;
+				}
 				LOG_WARN("worker %d (pid %d) exited; restarting", i, (int) dead);
 				g_worker_pids[i] = spawn_worker(i, n);
 				break;
@@ -312,7 +325,7 @@ static int run_master(int n)
 	hub_free(g_worker_pids);
 	g_worker_pids = 0;
 	rmdir(dir);
-	return 0;
+	return failed ? 1 : 0;
 }
 
 static pid_t spawn_worker(int index, int count)
@@ -340,6 +353,7 @@ int main_loop()
 	struct acl_handle acl;
 	struct hub_info* hub = 0;
 	int announce_pending = 0;
+	int failed = 0;
 
 #ifndef WIN32
 	/* Top-level process: if configured for multiple workers, become the master
@@ -417,6 +431,11 @@ int main_loop()
 
 		hub_set_variables(hub, &acl);
 
+		/* hub_set_variables() shuts the hub down when its plugins or boards
+		   fail to load; that is a failure to start, and the exit status says so. */
+		if (hub->status == hub_status_shutdown)
+			failed = 1;
+
 		/* Announce to the registration server once, at first start only (not on
 		 * SIGHUP config reloads). command_info is built by hub_set_variables. */
 		if (announce_pending)
@@ -444,7 +463,7 @@ int main_loop()
 
 	net_destroy();
 	hub_log_shutdown();
-	return 0;
+	return failed ? 1 : 0;
 }
 
 

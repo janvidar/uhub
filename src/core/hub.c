@@ -2002,7 +2002,11 @@ void hub_disconnect_all(struct hub_info* hub)
 
 void hub_event_loop(struct hub_info* hub)
 {
-	do
+	/* Tested before the first iteration, not after it: a hub that failed to
+	   start (its plugins did not load) is already shutting down, and a first
+	   net_backend_process() would block until a client happened to connect --
+	   leaving a hub that logged FATAL still holding its port. */
+	while (hub->status == hub_status_running || hub->status == hub_status_disabled)
 	{
 		net_backend_process();
 		event_queue_process(hub->queue);
@@ -2012,7 +2016,6 @@ void hub_event_loop(struct hub_info* hub)
 		   on an idle hub is a timer, delaying logins by seconds. */
 		route_flush_dirty(hub);
 	}
-	while (hub->status == hub_status_running || hub->status == hub_status_disabled);
 
 
 	if (hub->status == hub_status_shutdown)
