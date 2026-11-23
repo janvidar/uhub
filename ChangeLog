@@ -15,8 +15,83 @@ Incompatible changes (action required beyond replacing the binaries):
   is refused, with an error in the log. This catches two nodes sharing a
   node_id; a cluster linked with node_count = 1, which the hub already warned
   about, now refuses the users a peer announces from this hub's SID range.
+- mod_chat_history_sqlite is gone; mod_chat_history absorbed it and is now
+  SQLite backed, taking the same file= parameter. Without file= the history is
+  kept in memory for the lifetime of the hub, as the old mod_chat_history did:
+    old:  plugin .../mod_chat_history_sqlite.so "file=/var/lib/uhub/history.db"
+    new:  plugin .../mod_chat_history.so "file=/var/lib/uhub/history.db"
+- Setting file_plugins now REPLACES the hub's built-in default plugin set
+  rather than being the only way to get any plugins (see below). An existing
+  plugins file keeps working unchanged; there is nothing to migrate.
+- Flood control is now on by default (flood_ctl_interval=5, chat=3, connect=20,
+  search=1, update=2, extras=5). Hubs that deliberately ran without it must set
+  the counts to 0 explicitly.
+- limit_max_hubs_user, _reg and _op now default to 0 (no limit) instead of 10,
+  and limit_max_hubs to 0 instead of 25. The old defaults rejected anyone
+  connected to more than ten hubs. Set them explicitly to enforce a limit.
+- The register_self and max_chat_history options were removed. Neither had had
+  any effect for some time: use mod_selfregister and mod_chat_history's
+  history_max= parameter respectively. A leftover line is a startup error.
+- Plugin authors: hub_malloc() and the other allocators never return NULL;
+  running out of memory logs a fatal line and aborts the hub. The
+  MEMORY_DEBUG allocator is gone.
 
 New features:
+- uhub-seeder, a separate daemon that keeps content posted in chat available
+  after its poster leaves: it logs in as a registered bot, fetches what chat
+  magnets point to, verifies it against the TTH and answers searches for it.
+  Being an active client, it also bridges two passive users. It can subscribe
+  to bulletin boards and seed their posts. See doc/seedcache.txt.
+- uhub-fuse, an optional client that mounts a hub as a directory tree: hub
+  and user information, main and private chat, peers' shares under
+  users/<CID>/files/ and any file by hash under by-tth/. Needs libfuse3
+  (-DFUSE_SUPPORT=ON, zig build -Dfuse=true).
+- adcclient (and with it uhub-seeder and uhub-fuse) speaks HBRI, can pin the
+  hub's certificate (?kp=SHA256/... in the address) and accepts bracketed IPv6
+  hub addresses.
+- BBS0 bulletin boards: durable, threaded lists of posts that a client
+  subscribes to, catches up on and keeps. Boards are defined in a boards file
+  (file_bbs_boards) with per-credential permissions, and the index is kept in
+  SQLite (file_bbs_index). The hub holds the index only -- post content travels
+  between clients over the ordinary search and transfer machinery and is never
+  stored on or served by the hub. Off by default; see doc/bbs.txt.
+- New adcs_translate option: an ADCS compatibility mode. The encrypted
+  client-to-client extension has two names -- ADCS/ADCS-1.0 as ADC-EXT settled
+  on it, ADC0/ADCS-0.10 as its draft did and the DC++ family still sends -- and
+  a client recognises only the one it announced, so a mismatched pair gets a
+  plaintext transfer or none. When enabled the hub puts the protocol field of
+  every relayed CTM, RCM, NAT and RNT, and the PR field of the status message
+  refusing one, into the spelling its recipient announced. Off by default.
+- TLS is enabled by default. Plaintext adc:// keeps working on the same port,
+  so this only adds adcs://; set tls_require=1 to refuse plaintext or
+  tls_enable=0 to turn it off. A hub that cannot create or load a certificate
+  logs a warning and runs without TLS rather than refusing to start.
+- The hub creates a self-signed TLS certificate for itself when it has not
+  been given one, in its state directory, so adcs:// works without preparing
+  key material. ECDSA P-256, valid for ten years, written once: ADC clients pin
+  the key fingerprint, so the hub never regenerates it. Setting tls_certificate
+  and tls_private_key still selects your own pair, and a path that does not
+  exist is then an error rather than a cue to generate one.
+- The hub loads a built-in default set of plugins when no plugins file is
+  configured -- mod_auth_sqlite, mod_logging, mod_topic, mod_chat_history,
+  mod_ucmd and mod_users -- so a fresh install has working authentication,
+  logging and chat history with no configuration at all. Previously an
+  unconfigured hub ran with no plugins, which meant no account could hold a
+  credential and no operator command was reachable. A default plugin that
+  fails to load is reported and skipped; a plugin named in a plugins file is
+  still fatal. Turn the set off with plugin_defaults = no.
+- The msg_* status strings can be kept in their own file, named by the new
+  file_messages option, rather than in uhub.conf. Intended for translating or
+  rewording the hub's messages; see doc/messages.conf. They are still accepted
+  in uhub.conf, and the messages file is applied afterwards.
+- "uhub -C" now also reports which plugins the configuration would load, and
+  "uhub -s" / "-S" print the defaults when no configuration file exists instead
+  of printing nothing. Their output now also parses back in as a configuration
+  file: a quoted empty value ("") is accepted as the empty string, and
+  server_alt_ports, redirect_addr and tls_require_redirect_addr no longer carry
+  a validation pattern that rejected their own default.
+- chat_timestamps: turns the hub-stamped TS on relayed chat off, also for
+  chat arriving over a link. On by default.
 - mod_users: operator account management from inside the hub. !useradd,
   !userdel, !usermod, !userpass and !userlist work with whichever auth storage
   plugin is loaded. An operator can only manage accounts below their own level
@@ -76,11 +151,56 @@ Fixes:
   memory; a plugin that looked up a command from inside a command walk could
   loop forever.
 - An inbound hub link over TLS stalled until the peer sent more data.
+- HBRI was unreachable at login for nat_override users; they can now have
+  their IPv6 address verified.
+- !commands: an argument spec ending in "+" freed the trailing argument
+  twice.
+- A hub whose plugins failed to load at startup logged the error, then sat on
+  its port until the first client connected. It now exits with status 1, and
+  a multi-worker supervisor stops rather than respawn a worker that failed so.
+- mod_logging leaked its configuration when the plugin line failed to parse
+  or named file= twice.
+- mod_chat_is_privileged was built but never installed (#123).
+- Leaks on the plugin load-failure paths, and of the user lookup trees at
+  shutdown.
 
 Hardening:
 - Hub linking: a peer may route only chat, searches and directed traffic,
   and a roster entry (LINF) must be a BINF; an update that changes a user's
   CID is ignored.
+- HBRI: the validation token is bound to the connection, not the second it
+  was made in, so a user that took over a departed user's SID in the same
+  second can no longer replay that user's token.
+- The ADC0 spelling of the ADCS claim is stripped together with ADCS from a
+  client whose hub connection is not TLS.
+
+Packaging:
+- The install honours CMAKE_INSTALL_PREFIX and the GNUInstallDirs layout;
+  plugins and configuration no longer go to a hardcoded /usr/lib/uhub and
+  /etc/uhub. The directories the hub compiles in can be overridden with
+  -DUHUB_PLUGIN_DIR, -DUHUB_CONFIG_DIR and -DUHUB_STATE_DIR (and the matching
+  -Dplugin-dir / -Dconfig-dir / -Dstate-dir for build.zig).
+- users.conf and motd.txt are installed, and the man pages with them. A missing
+  motd.txt previously made the shipped plugins.conf fail mod_welcome's load,
+  so a hub installed from source and left as shipped refused to start.
+- The RPM spec and the Gentoo ebuild build with CMake. Both had been calling a
+  hand-written Makefile that no longer exists, and neither could be built.
+- mod_example is built but no longer installed; it is sample code.
+- systemd units for uhub and uhub-seeder, installed by a -DSYSTEMD_SUPPORT=ON
+  build. The hub's is Type=notify, which is what that option's sd_notify call
+  is for. Both are sandboxed; the hub may write only to its state directory,
+  so a file-based mod_logging needs a LogsDirectory drop-in.
+- Fixed SYSTEMD_SUPPORT=ON, which had not linked since uhub-seeder was added:
+  libsystemd was attached to a hand-maintained list of targets rather than to
+  libutils, where the sd_journal_print call actually is.
+- Release source archives include the submodules, and prebuilt binary
+  packages are published for Linux and macOS (x86_64, aarch64) and Windows
+  (x86_64).
+- "make install" no longer overwrites an installed configuration.
+
+Tests:
+- Every unit test runs alone and in any order, and CI also runs the suite in
+  a random order, plain and under ASan.
 
 0.8.2:
 A security release. See doc/advisories/ on the security-advisories branch for
@@ -177,53 +297,8 @@ Incompatible changes (action required beyond replacing the binaries):
 - Plugins must be rebuilt against plugin API 8 (minimum 8): struct plugin_user
   is opaque, so e.g. user->nick becomes plugin->hub.get_user_nick(plugin, user).
   Older plugins are refused at load.
-- mod_chat_history_sqlite is gone; mod_chat_history absorbed it and is now
-  SQLite backed, taking the same file= parameter. Without file= the history is
-  kept in memory for the lifetime of the hub, as the old mod_chat_history did:
-    old:  plugin .../mod_chat_history_sqlite.so "file=/var/lib/uhub/history.db"
-    new:  plugin .../mod_chat_history.so "file=/var/lib/uhub/history.db"
-- Setting file_plugins now REPLACES the hub's built-in default plugin set
-  rather than being the only way to get any plugins (see below). An existing
-  plugins file keeps working unchanged; there is nothing to migrate.
-- Flood control is now on by default (flood_ctl_interval=5, chat=3, connect=20,
-  search=1, update=2, extras=5). Hubs that deliberately ran without it must set
-  the counts to 0 explicitly.
-- limit_max_hubs_user, _reg and _op now default to 0 (no limit) instead of 10,
-  and limit_max_hubs to 0 instead of 25. The old defaults rejected anyone
-  connected to more than ten hubs. Set them explicitly to enforce a limit.
-- The register_self and max_chat_history options were removed. Neither had had
-  any effect for some time: use mod_selfregister and mod_chat_history's
-  history_max= parameter respectively. A leftover line is a startup error.
 
 New features:
-- TLS is enabled by default. Plaintext adc:// keeps working on the same port,
-  so this only adds adcs://; set tls_require=1 to refuse plaintext or
-  tls_enable=0 to turn it off. A hub that cannot create or load a certificate
-  logs a warning and runs without TLS rather than refusing to start.
-- The hub creates a self-signed TLS certificate for itself when it has not
-  been given one, in its state directory, so adcs:// works without preparing
-  key material. ECDSA P-256, valid for ten years, written once: ADC clients pin
-  the key fingerprint, so the hub never regenerates it. Setting tls_certificate
-  and tls_private_key still selects your own pair, and a path that does not
-  exist is then an error rather than a cue to generate one.
-- The hub loads a built-in default set of plugins when no plugins file is
-  configured -- mod_auth_sqlite, mod_logging, mod_topic, mod_chat_history and
-  mod_ucmd -- so a fresh install has working authentication, logging and chat
-  history with no configuration at all. Previously an unconfigured hub ran with
-  no plugins, which meant no account could hold a credential and no operator
-  command was reachable. A default plugin that fails to load is reported and
-  skipped; a plugin named in a plugins file is still fatal. Turn the set off
-  with plugin_defaults = no.
-- The msg_* status strings can be kept in their own file, named by the new
-  file_messages option, rather than in uhub.conf. Intended for translating or
-  rewording the hub's messages; see doc/messages.conf. They are still accepted
-  in uhub.conf, and the messages file is applied afterwards.
-- "uhub -C" now also reports which plugins the configuration would load, and
-  "uhub -s" / "-S" print the defaults when no configuration file exists instead
-  of printing nothing. Their output now also parses back in as a configuration
-  file: a quoted empty value ("") is accepted as the empty string, and
-  server_alt_ports, redirect_addr and tls_require_redirect_addr no longer carry
-  a validation pattern that rejected their own default.
 - New plugin mod_javascript: hub logic in JavaScript, embedding QuickJS. Scripts
   load with script=<file>, dir=<directory> or config=<list>; JavaScript versions
   of the welcome, chat-only and flood plugins ship as examples.
@@ -234,41 +309,8 @@ New features:
 - Chat messages carry a hub-stamped TS timestamp. A client-supplied TS is
   replaced, so the timestamp cannot be forged; chat forwarded over a link keeps
   the origin hub's stamp.
-- BBS0 bulletin boards: durable, threaded lists of posts that a client
-  subscribes to, catches up on and keeps. Boards are defined in a boards file
-  (file_bbs_boards) with per-credential permissions, and the index is kept in
-  SQLite (file_bbs_index). The hub holds the index only -- post content travels
-  between clients over the ordinary search and transfer machinery and is never
-  stored on or served by the hub. Off by default; see doc/bbs.txt.
-- New adcs_translate option: an ADCS compatibility mode. The encrypted
-  client-to-client extension has two names -- ADCS/ADCS-1.0 as ADC-EXT settled
-  on it, ADC0/ADCS-0.10 as its draft did and the DC++ family still sends -- and
-  a client recognises only the one it announced, so a mismatched pair gets a
-  plaintext transfer or none. When enabled the hub puts the protocol field of
-  every relayed CTM, RCM, NAT and RNT, and the PR field of the status message
-  refusing one, into the spelling its recipient announced. Off by default.
 - New operator command !unban to lift a ban by nick, CID or IP/range. Runtime
   bans could previously only be cleared by restarting the hub.
-
-Packaging:
-- The install honours CMAKE_INSTALL_PREFIX and the GNUInstallDirs layout;
-  plugins and configuration no longer go to a hardcoded /usr/lib/uhub and
-  /etc/uhub. The directories the hub compiles in can be overridden with
-  -DUHUB_PLUGIN_DIR, -DUHUB_CONFIG_DIR and -DUHUB_STATE_DIR (and the matching
-  -Dplugin-dir / -Dconfig-dir / -Dstate-dir for build.zig).
-- users.conf and motd.txt are installed, and the man pages with them. A missing
-  motd.txt previously made the shipped plugins.conf fail mod_welcome's load,
-  so a hub installed from source and left as shipped refused to start.
-- The RPM spec and the Gentoo ebuild build with CMake. Both had been calling a
-  hand-written Makefile that no longer exists, and neither could be built.
-- mod_example is built but no longer installed; it is sample code.
-- systemd units for uhub and uhub-seeder, installed by a -DSYSTEMD_SUPPORT=ON
-  build. The hub's is Type=notify, which is what that option's sd_notify call
-  is for. Both are sandboxed; the hub may write only to its state directory,
-  so a file-based mod_logging needs a LogsDirectory drop-in.
-- Fixed SYSTEMD_SUPPORT=ON, which had not linked since uhub-seeder was added:
-  libsystemd was attached to a hand-maintained list of targets rather than to
-  libutils, where the sd_journal_print call actually is.
 - !ban takes an optional duration ("!ban nick 30m", 12h, 7d) and a reason
   ("!ban nick 30m <reason>"). The reason is shown to the banned user on a
   refused reconnect, persisted by a storage plugin, and propagated to linked
