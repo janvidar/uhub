@@ -133,6 +133,7 @@ const fuse_daemon_sources = [_][]const u8{
 // source sets above) rather than globbed at build time; add a new .tcc here.
 const tcc_sources = [_][]const u8{
     "test_adchbri.tcc",
+    "test_adcs.tcc",
     "test_auth.tcc",
     "test_bbs.tcc",
     "test_bbs_board.tcc",
