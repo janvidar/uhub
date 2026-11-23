@@ -151,6 +151,9 @@ Fixes:
   memory; a plugin that looked up a command from inside a command walk could
   loop forever.
 - An inbound hub link over TLS stalled until the peer sent more data.
+- HTTPS on the hub port (metrics, the browser redirect) failed for every
+  browser and curl: a client that offered ALPN without "adc" was answered with
+  a malformed "adc" selection, and aborted the handshake.
 - HBRI was unreachable at login for nat_override users; they can now have
   their IPv6 address verified.
 - !commands: an argument spec ending in "+" freed the trailing argument

@@ -188,20 +188,22 @@ unsigned char alpn_protocols[] = {
 /**
  * Callback for the server to select a protocol from the list
  * sent by the client via ALPN.
+ *
+ * A client that offers ALPN without "adc" -- a web browser or curl reaching
+ * the metrics endpoint or the HTTP redirect over HTTPS offers h2 and
+ * http/1.1 -- gets no ALPN answer at all. Answering "adc" regardless, as this
+ * once did (and with the length byte included in the name), selects a
+ * protocol the client never offered, which RFC 7301 forbids and OpenSSL
+ * clients reject: the handshake failed with "bad extension".
  */
 static int alpn_server_select_protocol(SSL *ssl, const unsigned char **out, unsigned char *outlen,
                                  const unsigned char *in, unsigned int inlen, void *arg)
 {
 	(void) ssl; (void) arg;
-    int res = SSL_select_next_proto((unsigned char **)out, outlen,
-                    alpn_protocols, sizeof(alpn_protocols), in, inlen);
-    if (res == OPENSSL_NPN_NO_OVERLAP)
-    {
-        // set default protocol
-        *out = alpn_protocols;
-        *outlen = 1+alpn_protocols[0];
-    }
-    return SSL_TLSEXT_ERR_OK;
+	if (SSL_select_next_proto((unsigned char **)out, outlen,
+	                          alpn_protocols, sizeof(alpn_protocols), in, inlen) != OPENSSL_NPN_NEGOTIATED)
+		return SSL_TLSEXT_ERR_NOACK;
+	return SSL_TLSEXT_ERR_OK;
 }
 
 /**
