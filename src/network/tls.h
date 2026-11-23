@@ -149,6 +149,44 @@ extern int net_ssl_get_keyprint(struct ssl_context_handle* ctx, char* out, size_
 extern int net_ssl_get_peer_keyprint(struct net_connection* con, char* out, size_t out_size);
 
 /**
+ * The link key of the certificate installed in @p ctx: the SHA256 hash of its
+ * public key (DER SubjectPublicKeyInfo) in "SHA256/<base32>" form. Unlike the
+ * keyprint it survives renewing the certificate on the same key, which is why
+ * hub links pin it. A 60-byte buffer is always sufficient.
+ *
+ * @return 1 on success, 0 if no certificate is loaded or @p out is too small.
+ */
+extern int net_ssl_get_link_key(struct ssl_context_handle* ctx, char* out, size_t out_size);
+
+/**
+ * The link key of the certificate the peer presented on @p con (see
+ * net_ssl_get_link_key()). Only meaningful once the handshake has completed.
+ *
+ * @return 1 on success, 0 if @p con is not a TLS connection, the peer sent no
+ *         certificate, or @p out is too small.
+ */
+extern int net_ssl_get_peer_link_key(struct net_connection* con, char* out, size_t out_size);
+
+/**
+ * Fill @p out with @p out_len bytes exported from the TLS session on @p con
+ * under @p label (RFC 5705 / RFC 8446 exporter, no context). Both ends of one
+ * session compute the same bytes; no other session does.
+ *
+ * @return 1 on success, 0 otherwise.
+ */
+extern int net_ssl_export_keying_material(struct net_connection* con, const char* label, unsigned char* out, size_t out_len);
+
+/**
+ * Make @p ctx ask the peer for a certificate and accept whatever it gets,
+ * including none: a server context then requests a client certificate from
+ * every connection without requiring one. The caller decides what a
+ * presented certificate is worth (see net_ssl_get_peer_link_key()).
+ *
+ * @return 1 on success, 0 otherwise.
+ */
+extern int net_ssl_context_request_peer_cert(struct ssl_context_handle* ctx);
+
+/**
  * Compare two ADC keyprints.
  *
  * Case-insensitive (base32 and the hash name both are) and written to take the

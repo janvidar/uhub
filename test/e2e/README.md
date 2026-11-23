@@ -96,11 +96,16 @@ not run in CI.
 BUILD=/path/to/native/build test/e2e/run_windows_wine_e2e.sh [port]
 ```
 
+The scripts that link two hubs over TCP source `link_tls.sh`, which gives one
+hub the test certificate from `autotest/`, makes another for the second with
+the `openssl` command line tool, and reads both link keys with `uhub -K`.
+
 ## run_link_e2e.sh
 
-Brings up **two linked hubs** (node 0 and node 1, a shared `link_secret`, node 1
-linking to node 0), each with its **own** auth/ban database so the link is the
-only path a ban can travel between them. Verifies cluster propagation:
+Brings up **two linked hubs** (node 0 and node 1, node 1 linking to node 0 over
+TLS, each pinning the other's link key), each with its **own** auth/ban
+database so the link is the only path a ban can travel between them. Verifies
+cluster propagation:
 
 1. the two hubs establish a link;
 2. the roster is unified (a user on node B is visible on node A);
@@ -115,12 +120,14 @@ BUILD=/path/to/build test/e2e/run_link_e2e.sh [portA] [portB]
 ## run_link_security_e2e.sh
 
 Brings up a master hub and an `auth_proxy` slave linked to it, then attacks
-the link from outside, speaking the link protocol over bash's `/dev/tcp`:
+the link from outside, speaking the link protocol over bash's `/dev/tcp` and
+`openssl s_client`:
 
-1. the two hubs establish a link (the handshake works between real hubs);
-2. a peer that echoes the master's own challenge back is disconnected
-   unanswered, and finishing that attack establishes nothing (#127);
-3. a peer that plays the master's own answer back is refused with `LERR`;
+1. the two hubs establish a link (TLS with pinned keys, between real hubs);
+2. a plain-text link attempt is disconnected unanswered;
+3. a TLS link attempt with no certificate, or with one whose key the master
+   has not pinned, is sent no challenge -- so the reflection attacks of #127
+   have nothing to reflect -- and the master logs why;
 4. a nick with an embedded newline, given to the slave, injects no command into
    its master link: the nick named in the injected `LBAN` can still log in on
    the master (#128); an ordinary nick still logs in through the slave.

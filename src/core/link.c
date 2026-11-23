@@ -167,14 +167,11 @@ struct hub_link
 	int granted_node_id;                    /* coordinator side: window index granted to this link, or -1 */
 	int window_requested;                   /* member side: we sent LWRQ here and await LWIN */
 	int tls_pending;                        /* outbound: TLS handshake under way, LCHA not sent yet */
+	char secret[LINK_TLS_SECRET_LEN + 1];   /* TCP links: the handshake key, exported from this TLS session; empty = link_secret */
 };
 
 /* All active links (singleton hub), for teardown. */
 static struct linked_list* g_links = 0;
-
-/* Client TLS context for dialling peers, made on first use. Identity comes
-   from the link handshake, so the peer's certificate is not verified here. */
-static struct ssl_context_handle* g_link_tls = 0;
 
 /* Slave side of master-slave auth: connecting users whose login is paused
    awaiting a master reply (LACR/LVRS), found by SID when the reply arrives. */
@@ -265,6 +262,7 @@ static void link_become_coordinator(struct hub_info* hub)
 }
 
 static int  link_begin_handshake(struct hub_link* link);
+static int  link_tls_authenticate(struct hub_link* link);
 static void link_send_inf(struct hub_link* link, struct hub_user* user);
 static void link_send_roster(struct hub_link* link);
 static void link_handle_remote_inf(struct hub_link* link, const char* binf);
@@ -297,6 +295,7 @@ static void link_disconnect(struct hub_link* link)
 	if (g_links)
 		list_remove(g_links, link);
 	hub_free(link->peer_desc);
+	OPENSSL_cleanse(link->secret, sizeof(link->secret));
 	hub_free(link);
 }
 
@@ -405,7 +404,7 @@ static const char* link_server_nonce(const struct hub_link* link)
    Returns 0 to continue, -1 to close the link (caller disconnects). */
 static int link_process_line(struct hub_link* link, const char* line)
 {
-	const char* secret = link->hub->config->link_secret;
+	const char* secret = *link->secret ? link->secret : link->hub->config->link_secret;
 
 	if (strncmp(line, "LINF ", 5) == 0)
 	{
@@ -912,11 +911,12 @@ static void link_net_event(struct net_connection* con, int events, void* arg)
 	}
 	if (events & NET_EVENT_READ)
 	{
-		/* Our outbound TLS handshake has completed: the link protocol starts. */
+		/* Our outbound TLS handshake has completed: check who answered, then
+		   the link protocol starts. */
 		if (link->tls_pending)
 		{
 			link->tls_pending = 0;
-			if (link_begin_handshake(link) < 0)
+			if (link_tls_authenticate(link) < 0 || link_begin_handshake(link) < 0)
 			{
 				link_disconnect(link);
 				return;
@@ -949,38 +949,131 @@ static int link_begin_handshake(struct hub_link* link)
 	return link_sendf(link, "LCHA %s\n", link->nonce);
 }
 
-/* Start the link protocol on a link we dialled over TCP. A hub with tls_enable
-   speaks TLS to its peers -- and accepts nothing else from them -- so it first
-   runs a TLS handshake and sends LCHA once that completes (link_net_event).
+int link_key_pinned(const char* keys, const char* key)
+{
+	const char* p = keys;
+
+	if (!keys || !key || !*key)
+		return 0;
+	while (*p)
+	{
+		char one[128];
+		size_t len;
+		while (*p == ' ' || *p == ',' || *p == '\t')
+			p++;
+		len = strcspn(p, ", \t");
+		if (len > 0 && len < sizeof(one))
+		{
+			memcpy(one, p, len);
+			one[len] = 0;
+			if (net_ssl_keyprint_equal(one, key))
+				return 1;
+		}
+		p += len;
+	}
+	return 0;
+}
+
+/*
+ * A TCP link is authenticated by TLS: both ends present the hub's own
+ * certificate, and each requires the other's key to be one it has pinned
+ * (link_keys). Once that holds, the link handshake runs keyed on a value
+ * exported from this very TLS session rather than on a shared secret, which
+ * binds it to the session: there is nothing a relay in the middle could
+ * forward, since it would have to be both ends of one session.
+ *
+ * Returns 0 to go on, -1 to close the link.
+ */
+static int link_tls_authenticate(struct hub_link* link)
+{
+	char key[80];
+	char keyprint[80];
+	unsigned char exported[LINK_TLS_SECRET_LEN / 2];
+	size_t i;
+
+	if (!net_ssl_get_peer_link_key(link->connection, key, sizeof(key)))
+	{
+		LOG_WARN("link: %s presented no certificate; a hub link needs one whose key is in link_keys",
+			link->peer_desc);
+		return -1;
+	}
+	if (!link_key_pinned(link->hub->config->link_keys, key))
+	{
+		/* The certificate keyprint from a hub's adcs:// address is the easy
+		   thing to paste by mistake: it is not the key, and changes with
+		   every renewal. */
+		if (net_ssl_get_peer_keyprint(link->connection, keyprint, sizeof(keyprint))
+			&& link_key_pinned(link->hub->config->link_keys, keyprint))
+			LOG_WARN("link: %s is listed in link_keys by its certificate keyprint %s; list its link key instead: %s",
+				link->peer_desc, keyprint, key);
+		else
+			LOG_WARN("link: refusing %s: its link key %s is not in link_keys", link->peer_desc, key);
+		return -1;
+	}
+	if (!net_ssl_export_keying_material(link->connection, LINK_TLS_EXPORTER_LABEL, exported, sizeof(exported)))
+	{
+		LOG_WARN("link: unable to derive the handshake key for %s", link->peer_desc);
+		return -1;
+	}
+	for (i = 0; i < sizeof(exported); i++)
+		snprintf(link->secret + 2 * i, 3, "%02x", exported[i]);
+	OPENSSL_cleanse(exported, sizeof(exported));
+	LOG_INFO("link: %s authenticated by link key %s", link->peer_desc, key);
+	return 0;
+}
+
+/* A TCP link needs TLS and pinned keys; say which is missing. */
+static int link_tcp_possible(struct hub_info* hub, const char* desc)
+{
+	if (!hub->config->tls_enable || !hub->ctx)
+	{
+		LOG_WARN("link: no TCP link with %s: hub links run over TLS, and TLS is off (tls_enable)", desc);
+		return 0;
+	}
+	if (!*hub->config->link_keys)
+	{
+		LOG_WARN("link: no TCP link with %s: link_keys is empty", desc);
+		return 0;
+	}
+	return 1;
+}
+
+/* Start the link protocol on a link we dialled over TCP: a TLS handshake in
+   which we present our certificate, then -- once the peer's key checks out --
+   LCHA (here if the handshake completes at once, else in link_net_event).
    Returns -1 if the link cannot start. */
 static int link_open_outbound(struct hub_link* link)
 {
-	struct hub_config* cfg = link->hub->config;
 	ssize_t ret;
 
-	if (!cfg->tls_enable)
-		return link_begin_handshake(link);
-
-	if (!g_link_tls)
-		g_link_tls = net_ssl_context_create(cfg->tls_version, cfg->tls_ciphersuite, cfg->tls_ciphersuites);
-	if (!g_link_tls)
-	{
-		LOG_ERROR("link: could not create a TLS context to connect to %s", link->peer_desc);
+	if (!link_tcp_possible(link->hub, link->peer_desc))
 		return -1;
-	}
 
 	link->tls_pending = 1;
 	net_con_update(link->connection, NET_EVENT_READ | NET_EVENT_WRITE);
-	ret = net_con_ssl_handshake(link->connection, net_con_ssl_mode_client, g_link_tls);
+	ret = net_con_ssl_handshake(link->connection, net_con_ssl_mode_client, link->hub->ctx);
 	if (ret < 0)
 		return -1;
 	if (ret > 0)
 	{
 		/* Completed at once; no event will say so. */
 		link->tls_pending = 0;
+		if (link_tls_authenticate(link) < 0)
+			return -1;
 		return link_begin_handshake(link);
 	}
 	return 0;
+}
+
+static struct hub_link* link_take_connection(struct hub_info* hub, struct net_connection* con, int is_client, const char* desc)
+{
+	struct hub_link* link = link_create_internal(hub, is_client, desc);
+	if (!link)
+		return 0;
+	link->connection = con;
+	net_con_reinitialize(con, link_net_event, link, NET_EVENT_READ);
+	net_con_set_timeout(con, LINK_TIMEOUT);
+	return link;
 }
 
 int link_adopt(struct hub_info* hub, struct net_connection* con, int is_client, const char* desc)
@@ -993,50 +1086,57 @@ int link_adopt(struct hub_info* hub, struct net_connection* con, int is_client, 
 		return 0; /* caller closes the connection */
 	}
 
-	link = link_create_internal(hub, is_client, desc);
+	link = link_take_connection(hub, con, is_client, desc);
 	if (!link)
 		return 0;
 
-	link->connection = con;
-	net_con_reinitialize(con, link_net_event, link, NET_EVENT_READ);
-	net_con_set_timeout(con, LINK_TIMEOUT);
-
-	if (is_client)
-	{
-		if (link_open_outbound(link) < 0)
-			link_disconnect(link);
-		return 1;
-	}
-
-	/* An accepted peer's "LCHA <nonce>" is still buffered (probe used peek),
-	   so our first read will see it; send our own challenge now. */
+	/* Each side sends its challenge at once; an accepted peer's "LCHA
+	   <nonce>" is already waiting to be read. */
 	if (link_begin_handshake(link) < 0)
-	{
 		link_disconnect(link);
-		return 1; /* ownership taken (even if we just closed it) */
-	}
+	return 1; /* ownership taken (even if we just closed it) */
+}
 
-	/* Over TLS the probe's peek (SSL_peek) drained the socket into the TLS
-	   buffer, so no read event announces the LCHA waiting there: read it now,
-	   as probe.c does for an ADC or HTTP connection. A plain peek leaves the
-	   bytes in the kernel, where the next poll finds them. */
-	if (net_con_is_ssl(con))
-		net_con_callback(con, NET_EVENT_READ);
+int link_dial_adopt(struct hub_info* hub, struct net_connection* con, const char* desc)
+{
+	struct hub_link* link = link_take_connection(hub, con, 1, desc);
+	if (!link)
+		return 0;
+	if (link_open_outbound(link) < 0)
+		link_disconnect(link);
 	return 1;
 }
 
 int link_accept(struct hub_info* hub, struct net_connection* con, struct ip_addr_encap* addr)
 {
-	/* A hub with tls_enable dials its peers over TLS, so a plain-text link
-	   on its port is a peer that is out of date or misconfigured -- or not
-	   one of ours. Unix-socket links do not come through here. */
-	if (hub->config->tls_enable && !net_con_is_ssl(con))
+	const char* desc = ip_convert_to_string(addr);
+	struct hub_link* link;
+
+	/* Links run over TLS, so a plain-text link on the port is a peer that is
+	   out of date or misconfigured -- or not one of ours. Unix-socket links
+	   do not come through here. */
+	if (!net_con_is_ssl(con))
 	{
-		LOG_WARN("link: refusing a plain-text link from %s; this hub requires TLS (tls_enable)",
-			ip_convert_to_string(addr));
+		LOG_WARN("link: refusing a plain-text link from %s; hub links run over TLS", desc);
 		return 0;
 	}
-	return link_adopt(hub, con, 0, ip_convert_to_string(addr));
+	if (!link_tcp_possible(hub, desc))
+		return 0;
+
+	link = link_take_connection(hub, con, 0, desc);
+	if (!link)
+		return 0;
+	if (link_tls_authenticate(link) < 0 || link_begin_handshake(link) < 0)
+	{
+		link_disconnect(link);
+		return 1; /* ownership taken (even if we just closed it) */
+	}
+
+	/* The probe's peek (SSL_peek) drained the socket into the TLS buffer, so
+	   no read event announces the LCHA waiting there: read it now, as
+	   probe.c does for an ADC or HTTP connection. */
+	net_con_callback(con, NET_EVENT_READ);
+	return 1;
 }
 
 static void link_connect_callback(struct net_connect_handle* handle, enum net_connect_status status, struct net_connection* con, void* ptr)
@@ -1282,7 +1382,7 @@ void link_start(struct hub_info* hub)
 	   rosters are exchanged. Warn loudly -- set node_count to the cluster size
 	   and a unique node_id on every node. (node_id >= node_count is caught
 	   separately in uman_init.) */
-	if ((*cfg->link_peer || *cfg->link_secret) && cfg->node_count <= 1 && cfg->node_id >= 0)
+	if ((*cfg->link_peer || *cfg->link_secret || *cfg->link_keys) && cfg->node_count <= 1 && cfg->node_id >= 0)
 		LOG_WARN("Hub linking is configured but node_count is 1: SIDs are not "
 		         "partitioned, so the users a linked hub announces from this hub's "
 		         "SID range are refused. Set node_count "
@@ -1317,37 +1417,30 @@ void link_start(struct hub_info* hub)
 	   socket path, otherwise host:port over TCP. */
 	if (*cfg->link_peer)
 	{
-		if (!*cfg->link_secret)
+		char* list = hub_strdup(cfg->link_peer);
+		char* save = 0;
+		char* peer;
+		for (peer = strtok_r(list, ",", &save); peer; peer = strtok_r(0, ",", &save))
 		{
-			LOG_ERROR("link_peer is set but link_secret is empty; not linking");
-		}
-		else
-		{
-			char* list = hub_strdup(cfg->link_peer);
-			char* save = 0;
-			char* peer;
-			if (list)
+			while (*peer == ' ' || *peer == '\t')
+				peer++;
+			if (!*peer)
+				continue;
+			if (peer[0] == '/')
 			{
-				for (peer = strtok_r(list, ",", &save); peer; peer = strtok_r(0, ",", &save))
-				{
-					while (*peer == ' ' || *peer == '\t')
-						peer++;
-					if (!*peer)
-						continue;
-					if (peer[0] == '/')
-					{
 #ifndef WINSOCK
-						link_uds_connect(hub, peer);
+				if (!*cfg->link_secret)
+					LOG_ERROR("link: not linking to %s: a Unix-socket link needs link_secret", peer);
+				else
+					link_uds_connect(hub, peer);
 #else
-						LOG_WARN("link: Unix-domain peer '%s' ignored; not supported on this platform", peer);
+				LOG_WARN("link: Unix-domain peer '%s' ignored; not supported on this platform", peer);
 #endif
-					}
-					else
-						link_connect(hub, peer);
-				}
-				hub_free(list);
 			}
+			else if (link_tcp_possible(hub, peer))
+				link_connect(hub, peer);
 		}
+		hub_free(list);
 	}
 }
 
@@ -1391,12 +1484,6 @@ void link_stop(struct hub_info* hub)
 	hub_free(g_win_used);
 	g_win_used = 0;
 	g_win_count = 0;
-
-	if (g_link_tls)
-	{
-		net_ssl_context_destroy(g_link_tls);
-		g_link_tls = 0;
-	}
 }
 
 /* Send one user's INF to the peer as "LINF <binf>". user->info->cache is a

@@ -166,6 +166,7 @@ struct hub_info
 
 	struct ssl_context_handle* ctx;
 	char* tls_keyprint;                 /* ADC KEYP keyprint of the TLS certificate ("SHA256/..."), NULL when TLS is disabled. */
+	char* tls_link_key;                 /* Link key: SHA256 of the certificate's public key ("SHA256/..."), what peers pin in link_keys. NULL when TLS is disabled. */
 
 	struct bbs_handle* bbs;             /* BBS0 bulletin boards, or NULL when disabled. */
 
@@ -290,6 +291,15 @@ extern void hub_send_flood_warning(struct hub_info*, struct hub_user* user, cons
  * @return a pointer to the hub info.
  */
 extern struct hub_info* hub_start_service(struct hub_config* config);
+
+/**
+ * Print the link key of the configured TLS certificate (or of the one the hub
+ * keeps in its state directory) to stdout -- the value peers list in
+ * link_keys. Creates nothing.
+ *
+ * @return 0 on success, 1 if there is no readable certificate.
+ */
+extern int hub_print_link_key(struct hub_config* config);
 
 /**
  * This shuts down the hub.

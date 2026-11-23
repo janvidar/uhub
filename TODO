@@ -33,24 +33,11 @@ plain HTTP from loopback only; http_redirect_addr, tls_require_redirect_addr,
 !redirect and reg_server_url refuse plain-text targets, and an adc://
 hub_address is advertised as adcs://.
 
-Phase 2 -- hub links fully authenticated:
-- Links authenticate with the hub's own certificate, on both sides: the
-  accepting side already presents it, and the dialling side presents it as a
-  client certificate. Each node pins its peers' public keys (WireGuard-style:
-  a node knows only its peers' public keys). Pin the key, not the
-  certificate, so renewing a certificate on the same key keeps links up.
-  Replaces the shared link_secret over TCP, and with it the handshake relay
-  that TLS without channel binding still allows.
-- The accepting side asks every connection on the shared port for a client
-  certificate without requiring one. ADC clients generally offer none and are
-  unaffected; the handshake accepts any certificate, and link_accept then
-  requires one whose key is pinned (ADC and HTTP ignore it).
-- Until then, link_secret is the only link credential, and anyone who can
-  reach the hub's port can get the hub's answer to a challenge of their own
-  and guess the secret offline. A long random secret is the mitigation;
-  making the accepting side answer only after the connector has proved
-  itself would close it, if Phase 2 is far off.
-- Remove the plain-TCP link path.
+Phase 2 -- hub links fully authenticated: done. TCP links run over TLS only,
+both ends present the hub's certificate, and each requires the other's public
+key to be in link_keys ("uhub -K" prints a hub's own). The link handshake is
+keyed on a TLS exporter value, binding it to the session; link_secret is left
+to Unix-socket (worker) links. The plain-TCP link path is gone.
 
 Phase 3 -- remove the off switches:
 - Retire tls_enable and tls_require; the probe refuses plain ADC and plain

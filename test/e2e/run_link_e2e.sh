@@ -19,7 +19,6 @@ PA=${1:-51021}
 PB=${2:-51022}
 HUBA="adc://127.0.0.1:$PA"
 HUBB="adc://127.0.0.1:$PB"
-SECRET="e2e-link-secret"
 
 UHUB=$BUILD/uhub
 ADC=$BUILD/adc_cmd
@@ -31,6 +30,8 @@ done
 [ -f "$BUILD/mod_auth_sqlite.so" ] || { echo "MISSING: $BUILD/mod_auth_sqlite.so"; exit 2; }
 
 DIR=$(mktemp -d)
+. "$SCRIPT_DIR/link_tls.sh"
+link_tls_setup "$DIR"
 HUB_PIDS=()
 pass=0; fail=0
 
@@ -73,8 +74,7 @@ cat > "$DIR/hub_a.conf" <<EOF
 server_port = $PA
 server_bind_addr = 127.0.0.1
 file_plugins = $DIR/plugins_a.conf
-tls_enable = 0
-link_secret = $SECRET
+$(link_tls_conf a)
 node_count = 2
 node_id = 0
 EOF
@@ -83,8 +83,7 @@ cat > "$DIR/hub_b.conf" <<EOF
 server_port = $PB
 server_bind_addr = 127.0.0.1
 file_plugins = $DIR/plugins_b.conf
-tls_enable = 0
-link_secret = $SECRET
+$(link_tls_conf b)
 node_count = 2
 node_id = 1
 link_peer = 127.0.0.1:$PA

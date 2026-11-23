@@ -57,6 +57,11 @@
 #define LINK_AUTH_RESPONSE_LEN MAX_CID_LEN
 #define LINK_NONCE_LEN         MAX_CID_LEN
 
+/* TCP links key their handshake on 32 bytes exported from the TLS session
+   under this label, hex-encoded (see link_tls_authenticate in link.c). */
+#define LINK_TLS_EXPORTER_LABEL "EXPORTER-uhub-link-v1"
+#define LINK_TLS_SECRET_LEN     64
+
 /**
  * Whether `nonce` is well-formed: exactly LINK_NONCE_LEN base32 characters.
  */
@@ -166,14 +171,29 @@ extern void link_relay_broadcast(struct hub_info* hub, struct adc_message* msg);
 extern int link_accept(struct hub_info* hub, struct net_connection* con, struct ip_addr_encap* addr);
 
 /**
- * Run the link protocol on an already-connected connection: link_accept() is
- * this with is_client = 0. is_client says which side of the handshake we are
- * (1 = we opened the connection); a side that opened it starts TLS first when
- * tls_enable is set. desc names the peer in log messages.
+ * Run the link protocol on an already-connected local transport (a Unix
+ * socket, or a socketpair in the tests): no TLS, and the handshake is keyed on
+ * link_secret. is_client says which side of the handshake we are (1 = we
+ * opened the connection). desc names the peer in log messages.
  *
  * @return 1 if the connection was taken over, 0 if rejected (caller closes it).
  */
 extern int link_adopt(struct hub_info* hub, struct net_connection* con, int is_client, const char* desc);
+
+/**
+ * Run the link protocol on a TCP connection we dialled: a TLS handshake that
+ * presents the hub's certificate, a check that the peer's key is in
+ * link_keys, then the handshake keyed on the TLS session.
+ *
+ * @return 1 if the connection was taken over, 0 if not (caller closes it).
+ */
+extern int link_dial_adopt(struct hub_info* hub, struct net_connection* con, const char* desc);
+
+/**
+ * Whether @p key ("SHA256/...") is one of the comma-separated link keys in
+ * @p keys. Exposed for testing.
+ */
+extern int link_key_pinned(const char* keys, const char* key);
 
 /**
  * Start hub-to-hub linking: initiate the outbound link if link_peer is set

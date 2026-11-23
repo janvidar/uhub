@@ -702,6 +702,113 @@ int net_ssl_get_peer_keyprint(struct net_connection* con, char* out, size_t out_
 	return ret;
 }
 
+/**
+ * The link-key half: hash the certificate's public key (its DER
+ * SubjectPublicKeyInfo) rather than the whole certificate, so a certificate
+ * renewed on the same key keeps the same value. Same "SHA256/<base32>" form.
+ */
+static int link_key_from_x509(X509* cert, const char* who, char* out, size_t out_size)
+{
+	unsigned char* der = NULL;
+	int der_len;
+	unsigned char digest[SHA256_DIGEST_LENGTH];
+	char b32[(SHA256_DIGEST_LENGTH * 8 + 4) / 5 + 1];
+	int n;
+
+	der_len = i2d_X509_PUBKEY(X509_get_X509_PUBKEY(cert), &der);
+	if (der_len <= 0 || !der)
+	{
+		LOG_ERROR("%s: i2d_X509_PUBKEY failed: %s", who, ERR_error_string(ERR_get_error(), NULL));
+		return 0;
+	}
+
+	SHA256(der, (size_t) der_len, digest);
+	OPENSSL_free(der);
+	base32_encode(digest, sizeof(digest), b32);
+
+	n = snprintf(out, out_size, "SHA256/%s", b32);
+	if (n < 0 || (size_t) n >= out_size)
+		return 0;
+	return 1;
+}
+
+int net_ssl_get_link_key(struct ssl_context_handle* ctx_, char* out, size_t out_size)
+{
+	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
+	X509* cert;
+
+	if (!ctx || !ctx->ssl || !out || out_size == 0)
+		return 0;
+	cert = SSL_CTX_get0_certificate(ctx->ssl);
+	if (!cert)
+		return 0;
+	return link_key_from_x509(cert, "net_ssl_get_link_key", out, out_size);
+}
+
+int net_ssl_get_peer_link_key(struct net_connection* con, char* out, size_t out_size)
+{
+	struct net_ssl_openssl* handle;
+	X509* cert;
+	int ret;
+
+	if (!con || !out || out_size == 0)
+		return 0;
+	handle = (struct net_ssl_openssl*) con->ssl;
+	if (!handle || !handle->ssl)
+		return 0;
+#if defined(LIBRESSL_VERSION_NUMBER)
+	cert = SSL_get_peer_certificate(handle->ssl);
+#else
+	cert = SSL_get1_peer_certificate(handle->ssl);
+#endif
+	if (!cert)
+		return 0;
+	ret = link_key_from_x509(cert, "net_ssl_get_peer_link_key", out, out_size);
+	X509_free(cert);
+	return ret;
+}
+
+int net_ssl_export_keying_material(struct net_connection* con, const char* label, unsigned char* out, size_t out_len)
+{
+	struct net_ssl_openssl* handle;
+
+	if (!con || !label || !out || out_len == 0)
+		return 0;
+	handle = (struct net_ssl_openssl*) con->ssl;
+	if (!handle || !handle->ssl)
+		return 0;
+	if (SSL_export_keying_material(handle->ssl, out, out_len, label, strlen(label), NULL, 0, 0) != 1)
+	{
+		LOG_ERROR("SSL_export_keying_material failed: %s", ERR_error_string(ERR_get_error(), NULL));
+		return 0;
+	}
+	return 1;
+}
+
+/* Take whatever certificate the peer offers: who it is gets decided by the
+   caller, against the keys it has pinned, not by a chain to some CA. */
+static int verify_accept_any(int preverify_ok, X509_STORE_CTX* store)
+{
+	(void) preverify_ok;
+	(void) store;
+	return 1;
+}
+
+int net_ssl_context_request_peer_cert(struct ssl_context_handle* ctx_)
+{
+	struct net_context_openssl* ctx = (struct net_context_openssl*) ctx_;
+	static const unsigned char sid_ctx[] = "uhub";
+
+	if (!ctx || !ctx->ssl)
+		return 0;
+	/* SSL_VERIFY_PEER without FAIL_IF_NO_PEER_CERT: a server asks every
+	   client for a certificate and takes a handshake without one. A
+	   session-id context is required once peers are verified, or a resumed
+	   session fails. */
+	SSL_CTX_set_verify(ctx->ssl, SSL_VERIFY_PEER, verify_accept_any);
+	return SSL_CTX_set_session_id_context(ctx->ssl, sid_ctx, sizeof(sid_ctx) - 1) == 1;
+}
+
 /** ASCII fold to upper case without branching on the character value. */
 static unsigned char keyprint_upper(unsigned char c)
 {

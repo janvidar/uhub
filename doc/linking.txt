@@ -40,13 +40,20 @@ first bytes. The probe in src/core/probe.c recognises this prefix -- exactly as
 it recognises "HSUP" for an ADC client or a TLS ClientHello -- and hands the
 connection to link_accept() instead of the client login path.
 
-A hub with tls_enable set (the default) dials its TCP peers over TLS, and
-refuses a plain-text link on its port. The probe recognises the TLS
-ClientHello, completes the handshake and finds "LCHA" in the decrypted stream,
-as it does for ADC and HTTP. Every node in a cluster therefore needs the same
-tls_enable setting. Unix-socket links are not wrapped, on either side. The link handshake below
-then runs inside TLS. The peer's certificate is not checked: the link
-handshake is what authenticates the peer.
+TCP links always run over TLS, so every node needs tls_enable (the default);
+a plain-text link on the port is refused, and a hub with TLS off makes and
+takes no TCP links. The probe recognises the TLS ClientHello, completes the
+handshake and finds "LCHA" in the decrypted stream, as it does for ADC and
+HTTP. Unix-socket links are not wrapped, on either side.
+
+Both ends present the hub's own certificate: the accepting side as the server
+certificate it shows every client, the dialling side as a client certificate.
+Each end then requires the other's public key to be one it has pinned in
+link_keys (see "Authentication"), so a TCP link is mutually authenticated by
+TLS before the link protocol starts. The hub's TLS context asks every
+connection on the port for a client certificate without requiring one: ADC
+clients and browsers offer none and are unaffected, and only link_accept()
+looks at one that is offered.
 
 Messages are newline-terminated text. Every command is a four-character code
 ("FOURCC"), mirroring ADC's framing of one context character ('L' for link)
@@ -92,11 +99,38 @@ processes yourself (e.g. a systemd template); leaving it off by default avoids
 two unrelated hubs silently sharing a port.
 
 
-== Authentication handshake ==
+== Authentication ==
 
-Both endpoints authenticate each other with a role-bound mutual
-challenge-response keyed on a shared secret (the "link_secret" config option).
-Neither side trusts the other until both directions have been verified.
+=== Link keys (TCP) ===
+
+A node's link key is the SHA-256 hash of its certificate's public key (the
+DER SubjectPublicKeyInfo), written "SHA256/<base32>" like an ADC keyprint. It
+names the key, not the certificate, so renewing a certificate on the same key
+keeps every link up. A hub logs its own at start-up ("Link key: ..."), and
+"uhub -K" prints it without starting the hub; the same value comes out of
+
+  openssl x509 -in server.crt -pubkey -noout | openssl pkey -pubin -outform DER \
+    | openssl dgst -sha256 -binary | base32 | tr -d =
+
+prefixed with "SHA256/". Each node lists the keys of the peers it links with
+in link_keys, as WireGuard nodes list their peers' public keys: there is no
+shared secret, nothing secret on the wire, and a node is dropped from the
+cluster by removing its key from the others. A peer that presents no
+certificate, or one whose key is not listed, is refused before it is sent a
+challenge, and the log names the key it presented. The certificate keyprint
+from a hub's adcs:// address is a different value; listing it by mistake is
+reported as such.
+
+=== The link handshake ===
+
+After the keys check out -- or straight away on a Unix-socket link -- both
+endpoints authenticate each other with a role-bound mutual challenge-response.
+On a TCP link it is keyed on 32 bytes exported from the TLS session (RFC 5705 /
+8446, label "EXPORTER-uhub-link-v1", hex-encoded), which binds it to that
+session: a relay in the middle would have to be both ends of one TLS session.
+On a Unix-socket link it is keyed on a shared secret (link_secret), which a
+multi-worker hub generates for its workers. Neither side trusts the other until
+both directions have been verified.
 
   context  = "uhub-link-v2 " || role || " " || client_nonce || " " || server_nonce
   response = base32( HMAC-SHA256( secret, context )[0:24] )
@@ -148,9 +182,9 @@ peer_nonce)), uhub 0.7.0 - 0.8.0) let a peer without the secret complete the
 handshake by reflecting the hub's own challenge. There is no fallback: every
 hub and worker in a cluster must run a version with the v2 handshake.
 
-The handshake authenticates the peer only. Over TLS the traffic that follows
-is encrypted and integrity-protected; without it -- a hub with tls_enable off
--- it is neither. See "Security" for what the handshake does not cover.
+On a TCP link the traffic that follows is encrypted and integrity-protected
+by the same TLS session the keys were checked in. A Unix-socket link is
+neither; it is protected by the socket's file permissions.
 
 
 == Command reference ==
@@ -265,7 +299,7 @@ loser leases from it.
 A pending winner (node_id = -1 that wins) claims window 0 for itself at
 election time, then grants the other windows. This lets an entire cluster come
 up with NO node designated as coordinator: give every node node_id = -1,
-node_count = N and a shared link_secret, and they elect among themselves.
+node_count = N and its peers' link keys, and they elect among themselves.
 
 A node that has already leased its window is a member from then on: it never
 coordinates, even when it wins a later election, and it ignores a window
@@ -404,8 +438,11 @@ Relevant uhub.conf options:
   link_peer      Peer(s) to connect to, comma-separated. Each is either a
                  host:port (TCP) or a path beginning with "/" (Unix socket).
                  When set, the node links out on start-up. Empty = accept only.
-  link_secret    Shared secret for the mutual challenge-response. Must match on
-                 both ends. Empty disables linking.
+  link_keys      Link keys of the peers this node links with over TCP, comma-
+                 separated. Checked in both directions. Empty = no TCP links.
+                 TCP links also need tls_enable.
+  link_secret    Shared secret for Unix-socket links only. Must match on both
+                 ends; a multi-worker hub sets its own.
   link_socket    Unix socket path to also accept links on (for same-host
                  worker links). Must be short (sun_path is ~108 bytes).
   node_count     Number of windows the SID space is divided into (cluster size,
@@ -437,30 +474,26 @@ for the accounts. No node is less trusted than another, and a node you would
 not trust with that does not belong in the cluster. What keeps others out is
 the link credential and who can reach the port links arrive on.
 
-That credential is a shared secret today, with the weaknesses of a shared
-password: one secret for the whole cluster, no per-node identity, no rotation
-or revocation, and it sits in every node's config file. It also gives away an
-offline guess: anyone who can reach the hub's port can send a challenge and
-receive the hub's answer to it, so a weak link_secret can be cracked without
-further contact. Use a long random one.
+Over TCP that credential is the node's key pair: each node pins its peers'
+public keys (link_keys), and both ends of a link prove they hold the private
+key for a pinned one in the TLS handshake. That gives each node an identity of
+its own, and revocation -- remove a key from the others' link_keys -- with
+nothing secret shared between nodes or sent on the wire; a stranger who can
+reach the port is refused before it is sent anything to work on. The link
+handshake that follows is bound to the TLS session, so it cannot be relayed
+between two hubs by someone in the middle. Keep each node's private key as
+private as its accounts: a node's key is the node.
 
-Over TLS (see "Transport and detection") link traffic is encrypted and
-integrity-protected, but the handshake is not bound to the TLS session: an
-attacker in the middle could run one TLS session with each hub and relay the
-handshake between them. Run links over a network you trust until links
-authenticate with keys.
-
-The planned replacement (see TODO): links authenticate with each hub's own
-certificate on both sides, and every node pins its peers' public keys, as in
-WireGuard. That gives per-node identity and revocation with nothing secret on
-the wire or shared between nodes.
+Unix-socket links (the worker mesh of one machine) still use a shared secret,
+generated per run by the master for its workers, and the socket's file
+permissions.
 
 
 == Status and limitations ==
 
 Implemented and tested (two nodes / star-to-a-coordinator, and multi-process):
   - probe-based link detection and the mutual LCHA/LRES/LACK handshake, over
-    TCP (TLS when tls_enable is set) or a Unix socket
+    TCP (TLS with pinned link keys on both ends) or a Unix socket
   - static and dynamic SID partitioning; window leasing (LWRQ/LWIN)
   - coordinator election (LELC)
   - roster snapshot and live join/update/quit deltas (LINF/LQUI)
@@ -487,6 +520,5 @@ Not yet implemented:
   - Reconnect/backoff: a failed outbound link is attempted once.
   - Cluster-wide nick/CID collision precedence (the propagation-window race),
     and aggregate hub counts across nodes.
-  - mutual-TLS / certificate-pinned link authentication.
 
 See the source in src/core/link.c and src/core/probe.c.

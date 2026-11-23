@@ -23,7 +23,7 @@ set -u
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$SCRIPT_DIR/../.." && pwd)
 BUILD=${BUILD:-$REPO/build}
-PORT=${1:-51071}
+PORT=${1:-51101}
 
 UHUB=$BUILD/uhub
 ADC=$BUILD/adc_cmd

@@ -51,6 +51,12 @@ the configuration files.
 .BI \^\-S
 Show all non-default configuration parameters.
 .TP
+.BI \^\-K
+Print this hub's link key \- the SHA256 fingerprint of its TLS certificate's
+public key, which the hubs it links with list in link_keys \- and return.
+Reads the configured certificate, or the one the hub keeps in its state
+directory; creates nothing.
+.TP
 .BI \^\-h
 Show the help message.
 .TP

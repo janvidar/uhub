@@ -7,10 +7,14 @@ Incompatible changes (action required beyond replacing the binaries):
 - As in 0.8.1, an auth plugin with "exclusive" set refuses nicks it does not
   hold; that refusal also beats mod_guest_passwd, so a hub combining the two
   admits no guests. Remove "exclusive" to keep admitting guests.
-- Hub linking: a hub with tls_enable (the default) now dials its peers over
-  TLS and refuses plain-text links on its port. Every node in a cluster needs
-  the same tls_enable setting, and the nodes must be upgraded together.
-  Unix-socket links between workers are unchanged. See doc/linking.txt.
+- Hub linking over TCP authenticates with pinned keys instead of link_secret.
+  Links run over TLS only (plain-text links are refused, and a hub with TLS
+  off makes none); each end presents the hub's own certificate, and requires
+  the other's public key to be listed in the new link_keys option. Give every
+  node its peers' link keys -- each hub logs its own at startup, and "uhub -K"
+  prints it -- and upgrade the nodes together. link_secret is now used only by
+  Unix-socket links, which a multi-worker hub sets up itself. See
+  doc/linking.txt.
 - Hub linking: a user a peer announces with a SID from this hub's own window
   is refused, with an error in the log. This catches two nodes sharing a
   node_id; a cluster linked with node_count = 1, which the hub already warned
@@ -104,6 +108,12 @@ New features:
   file: a quoted empty value ("") is accepted as the empty string, and
   server_alt_ports, redirect_addr and tls_require_redirect_addr no longer carry
   a validation pattern that rejected their own default.
+- link_keys and "uhub -K": hub links pin each peer's public key, WireGuard
+  style -- a per-node identity that a certificate renewal on the same key
+  keeps, revoked by removing it from the other nodes. The link handshake is
+  keyed on the TLS session, so it can no longer be relayed by someone in the
+  middle, and a stranger who reaches the port gets nothing to guess the link
+  credential from offline.
 - chat_timestamps: turns the hub-stamped TS on relayed chat off, also for
   chat arriving over a link. On by default.
 - mod_users: operator account management from inside the hub. !useradd,

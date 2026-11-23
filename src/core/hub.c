@@ -1197,11 +1197,62 @@ static int load_ssl_certificates(struct hub_info* hub, struct hub_config* config
 				hub->tls_keyprint = hub_strdup(keyprint);
 			else
 				LOG_WARN("Unable to compute TLS certificate keyprint; adcs:// URLs will omit ?kp=.");
+
+			/* Hub links authenticate both ends by certificate: ask every
+			   connection on the port for one, without requiring it. ADC
+			   clients and browsers offer none, and nothing but link_accept()
+			   looks at one that is offered. The same context presents our
+			   certificate when we dial a peer. */
+			if (!net_ssl_context_request_peer_cert(hub->ctx))
+			{
+				LOG_ERROR("Unable to set up client certificate requests for hub links.");
+				return 0;
+			}
+			if (net_ssl_get_link_key(hub->ctx, keyprint, sizeof(keyprint)))
+			{
+				hub->tls_link_key = hub_strdup(keyprint);
+				LOG_INFO("Link key (for peers' link_keys): %s", keyprint);
+			}
 			return 1;
 		}
 		return 0;
 	}
 	return 1;
+}
+
+int hub_print_link_key(struct hub_config* config)
+{
+	int managed = !*config->tls_certificate && !*config->tls_private_key;
+	const char* cert = managed ? UHUB_DEFAULT_TLS_CERT : config->tls_certificate;
+	struct ssl_context_handle* ctx;
+	char key[80];
+	int ok;
+
+	if (!*cert)
+	{
+		fprintf(stderr, "tls_certificate is not set.\n");
+		return 1;
+	}
+	if (access(cert, R_OK) != 0)
+	{
+		if (managed)
+			fprintf(stderr, "No certificate in %s yet: the hub creates one when it first starts with TLS on.\n", cert);
+		else
+			fprintf(stderr, "Unable to read %s: %s\n", cert, strerror(errno));
+		return 1;
+	}
+
+	ctx = net_ssl_context_create(config->tls_version, config->tls_ciphersuite, config->tls_ciphersuites);
+	ok = ctx && ssl_load_certificate(ctx, cert) && net_ssl_get_link_key(ctx, key, sizeof(key));
+	if (ctx)
+		net_ssl_context_destroy(ctx);
+	if (!ok)
+	{
+		fprintf(stderr, "Unable to read a certificate from %s\n", cert);
+		return 1;
+	}
+	fprintf(stdout, "%s\n", key);
+	return 0;
 }
 
 static void unload_ssl_certificates(struct hub_info* hub)
@@ -1210,6 +1261,8 @@ static void unload_ssl_certificates(struct hub_info* hub)
 		net_ssl_context_destroy(hub->ctx);
 	hub_free(hub->tls_keyprint);
 	hub->tls_keyprint = NULL;
+	hub_free(hub->tls_link_key);
+	hub->tls_link_key = NULL;
 }
 
 static void hub_init_secret(struct hub_info* hub) {

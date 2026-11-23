@@ -19,7 +19,6 @@ REPO=$(cd "$SCRIPT_DIR/../.." && pwd)
 BUILD=${BUILD:-$REPO/build}
 PA=${1:-52141}
 PB=${2:-52142}
-SECRET="link-stress-secret"
 
 UHUB=$BUILD/uhub
 CRUSH=$BUILD/adcrush
@@ -28,6 +27,8 @@ for f in "$UHUB" "$CRUSH"; do
 done
 
 DIR=$(mktemp -d)
+. "$SCRIPT_DIR/link_tls.sh"
+link_tls_setup "$DIR"
 PIDS=()
 cleanup() { for p in "${PIDS[@]:-}"; do [ -n "$p" ] && kill "$p" 2>/dev/null; done; wait 2>/dev/null; rm -rf "$DIR"; }
 trap cleanup EXIT
@@ -38,16 +39,14 @@ export UBSAN_OPTIONS="halt_on_error=1:print_stacktrace=1"
 cat > "$DIR/hub_a.conf" <<EOF
 server_port = $PA
 server_bind_addr = 127.0.0.1
-tls_enable = 0
-link_secret = $SECRET
+$(link_tls_conf a)
 node_count = 2
 node_id = 0
 EOF
 cat > "$DIR/hub_b.conf" <<EOF
 server_port = $PB
 server_bind_addr = 127.0.0.1
-tls_enable = 0
-link_secret = $SECRET
+$(link_tls_conf b)
 node_count = 2
 node_id = 1
 link_peer = 127.0.0.1:$PA

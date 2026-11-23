@@ -196,7 +196,10 @@
 	<option name="link_peer" type="string" default="">
 		<short>Upstream hub to link to (host:port)</short>
 		<description><![CDATA[
-			Address (host:port) of an upstream hub to establish a persistent link to. Empty disables outbound linking.
+			Address (host:port) of an upstream hub to establish a persistent link to, or a comma-separated
+			list of them. Empty disables outbound linking. A TCP link runs over TLS and needs the peer's
+			link key in link_keys; a peer beginning with "/" is a Unix socket (see link_socket), which
+			authenticates with link_secret instead.
 		]]></description>
 		<example><![CDATA[
 			link_peer = hub2.example.org:1512
@@ -205,12 +208,36 @@
 	</option>
 
 	<option name="link_secret" type="string" default="">
-		<short>Shared secret authenticating hub-to-hub links</short>
+		<short>Shared secret authenticating Unix-socket hub links</short>
 		<description><![CDATA[
-			Shared secret that both ends of a link must hold. Links authenticate by proving knowledge of
-			this secret via a nonce challenge-response; the secret itself is never sent over the wire.
+			Shared secret that both ends of a Unix-socket link (link_socket) must hold. Such links
+			authenticate by proving knowledge of it via a nonce challenge-response; the secret itself is
+			never sent. TCP links do not use it: they authenticate with pinned keys (link_keys). A
+			multi-worker hub generates its own.
 		]]></description>
 		<since>0.7.0</since>
+	</option>
+
+	<option name="link_keys" type="string" default="">
+		<check regexp="[A-Za-z0-9/, ]*" />
+		<short>Link keys of the hubs allowed to link with this one over TCP</short>
+		<description><![CDATA[
+			<p>
+			Comma-separated list of the link keys ("SHA256/..." fingerprints of a hub's public key) of
+			the peers this hub links with over TCP. Both directions are checked: a hub that dials this one
+			must present a certificate whose key is listed, and a hub this one dials must answer with
+			one. Each hub prints its own link key at startup ("Link key: ..."). It is the key, not the
+			certificate, that is pinned, so renewing a certificate on the same key keeps links up.
+			</p>
+			<p>
+			TCP links need TLS (tls_enable) on both ends. With this empty, this hub neither accepts nor
+			makes TCP links.
+			</p>
+		]]></description>
+		<example><![CDATA[
+			link_keys = SHA256/7LTBHRI6DRARELTAMUCE3MXHGRZQRZHCIKYE4GHP4S3GV4LETMZQ
+		]]></example>
+		<since>0.9.0</since>
 	</option>
 
 	<option name="auth_proxy" type="boolean" default="0">

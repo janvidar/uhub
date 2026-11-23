@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include "system.h"
@@ -163,6 +164,10 @@ static void lt_peer_close(void)
 }
 
 EXO_SETUP({
+	/* A link closes its end of a socketpair on refusing a peer, and the
+	   test's TLS end then writes its close-notify into it; the hub ignores
+	   SIGPIPE in main(), and so must the tests. */
+	signal(SIGPIPE, SIG_IGN);
 	if (!test_net_acquire())
 		return 0;
 	lt_hub = (struct hub_info*) hub_malloc_zero(sizeof(struct hub_info));
@@ -1831,17 +1836,55 @@ struct lt_tls
 
 static struct lt_tls lt_t;
 
-/* Contexts and a connected socketpair; neither end has started TLS. */
-static int lt_tls_open(void)
+/* A second certificate, made for the test, whose key is in no link_keys. */
+static char lt_alt_dir[64];
+static char lt_alt_cert[96];
+static char lt_alt_key[96];
+
+static int lt_alt_make(void)
+{
+	snprintf(lt_alt_dir, sizeof(lt_alt_dir), "/tmp/uhub-linktest-XXXXXX");
+	if (!mkdtemp(lt_alt_dir))
+		return 0;
+	snprintf(lt_alt_cert, sizeof(lt_alt_cert), "%s/cert.pem", lt_alt_dir);
+	snprintf(lt_alt_key, sizeof(lt_alt_key), "%s/key.pem", lt_alt_dir);
+	return net_ssl_certificate_create(lt_alt_cert, lt_alt_key, "uhub-linktest");
+}
+
+static void lt_alt_remove(void)
+{
+	if (!*lt_alt_dir)
+		return;
+	unlink(lt_alt_cert);
+	unlink(lt_alt_key);
+	rmdir(lt_alt_dir);
+	lt_alt_dir[0] = 0;
+}
+
+/* A context that asks its peer for a certificate, as the hub's does, and
+   presents cert/key when they are given. */
+static struct ssl_context_handle* lt_tls_ctx(const char* cert, const char* key)
+{
+	struct ssl_context_handle* ctx = net_ssl_context_create("1.2", "DEFAULT", "");
+	if (!ctx || !net_ssl_context_request_peer_cert(ctx))
+		return ctx;
+	if (cert && (ssl_load_certificate(ctx, cert) != 1 || ssl_load_private_key(ctx, key) != 1))
+	{
+		net_ssl_context_destroy(ctx);
+		return NULL;
+	}
+	return ctx;
+}
+
+/* Contexts and a connected socketpair; neither end has started TLS. The
+   server presents server_cert, the client client_cert (NULL: none). */
+static int lt_tls_open_with(const char* server_cert, const char* server_key, const char* client_cert, const char* client_key)
 {
 	int sv[2];
 	memset(&lt_t, 0, sizeof(lt_t));
-	lt_t.server_ctx = net_ssl_context_create("1.2", "DEFAULT", "");
-	lt_t.client_ctx = net_ssl_context_create("1.2", "DEFAULT", "");
-	if (!lt_t.server_ctx || !lt_t.client_ctx
-		|| ssl_load_certificate(lt_t.server_ctx, LT_TLS_CERT) != 1
-		|| ssl_load_private_key(lt_t.server_ctx, LT_TLS_KEY) != 1
-		|| socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0)
+	lt_t.server_ctx = lt_tls_ctx(server_cert, server_key);
+	lt_t.client_ctx = lt_tls_ctx(client_cert, client_key);
+	if (!lt_t.server_ctx || !lt_t.client_ctx || socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0)
 		return 0;
 	net_set_nonblocking(sv[0], 1);
 	net_set_nonblocking(sv[1], 1);
@@ -1855,10 +1898,22 @@ static int lt_tls_open(void)
 	return 1;
 }
 
+/* Pin the link key of the certificate in ctx. */
+static int lt_tls_pin(struct ssl_context_handle* ctx)
+{
+	char key[80];
+	if (!net_ssl_get_link_key(ctx, key, sizeof(key)))
+		return 0;
+	hub_free(lt_hub->config->link_keys);
+	lt_hub->config->link_keys = hub_strdup(key);
+	return 1;
+}
+
 /* The link's end is closed by the link (link_stop) once it owns it. */
 static void lt_tls_close(int link_owns_its_end)
 {
 	link_stop(lt_hub);
+	lt_hub->ctx = NULL;
 	if (lt_t.con)
 		net_con_close(lt_t.con);
 	if (lt_t.link_con && !link_owns_its_end)
@@ -1868,6 +1923,8 @@ static void lt_tls_close(int link_owns_its_end)
 	if (lt_t.client_ctx)
 		net_ssl_context_destroy(lt_t.client_ctx);
 	memset(&lt_t, 0, sizeof(lt_t));
+	lt_alt_remove();
+	lt_hub->config->tls_enable = 0;
 }
 
 /* Run both ends' events a few times: handshakes, then whatever the link sends.
@@ -1891,31 +1948,45 @@ static void lt_tls_pump(void)
 	}
 }
 
-/* An LCHA from a peer that connected over TLS sits in the TLS buffer once the
-   probe has peeked at it, where no read event will announce it. The link reads
-   it straight away and answers. */
-EXO_TEST(link_tls_accepted_reads_buffered_challenge, {
+/* The handshake key both ends of this TLS session derive. */
+static int lt_tls_secret(char out[LINK_TLS_SECRET_LEN + 1])
+{
+	unsigned char bytes[LINK_TLS_SECRET_LEN / 2];
+	size_t i;
+	if (!net_ssl_export_keying_material(lt_t.con, LINK_TLS_EXPORTER_LABEL, bytes, sizeof(bytes)))
+		return 0;
+	for (i = 0; i < sizeof(bytes); i++)
+		snprintf(out + 2 * i, 3, "%02x", bytes[i]);
+	return 1;
+}
+
+/* The test dials the hub's port over TLS presenting client_cert, and sends
+   LCHA once the probe would have seen it. Returns whether link_accept() took
+   the connection; what the link sent back is in lt_t.in. */
+static int lt_tls_accept(const char* client_cert, const char* client_key, int pin_client)
+{
 	struct ip_addr_encap addr;
 	char peek[8];
 	int i;
-	int ok = 0;
-	int owned = 0;
-	lt_fresh();
+	int owned;
 	lt_hub->config->tls_enable = 1;
 	ip_convert_to_binary("127.0.0.1", &addr);
-	if (!lt_tls_open())
-		goto done;
+	if (!lt_tls_open_with(LT_TLS_CERT, LT_TLS_KEY, client_cert, client_key))
+		return 0;
+	lt_hub->ctx = lt_t.server_ctx;
+	if (pin_client && !lt_tls_pin(lt_t.client_ctx))
+		return 0;
 	net_con_ssl_handshake(lt_t.link_con, net_con_ssl_mode_server, lt_t.server_ctx);
 	net_con_ssl_handshake(lt_t.con, net_con_ssl_mode_client, lt_t.client_ctx);
 	lt_tls_pump();
 	if (!lt_t.end.connected || !lt_t.link_end.connected)
-		goto done;
+		return 0;
 	net_con_send(lt_t.con, "LCHA " LT_CLIENT_NONCE "\n", 5 + LINK_NONCE_LEN + 1);
 	for (i = 0; i < 50 && net_con_peek(lt_t.link_con, peek, 4) < 4; i++)
 		;                             /* what probe.c does to classify it */
 	owned = link_accept(lt_hub, lt_t.link_con, &addr);
 	if (!owned)
-		goto done;
+		return 0;
 	/* Only the test's end runs from here: the link has to have answered
 	   already, without another event of its own. */
 	for (i = 0; i < 50; i++)
@@ -1929,12 +2000,8 @@ EXO_TEST(link_tls_accepted_reads_buffered_challenge, {
 			lt_t.in[lt_t.inlen] = 0;
 		}
 	}
-	ok = strstr(lt_t.in, "LCHA ") && strstr(lt_t.in, "\nLRES ");
-done:
-	lt_tls_close(owned);
-	lt_hub->config->tls_enable = 0;
-	return ok;
-});
+	return owned;
+}
 
 /* The first line the test received that starts with prefix; the rest of it
    (without the newline) goes to out. */
@@ -1966,22 +2033,95 @@ static void lt_tls_send(const char* line)
 	lt_tls_pump();
 }
 
-/* A hub with tls_enable dials its peers over TLS: the first bytes on the wire
-   are a TLS record, not "LCHA", and the whole link handshake runs inside it. */
+/* A peer that dials in presenting a pinned key gets the handshake, keyed on
+   the TLS session, not on link_secret. Its LCHA sits in the TLS buffer once
+   the probe has peeked at it, where no read event will announce it: the link
+   reads it straight away and answers. */
+EXO_TEST(link_tls_accepted_pinned_key, {
+	char resp[LINK_AUTH_RESPONSE_LEN + 8];
+	char server_nonce[LINK_NONCE_LEN + 8];
+	char secret[LINK_TLS_SECRET_LEN + 1];
+	char expect[LINK_AUTH_RESPONSE_LEN + 1];
+	char with_secret[LINK_AUTH_RESPONSE_LEN + 1];
+	int ok = 0;
+	int owned;
+	lt_fresh();
+	owned = lt_tls_accept(LT_TLS_CERT, LT_TLS_KEY, 1);
+	if (!owned || !lt_tls_find("LCHA ", server_nonce, sizeof(server_nonce))
+		|| !lt_tls_find("LRES ", resp, sizeof(resp)) || !lt_tls_secret(secret))
+		goto done;
+	link_auth_response(secret, LT_CLIENT_NONCE, server_nonce, 0, expect);
+	link_auth_response(LT_SECRET, LT_CLIENT_NONCE, server_nonce, 0, with_secret);
+	ok = !strcmp(resp, expect) && strcmp(resp, with_secret);
+done:
+	lt_tls_close(owned);
+	return ok;
+});
+
+/* A peer that presents no certificate is refused before a word is said. */
+EXO_TEST(link_tls_accepted_without_cert_refused, {
+	int owned;
+	int ok;
+	lt_fresh();
+	hub_free(lt_hub->config->link_keys);
+	lt_hub->config->link_keys = hub_strdup("SHA256/7LTBHRI6DRARELTAMUCE3MXHGRZQRZHCIKYE4GHP4S3GV4LETMZQ");
+	owned = lt_tls_accept(NULL, NULL, 0);
+	ok = owned && !strstr(lt_t.in, "LCHA") && !strstr(lt_t.in, "LRES");
+	lt_tls_close(owned);
+	return ok;
+});
+
+/* ... and so is one whose key is not pinned. */
+EXO_TEST(link_tls_accepted_unpinned_key_refused, {
+	int owned = 0;
+	int ok = 0;
+	lt_fresh();
+	if (!lt_alt_make())
+		goto done;
+	hub_free(lt_hub->config->link_keys);
+	lt_hub->config->link_keys = hub_strdup("SHA256/7LTBHRI6DRARELTAMUCE3MXHGRZQRZHCIKYE4GHP4S3GV4LETMZQ");
+	owned = lt_tls_accept(lt_alt_cert, lt_alt_key, 0);
+	ok = owned && !strstr(lt_t.in, "LCHA") && !strstr(lt_t.in, "LRES");
+done:
+	lt_tls_close(owned);
+	return ok;
+});
+
+/* With no link_keys there are no TCP links at all. */
+EXO_TEST(link_tls_accepted_without_link_keys_refused, {
+	int owned;
+	int ok;
+	lt_fresh();
+	owned = lt_tls_accept(LT_TLS_CERT, LT_TLS_KEY, 0);
+	ok = !owned && !strstr(lt_t.in, "LCHA");
+	lt_tls_close(owned);
+	return ok;
+});
+
+/* The hub dials a peer: the first bytes on the wire are a TLS record, not
+   "LCHA"; the hub presents its certificate; and once the peer's key checks
+   out the whole link handshake runs inside the session, keyed on it. */
 EXO_TEST(link_tls_dialled_over_tls, {
 	char raw[1];
 	char client_nonce[LINK_NONCE_LEN + 8];
 	char resp[LINK_AUTH_RESPONSE_LEN + 8];
 	char expect[LINK_AUTH_RESPONSE_LEN + 1];
+	char secret[LINK_TLS_SECRET_LEN + 1];
 	char line[128];
+	char hub_key[80];
+	char seen_key[80];
 	int i;
 	int ok = 0;
 	int owned = 0;
 	lt_fresh();
 	lt_hub->config->tls_enable = 1;
-	if (!lt_tls_open())
+	/* The test is the accepting peer, with a key of its own; the hub has
+	   the test certificate. */
+	if (!lt_alt_make() || !lt_tls_open_with(lt_alt_cert, lt_alt_key, LT_TLS_CERT, LT_TLS_KEY)
+		|| !lt_tls_pin(lt_t.server_ctx))
 		goto done;
-	owned = link_adopt(lt_hub, lt_t.link_con, 1, "test-peer");
+	lt_hub->ctx = lt_t.client_ctx;
+	owned = link_dial_adopt(lt_hub, lt_t.link_con, "test-peer");
 	if (!owned)
 		goto done;
 	for (i = 0; i < 50 && recv(lt_t.raw_fd, raw, 1, MSG_PEEK) != 1; i++)
@@ -1990,22 +2130,78 @@ EXO_TEST(link_tls_dialled_over_tls, {
 		goto done;
 	net_con_ssl_handshake(lt_t.con, net_con_ssl_mode_server, lt_t.server_ctx);
 	lt_tls_pump();
-	if (!lt_tls_find("LCHA ", client_nonce, sizeof(client_nonce)))
+	if (!net_ssl_get_link_key(lt_t.client_ctx, hub_key, sizeof(hub_key))
+		|| !net_ssl_get_peer_link_key(lt_t.con, seen_key, sizeof(seen_key))
+		|| strcmp(hub_key, seen_key))
+		goto done;                    /* the hub presented its certificate */
+	if (!lt_tls_find("LCHA ", client_nonce, sizeof(client_nonce)) || !lt_tls_secret(secret))
 		goto done;
 	snprintf(line, sizeof(line), "LCHA %s\n", LT_PEER_NONCE);
 	lt_tls_send(line);
-	link_auth_response(LT_SECRET, client_nonce, LT_PEER_NONCE, 1, expect);
+	link_auth_response(secret, client_nonce, LT_PEER_NONCE, 1, expect);
 	if (!lt_tls_find("LRES ", resp, sizeof(resp)) || strcmp(resp, expect))
 		goto done;
-	link_auth_response(LT_SECRET, client_nonce, LT_PEER_NONCE, 0, resp);
+	link_auth_response(secret, client_nonce, LT_PEER_NONCE, 0, resp);
 	snprintf(line, sizeof(line), "LRES %s\n", resp);
 	lt_tls_send(line);
 	lt_tls_send("LACK\n");
 	ok = lt_tls_find("LACK", line, sizeof(line)) && lt_tls_find("LELC ", line, sizeof(line));
 done:
 	lt_tls_close(owned);
-	lt_hub->config->tls_enable = 0;
 	return ok;
+});
+
+/* A dialled peer whose key is not pinned gets no LCHA. */
+EXO_TEST(link_tls_dialled_unpinned_peer_refused, {
+	int i;
+	int ok = 0;
+	int owned = 0;
+	lt_fresh();
+	lt_hub->config->tls_enable = 1;
+	if (!lt_alt_make() || !lt_tls_open_with(lt_alt_cert, lt_alt_key, LT_TLS_CERT, LT_TLS_KEY)
+		|| !lt_tls_pin(lt_t.client_ctx))   /* pins the hub's own key, not the peer's */
+		goto done;
+	lt_hub->ctx = lt_t.client_ctx;
+	owned = link_dial_adopt(lt_hub, lt_t.link_con, "test-peer");
+	if (!owned)
+		goto done;
+	for (i = 0; i < 5; i++)
+		net_con_callback(lt_t.link_con, NET_EVENT_READ);
+	net_con_ssl_handshake(lt_t.con, net_con_ssl_mode_server, lt_t.server_ctx);
+	lt_tls_pump();
+	ok = !strstr(lt_t.in, "LCHA");
+done:
+	lt_tls_close(owned);
+	return ok;
+});
+
+/* A hub with TLS off makes no TCP links. */
+EXO_TEST(link_tls_dial_without_tls_refused, {
+	int sv[2];
+	struct net_connection* con;
+	char buf[16];
+	int ok;
+	lt_fresh();
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0)
+		return 0;
+	net_set_nonblocking(sv[1], 1);
+	con = net_con_create();
+	net_con_initialize(con, sv[0], NULL, NULL, 0);
+	link_dial_adopt(lt_hub, con, "test-peer");
+	ok = read(sv[1], buf, sizeof(buf)) <= 0;
+	link_stop(lt_hub);
+	close(sv[1]);
+	return ok;
+});
+
+/* link_keys is a comma-separated list; spaces are allowed, case is not
+   significant, and a keyprint must match whole. */
+EXO_TEST(link_key_pinned_list, {
+	const char* keys = "SHA256/AAAA, sha256/bbbb ,SHA256/CCCC";
+	return link_key_pinned(keys, "SHA256/AAAA") && link_key_pinned(keys, "SHA256/BBBB")
+		&& link_key_pinned(keys, "SHA256/cccc") && !link_key_pinned(keys, "SHA256/AAA")
+		&& !link_key_pinned(keys, "SHA256/DDDD") && !link_key_pinned("", "SHA256/AAAA")
+		&& !link_key_pinned(keys, "") && !link_key_pinned(NULL, "SHA256/AAAA");
 });
 
 /* Offer link_accept() a plain-text connection; return what it said, and
@@ -2036,8 +2232,8 @@ static int lt_accept_plain(int* answered)
 	return taken;
 }
 
-/* A hub with tls_enable dials its peers over TLS and takes nothing else from
-   them: a plain-text link is refused before the hub says a word. */
+/* Links run over TLS and take nothing else: a plain-text link on the port is
+   refused before the hub says a word. */
 EXO_TEST(link_plaintext_refused_on_tls_hub, {
 	int answered;
 	int taken;
@@ -2048,9 +2244,9 @@ EXO_TEST(link_plaintext_refused_on_tls_hub, {
 	return taken == 0 && !answered;
 });
 
-/* Without tls_enable, plain text is all there is. */
-EXO_TEST(link_plaintext_accepted_without_tls, {
+/* ... and a hub without TLS takes no TCP links at all. */
+EXO_TEST(link_plaintext_refused_without_tls, {
 	int answered;
 	lt_fresh();
-	return lt_accept_plain(&answered) == 1 && answered;
+	return lt_accept_plain(&answered) == 0 && !answered;
 });

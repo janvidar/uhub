@@ -49,6 +49,7 @@ static int arg_verbose = 5;
 static int arg_fork    = 0;
 static int arg_check_config = 0;
 static int arg_dump_config  = 0;
+static int arg_link_key     = 0;
 static int arg_have_config = 0;
 static const char* arg_uid = 0;
 static const char* arg_gid = 0;
@@ -547,6 +548,7 @@ void print_usage(char* program)
 		"   -C          Check configuration and return\n"
 		"   -s          Show configuration parameters\n"
 		"   -S          Show configuration parameters, but ignore defaults\n"
+		"   -K          Print this hub's link key (for peers' link_keys) and return\n"
 		"   -h          This message\n"
 #ifndef WIN32
 #ifdef SYSTEMD
@@ -568,7 +570,7 @@ void print_usage(char* program)
 void parse_command_line(int argc, char** argv)
 {
 	int opt;
-	while ((opt = getopt(argc, argv, "vqfc:l:hu:g:VCsSLp:")) != -1)
+	while ((opt = getopt(argc, argv, "vqfc:l:hu:g:VCsSKLp:")) != -1)
 	{
 		switch (opt)
 		{
@@ -606,6 +608,10 @@ void parse_command_line(int argc, char** argv)
 			case 'S':
 				arg_dump_config = 2;
 				arg_check_config = 1;
+				break;
+
+			case 'K':
+				arg_link_key = 1;
 				break;
 
 			case 'l':
@@ -823,6 +829,16 @@ int main(int argc, char** argv)
 	if (arg_check_config)
 	{
 		return check_configuration(arg_dump_config);
+	}
+
+	if (arg_link_key)
+	{
+		struct hub_config configuration;
+		if (load_configuration(&configuration, !arg_have_config) == -1)
+			return 1;
+		ret = hub_print_link_key(&configuration);
+		free_config(&configuration);
+		return ret;
 	}
 
 #ifndef WIN32

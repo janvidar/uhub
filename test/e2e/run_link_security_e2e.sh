@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
 #
 # End-to-end checks that the hub-to-hub link cannot be joined or driven by
-# someone who does not hold the link secret. Two hubs: A, the master and
-# cluster coordinator, and S, an auth_proxy slave that links to it.
+# someone whose key the hub has not pinned. Two hubs: A, the master and
+# cluster coordinator, and S, an auth_proxy slave that links to it, each
+# listing the other's link key in link_keys.
 #
-#  1. A and S establish their link (the handshake works between real hubs).
-#  2. A peer that echoes A's own challenge back is refused (issue #127).
-#  3. A peer that plays A's own answer back to it is refused (issue #127).
+#  1. A and S establish their link (TLS with pinned keys, between real hubs).
+#  2. A plain-text link attempt is refused before A says a word.
+#  3. A TLS link attempt without a certificate, or with one whose key A has
+#     not pinned, gets no challenge -- so the reflection attacks of issue
+#     #127 have nothing to reflect.
 #  4. A nick with an embedded newline, given to the slave, cannot inject a
 #     command into its master link (issue #128): the injected LBAN never
 #     reaches A, so the nick it names can still log in there.
 #
-# The reflection scenarios speak the link protocol directly over bash's
-# /dev/tcp, since no real hub would send those lines.
+# Scenario 2 speaks the link protocol over bash's /dev/tcp, scenario 3 over
+# openssl s_client, since no real hub would send those lines.
 #
 # Usage:  BUILD=/path/to/build  test/e2e/run_link_security_e2e.sh  [portA] [portS]
 #
@@ -25,7 +28,6 @@ PA=${1:-51031}
 PS=${2:-51032}
 HUBA="adc://127.0.0.1:$PA"
 HUBS="adc://127.0.0.1:$PS"
-SECRET="e2e-link-secret"
 NONCE="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 CID="GNSSMURMD7K466NGZIHU65TP3S3UZSQ6MN5B2RI"
 
@@ -39,6 +41,8 @@ done
 [ -f "$BUILD/mod_auth_sqlite.so" ] || { echo "MISSING: $BUILD/mod_auth_sqlite.so"; exit 2; }
 
 DIR=$(mktemp -d)
+. "$SCRIPT_DIR/link_tls.sh"
+link_tls_setup "$DIR"
 HUB_PIDS=()
 pass=0; fail=0
 
@@ -109,8 +113,7 @@ cat > "$DIR/hub_a.conf" <<EOF
 server_port = $PA
 server_bind_addr = 127.0.0.1
 file_plugins = $DIR/plugins_a.conf
-tls_enable = 0
-link_secret = $SECRET
+$(link_tls_conf a)
 node_count = 2
 node_id = 0
 EOF
@@ -120,8 +123,7 @@ server_port = $PS
 server_bind_addr = 127.0.0.1
 file_plugins = $DIR/plugins_s.conf
 plugin_defaults = no
-tls_enable = 0
-link_secret = $SECRET
+$(link_tls_conf b)
 node_count = 2
 node_id = 1
 link_peer = 127.0.0.1:$PA
@@ -139,51 +141,47 @@ else
 fi
 BASE=$(established_count)
 
-# --- 2: echo A's own challenge back at it ---
+# --- 2: a plain-text link attempt ---
 exec 3<>"/dev/tcp/127.0.0.1/$PA"
 printf 'LCHA %s\n' "$NONCE" >&3
 read_lines
-CHAL=$(line_value "LCHA ") || CHAL=""
-if [ -z "$CHAL" ]; then
-	bad "A did not challenge a link peer"
+if [ "$EOF" = 1 ] && ! line_value "LCHA " >/dev/null && ! line_value "LRES " >/dev/null; then
+	ok "a plain-text link attempt is disconnected unanswered"
 else
-	# A answered our first challenge already; now ask it to answer its own.
-	printf 'LCHA %s\n' "$CHAL" >&3
-	read_lines
-	if [ "$EOF" = 1 ] && ! line_value "LRES " >/dev/null; then
-		ok "a peer echoing A's own challenge is disconnected unanswered"
-	else
-		bad "A answered its own challenge (lines: ${LINES[*]:-none}, eof $EOF)"
-		# Finish the attack, so the check below sees whether it worked.
-		ANSWER=$(line_value "LRES ") && printf 'LRES %s\nLACK\n' "$ANSWER" >&3
-		read_lines
-	fi
+	bad "A answered a plain-text link (lines: ${LINES[*]:-none}, eof $EOF)"
 fi
 exec 3>&- 3<&-
 
-# --- 3: play A's own answer back to it ---
-exec 3<>"/dev/tcp/127.0.0.1/$PA"
-printf 'LCHA %s\n' "$NONCE" >&3
-read_lines
-RESP=$(line_value "LRES ") || RESP=""
-if [ -z "$RESP" ]; then
-	bad "A did not answer a link peer's challenge"
+# --- 3: TLS without a pinned key ---
+# tls_link_try [cert key]: what A says to an LCHA over TLS.
+tls_link_try() {
+	local args=()
+	[ $# -eq 2 ] && args=(-cert "$1" -key "$2")
+	printf 'LCHA %s\n' "$NONCE" | timeout 3 openssl s_client -connect "127.0.0.1:$PA" -quiet "${args[@]}" 2>/dev/null
+}
+if ! tls_link_try | grep -q "^LCHA \|^LRES "; then
+	ok "a TLS link attempt without a certificate gets no challenge"
 else
-	printf 'LRES %s\nLACK\n' "$RESP" >&3
-	read_lines
-	if [ "$EOF" = 1 ] && line_value "LERR" >/dev/null && ! line_value "LACK" >/dev/null; then
-		ok "a peer replaying A's own answer is refused (LERR)"
-	else
-		bad "A accepted its own answer (lines: ${LINES[*]:-none}, eof $EOF)"
-	fi
+	bad "A challenged a link peer with no certificate"
 fi
-exec 3>&- 3<&-
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+	-keyout "$DIR/stranger-key.pem" -out "$DIR/stranger-cert.pem" -days 2 -subj /CN=stranger >/dev/null 2>&1
+if ! tls_link_try "$DIR/stranger-cert.pem" "$DIR/stranger-key.pem" | grep -q "^LCHA \|^LRES "; then
+	ok "a TLS link attempt with an unpinned key gets no challenge"
+else
+	bad "A challenged a link peer whose key it has not pinned"
+fi
+if wait_for "is not in link_keys" "$DIR/hubA.log" 10 && wait_for "presented no certificate" "$DIR/hubA.log" 10; then
+	ok "A logs why it refused each"
+else
+	bad "no refusal reason in $DIR/hubA.log"
+fi
 
 sleep 0.3
 if [ "$(established_count)" = "$BASE" ]; then
-	ok "no link was established by either reflection attempt"
+	ok "no link was established by any refused attempt"
 else
-	bad "a reflection attempt established a link (see $DIR/hubA.log)"
+	bad "a refused attempt established a link (see $DIR/hubA.log)"
 fi
 
 # --- 4: a newline in a nick given to the slave ---
