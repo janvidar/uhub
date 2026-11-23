@@ -79,11 +79,6 @@ TLS 1.3 is always offered -- openssl.c sets a minimum version only. Keep it so.
   semantics -- so test/e2e/run_windows_wine_e2e.sh (zig + wine, not in CI) is
   the runtime check; the CI windows job only starts uhub.exe.
 
-## Cleanup
-- Branch sprawl: 27 local and 34 remote branches, mostly unmerged historical
-  topic branches (gnutls_work, libevent_work, visual_studio_2010_work, ...).
-  Tag-then-delete historical work; delete locals that only mirror origin.
-
 ## Resolved since the 0.6.1 assessment (ASSESSMENT.md)
 ASSESSMENT.md is pinned to 0.6.1 and is stale on these points:
 - Version drift — CMakeLists.txt, build.zig and build.zig.zon now agree.
