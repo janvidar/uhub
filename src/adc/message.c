@@ -39,35 +39,6 @@
 #define ADC_MSG_ASSERT(X) do { } while(0)
 #endif /* DEBUG */
 
-#ifdef MSG_MEMORY_DEBUG
-#undef msg_malloc
-#undef msg_malloc_zero
-#undef msg_free
-
-static void* msg_malloc(size_t size)
-{
-	void* ptr = valloc(size);
-	LOG_MEMORY("msg_malloc: %p %d", ptr, (int) size);
-	return ptr;
-}
-
-static void* msg_malloc_zero(size_t size)
-{
-	void* ptr = msg_malloc(size);
-	memset(ptr, 0, size);
-	return ptr;
-}
-
-static void msg_free(void* ptr)
-{
-	LOG_MEMORY("msg_free:   %p", ptr);
-	hub_free(ptr);
-}
-#else
-#define msg_malloc(X)       hub_malloc(X)
-#define msg_malloc_zero(X)  hub_malloc_zero(X)
-#define msg_free(X)         hub_free(X)
-#endif /* MSG_MEMORY_DEBUG */
 
 static int msg_check_escapes(const char* string, size_t len)
 {
@@ -101,9 +72,6 @@ struct adc_message* adc_msg_incref(struct adc_message* msg)
 {
 #ifndef ADC_MESSAGE_INCREF
 	msg->references++;
-#ifdef MSG_MEMORY_DEBUG
-	adc_msg_protect(msg);
-#endif
 	return msg;
 #else
 	struct adc_message* copy = adc_msg_copy(msg);
@@ -130,14 +98,14 @@ static int adc_msg_grow(struct adc_message* msg, size_t size)
 	newsize = size + 2; /* size + termination */
 	newsize += (sizeof(size_t) - newsize) % sizeof(size_t); /* alignment padding */
 
-	buf = msg_malloc_zero(newsize);
+	buf = hub_malloc_zero(newsize);
 	if (!buf)
 		return 0;
 
 	if (msg->cache)
 	{
 		memcpy(buf, msg->cache, msg->length);
-		msg_free(msg->cache);
+		hub_free(msg->cache);
 	}
 
 	msg->cache = buf;
@@ -242,7 +210,7 @@ void adc_msg_free(struct adc_message* msg)
 			*msg->cache = 0;
 		}
 #endif
-		msg_free(msg->cache);
+		hub_free(msg->cache);
 
 		if (msg->feature_cast_include)
 		{
@@ -258,7 +226,7 @@ void adc_msg_free(struct adc_message* msg)
 			msg->feature_cast_exclude = 0;
 		}
 
-		msg_free(msg);
+		hub_free(msg);
 	}
 }
 
@@ -266,7 +234,7 @@ void adc_msg_free(struct adc_message* msg)
 struct adc_message* adc_msg_copy(const struct adc_message* cmd)
 {
 	char* tmp = 0;
-	struct adc_message* copy = (struct adc_message*) msg_malloc_zero(sizeof(struct adc_message));
+	struct adc_message* copy = (struct adc_message*) hub_malloc_zero(sizeof(struct adc_message));
 	if (!copy) return NULL; /* OOM */
 
 	ADC_MSG_ASSERT(cmd);
@@ -371,7 +339,7 @@ static struct adc_message* adc_msg_parse_ex(const char* line, size_t length, int
 	if (length < 4)
 		return NULL;
 
-	command = (struct adc_message*) msg_malloc_zero(sizeof(struct adc_message));
+	command = (struct adc_message*) hub_malloc_zero(sizeof(struct adc_message));
 	if (command == NULL)
 		return NULL; /* OOM */
 
@@ -380,14 +348,14 @@ static struct adc_message* adc_msg_parse_ex(const char* line, size_t length, int
 	if (!is_printable_utf8(line, length))
 	{
 		LOG_DEBUG("Dropped message with non-printable UTF-8 characters.");
-		msg_free(command);
+		hub_free(command);
 		return NULL;
 	}
 
 	if (!msg_check_escapes(line, length))
 	{
 		LOG_DEBUG("Dropped message with invalid ADC escape.");
-		msg_free(command);
+		hub_free(command);
 		return NULL;
 	}
 
@@ -398,7 +366,7 @@ static struct adc_message* adc_msg_parse_ex(const char* line, size_t length, int
 
 	if (!adc_msg_grow(command, length + need_terminate))
 	{
-		msg_free(command);
+		hub_free(command);
 		return NULL; /* OOM */
 	}
 
@@ -482,8 +450,8 @@ static struct adc_message* adc_msg_parse_ex(const char* line, size_t length, int
 				{
 					list_destroy(command->feature_cast_include);
 					list_destroy(command->feature_cast_exclude);
-					msg_free(command->cache);
-					msg_free(command);
+					hub_free(command->cache);
+					hub_free(command);
 					return NULL; /* OOM */
 				}
 
@@ -643,13 +611,13 @@ struct adc_message* adc_msg_construct_source_dest(fourcc_t fourcc, sid_t source,
 
 struct adc_message* adc_msg_construct(fourcc_t fourcc, size_t size)
 {
-	struct adc_message* msg = (struct adc_message*) msg_malloc_zero(sizeof(struct adc_message));
+	struct adc_message* msg = (struct adc_message*) hub_malloc_zero(sizeof(struct adc_message));
 	if (!msg)
 		return NULL; /* OOM */
 
 	if (!adc_msg_grow(msg, sizeof(fourcc) + size + 1))
 	{
-		msg_free(msg);
+		hub_free(msg);
 		return NULL; /* OOM */
 	}
 
@@ -1092,7 +1060,7 @@ size_t adc_msg_unescape_length(const char* str)
 char* adc_msg_unescape(const char* string)
 {
 	size_t dstlen = adc_msg_unescape_length(string) + 1;
-	char* new_string = msg_malloc(dstlen);
+	char* new_string = hub_malloc(dstlen);
 	if (!new_string)
 		return NULL;
 	char* ptr = (char*) new_string;

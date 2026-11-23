@@ -69,11 +69,9 @@ enum log_verbosity {
 
 #ifdef LOWLEVEL_DEBUG
 # define LOG_DUMP(format, ...)   hub_log(log_dump,     format __VA_OPT__(,) __VA_ARGS__)
-# define LOG_MEMORY(format, ...) hub_log(log_memory,   format __VA_OPT__(,) __VA_ARGS__)
 # define LOG_PROTO(format, ...)  hub_log(log_protocol, format __VA_OPT__(,) __VA_ARGS__)
 #else
 # define LOG_DUMP(format, ...)   do { } while(0)
-# define LOG_MEMORY(format, ...) do { } while(0)
 # define LOG_PROTO(format, ...)  do { } while(0)
 #endif
 

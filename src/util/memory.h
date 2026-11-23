@@ -36,28 +36,11 @@
  */
 extern void hub_out_of_memory(size_t size) __attribute__((noreturn));
 
-#ifdef MEMORY_DEBUG
-
-#define hub_malloc     debug_mem_malloc
-#define hub_free       debug_mem_free
-#define hub_realloc    debug_mem_realloc
-#define hub_strdup     debug_mem_strdup
-#define hub_strndup    debug_mem_strndup
-extern void* debug_mem_malloc(size_t size);
-extern void  debug_mem_free(void* ptr);
-extern void* debug_mem_realloc(void* ptr, size_t size);
-extern char* debug_mem_strdup(const char* s);
-extern char* debug_mem_strndup(const char* s, size_t n);
-
-#else
-
 #define hub_free       free
 extern void* hub_malloc(size_t size);
 extern void* hub_realloc(void* ptr, size_t size);
 extern char* hub_strdup(const char* s);
 extern char* hub_strndup(const char* s, size_t n);
-
-#endif
 
 extern void* hub_malloc_zero(size_t size);
 
@@ -65,7 +48,7 @@ extern void* hub_malloc_zero(size_t size);
  * Free callback with a stable address and the exact void(*)(void*) signature
  * required by list_clear() / list_remove_first(). Use this instead of passing
  * the hub_free macro as a function pointer: hub_free is a macro, and its being
- * passable as a function pointer is an accident of how it currently expands.
+ * passable as a function pointer is an accident of how it expands.
  */
 extern void hub_free_handle(void* ptr);
 

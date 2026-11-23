@@ -37,11 +37,6 @@ static int use_syslog = 0;
 static int verbosity = 4;
 static FILE* logfile = NULL;
 
-#ifdef MEMORY_DEBUG
-static FILE* memfile = NULL;
-#define MEMORY_DEBUG_FILE "memlog.txt"
-#endif
-
 #ifdef NETWORK_DUMP_DEBUG
 #define NETWORK_DUMP_FILE "netdump.log"
 static FILE* netdump = NULL;
@@ -72,15 +67,6 @@ void hub_log_initialize(const char* file, int syslog)
 #endif
 
 	setlocale(LC_ALL, "C");
-
-#ifdef MEMORY_DEBUG
-	memfile = fopen(MEMORY_DEBUG_FILE, "w");
-	if (!memfile)
-	{
-		fprintf(stderr, "Unable to create " MEMORY_DEBUG_FILE " for logging memory allocations\n");
-		return;
-	}
-#endif
 
 #ifdef NETWORK_DUMP_DEBUG
 	netdump = fopen(NETWORK_DUMP_FILE, "w");
@@ -125,14 +111,6 @@ void hub_log_shutdown()
 		fclose(logfile);
 		logfile = NULL;
 	}
-
-#ifdef MEMORY_DEBUG
-	if (memfile)
-	{
-		fclose(memfile);
-		memfile = NULL;
-	}
-#endif
 
 #ifdef NETWORK_DUMP_DEBUG
 	if (netdump)
@@ -190,12 +168,8 @@ int hub_log_level_from_string(const char* name)
 
 int hub_log_enabled(int log_verbosity)
 {
-	/* These two are written to a file of their own whatever the verbosity is,
+	/* The protocol dump goes to a file of its own whatever the verbosity is,
 	   so a caller asking whether to bother formatting must hear yes. */
-#ifdef MEMORY_DEBUG
-	if (memfile && log_verbosity == log_memory)
-		return 1;
-#endif
 #ifdef NETWORK_DUMP_DEBUG
 	if (netdump && log_verbosity == log_protocol)
 		return 1;
@@ -227,18 +201,6 @@ void hub_log(int log_verbosity, const char *format, ...)
 	struct tm *tmp;
 	time_t t;
 	va_list args;
-
-#ifdef MEMORY_DEBUG
-	if (memfile && log_verbosity == log_memory)
-	{
-		va_start(args, format);
-		vsnprintf(logmsg, 1024, format, args);
-		va_end(args);
-		fprintf(memfile, "%s\n", logmsg);
-		fflush(memfile);
-		return;
-	}
-#endif
 
 #ifdef NETWORK_DUMP_DEBUG
 	if (netdump && log_verbosity == log_protocol)
