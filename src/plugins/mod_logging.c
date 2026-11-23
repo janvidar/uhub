@@ -77,9 +77,6 @@ static struct log_data* parse_config(const char* line, struct plugin_handle* plu
 	struct cfg_tokens* tokens = cfg_tokenize(line);
 	char* token = cfg_token_get_first(tokens);
 
-	if (!data)
-		return 0;
-
 	reset(data);
 
 	while (token)
@@ -90,12 +87,15 @@ static struct log_data* parse_config(const char* line, struct plugin_handle* plu
 		{
 			set_error_message(plugin, "Unable to parse startup parameters");
 			cfg_tokens_free(tokens);
+			hub_free(data->logfile);
 			hub_free(data);
 			return 0;
 		}
 
 		if (strcmp(cfg_settings_get_key(setting), "file") == 0)
 		{
+			/* The last file= wins; an earlier one is not leaked. */
+			hub_free(data->logfile);
 			data->logfile = hub_strdup(cfg_settings_get_value(setting));
 			data->logmode = mode_file;
 		}
@@ -114,6 +114,7 @@ static struct log_data* parse_config(const char* line, struct plugin_handle* plu
 			set_error_message(plugin, "Unknown startup parameters given");
 			cfg_tokens_free(tokens);
 			cfg_settings_free(setting);
+			hub_free(data->logfile);
 			hub_free(data);
 			return 0;
 		}
