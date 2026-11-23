@@ -1327,11 +1327,14 @@ struct hub_info* hub_start_service(struct hub_config* config)
 			LOG_INFO("Connect address: %s", url);
 	}
 
-	/* Plain text only on request: say so when it was asked for. */
+	/* Plain text only on request: say so when it was asked for, on every
+	   start, and that the request will stop working (TODO, phase 3). */
 	if (!config->tls_enable)
-		LOG_WARN("TLS is off: clients, their passwords and hub links travel in plain text.");
+		LOG_WARN("TLS is off: clients, their passwords and hub links travel in plain text. "
+			"tls_enable=no is deprecated and will be removed in a future release.");
 	else if (!config->tls_require)
-		LOG_WARN("TLS is optional (tls_require=no): clients may still connect in plain text.");
+		LOG_WARN("TLS is optional (tls_require=no): clients may still connect in plain text. "
+			"tls_require=no is deprecated and will be removed in a future release.");
 
 	/* The metrics endpoint checks its bearer token over whatever transport the
 	 * request arrives on. With TLS off, a scrape (token included) crosses the

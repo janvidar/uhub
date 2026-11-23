@@ -826,7 +826,8 @@
 	<option name="tls_enable" type="boolean" default="1">
 		<short>Enable SSL/TLS support</short>
 		<description><![CDATA[
-			Enables/disables TLS/SSL support. With neither tls_certificate nor tls_private_key set, the hub
+			Enables/disables TLS/SSL support. Turning it off is deprecated: the hub warns at every start,
+			and the option will be removed in a future release. With neither tls_certificate nor tls_private_key set, the hub
 			creates a self-signed certificate in its state directory on first start and keeps using it.
 			A hub with TLS enabled also links to its peers over TLS and refuses plain-text links, so every
 			node of a cluster needs the same setting.
@@ -840,7 +841,8 @@
 			With this on (the default), a client that connects in plain text (adc://) is
 			redirected to the hub's adcs:// address -- tls_require_redirect_addr, or the hub's
 			own -- and never logs in. Turn it off to also admit plain-text clients; the hub
-			warns at startup when it is off. While it is on, a self-signed certificate the hub
+			warns at every start when it is off. Turning it off is deprecated and will stop
+			working in a future release. While it is on, a self-signed certificate the hub
 			cannot create stops the hub from starting rather than letting it run without TLS.
 			This option has no effect unless tls_enable is enabled.
 		]]></description>

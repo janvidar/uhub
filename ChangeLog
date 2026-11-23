@@ -41,7 +41,8 @@ Incompatible changes (action required beyond replacing the binaries):
   tls_require_redirect_addr if set, otherwise the hub's own address with its
   certificate keyprint, taken from hub_address or from the address the client
   reached -- and does not log in. Set tls_require=0 to admit plaintext clients
-  as well; the hub warns at startup when TLS is optional or off.
+  as well; the hub warns at every start when TLS is optional or off, and that
+  both switches are deprecated and will be removed in a future release.
 - While TLS is required, a self-signed certificate the hub cannot create stops
   it from starting; before, it warned and ran in plain text. With tls_require
   off it still falls back, with the warning.

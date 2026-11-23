@@ -40,6 +40,8 @@ keyed on a TLS exporter value, binding it to the session; link_secret is left
 to Unix-socket (worker) links. The plain-TCP link path is gone.
 
 Phase 3 -- remove the off switches:
+- Until then, the hub warns on every start that tls_enable=no or
+  tls_require=no is deprecated and will be removed (hub_start_service).
 - Retire tls_enable and tls_require; the probe refuses plain ADC and plain
   HTTP (metrics on localhost excepted). A plain ADC client still gets its
   one-line redirect to adcs://, the only plain text the hub sends.
