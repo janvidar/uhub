@@ -317,6 +317,8 @@ void uman_send_quit_message(struct hub_info* hub, struct hub_user_manager* users
 {
 	(void) users;
 	struct adc_message* command = adc_msg_construct(ADC_CMD_IQUI, 6);
+	if (!command)
+		return; /* OOM */
 	adc_msg_add_argument(command, (const char*) sid_to_string(leaving->id.sid));
 
 	if (leaving->quit_reason == quit_banned || leaving->quit_reason == quit_kicked)

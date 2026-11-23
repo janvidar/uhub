@@ -190,6 +190,12 @@ void send_message(struct command_base* cbase, struct hub_user* user, struct cbuf
 		return;
 	}
 	command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
+	if (!command)
+	{
+		hub_free(buffer);
+		cbuf_destroy(buf);
+		return;
+	}
 	adc_msg_add_argument(command, buffer);
 	route_to_user(cbase->hub, user, command);
 	adc_msg_free(command);
@@ -221,6 +227,12 @@ static void send_rich_message(struct command_base* cbase, struct hub_user* user,
 		return;
 	}
 	command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 10);
+	if (!command)
+	{
+		hub_free(buffer);
+		cbuf_destroy(buf);
+		return;
+	}
 	adc_msg_add_argument(command, buffer);
 	adc_msg_add_named_argument(command, ADC_MSG_FLAG_RICH_TEXT, "1");
 	route_to_user(cbase->hub, user, command);

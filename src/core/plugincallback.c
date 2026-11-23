@@ -135,6 +135,11 @@ static int cbfunc_send_message(struct plugin_handle* plugin, struct plugin_user*
 	if (!buffer)
 		return 0;
 	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
+	if (!command)
+	{
+		hub_free(buffer);
+		return 0;
+	}
 	adc_msg_add_argument(command, buffer);
 	route_to_user(plugin_get_hub(plugin), as_hub_user(user), command);
 	adc_msg_free(command);
@@ -168,6 +173,11 @@ static int cbfunc_send_rich_message(struct plugin_handle* plugin, struct plugin_
 	if (!buffer)
 		return 0;
 	command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 10);
+	if (!command)
+	{
+		hub_free(buffer);
+		return 0;
+	}
 	adc_msg_add_argument(command, buffer);
 	adc_msg_add_named_argument(command, ADC_MSG_FLAG_RICH_TEXT, "1");
 	route_to_user(hub, as_hub_user(user), command);
@@ -185,6 +195,11 @@ static int cbfunc_send_broadcast(struct plugin_handle* plugin, const char* messa
 	if (!buffer)
 		return 0;
 	struct adc_message* command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
+	if (!command)
+	{
+		hub_free(buffer);
+		return 0;
+	}
 	adc_msg_add_argument(command, buffer);
 	route_to_all(plugin_get_hub(plugin), command);
 	adc_msg_free(command);
@@ -208,6 +223,11 @@ static int cbfunc_send_chat(struct plugin_handle* plugin, enum auth_credentials 
 	if (!buffer)
 		return 0;
 	command = adc_msg_construct(ADC_CMD_IMSG, strlen(buffer) + 6);
+	if (!command)
+	{
+		hub_free(buffer);
+		return 0;
+	}
 	adc_msg_add_argument(command, buffer);
 	LIST_FOREACH_SAFE(struct hub_user*, user, hub->users->list, cursor,
 	{
@@ -233,6 +253,11 @@ static int cbfunc_send_status(struct plugin_handle* plugin, struct plugin_user* 
 	if (!buffer)
 		return 0;
 	struct adc_message* command = adc_msg_construct(ADC_CMD_ISTA, strlen(buffer) + 10);
+	if (!command)
+	{
+		hub_free(buffer);
+		return 0;
+	}
 	snprintf(code_str, sizeof(code_str), "%03d", code);
 	adc_msg_add_argument(command, code_str);
 	adc_msg_add_argument(command, buffer);
@@ -259,6 +284,11 @@ static int cbfunc_send_user_command(struct plugin_handle* plugin, struct plugin_
 	if (!esc_name)
 		return 0;
 	struct adc_message* msg = adc_msg_construct(ADC_CMD_ICMD, strlen(esc_name) + (command ? strlen(command) : 0) + 32);
+	if (!msg)
+	{
+		hub_free(esc_name);
+		return 0;
+	}
 	adc_msg_add_argument(msg, esc_name);                 /* positional: menu name (submenus split by '/') */
 	if (command)
 	{
@@ -726,10 +756,12 @@ static void cbfunc_set_hub_name(struct plugin_handle* plugin, const char* str)
 
 	// Broadcast hub name
 	command = adc_msg_construct(ADC_CMD_IINF, (strlen(new_str) + 8));
-	adc_msg_add_named_argument(command, ADC_INF_FLAG_NICK, new_str);
-	route_to_all(hub, command);
-
-	adc_msg_free(command);
+	if (command)
+	{
+		adc_msg_add_named_argument(command, ADC_INF_FLAG_NICK, new_str);
+		route_to_all(hub, command);
+		adc_msg_free(command);
+	}
 	hub_free(new_str);
 }
 

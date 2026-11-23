@@ -1704,6 +1704,8 @@ static void ADC_client_send_password(struct ADC_client* client, const char* chal
 	response[MAX_CID_LEN] = 0;
 
 	hpas = adc_msg_construct(ADC_CMD_HPAS, MAX_CID_LEN + 8);
+	if (!hpas)
+		return; /* OOM */
 	adc_msg_add_argument(hpas, response);
 	ADC_client_set_state(client, ps_verify);
 	ADC_client_send(client, hpas);
