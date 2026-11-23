@@ -5,7 +5,7 @@ const std = @import("std");
 const version_major = 0;
 const version_minor = 9;
 const version_patch = 0;
-const version_pre = "dev"; // "" for a release
+const version_pre = ""; // "" for a release
 const version_string = std.fmt.comptimePrint("{d}.{d}.{d}{s}{s}", .{
     version_major, version_minor, version_patch,
     if (version_pre.len > 0) "-" else "", version_pre,

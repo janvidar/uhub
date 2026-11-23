@@ -20,7 +20,7 @@ set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # numbers, so the label lives here; build.zig (version_pre) and build.zig.zon
 # must carry the same one, and the release workflow refuses a tag it does not
 # match -- a "dev" build can never be published as a release.
-set (UHUB_VERSION_PRERELEASE "dev")
+set (UHUB_VERSION_PRERELEASE "")
 if (UHUB_VERSION_PRERELEASE)
 	set (UHUB_VERSION_STRING "${PROJECT_VERSION}-${UHUB_VERSION_PRERELEASE}")
 else()

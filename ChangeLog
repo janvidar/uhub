@@ -1,4 +1,4 @@
-Unreleased:
+0.9.0:
 Incompatible changes (action required beyond replacing the binaries):
 - Plugins must be rebuilt against plugin API 9 (minimum 9). struct
   plugin_funcs gained auth_list_users, which moves the hub function table that
