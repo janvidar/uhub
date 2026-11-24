@@ -141,6 +141,27 @@ New features:
   hub.get_user_by_nick, and an auth_list_users storage callback, implemented by
   mod_auth_sqlite and mod_auth_simple.
 
+Security:
+- #131: a client could send broadcasts, private messages and INFs as the hub
+  itself: the source-SID check was skipped for "AAAA", the hub's reserved SID,
+  which parses to 0. Affects all releases.
+- #134: !kick, !redirect and !ban only refused acting on oneself, so an
+  operator could kick, redirect or ban (cluster-wide, persistently) an admin
+  or a fellow operator. They now act only on lower ranks; a user on a linked
+  hub is ranked by the CT flag its hub set. Affects !kick since 0.3.0, !ban
+  since 0.7.0, !redirect since 0.7.1.
+- #135: hub-list registration over https:// did not verify the server's
+  certificate, so anyone on the path could take the announce. It is now
+  checked against the system trust store and the URL's host. Affects 0.7.0 -
+  0.8.2 (which also allowed http://).
+- #132: mod_users let an operator create a ubot account, and a super an
+  opubot one, or take over an existing one: unrestricted levels that may send
+  as any user. Only an admin may now give out or manage them. Not in any
+  release.
+- #133: links now authenticate by pinned key with the handshake bound to the
+  TLS session (see the incompatible changes); 0.7.0 - 0.8.2 linked in plain
+  text.
+
 Fixes:
 - mod_welcome: a motd or rules text ending in a lone "%" made the formatter
   read past the end of the string.
