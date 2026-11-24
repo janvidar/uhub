@@ -473,6 +473,55 @@ static int command_uptime(struct command_base* cbase, struct hub_user* user, str
 	return command_status(cbase, user, cmd, buf);
 }
 
+/*
+ * A user's rank, for deciding who may act on whom. A local user's is their
+ * credential. A remote user, learned over a hub link, holds none on this hub;
+ * their own hub states their rank in the CT flag of their INF (4 operator,
+ * 8 super, 16 owner), and a linked peer is trusted to say so.
+ */
+static enum auth_credentials command_user_rank(struct hub_user* u)
+{
+	char* ct;
+	int flags;
+
+	if (!u->origin_link)
+		return u->credentials;
+
+	ct = adc_msg_get_named_argument(u->info, ADC_INF_FLAG_CLIENT_TYPE);
+	flags = ct ? uhub_atoi(ct) : 0;
+	hub_free(ct);
+	if (flags & 16)
+		return auth_cred_admin;
+	if (flags & 8)
+		return auth_cred_super;
+	if (flags & 4)
+		return auth_cred_operator;
+	if (flags & 2)
+		return auth_cred_user;
+	return auth_cred_guest;
+}
+
+/*
+ * !kick, !redirect and !ban act on someone else. Not on oneself, and not on
+ * anyone of equal or higher rank (#134): an operator could otherwise ban an
+ * admin -- cluster-wide, and persistently -- or kick another operator. This
+ * is the rule mod_users applies to accounts. On refusal the reason is in buf.
+ */
+int command_may_act_on(struct hub_user* user, struct hub_user* target, const char* verb, struct cbuffer* buf)
+{
+	if (target == user)
+	{
+		cbuf_append_format(buf, "Cannot %s yourself.", verb);
+		return 0;
+	}
+	if (command_user_rank(target) >= user->credentials)
+	{
+		cbuf_append_format(buf, "Cannot %s \"%s\": they are of your rank or above.", verb, target->id.nick);
+		return 0;
+	}
+	return 1;
+}
+
 static int command_kick(struct command_base* cbase, struct hub_user* user, struct hub_command* cmd)
 {
 	struct cbuffer* buf;
@@ -482,11 +531,7 @@ static int command_kick(struct command_base* cbase, struct hub_user* user, struc
 	const char* reason = reason_arg ? reason_arg->data.string : NULL;
 
 	buf = cbuf_create(128);
-	if (target == user)
-	{
-		cbuf_append(buf, "Cannot kick yourself.");
-	}
-	else
+	if (command_may_act_on(user, target, "kick", buf))
 	{
 		/* Only the user being kicked hears why: by the time the hub tells
 		   everyone else they are gone, the connection is already closed. The
@@ -642,10 +687,8 @@ static int command_redirect(struct command_base* cbase, struct hub_user* user, s
 	struct hub_user* target = arg_user->data.user;
 	const char* address = arg_addr->data.string;
 
-	if (target == user)
-	{
-		cbuf_append(buf, "Cannot redirect yourself.");
-	}
+	if (!command_may_act_on(user, target, "redirect", buf))
+		; /* the reason is in buf */
 	else if (!command_redirect_valid_address(address))
 	{
 		cbuf_append_format(buf, "Invalid redirect address \"%s\". Expected adcs://host:port, optionally followed by /?kp=<keyprint>.", address);
@@ -684,11 +727,7 @@ static int command_ban(struct command_base* cbase, struct hub_user* user, struct
 	if (seconds > 0)
 		expiry = time(NULL) + seconds;
 
-	if (target == user)
-	{
-		cbuf_append(buf, "Cannot ban yourself.");
-	}
-	else
+	if (command_may_act_on(user, target, "ban", buf))
 	{
 		if (expiry)
 			cbuf_append_format(buf, "Banning user \"%s\" for %d seconds.", target->id.nick, seconds);

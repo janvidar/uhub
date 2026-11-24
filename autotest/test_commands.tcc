@@ -2,6 +2,7 @@
 #include "core/commands.h"
 #include "core/hub.h"
 #include "core/usermanager.h"
+#include "util/cbuffer.h"
 
 static struct hub_info* hub = NULL;
 static struct hub_command* cmd = NULL;
@@ -303,6 +304,59 @@ EXO_TEST(command_redirect_addr_path,         { return command_redirect_valid_add
 EXO_TEST(command_redirect_addr_plain,        { return command_redirect_valid_address("justtext") == 0; });
 EXO_TEST(command_redirect_addr_empty,        { return command_redirect_valid_address("") == 0; });
 #undef RD_KP
+
+/* #134: !kick, !redirect and !ban act only on someone ranked below the
+   caller. Local users rank by credential; a remote user by the CT flag their
+   own hub put in their INF. */
+static int may_act(enum auth_credentials actor_cred, enum auth_credentials target_cred, const char* remote_ct)
+{
+	struct hub_user actor;
+	struct hub_user target;
+	struct cbuffer* buf = cbuf_create(64);
+	int ok;
+	memset(&actor, 0, sizeof(actor));
+	memset(&target, 0, sizeof(target));
+	strcpy(actor.id.nick, "actor");
+	strcpy(target.id.nick, "target");
+	actor.credentials = actor_cred;
+	target.credentials = target_cred;
+	if (remote_ct)
+	{
+		char inf[64];
+		snprintf(inf, sizeof(inf), "BINF AAAC NItarget%s%s", *remote_ct ? " CT" : "", remote_ct);
+		target.info = adc_msg_create(inf);
+		target.origin_link = (struct hub_link*) &target; /* any non-NULL link: remote */
+	}
+	ok = command_may_act_on(&actor, &target, "kick", buf);
+	adc_msg_free(target.info);
+	cbuf_destroy(buf);
+	return ok;
+}
+
+EXO_TEST(command_rank_operator_on_user,      { return may_act(auth_cred_operator, auth_cred_user, NULL) == 1; });
+EXO_TEST(command_rank_operator_on_operator,  { return may_act(auth_cred_operator, auth_cred_operator, NULL) == 0; });
+EXO_TEST(command_rank_operator_on_super,     { return may_act(auth_cred_operator, auth_cred_super, NULL) == 0; });
+EXO_TEST(command_rank_operator_on_admin,     { return may_act(auth_cred_operator, auth_cred_admin, NULL) == 0; });
+EXO_TEST(command_rank_super_on_operator,     { return may_act(auth_cred_super, auth_cred_operator, NULL) == 1; });
+EXO_TEST(command_rank_admin_on_super,        { return may_act(auth_cred_admin, auth_cred_super, NULL) == 1; });
+EXO_TEST(command_rank_admin_on_admin,        { return may_act(auth_cred_admin, auth_cred_admin, NULL) == 0; });
+EXO_TEST(command_rank_remote_admin,          { return may_act(auth_cred_super, auth_cred_none, "20") == 0; });
+EXO_TEST(command_rank_remote_super,          { return may_act(auth_cred_operator, auth_cred_none, "12") == 0; });
+EXO_TEST(command_rank_remote_operator,       { return may_act(auth_cred_operator, auth_cred_none, "4") == 0
+                                                   && may_act(auth_cred_super, auth_cred_none, "4") == 1; });
+EXO_TEST(command_rank_remote_user,           { return may_act(auth_cred_operator, auth_cred_none, "2") == 1; });
+EXO_TEST(command_rank_remote_guest,          { return may_act(auth_cred_operator, auth_cred_none, "") == 1; });
+
+EXO_TEST(command_rank_not_self, {
+	struct hub_user u;
+	struct cbuffer* buf = cbuf_create(64);
+	int ok;
+	memset(&u, 0, sizeof(u));
+	u.credentials = auth_cred_admin;
+	ok = command_may_act_on(&u, &u, "ban", buf) == 0 && strstr(cbuf_get(buf), "yourself") != NULL;
+	cbuf_destroy(buf);
+	return ok;
+});
 
 /* !kick takes "u?+m": a user, then an optional reason that keeps its spaces. */
 static int kick_spec_parse(const char* line, const char* expected_reason)

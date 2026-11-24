@@ -119,6 +119,14 @@ int command_is_available(struct command_handle* handle, enum auth_credentials cr
 int command_redirect_valid_address(const char* addr);
 
 /**
+ * Whether @p user may !kick, !redirect or !ban @p target: not themselves, and
+ * only someone ranked below them (a remote user ranked by the CT flag their
+ * own hub gave them). On refusal the reason is appended to @p buf. Exposed
+ * for testing.
+ */
+int command_may_act_on(struct hub_user* user, struct hub_user* target, const char* verb, struct cbuffer* buf);
+
+/**
  * Lookup a command handle based on prefix.
  * If no matching command handle is found then NULL is returned.
  */
