@@ -522,6 +522,93 @@ EXO_TEST(mu_userpass_refuses_higher, {
 	return !strcmp(mu_find_account("Admin")->password, "a");
 });
 
+/* ---- unrestricted levels (#132) ------------------------------------------- */
+
+/* ubot and opubot rank below operator and super by number, but may send as
+   any user and pass the flood limits, which no operator or super can. Only an
+   admin gives them out, or touches an account that holds one. */
+static int mu_useradd_as(struct mu_user* actor, enum auth_credentials cred)
+{
+	struct auth_info* a;
+	mu_arg_string("Dave");
+	mu_arg_string("secret");
+	mu_arg_cred(cred);
+	mu_run(actor, "useradd");
+	a = mu_find_account("Dave");
+	return a && a->credentials == cred;
+}
+
+EXO_TEST(mu_operator_cannot_create_ubot, {
+	if (!mu_reset())
+		return 0;
+	return !mu_useradd_as(&mu_op, auth_cred_ubot)
+		&& strstr(mu_op.sent, "Only an admin") != NULL;
+});
+
+EXO_TEST(mu_super_cannot_create_opubot_or_ubot, {
+	if (!mu_reset())
+		return 0;
+	if (mu_useradd_as(&mu_super, auth_cred_opubot))
+		return 0;
+	return !mu_useradd_as(&mu_super, auth_cred_ubot);
+});
+
+EXO_TEST(mu_admin_can_create_unrestricted, {
+	if (!mu_reset() || !mu_useradd_as(&mu_admin, auth_cred_ubot))
+		return 0;
+	mu_auth_delete_user(&mu_plugin, mu_find_account("Dave"));
+	return mu_useradd_as(&mu_admin, auth_cred_opubot);
+});
+
+/* Still possible below the operator: an ordinary bot. */
+EXO_TEST(mu_operator_can_create_bot, {
+	if (!mu_reset())
+		return 0;
+	return mu_useradd_as(&mu_op, auth_cred_bot);
+});
+
+EXO_TEST(mu_operator_cannot_promote_to_ubot, {
+	if (!mu_reset())
+		return 0;
+	mu_arg_string("Bob");
+	mu_arg_cred(auth_cred_ubot);
+	mu_run(&mu_op, "usermod");
+	return mu_find_account("Bob")->credentials == auth_cred_user;
+});
+
+/* Taking over an existing unrestricted account is the same escalation. */
+EXO_TEST(mu_operator_cannot_take_over_ubot, {
+	struct auth_info* a;
+	if (!mu_reset())
+		return 0;
+	mu_add_account("Relay", "r", auth_cred_ubot);
+	mu_arg_string("Relay");
+	mu_arg_string("mine-now");
+	mu_run(&mu_op, "userpass");
+	a = mu_find_account("Relay");
+	if (!a || strcmp(a->password, "r"))
+		return 0;
+	mu_arg_string("Relay");
+	mu_arg_cred(auth_cred_user);
+	mu_run(&mu_op, "usermod");
+	mu_arg_string("Relay");
+	mu_run(&mu_super, "userdel");
+	a = mu_find_account("Relay");
+	return a && a->credentials == auth_cred_ubot;
+});
+
+EXO_TEST(mu_admin_can_manage_ubot, {
+	struct auth_info* a;
+	if (!mu_reset())
+		return 0;
+	mu_add_account("Relay", "r", auth_cred_ubot);
+	mu_arg_string("Relay");
+	mu_arg_string("rotated");
+	mu_run(&mu_admin, "userpass");
+	a = mu_find_account("Relay");
+	return a && !strcmp(a->password, "rotated");
+});
+
 /* ---- !userlist ------------------------------------------------------------ */
 
 /* Highest level first, and never a password. */

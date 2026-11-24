@@ -29,7 +29,9 @@
  * One rule governs every command: an operator can only create, change or
  * delete accounts below their own level, and can only hand out levels below
  * it. That keeps a second account from being a way up, and keeps operators of
- * equal standing from removing each other. Accounts at or above an operator's
+ * equal standing from removing each other. The unrestricted levels (ubot,
+ * opubot) are admin-only whatever their number; see may_handle_level().
+ * Accounts at or above an operator's
  * own level -- their own included -- are managed with uhub-passwd, or by
  * someone ranked higher.
  */
@@ -37,6 +39,7 @@
 #include "plugin_api/command_api.h"
 #include "plugin_api/handle.h"
 #include "util/cbuffer.h"
+#include "util/credentials.h"
 #include "util/log.h"
 #include "util/memory.h"
 #include "util/misc.h"
@@ -92,6 +95,22 @@ static int grantable(enum auth_credentials cred)
 	}
 }
 
+/*
+ * Whether someone at level own may give out, or manage an account at, level
+ * cred. The levels are numbered, but the numbers are not the whole story:
+ * ubot and opubot rank below operator and super, yet they are unrestricted --
+ * they may send as any user and pass the flood limits -- which no operator or
+ * super has. Comparing the numbers alone let an operator mint one (#132). An
+ * unrestricted level is the admin's to hand out; anything else, a level below
+ * one's own.
+ */
+static int may_handle_level(enum auth_credentials own, enum auth_credentials cred)
+{
+	if (auth_cred_is_unrestricted(cred))
+		return own >= auth_cred_admin;
+	return cred < own;
+}
+
 static void reply(struct plugin_handle* plugin, struct plugin_user* user, struct cbuffer* buf)
 {
 	plugin->hub.send_message(plugin, user, cbuf_get(buf));
@@ -125,10 +144,14 @@ static int find_account(struct plugin_handle* plugin, struct plugin_user* actor,
 		return 0;
 	}
 
-	if (info->credentials >= own)
+	if (!may_handle_level(own, info->credentials))
 	{
-		cbuf_append_format(buf, "*** %s: \"%s\" is a %s account; you can only manage accounts below your own level.",
-			cmd->prefix, info->nickname, auth_cred_to_string(info->credentials));
+		if (auth_cred_is_unrestricted(info->credentials))
+			cbuf_append_format(buf, "*** %s: \"%s\" is a %s account, which only an admin can manage.",
+				cmd->prefix, info->nickname, auth_cred_to_string(info->credentials));
+		else
+			cbuf_append_format(buf, "*** %s: \"%s\" is a %s account; you can only manage accounts below your own level.",
+				cmd->prefix, info->nickname, auth_cred_to_string(info->credentials));
 		return 0;
 	}
 
@@ -146,10 +169,14 @@ static int check_grant(struct plugin_handle* plugin, struct plugin_user* actor, 
 		return 0;
 	}
 
-	if (cred >= own)
+	if (!may_handle_level(own, cred))
 	{
-		cbuf_append_format(buf, "*** %s: You can only give out levels below your own (%s).",
-			cmd->prefix, auth_cred_to_string(own));
+		if (auth_cred_is_unrestricted(cred))
+			cbuf_append_format(buf, "*** %s: Only an admin can give out the unrestricted level \"%s\".",
+				cmd->prefix, auth_cred_to_string(cred));
+		else
+			cbuf_append_format(buf, "*** %s: You can only give out levels below your own (%s).",
+				cmd->prefix, auth_cred_to_string(own));
 		return 0;
 	}
 
