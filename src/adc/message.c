@@ -171,6 +171,22 @@ static int adc_msg_cache_append(struct adc_message* msg, const char* string, siz
  * Excludes mandatory arguments for the given type of message
  * like source and target.
  */
+int adc_msg_has_source(const struct adc_message* msg)
+{
+	if (!msg || !msg->cache)
+		return 0;
+	switch (msg->cache[0])
+	{
+		case 'B':
+		case 'D':
+		case 'E':
+		case 'F':
+			return 1;
+		default:
+			return 0;
+	}
+}
+
 int adc_msg_get_arg_offset(struct adc_message* msg)
 {
 	if (!msg || !msg->cache)
@@ -318,7 +334,15 @@ struct adc_message* adc_msg_parse_verify(struct hub_user* u, const char* line, s
 	if (!command)
 		return 0;
 
-	if (command->source && (!u || (command->source != u->id.sid && !auth_cred_is_unrestricted(u->credentials))))
+	/* B, D, E and F messages always carry a source SID; the parser has
+	   already checked it is four base32 characters. Decide by the message
+	   type, not by the SID's value: "AAAA" parses to 0, which is the hub's
+	   own reserved SID, so testing the value would wave a message claiming
+	   to come from the hub straight through. No user holds SID 0, the
+	   unrestricted ones included. */
+	if (adc_msg_has_source(command) &&
+		(!u || command->source == 0 ||
+		 (command->source != u->id.sid && !auth_cred_is_unrestricted(u->credentials))))
 	{
 		LOG_DEBUG("Command does not match user's SID (command->source=%d, user->id.sid=%d)", command->source, (u ? u->id.sid : 0));
 		adc_msg_free(command);

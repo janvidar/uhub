@@ -1,6 +1,7 @@
 #include "util/memory.h"
 #include "adc/message.h"
 #include "core/user.h"
+#include "util/credentials.h"
 static struct hub_user* g_user = 0;
 static const char* test_string1 = "IINF AAfoo BBbar CCwhat\n";
 static const char* test_string2 = "BMSG AAAB Hello\\sWorld!\n";
@@ -48,6 +49,60 @@ EXO_TEST(adc_message_parse_3, {
 EXO_TEST(adc_message_parse_4, {
 	struct adc_message* msg = adc_msg_parse_verify(g_user, "BMSG AAAC Hello\\sWorld!", 23);
 	return msg == NULL;
+});
+
+/* #131: "AAAA" parses to SID 0, the hub's own. A message claiming it is
+   refused in every context that carries a source, whoever sends it. */
+static int spoof_hub_refused(const char* line)
+{
+	struct adc_message* msg = adc_msg_parse_verify(g_user, line, strlen(line));
+	adc_msg_free(msg);
+	return msg == NULL;
+}
+
+EXO_TEST(adc_message_hub_sid_spoof_b, { return spoof_hub_refused("BMSG AAAA Hello\n"); });
+EXO_TEST(adc_message_hub_sid_spoof_binf, { return spoof_hub_refused("BINF AAAA NIhub\n"); });
+EXO_TEST(adc_message_hub_sid_spoof_d, { return spoof_hub_refused("DMSG AAAA AAAB Hello\n"); });
+EXO_TEST(adc_message_hub_sid_spoof_e, { return spoof_hub_refused("EMSG AAAA AAAB Hello\n"); });
+EXO_TEST(adc_message_hub_sid_spoof_f, { return spoof_hub_refused("FSCH AAAA +TCP4 ANfoo\n"); });
+
+/* An unrestricted bot may speak for other users, but not for the hub. */
+EXO_TEST(adc_message_hub_sid_spoof_unrestricted, {
+	enum auth_credentials saved = g_user->credentials;
+	int ok;
+	g_user->credentials = auth_cred_ubot;
+	ok = spoof_hub_refused("BMSG AAAA Hello\n");
+	if (ok)
+	{
+		struct adc_message* other = adc_msg_parse_verify(g_user, "BMSG AAAC Hello\n", 16);
+		ok = other != NULL;
+		adc_msg_free(other);
+	}
+	g_user->credentials = saved;
+	return ok;
+});
+
+/* A user's own SID still goes through in every context. */
+EXO_TEST(adc_message_own_sid_all_contexts, {
+	const char* lines[] = { "BMSG AAAB Hello\n", "DMSG AAAB AAAC Hello\n",
+		"EMSG AAAB AAAC Hello\n", "FSCH AAAB +TCP4 ANfoo\n", NULL };
+	int i;
+	for (i = 0; lines[i]; i++)
+	{
+		struct adc_message* msg = adc_msg_parse_verify(g_user, lines[i], strlen(lines[i]));
+		if (!msg)
+			return 0;
+		adc_msg_free(msg);
+	}
+	return 1;
+});
+
+/* Contexts without a source (I, H) have nothing to check. */
+EXO_TEST(adc_message_no_source_context, {
+	struct adc_message* msg = adc_msg_parse_verify(g_user, "HSUP ADBASE\n", 12);
+	int ok = msg != NULL && !adc_msg_has_source(msg);
+	adc_msg_free(msg);
+	return ok;
 });
 
 EXO_TEST(adc_message_parse_5, {
