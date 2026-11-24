@@ -510,6 +510,19 @@ void regserver_announce(struct hub_info* hub)
 			regserver_finish(rs);
 			return;
 		}
+
+		/* Check who answers (#135): the system trust store, the URL's host
+		   against the certificate, and SNI. Unverified, anyone on the path
+		   could take the announce and put a hub of their own in the list
+		   under this one's name. If verification cannot even be set up, do
+		   not announce at all. */
+		if (!net_ssl_context_set_client_verify(rs->ssl_ctx, rs->url.host))
+		{
+			LOG_ERROR("regserver: cannot verify %s's certificate (no usable trust store?); hub not registered.",
+				rs->url.host);
+			regserver_finish(rs);
+			return;
+		}
 	}
 
 	LOG_INFO("regserver: announcing hub to %s://%s:%u%s",

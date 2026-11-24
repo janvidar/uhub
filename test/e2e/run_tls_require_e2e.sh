@@ -10,8 +10,9 @@
 #   3. tls_require = no admits plain-text clients again, with a startup warning;
 #   4. the metrics endpoint answers plain HTTP from loopback only, HTTPS from
 #      anywhere;
-#   5. plain-text redirect targets are refused in the configuration, and an
-#      http:// reg_server_url is refused at announce;
+#   5. plain-text redirect targets are refused in the configuration, an
+#      http:// reg_server_url is refused at announce, and an https:// one is
+#      announced to only if its certificate verifies;
 #   6. a hub that cannot create its certificate refuses to start (skipped when
 #      the compiled-in state directory happens to be writable).
 #
@@ -166,6 +167,50 @@ sleep 0.5
 if grep -q "refusing plain-text reg_server_url" "$DIR/regserver.log"; then
 	ok "http:// reg_server_url refused"; else bad "reg_server_url (see $DIR/regserver.log)"; fi
 stop_hub
+
+# The registration server's certificate is verified (#135): one that nothing
+# trusts gets no announce; once trusted (SSL_CERT_FILE), the POST goes through.
+REG=$((PORT + 1))
+if command -v openssl >/dev/null; then
+	openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+		-keyout "$DIR/reg-key.pem" -out "$DIR/reg-cert.pem" -days 2 -subj /CN=reg.test \
+		-addext "subjectAltName=IP:127.0.0.1" >/dev/null 2>&1
+	# reg_try LABEL [SSL_CERT_FILE]: run a hub that announces to a local
+	# s_server, logging to $DIR/LABEL.log.
+	reg_try() {
+		local label=$1 trust=${2:-}
+		timeout 6 openssl s_server -accept "$REG" -cert "$DIR/reg-cert.pem" -key "$DIR/reg-key.pem" \
+			-naccept 1 -quiet >/dev/null 2>&1 </dev/null &
+		local srv=$!
+		sleep 0.5
+		write_conf "$label" "reg_server_url = https://127.0.0.1:$REG/register" "hub_address = hub.example.org"
+		if [ -n "$trust" ]; then
+			SSL_CERT_FILE=$trust "$UHUB" -c "$DIR/$label.conf" >"$DIR/$label.log" 2>&1 &
+		else
+			"$UHUB" -c "$DIR/$label.conf" >"$DIR/$label.log" 2>&1 &
+		fi
+		HUB_PID=$!
+		sleep 2
+		stop_hub
+		kill "$srv" 2>/dev/null; wait "$srv" 2>/dev/null
+	}
+	# The hub's own log says whether the handshake verified: "dialled" only
+	# once it has, "certificate verify failed" when it has not.
+	reg_try reg_untrusted
+	if grep -q "certificate verify failed" "$DIR/reg_untrusted.log" && ! grep -q "dialled:" "$DIR/reg_untrusted.log"; then
+		ok "an untrusted registration server gets no announce"
+	else
+		bad "the hub talked to an unverified server (see $DIR/reg_untrusted.log)"
+	fi
+	reg_try reg_trusted "$DIR/reg-cert.pem"
+	if grep -q "dialled:" "$DIR/reg_trusted.log" && grep -q "response from 127.0.0.1:$REG" "$DIR/reg_trusted.log"; then
+		ok "a trusted registration server gets the announce"
+	else
+		bad "no announce to a trusted server (see $DIR/reg_trusted.log)"
+	fi
+else
+	skipped "openssl not found; registration certificate checks"
+fi
 
 # --- 6. no certificate, TLS required ----------------------------------------
 {

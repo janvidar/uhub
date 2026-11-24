@@ -556,7 +556,9 @@
 		the hub up automatically. Leave empty (the default) to disable; this is
 		the on/off switch, so leave it empty for private hubs. The path defaults
 		to /register and the port to 443. A plain http:// URL is refused, and the
-		hub does not announce itself. For the
+		hub does not announce itself. The server's certificate must verify
+		against the system trust store and name the URL's host; otherwise the
+		announce is abandoned. For the
 		announce to carry a usable address, also configure hub_address (the HH
 		field): it is normalized to an adcs:// URL with the certificate keyprint
 		and the port when tls_enable is set (an adc:// address is upgraded, since
