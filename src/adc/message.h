@@ -76,6 +76,13 @@ extern struct adc_message* adc_msg_copy(const struct adc_message* cmd);
  * The message is only considered valid if the user who sent it
  * is the rightful origin of the message.
  */
+/**
+ * Whether the message's context carries a source SID (B, D, E and F). Decide
+ * on this rather than on msg->source, which is 0 both when there is no source
+ * and for "AAAA", the hub's own reserved SID.
+ */
+extern int adc_msg_has_source(const struct adc_message* msg);
+
 extern struct adc_message* adc_msg_parse_verify(struct hub_user* u, const char* string, size_t length);
 
 /**
