@@ -1265,17 +1265,22 @@ static void unload_ssl_certificates(struct hub_info* hub)
 	hub->tls_link_key = NULL;
 }
 
-static void hub_init_secret(struct hub_info* hub) {
-    /* A random secret unknown to clients; falls back to startup entropy if the
-	   CSPRNG is somehow unavailable. */
+/*
+ * A random secret unknown to clients. It keys the password challenge (GPA) and
+ * the HBRI token MAC, so it comes from the CSPRNG or not at all: a fallback
+ * built from a pointer, the time and the process ID could be searched for, and
+ * both of those would become predictable.
+ *
+ * @return 1 on success, 0 if no random numbers are available.
+ */
+static int hub_init_secret(struct hub_info* hub)
+{
 	if (RAND_bytes(hub->hub_secret, (int) sizeof(hub->hub_secret)) != 1)
 	{
-		uint64_t seed[3];
-		char buf[64];
-		int n = snprintf(buf, sizeof(buf), "%p|%ld|%d", (void*) hub, (long) time(NULL), (int) getpid());
-		tiger((uint64_t*) buf, (uint64_t) n, seed);
-		memcpy(hub->hub_secret, seed, sizeof(hub->hub_secret));
+		LOG_FATAL("Unable to generate the hub secret: no random numbers available.");
+		return 0;
 	}
+	return 1;
 }
 
 struct hub_info* hub_start_service(struct hub_config* config)
@@ -1287,6 +1292,13 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	if (!hub)
 	{
 		LOG_FATAL("Unable to allocate memory for hub");
+		return 0;
+	}
+
+	/* First, while there is nothing else to undo. */
+	if (!hub_init_secret(hub))
+	{
+		hub_free(hub);
 		return 0;
 	}
 
@@ -1379,8 +1391,6 @@ struct hub_info* hub_start_service(struct hub_config* config)
 	hub->ipcount = ipcount_create();
 	if (!hub->ipcount)
 		LOG_WARN("hub_start_service(): unable to allocate per-IP connection tracker; max_connections_per_ip will not be enforced.");
-
-	hub_init_secret(hub);
 
 	server_alt_port_start(hub, config);
 
