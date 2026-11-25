@@ -181,6 +181,8 @@ Security:
 Fixes:
 - The reg_server_url example used an http:// URL, which the hub refuses
   (#136).
+- The Windows file_acl example lost its backslashes when parsed; every
+  example in the configuration reference is now checked by the test suite.
 - mod_welcome: a motd or rules text ending in a lone "%" made the formatter
   read past the end of the string.
 - Windows: an IPv4 client on a dual-stack listener (the default) was seen as
@@ -232,6 +234,13 @@ Fixes:
   shutdown.
 
 Hardening:
+- The hub refuses to start when it cannot draw its secret (which keys the
+  password challenge and HBRI tokens) from the CSPRNG, instead of falling
+  back to a hash of pointer, time and process ID.
+- !ban says so when the storage plugin refuses to keep the ban, which then
+  lasts only until the hub restarts; the hub logs a warning too.
+- uhub-fuse no longer deletes a cached file when a peer's file list turns out
+  to be byte-identical to it.
 - uhub-fuse locks a descriptor's pending chat buffer: FUSE runs callbacks on
   several threads, and concurrent writes to one descriptor could corrupt it
   (#142).
