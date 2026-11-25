@@ -20,6 +20,11 @@ EXO_TEST(cred_from_string_5,  { CRED_FROM_STRING("reg",      auth_cred_user);   
 EXO_TEST(cred_from_string_6,  { CRED_FROM_STRING("operator", auth_cred_operator); });
 EXO_TEST(cred_from_string_7,  { CRED_FROM_STRING("op",       auth_cred_operator); });
 EXO_TEST(cred_from_string_8,  { CRED_FROM_STRING("super",    auth_cred_super);    });
-EXO_TEST(cred_from_string_9,  { CRED_FROM_STRING("link",     auth_cred_link);     });
+/* "link" names no level a user can hold, and would rank between super and
+   admin: it is not accepted from anywhere. */
+EXO_TEST(cred_from_string_9,  {
+	enum auth_credentials cred = auth_cred_guest;
+	return auth_string_to_cred("link", &cred) == 0 && cred == auth_cred_guest;
+});
 EXO_TEST(cred_from_string_10, { CRED_FROM_STRING("admin",    auth_cred_admin);    });
 

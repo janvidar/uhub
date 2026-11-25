@@ -194,7 +194,8 @@ EXO_TEST(command_cred_4, { as(auth_cred_guest, 1); return verify("!test7 super",
 EXO_TEST(command_cred_5, { as(auth_cred_guest, 1); return verify("!test7 admin", cmd_status_ok); });
 EXO_TEST(command_cred_6, { as(auth_cred_guest, 1); return verify("!test7 nobody", cmd_status_arg_cred); });
 EXO_TEST(command_cred_7, { as(auth_cred_guest, 1); return verify("!test7 bot", cmd_status_ok); });
-EXO_TEST(command_cred_8, { as(auth_cred_guest, 1); return verify("!test7 link", cmd_status_ok); });
+/* "link" is no level anyone can hold, so it is not accepted as one. */
+EXO_TEST(command_cred_8, { as(auth_cred_guest, 1); return verify("!test7 link", cmd_status_arg_cred); });
 
 
 #if 0

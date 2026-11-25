@@ -209,10 +209,10 @@ static plugin_st get_user(struct plugin_handle *plugin, const char *nickname, st
             data->password[MAX_PASS_LEN] = '\0';
         }
 
-        if (cred) {
-            auth_string_to_cred(cred, &data->credentials);
+        /* A level that does not parse -- "link", or a typo -- leaves the
+           record unusable, like one without a level: refused below. */
+        if (cred && auth_string_to_cred(cred, &data->credentials))
             found = 1;
-        }
     }
 
     sqlite3_finalize(stmt);

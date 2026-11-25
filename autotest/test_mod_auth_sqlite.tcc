@@ -509,6 +509,25 @@ EXO_TEST(mas_exclusive_account_allowed, {
 		&& info.credentials == auth_cred_admin);
 });
 
+/* A stored level that does not parse makes the record unusable: the login is
+   refused, not let through at whatever level the lookup started from. "link"
+   is one such level -- it would otherwise outrank super. */
+EXO_TEST(mas_link_level_refused, {
+	struct auth_info info;
+	if (!mas_start_with(1, NULL)
+		|| !mas_exec("INSERT INTO users VALUES ('Relay', 'secret', 'link');"))
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_get_user(&mas_plugin, "relay", &info) == st_deny);
+});
+
+EXO_TEST(mas_unknown_level_refused, {
+	struct auth_info info;
+	if (!mas_start_with(1, NULL)
+		|| !mas_exec("INSERT INTO users VALUES ('Typo', 'secret', 'amdin');"))
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_get_user(&mas_plugin, "typo", &info) == st_deny);
+});
+
 /* A fresh install has no users table: that is "no accounts", not a failure,
    or the default plugin set would refuse every login on a new hub. */
 EXO_TEST(mas_no_users_table_passed_on, {

@@ -123,7 +123,10 @@ int auth_string_to_cred(const char* str, enum auth_credentials* out)
 		case 4:
 			if (!strcasecmp(str, "none")) { *out = auth_cred_none; return 1; }
 			if (!strcasecmp(str, "user")) { *out = auth_cred_user; return 1; }
-			if (!strcasecmp(str, "link")) { *out = auth_cred_link; return 1; }
+			/* "link" is deliberately not accepted. auth_cred_link names no
+			   level a user can hold, yet it sits between super and admin, so
+			   an account stored as "link" would outrank super everywhere a
+			   level is compared. Nothing assigns it; nothing may. */
 			if (!strcasecmp(str, "ubot")) { *out = auth_cred_ubot; return 1; }
 			return 0;
 
