@@ -290,8 +290,8 @@ static plugin_st delete_user(struct plugin_handle *plugin, struct auth_info *use
     sqlite3_stmt *stmt;
     int rc;
 
-    if (sql->exclusive)
-        return st_deny;
+    /* "exclusive" governs who may log in, not what an operator may change:
+       refusing here left a compromised account impossible to remove (#138). */
 
     /* Match the nick case-insensitively, consistent with get_user (L-8): a
        nick's identity does not depend on case, so deleting "boss" must remove a
@@ -353,9 +353,8 @@ static plugin_st ban_add(struct plugin_handle *plugin, const struct ban_info *ba
     sqlite3_stmt *stmt;
     int rc;
 
-    if (sql->exclusive)
-        return st_deny;
-
+    /* Stored whatever "exclusive" says: the hub only keeps the ban in memory
+       otherwise, and it would be gone at the next restart (#138). */
     rc = sqlite3_prepare_v2(sql->db, "INSERT INTO bans (cid, nickname, expiry, reason) VALUES(?, ?, ?, ?);", -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "Unable to store ban: %s\n", sqlite3_errmsg(sql->db));

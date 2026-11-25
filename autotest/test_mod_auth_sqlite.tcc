@@ -509,6 +509,30 @@ EXO_TEST(mas_exclusive_account_allowed, {
 		&& info.credentials == auth_cred_admin);
 });
 
+/* #138: exclusive restricts logins, not moderation. A ban is stored and
+   applies, and an account can still be deleted. */
+EXO_TEST(mas_exclusive_ban_stored, {
+	struct ban_info b = mas_ban(MAS_CID, "Eviluser");
+	struct mas_user u = mas_puser(MAS_CID, "Eviluser");
+	time_t exp = -1;
+	if (!mas_start_with(1, "exclusive=1"))
+		return mas_stop(0);
+	if (mas_plugin.funcs.auth_ban_add(&mas_plugin, &b) != st_allow)
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_is_banned(&mas_plugin, mas_as_puser(&u), &exp, NULL) == st_deny);
+});
+
+EXO_TEST(mas_exclusive_delete_user, {
+	struct auth_info a = mas_info("Boss", "", auth_cred_none);
+	struct auth_info info;
+	if (!mas_start_with(1, "exclusive=1")
+		|| !mas_exec("INSERT INTO users VALUES ('Boss', 'secret', 'admin');"))
+		return mas_stop(0);
+	if (mas_plugin.funcs.auth_delete_user(&mas_plugin, &a) != st_allow)
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_get_user(&mas_plugin, "boss", &info) == st_deny);
+});
+
 /* A stored level that does not parse makes the record unusable: the login is
    refused, not let through at whatever level the lookup started from. "link"
    is one such level -- it would otherwise outrank super. */
