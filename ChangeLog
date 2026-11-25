@@ -1,3 +1,23 @@
+0.8.3:
+A security release. See doc/advisories/ on the security-advisories branch for
+UHUB-2026-012 and -013. No configuration or protocol changes; nodes of a
+linked hub can be upgraded one at a time.
+
+Security:
+- UHUB-2026-012 (#131): a client could send broadcasts and private messages
+  as the hub itself. The source-SID check was skipped for "AAAA", the hub's
+  reserved SID, which parses to 0. Affects all releases up to 0.8.2.
+- UHUB-2026-013 (#134): !kick, !redirect and !ban only refused acting on
+  oneself, so an operator could kick, redirect or ban an admin or a fellow
+  operator; a ban is persistent and cluster-wide. They now act only on lower
+  ranks, and a user on a linked hub is ranked by the CT flag its hub set.
+  Affects !kick since 0.3.0, !ban since 0.7.0, !redirect since 0.7.1.
+
+Not in this release: hub-list registration does not verify the server's
+certificate (#135), and hub links run in plain text (#133). Both are fixed in
+0.9.0; until then leave reg_server_url empty, and link only over a network you
+trust.
+
 0.8.2:
 A security release. See doc/advisories/ on the security-advisories branch for
 UHUB-2026-009..011. No configuration changes; a 0.8.2 auth slave works with a
