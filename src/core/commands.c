@@ -759,7 +759,8 @@ static int command_ban(struct command_base* cbase, struct hub_user* user, struct
 			cbuf_append_format(buf, "Banning user \"%s\".", target->id.nick);
 		/* Ban by CID and nick, disconnect, and propagate to linked hubs so the
 		   ban applies across the whole logical hub. */
-		hub_apply_ban(cbase->hub, target->id.cid, target->id.nick, expiry, reason, 1);
+		if (hub_apply_ban(cbase->hub, target->id.cid, target->id.nick, expiry, reason, 1) < 0)
+			cbuf_append(buf, " The ban could not be stored and lasts only until the hub restarts.");
 	}
 	return command_status(cbase, user, cmd, buf);
 }

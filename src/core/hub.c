@@ -1519,9 +1519,10 @@ void hub_update_description(struct hub_info* hub, const char* escaped_desc, int 
 		link_broadcast_description(hub, escaped_desc);
 }
 
-void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, time_t expiry, const char* reason, int propagate)
+int hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, time_t expiry, const char* reason, int propagate)
 {
 	struct hub_user* u;
+	int stored = 0;
 
 	/* Add to this node's runtime ACL so the user cannot reconnect here
 	   (check_acl consults the ACL at login). One record carries both identifiers,
@@ -1554,8 +1555,15 @@ void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, time
 			strncpy(ban.reason, reason, sizeof(ban.reason) - 1);
 			ban.reason[sizeof(ban.reason) - 1] = '\0';
 		}
-		if (ban.flags)
-			plugin_ban_add(hub, &ban);
+		/* A store that refuses is not the same as no store: the operator
+		   believes the ban is kept, and it is gone at the next restart. Said
+		   out loud rather than swallowed, which is how #138 went unnoticed. */
+		if (ban.flags && plugin_ban_add(hub, &ban) == st_deny)
+		{
+			LOG_WARN("Ban on \"%s\" was refused by the storage plugin; it lasts only until the hub restarts.",
+				(nick && *nick) ? nick : (cid ? cid : ""));
+			stored = -1;
+		}
 	}
 
 	/* Disconnect a matching locally-connected user. The session lives on exactly
@@ -1579,6 +1587,8 @@ void hub_apply_ban(struct hub_info* hub, const char* cid, const char* nick, time
 	   expiry is an absolute time, so every node agrees on when it lifts. */
 	if (propagate)
 		link_broadcast_ban(hub, cid, nick, expiry, reason);
+
+	return stored;
 }
 
 int hub_apply_unban(struct hub_info* hub, const char* target, int propagate)

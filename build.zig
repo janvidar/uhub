@@ -152,6 +152,7 @@ const tcc_sources = [_][]const u8{
     "test_fuse_render.tcc",
     "test_fuse_roster.tcc",
     "test_hbri.tcc",
+    "test_hub_ban.tcc",
     "test_help_rtf0.tcc",
     "test_hub.tcc",
     "test_inf.tcc",
