@@ -223,7 +223,8 @@ static int acl_parse_line(char* line, int line_count, void* ptr_data)
 	struct acl_handle* handle = (struct acl_handle*) ptr_data;
 	int ret;
 
-	strip_off_ini_line_comments(line, line_count);
+	if (strip_off_ini_line_comments(line, line_count) < 0)
+		return -1;
 
 	line = strip_white_space(line);
 	if (!*line)

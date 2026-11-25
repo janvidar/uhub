@@ -557,14 +557,24 @@ const char* get_timestamp(time_t now)
 	return ts;
 }
 
-void strip_off_ini_line_comments(char* line, int line_count)
+/*
+ * Remove a trailing "# comment" and resolve the escapes \\, \# and \" in place.
+ *
+ * Any other backslash is an error rather than a backslash dropped with a
+ * warning: "c:\uhub\users.conf" read as "c:uhubusers.conf" is a hub that
+ * quietly opens the wrong file. A backslash ending the line is one too.
+ *
+ * @return 0 on success, -1 on an invalid escape (logged; the line is then
+ *         left in an unspecified state and must not be used).
+ */
+int strip_off_ini_line_comments(char* line, int line_count)
 {
 	char* p = line;
 	char* out = line;
 	int backslash = 0;
 
 	if (!*line)
-		return;
+		return 0;
 
 	for (; *p; p++)
 	{
@@ -576,8 +586,6 @@ void strip_off_ini_line_comments(char* line, int line_count)
 			}
 			else if (*p == '#')
 			{
-				*out = '\0';
-				out++;
 				break;
 			}
 			else
@@ -588,21 +596,26 @@ void strip_off_ini_line_comments(char* line, int line_count)
 		}
 		else
 		{
-			if (*p == '\\' || *p == '#' || *p == '\"')
+			if (*p != '\\' && *p != '#' && *p != '\"')
 			{
-				*out = *p;
-				out++;
+				LOG_ERROR("Invalid backslash escape \"\\%c\" on line %d; write \"\\\\\" for a backslash.",
+					*p, line_count);
+				return -1;
 			}
-			else
-			{
-				LOG_WARN("Invalid backslash escape on line %d", line_count);
-				*out = *p;
-				out++;
-			}
+			*out = *p;
+			out++;
 			backslash = 0;
 		}
 	}
+
+	if (backslash)
+	{
+		LOG_ERROR("A backslash ends line %d; write \"\\\\\" for a backslash.", line_count);
+		return -1;
+	}
+
 	*out = '\0';
+	return 0;
 }
 
 int string_to_boolean(const char* str, int* boolean)

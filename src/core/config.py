@@ -187,7 +187,11 @@ class CSourceGenerator(SourceGenerator):
 			test = "strcmp(config->%s, %s) != 0" % (option.name, option.formatted_default())
 
 		s += "\tif (!ignore_defaults || %s)\n" % test;
-		s += "\t\tfprintf(stdout, \"%s = %s\\n\", %s);\n\n" % (option.name, fmt, val)
+		if option.is_string:
+			# Escaped, so the dump parses back to the same value.
+			s += "\t\tdump_string(\"%s\", %s);\n\n" % (option.name, val)
+		else:
+			s += "\t\tfprintf(stdout, \"%s = %s\\n\", %s);\n\n" % (option.name, fmt, val)
 		self.f.write(s)
 
 	def write(self, options):

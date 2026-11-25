@@ -100,25 +100,6 @@ static void ce_value(const char* line, char* out, size_t size)
 	out[len] = '\0';
 }
 
-/*
- * A backslash before anything but \\, # or " is dropped by the parser with only
- * a warning, so "c:\uhub\users.conf" would quietly become "c:uhubusers.conf".
- */
-static int ce_bad_escape(const char* line)
-{
-	const char* p;
-
-	for (p = line; *p; p++)
-	{
-		if (*p != '\\')
-			continue;
-		if (p[1] != '\\' && p[1] != '#' && p[1] != '"')
-			return 1;
-		p++;
-	}
-	return 0;
-}
-
 /* Parse one setting as uhub.conf would. */
 static int ce_parses(const char* line)
 {
@@ -126,8 +107,6 @@ static int ce_parses(const char* line)
 	FILE* f;
 	int ret;
 
-	if (ce_bad_escape(line))
-		return 0;
 	f = fopen(CE_TMP, "w");
 	if (!f)
 		return 0;

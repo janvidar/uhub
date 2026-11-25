@@ -100,6 +100,10 @@ EXO_TEARDOWN({
 });
 
 /* deny_nick / ban_nick / ban_cid query helpers. */
+/* An ACL file takes the same escapes as uhub.conf, and refuses the rest. */
+EXO_TEST(acl_escape_invalid_refused, { return acl_parse_expect("deny_nick foo\\bar\n", -1); });
+EXO_TEST(acl_escape_valid_accepted,  { return acl_parse_expect("deny_nick foo\\\\bar\n", 0); });
+
 EXO_TEST(acl_deny_nick,      { acl_fresh(); return acl_is_user_denied(&acl_acl, "badnick") == 1; });
 EXO_TEST(acl_deny_nick_neg,  { acl_fresh(); return acl_is_user_denied(&acl_acl, "goodnick") == 0; });
 EXO_TEST(acl_ban_nick,       { acl_fresh(); return acl_is_user_banned(&acl_acl, "evil") == 1; });

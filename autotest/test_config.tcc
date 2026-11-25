@@ -1,5 +1,6 @@
 #include "network/network.h"
 #include "core/config.h"
+#include "util/memory.h"
 #include "testutil_net.h"
 
 /*
@@ -350,6 +351,77 @@ EXO_TEST(msg_missing_file_tolerated, {
 	ok = read_messages("test_messages_does_not_exist.tmp", &config) == 0
 	     && strcmp(config.msg_hub_full, "Hub is full") == 0;
 	free_config(&config);
+	return ok;
+});
+
+/* ---- backslash escapes: \\, \# and \" only; anything else is refused ---- */
+
+static int cfg_string_is(const char* contents, const char* expect)
+{
+	struct hub_config config;
+	int ok = cfg_read(contents, &config) == 0 && strcmp(config.hub_name, expect) == 0;
+	free_config(&config);
+	return ok;
+}
+
+EXO_TEST(cfg_escape_backslash, { return cfg_string_is("hub_name = \"c:\\\\uhub\\\\x\"\n", "c:\\uhub\\x"); });
+EXO_TEST(cfg_escape_hash,      { return cfg_string_is("hub_name = \"a\\#b\"\n", "a#b"); });
+EXO_TEST(cfg_escape_quote,     { return cfg_string_is("hub_name = \"a\\\"b\"\n", "a\"b"); });
+
+/* Before, "\u" became "u" with a warning: c:\uhub\users.conf read as
+   c:uhubusers.conf, and the hub opened another file than the one named. */
+EXO_TEST(cfg_escape_invalid_refused,  { return cfg_expect("file_acl = \"c:\\uhub\\users.conf\"\n", -1); });
+EXO_TEST(cfg_escape_trailing_refused, { return cfg_expect("hub_name = abc\\\n", -1); });
+
+/* A comment ends the line before its backslashes are looked at. */
+EXO_TEST(cfg_escape_in_comment_ignored, { return cfg_string_is("hub_name = x # see c:\\uhub\n", "x"); });
+
+/* The messages file goes through the same line parser. */
+EXO_TEST(msg_escape_invalid_refused, {
+	struct hub_config config;
+	FILE* fh;
+	int ok;
+	if (read_config("test_config_does_not_exist.tmp", &config, 1) == -1)
+		return 0;
+	fh = fopen(msg_test_file, "w");
+	if (!fh) { free_config(&config); return 0; }
+	fputs("msg_hub_full = full\\now\n", fh);
+	fclose(fh);
+	ok = read_messages(msg_test_file, &config) == -1;
+	free_config(&config);
+	return ok;
+});
+
+/* "uhub -s" output must parse back to the same values, characters the parser
+   treats specially included. dump_config() writes to stdout, so stdout is
+   pointed at a file for the duration. */
+EXO_TEST(cfg_dump_round_trip_escapes, {
+	struct hub_config config, again;
+	const char* tricky = "a#b\"c\\d";
+	int saved, fd, ok;
+
+	config_defaults(&config);
+	hub_free(config.hub_name);
+	config.hub_name = hub_strdup(tricky);
+
+	fflush(stdout);
+	saved = dup(STDOUT_FILENO);
+	fd = open(cfg_test_file, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+	if (saved < 0 || fd < 0)
+	{
+		free_config(&config);
+		return 0;
+	}
+	dup2(fd, STDOUT_FILENO);
+	close(fd);
+	dump_config(&config, 1);
+	fflush(stdout);
+	dup2(saved, STDOUT_FILENO);
+	close(saved);
+	free_config(&config);
+
+	ok = read_config(cfg_test_file, &again, 0) == 0 && strcmp(again.hub_name, tricky) == 0;
+	free_config(&again);
 	return ok;
 });
 

@@ -122,6 +122,25 @@ static int apply_integer(const char* key, const char* data, int* target, int* mi
 	return 1;
 }
 
+/*
+ * Write a string option as dump_config() does: quoted, with the characters
+ * config_split_line() treats specially escaped, so "uhub -s" output parses back
+ * to the same value. A raw '#' would start a comment, a raw '\\' is refused.
+ */
+static void dump_string(const char* key, const char* value)
+{
+	const char* p;
+
+	fprintf(stdout, "%s = \"", key);
+	for (p = value; *p; p++)
+	{
+		if (*p == '\\' || *p == '#' || *p == '"')
+			fputc('\\', stdout);
+		fputc(*p, stdout);
+	}
+	fprintf(stdout, "\"\n");
+}
+
 #include "gen_config.c"
 
 /*
@@ -137,7 +156,11 @@ static int config_split_line(char* line, int line_count, char** key, char** data
 	char* pos;
 	int quoted_empty;
 
-	strip_off_ini_line_comments(line, line_count);
+	if (strip_off_ini_line_comments(line, line_count) < 0)
+	{
+		LOG_FATAL("Configuration parse error on line %d", line_count);
+		return -1;
+	}
 
 	if (!*line) return 0;
 

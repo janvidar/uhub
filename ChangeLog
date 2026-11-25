@@ -4,6 +4,11 @@ Incompatible changes (action required beyond replacing the binaries):
   plugin_funcs gained auth_list_users, which moves the hub function table that
   follows it in struct plugin_handle. Older plugins are refused at load.
 - Building with zig now needs zig 0.17.0 or newer.
+- A backslash in uhub.conf, the messages file or users.conf may only escape
+  another backslash, "#" or a double quote. Any other backslash was dropped
+  with a warning (so "c:\uhub" read as "c:uhub") and is now a parse error that
+  stops the hub; write two backslashes for one. "uhub -s" escapes these
+  characters, so its output parses back unchanged.
 - As in 0.8.1, an auth plugin with "exclusive" set refuses nicks it does not
   hold; that refusal also beats mod_guest_passwd, so a hub combining the two
   admits no guests. Remove "exclusive" to keep admitting guests.
