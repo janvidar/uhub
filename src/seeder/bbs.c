@@ -27,6 +27,7 @@
 #include "seeder/embed.h"
 #include "seeder/hubconn.h"
 #include "seeder/post.h"
+#include "seeder/sniff.h"
 #include "util/log.h"
 #include "util/memory.h"
 #include "util/misc.h"
@@ -564,6 +565,20 @@ void seed_bbs_on_board(struct seed_bbs* bbs, const struct seed_bbs_board* desc)
 
 /* ------------------------------------------------------------------- entries */
 
+/*
+ * Whether a tombstone may take @p cached out of the cache.
+ *
+ * Only a post document. The tombstone names a hash and nothing else, and anyone
+ * who may post can post any hash and then withdraw it: honouring that for
+ * whatever the cache holds under the hash would let them delete a chat image or
+ * an operator's upload (#140). The type comes from sniffing the bytes on ingest,
+ * so a poster cannot claim it.
+ */
+int seed_bbs_tombstone_may_remove(const struct seed_entry* cached)
+{
+	return cached && strcmp(cached->media_type, SEED_TYPE_BBS_POST) == 0;
+}
+
 void seed_bbs_on_entry(struct seed_bbs* bbs, const struct seed_bbs_entry* entry)
 {
 	struct bbs_board* board;
@@ -602,16 +617,24 @@ void seed_bbs_on_entry(struct seed_bbs* bbs, const struct seed_bbs_entry* entry)
 		 * Replies are separate posts and are not touched.
 		 */
 		struct bbs_want* want = bbs_find_want(bbs, entry->tth);
+		struct seed_entry cached;
+
+		memset(&cached, 0, sizeof(cached));
 
 		if (want)
 			bbs_release_want(bbs, want);
 
-		if (seed_cache_peek(bbs->cache, entry->tth, NULL))
+		if (seed_cache_peek(bbs->cache, entry->tth, &cached) && seed_bbs_tombstone_may_remove(&cached))
 		{
 			seed_cache_remove(bbs->cache, entry->tth, "withdrawn from a bulletin board");
 			bbs->stats.withdrawn++;
 			LOG_INFO("seed_bbs: post TTH=%s withdrawn from board \"%s\"; cached copy deleted.",
 				entry->tth, entry->board);
+		}
+		else if (*cached.tth)
+		{
+			LOG_WARN("seed_bbs: board \"%s\" withdrew TTH=%s, which is cached but not as a post (%s); kept.",
+				entry->board, entry->tth, *cached.media_type ? cached.media_type : "unknown type");
 		}
 		return;
 	}

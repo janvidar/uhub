@@ -207,6 +207,12 @@ extern void seed_bbs_on_board(struct seed_bbs* bbs, const struct seed_bbs_board*
 extern void seed_bbs_on_entry(struct seed_bbs* bbs, const struct seed_bbs_entry* entry);
 
 /**
+ * Whether a board's tombstone may delete this cached object: only a post
+ * document, never a file that happens to share the hash. Exposed for the tests.
+ */
+extern int seed_bbs_tombstone_may_remove(const struct seed_entry* cached);
+
+/**
  * A search result arrived. Where it answers a search this engine issued, the
  * responder is asked for the bytes.
  */

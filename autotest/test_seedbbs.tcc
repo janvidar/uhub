@@ -461,3 +461,31 @@ EXO_TEST(seedbbs_stats_of_null_is_zeroed, {
 	seed_bbs_get_stats(NULL, &stats);
 	return stats.boards == 0 && stats.queued == 0 && stats.posts_fetched == 0;
 });
+
+/* ---------------------------------------------------------------- tombstones */
+
+/* #140: a tombstone deletes a cached post document and nothing else. Anyone
+   who may post can post, then withdraw, any hash at all. */
+static struct seed_entry bb_cached(const char* type)
+{
+	struct seed_entry e;
+	memset(&e, 0, sizeof(e));
+	strcpy(e.tth, "LWPNACQDBZRYXW3VHJVCJ64QBZNGHOHHHZWCLNQ");
+	snprintf(e.media_type, sizeof(e.media_type), "%s", type);
+	return e;
+}
+
+EXO_TEST(seedbbs_tombstone_removes_post, {
+	struct seed_entry e = bb_cached("application/x-adc-bbs-post");
+	return seed_bbs_tombstone_may_remove(&e) == 1;
+});
+
+EXO_TEST(seedbbs_tombstone_keeps_other_types, {
+	struct seed_entry png = bb_cached("image/png");
+	struct seed_entry none = bb_cached("");
+	struct seed_entry prefix = bb_cached("application/x-adc-bbs-post-not");
+	return seed_bbs_tombstone_may_remove(&png) == 0
+		&& seed_bbs_tombstone_may_remove(&none) == 0
+		&& seed_bbs_tombstone_may_remove(&prefix) == 0
+		&& seed_bbs_tombstone_may_remove(NULL) == 0;
+});

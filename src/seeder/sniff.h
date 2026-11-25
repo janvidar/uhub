@@ -42,6 +42,8 @@
  * admitting every markup dialect that also looks like text.
  */
 
+#define SEED_TYPE_BBS_POST "application/x-adc-bbs-post"
+
 /** Number of leading bytes the sniffer needs. The ingest path buffers exactly
  *  this many before deciding, so a rejected upload is cut off early. */
 #define SEED_SNIFF_BYTES 64

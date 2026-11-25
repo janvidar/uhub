@@ -70,7 +70,7 @@
  * therefore always has that space. A document that is nothing but "IBB0" is not
  * a valid post and is not claimed here.
  */
-#define SEED_TYPE_BBS_POST "application/x-adc-bbs-post"
+/* SEED_TYPE_BBS_POST is in sniff.h: the board engine checks for it too. */
 
 /**
  * Compare @p magic_len bytes of @p magic against @p buf at @p offset.
