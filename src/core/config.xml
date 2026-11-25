@@ -568,7 +568,7 @@
 		]]></description>
 		<since>0.7.0</since>
 		<example><![CDATA[
-			reg_server_url = "http://adcreg.dchublist.org:8080/register"
+			reg_server_url = "https://hublist.example.org/register"
 		]]></example>
 	</option>
 

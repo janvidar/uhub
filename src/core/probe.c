@@ -88,7 +88,13 @@ static int probe_tls_redirect_address(struct hub_probe* probe, char* out, size_t
 }
 
 /* Tell a plain ADC client to come back over TLS: a SUP, a SID and a QUI that
-   carries the redirect, which is all a client reads before it has logged in. */
+   carries the redirect, which is all a client reads before it has logged in.
+
+   The IINF in between is the hub's INF a client expects after the SID, with a
+   placeholder name: the real hub is not being shown here, only pointed at.
+   Anything reading this exchange -- a pinger, a hub list -- must read on to
+   the IQUI rather than take the name from that IINF, or it records the hub as
+   "Redirecting..." and never sees the RD address (#136). */
 static void probe_send_tls_redirect(struct hub_probe* probe)
 {
 	char addr[512];
