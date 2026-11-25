@@ -121,6 +121,31 @@ Operator mitigations without a rebuild: `auth_proxy = 0` (UHUB-2026-009,
 -010); `registered_users_only = yes` narrows UHUB-2026-011 to registered
 users.
 
+## 0.8.3 (the hub's own SID and command ranks)
+
+| Issue | 0.4.1 | 0.5.x – 0.6.x | 0.7.x – 0.8.2 | Fixed in |
+|-------|:-----:|:-------------:|:-------------:|----------|
+| UHUB-2026-012 — messages sent as the hub's SID `AAAA` | affected | affected | affected | 0.8.3 |
+| UHUB-2026-013 — `!kick` / `!redirect` / `!ban` ignore rank | `!kick` | `!kick` | all three | 0.8.3 |
+
+Two commits, both on 0.8.x-stable and applying to 0.8.2 as they are:
+
+- `7e2ba38` (`700c4e9` on master): UHUB-2026-012. A small change to
+  `adc_msg_parse_verify()` plus a helper, `adc_msg_has_source()`; it applies
+  to any base back to 0.5.0. On 0.4.1, which has no unrestricted bots, drop
+  the `auth_cred_is_unrestricted()` term.
+- `a8ce0f1` (`b6be8ca` on master): UHUB-2026-013. The rank check is
+  self-contained; on a base without linking (before 0.7.0) the remote-user
+  branch, which reads `origin_link`, goes, and only `!kick` needs the check.
+
+Three more issues reported alongside these are fixed in 0.9.0 only, as their
+fixes are larger than a stable release takes: hub-list registration not
+verifying the server's certificate (#135; 0.7.0 – 0.8.2), link traffic in
+plain text (#133; 0.7.0 – 0.8.2, where links do not use TLS at all), and
+mod_users handing out unrestricted bot levels (#132; never in a release).
+Without a rebuild: leave `reg_server_url` empty, and run links only over a
+network you trust.
+
 ## Exclusive authentication (all releases <= 0.8.0)
 
 UHUB-2026-008 is not specific to linking: the refusal-becomes-guest collapse

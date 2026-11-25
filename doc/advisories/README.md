@@ -15,6 +15,8 @@ Remotely-triggerable security issues, indexed by advisory ID.
 | [UHUB-2026-009](UHUB-2026-009.md) | Use-after-free in the `auth_proxy` slave's pending-login registry | Critical | 0.7.0 – 0.8.1, `auth_proxy` enabled | 0.8.2 |
 | [UHUB-2026-010](UHUB-2026-010.md) | `auth_proxy` slave applies a late master reply to the next login on the same SID | Medium | 0.7.0 – 0.8.1, `auth_proxy` enabled | 0.8.2 |
 | [UHUB-2026-011](UHUB-2026-011.md) | NULL dereference when a client is disconnected by its own message | Medium | <= 0.8.1 | 0.8.2 |
+| [UHUB-2026-012](UHUB-2026-012.md) | Any client can send messages as the hub itself (issue #131) | Medium | <= 0.8.2 | 0.8.3 |
+| [UHUB-2026-013](UHUB-2026-013.md) | `!kick`, `!redirect` and `!ban` ignore rank (issue #134) | Low | 0.3.0 – 0.8.2 | 0.8.3 |
 
 See [BACKPORT.md](BACKPORT.md) for per-release exposure (incl. Debian's 0.4.1)
 and downstream cherry-pick guidance.
