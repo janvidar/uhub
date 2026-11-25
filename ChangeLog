@@ -162,8 +162,25 @@ Security:
 - #133: links now authenticate by pinned key with the handshake bound to the
   TLS session (see the incompatible changes); 0.7.0 - 0.8.2 linked in plain
   text.
+- #137: mod_no_guest_downloads did not check reverse connects, so a passive
+  guest could download from a registered user by sending DRCM. Affects
+  0.4.1 - 0.8.3.
+- #138: mod_auth_sqlite with exclusive=1 refused to store bans and to delete
+  accounts; a ban lasted only until the next restart. Affects 0.8.0 - 0.8.3.
+- #139: mod_auth_sqlite read a failed ban lookup (a locked or broken
+  database) as "not banned". It now waits briefly for a lock and otherwise
+  refuses the login as a one-minute temporary ban. Affects 0.8.0 - 0.8.3.
+- #141: client PIDs were derived from a pointer, the process ID and the time
+  rather than drawn from the CSPRNG, so a CID could be searched back to its
+  PID offline. uhub-fuse keeps its PID: delete the "identity" file in its
+  cache directory to get a new one. Not in any release.
+- #140: uhub-seeder honoured a board withdrawal for whatever it cached under
+  the hash, so a poster could delete chat images or uploads; only a post
+  document is removed now. Not in any release.
 
 Fixes:
+- The reg_server_url example used an http:// URL, which the hub refuses
+  (#136).
 - mod_welcome: a motd or rules text ending in a lone "%" made the formatter
   read past the end of the string.
 - Windows: an IPv4 client on a dual-stack listener (the default) was seen as
@@ -215,6 +232,9 @@ Fixes:
   shutdown.
 
 Hardening:
+- uhub-fuse locks a descriptor's pending chat buffer: FUSE runs callbacks on
+  several threads, and concurrent writes to one descriptor could corrupt it
+  (#142).
 - !getip and !whoip show an operator only their own address and those of
   users ranked below them, as !kick and !ban act only on them; bots rank with
   the humans they stand in for, so an operator bot does not outrank operators.
