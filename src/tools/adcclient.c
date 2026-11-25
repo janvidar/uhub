@@ -21,6 +21,7 @@
 
 #include "network/dnsresolver.h"
 #include "network/ipcalc.h"
+#include <openssl/rand.h>
 
 #define ADC_HANDSHAKE "HSUP ADBASE ADTIGR ADPING"
 
@@ -265,8 +266,6 @@ static void ADC_client_set_state(struct ADC_client* client, enum ADC_client_stat
 static void adc_cid_pid(struct ADC_client* client, struct adc_message* info)
 {
 	ADC_TRACE;
-	static uint32_t counter = 0;
-	char seed[64];
 	char pid[64];
 	char cid[64];
 	uint64_t tiger_res1[3];
@@ -285,12 +284,15 @@ static void adc_cid_pid(struct ADC_client* client, struct adc_message* info)
 	}
 	else
 	{
-		/* create cid+pid pair; mix in pid, time and a per-instance counter so
-		 * the identity is not a predictable function of the heap pointer alone. */
-		memset(seed, 0, 64);
-		snprintf(seed, 64, VERSION "%p%d%ld%u", client, (int) getpid(), (long) time(NULL), ++counter);
-
-		tiger((uint64_t*) seed, strlen(seed), tiger_res1);
+		/* The PID is the secret behind the public CID = tiger(PID), and
+		 * uhub-fuse keeps it as a permanent identity: it must come from the
+		 * CSPRNG. A seed of pointer, process ID and time could be searched for
+		 * offline from the CID (#141). Without one, send no identity at all. */
+		if (RAND_bytes((unsigned char*) tiger_res1, TIGERSIZE) != 1)
+		{
+			LOG_ERROR("Unable to generate a client identity: no random numbers available.");
+			return;
+		}
 		base32_encode((unsigned char*) tiger_res1, TIGERSIZE, pid);
 	}
 

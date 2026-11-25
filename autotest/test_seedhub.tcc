@@ -1073,3 +1073,48 @@ EXO_TEST(seedhub_support_reaches_the_inf, {
 	ADC_client_destroy(client);
 	return ok;
 });
+
+/* #141: a generated PID now comes from the CSPRNG; this checks the CID is still
+   base32(tiger(PID)) -- which the hub verifies -- and that two clients built in
+   the same second, in the same process, do not share one. */
+static int sh_pid_cid(struct ADC_client* client, char* pid, char* cid)
+{
+	struct adc_message* info = ADC_client_build_info(client);
+	char* pd = info ? adc_msg_get_named_argument(info, ADC_INF_FLAG_PRIVATE_ID) : NULL;
+	char* id = info ? adc_msg_get_named_argument(info, ADC_INF_FLAG_CLIENT_ID) : NULL;
+	int ok = pd && id && strlen(pd) == MAX_CID_LEN && strlen(id) == MAX_CID_LEN;
+	if (ok)
+	{
+		strcpy(pid, pd);
+		strcpy(cid, id);
+	}
+	hub_free(pd);
+	hub_free(id);
+	adc_msg_free(info);
+	return ok;
+}
+
+EXO_TEST(seedhub_generated_pid_random, {
+	struct ADC_client* a = ADC_client_create("pidtest", "", NULL);
+	struct ADC_client* b = ADC_client_create("pidtest", "", NULL);
+	char pid_a[MAX_CID_LEN + 1], cid_a[MAX_CID_LEN + 1];
+	char pid_b[MAX_CID_LEN + 1], cid_b[MAX_CID_LEN + 1];
+	uint64_t raw[8], hash[3];
+	char expect[64];
+	int ok = a && b && sh_pid_cid(a, pid_a, cid_a) && sh_pid_cid(b, pid_b, cid_b)
+		&& strcmp(pid_a, pid_b) != 0 && strcmp(cid_a, cid_b) != 0;
+
+	if (ok)
+	{
+		memset(raw, 0, sizeof(raw));
+		base32_decode(pid_a, (unsigned char*) raw, MAX_CID_LEN);
+		tiger(raw, TIGERSIZE, hash);
+		base32_encode((unsigned char*) hash, TIGERSIZE, expect);
+		expect[MAX_CID_LEN] = '\0';
+		ok = strcmp(expect, cid_a) == 0;
+	}
+
+	ADC_client_destroy(a);
+	ADC_client_destroy(b);
+	return ok;
+});
