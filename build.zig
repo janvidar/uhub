@@ -142,6 +142,7 @@ const tcc_sources = [_][]const u8{
     "test_commands.tcc",
     "test_condead.tcc",
     "test_config.tcc",
+    "test_config_examples.tcc",
     "test_connect.tcc",
     "test_credentials.tcc",
     "test_eventqueue.tcc",

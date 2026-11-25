@@ -1001,7 +1001,7 @@
 			</p>
 			<p>
 			Windows users: <br />
-				file_acl = "c:\uhub\users.conf"
+				file_acl = "c:\\uhub\\users.conf"
 			</p>
 		]]></example>
 	</option>
