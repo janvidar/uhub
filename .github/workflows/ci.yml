@@ -474,7 +474,7 @@ jobs:
         run: |
           cmake --build build-cov -j --target \
             autotest-bin uhub uhub-passwd adc_cmd adcrush \
-            mod_auth_sqlite mod_users mod_e2e_test
+            mod_auth_sqlite mod_users mod_guest_passwd mod_e2e_test
 
       # Two runs so both event backends are covered: the default (epoll) and,
       # forced via EVENT_NOEPOLL, the select fallback. .gcda counters accumulate
