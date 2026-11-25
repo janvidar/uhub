@@ -168,6 +168,7 @@ const tcc_sources = [_][]const u8{
     "test_mod_chat_history.tcc",
     "test_mod_guest_passwd.tcc",
     "test_mod_joins.tcc",
+    "test_mod_no_guest_downloads.tcc",
     "test_mod_users.tcc",
     "test_mod_welcome.tcc",
     "test_netbackend.tcc",
@@ -588,6 +589,7 @@ pub fn build(b: *std.Build) void {
         ctx.addSources(autotest_mod, &.{"autotest/mod_guest_passwd_shim.c"});
         ctx.addSources(autotest_mod, &.{"autotest/mod_joins_shim.c"});
         ctx.addSources(autotest_mod, &.{"autotest/mod_welcome_shim.c"});
+        ctx.addSources(autotest_mod, &.{"autotest/mod_no_guest_downloads_shim.c"});
         ctx.addSources(autotest_mod, &.{"autotest/testutil_net.c"});
         ctx.addSqlite(autotest_mod);
         ctx.addAutotest(autotest_mod);

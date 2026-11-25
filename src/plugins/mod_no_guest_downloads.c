@@ -52,8 +52,11 @@ int plugin_register(struct plugin_handle* plugin, const char* config)
 	plugin->ptr = NULL;
 	plugin->funcs.on_search = on_search;
 	plugin->funcs.on_search_result = on_search_result;
+	/* Both directions: a passive guest asks with DRCM, and the registered
+	   user's DCTM answer would pass on_p2p_connect, so the request itself is
+	   the only place to refuse it (#137). */
 	plugin->funcs.on_p2p_connect = on_p2p_connect;
-	// plugin->funcs.on_p2p_revconnect = on_p2p_connect;
+	plugin->funcs.on_p2p_revconnect = on_p2p_connect;
 	return 0;
 }
 
