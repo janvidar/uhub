@@ -98,6 +98,7 @@ struct fs_filelist_want
 	int used;
 	char cid[MAX_CID_LEN + 1];
 	struct fs_task* waiters;
+	time_t asked;           /** When the request went out; see files_adopt(). */
 	time_t deadline;
 };
 
@@ -299,8 +300,12 @@ static void list_want_finish(struct fs_transfer* t, struct fs_filelist_want* wan
  * The compressed document is read back out of the cache and then removed from
  * it: it is not content anybody will ask us for by hash, and a share list can
  * be large enough to be worth not keeping twice.
+ *
+ * Unless @p keep is set. The cache holds one copy of any content, so a "list"
+ * whose bytes match a file already cached lands on that file's entry --
+ * removing it would delete the file, not the list.
  */
-static int files_adopt(struct fs_transfer* t, const char* cid, const char* tth, uint64_t size)
+static int files_adopt(struct fs_transfer* t, const char* cid, const char* tth, uint64_t size, int keep)
 {
 	struct fs_peer_files* slot;
 	struct fs_filelist* list;
@@ -310,7 +315,8 @@ static int files_adopt(struct fs_transfer* t, const char* cid, const char* tth, 
 
 	if (!size || size > FS_FILELIST_MAX)
 	{
-		seed_cache_remove(t->cache, tth, "file list, unusable");
+		if (!keep)
+			seed_cache_remove(t->cache, tth, "file list, unusable");
 		return 0;
 	}
 
@@ -331,13 +337,15 @@ static int files_adopt(struct fs_transfer* t, const char* cid, const char* tth, 
 	if (got != (ssize_t) size)
 	{
 		hub_free(buf);
-		seed_cache_remove(t->cache, tth, "file list, short read");
+		if (!keep)
+			seed_cache_remove(t->cache, tth, "file list, short read");
 		return 0;
 	}
 
 	list = fs_filelist_load(buf, (size_t) size);
 	hub_free(buf);
-	seed_cache_remove(t->cache, tth, "file list, parsed");
+	if (!keep)
+		seed_cache_remove(t->cache, tth, "file list, parsed");
 
 	if (!list)
 	{
@@ -519,7 +527,13 @@ static void transfer_on_download(void* ptr, const char* tth, enum seed_error err
 			 * list turned out to hash to is only known now, and is the only
 			 * way to find it in the cache.
 			 */
-			int ok = files_adopt(t, entry->origin_cid, entry->tth, entry->size);
+			/*
+			 * An entry first seen before the list was asked for was in the
+			 * cache already: this download was a duplicate of it, and the
+			 * entry is that earlier file's, not the list's to remove.
+			 */
+			int keep = entry->first_seen < list_want->asked;
+			int ok = files_adopt(t, entry->origin_cid, entry->tth, entry->size, keep);
 			list_want_finish(t, list_want, ok ? 0 : -EIO);
 			return;
 		}
@@ -1005,6 +1019,7 @@ int fs_transfer_want_filelist(struct fs_transfer* t, const char* cid, struct fs_
 	memset(want, 0, sizeof(*want));
 	want->used = 1;
 	snprintf(want->cid, sizeof(want->cid), "%s", cid);
+	want->asked = now;
 	want->deadline = now + t->timeout;
 
 	task->next = want->waiters;
