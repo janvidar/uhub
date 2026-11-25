@@ -50,6 +50,12 @@ Phase 3 -- remove the off switches:
 - Client-to-client: stop relaying CTM/RCM that ask for plain ADC/1.0; the
   seeder and uhub-fuse refuse plain transfers. Most likely to break real
   clients -- consider shipping it as an option first.
+- Client-to-client TLS is not authenticated: uhub-seeder (seeder/cc.c) and
+  uhub-fuse (fuse/transfer.c) accept whatever certificate a peer presents.
+  ADCS clients publish their certificate's keyprint in their INF (KP); keep
+  it per user in adcclient and require it on the transfer connection, with
+  no fallback once a peer has published one. TTH verification already stops
+  a man in the middle from altering content, but not from reading it.
 - Tools (adcclient, adcrush, linktest, uhub-seeder, uhub-fuse) drop adc://.
 - Integration tests move to TLS; unit tests of internal APIs may keep plain
   socketpairs.
