@@ -215,6 +215,12 @@ Fixes:
   shutdown.
 
 Hardening:
+- !getip and !whoip show an operator only their own address and those of
+  users ranked below them, as !kick and !ban act only on them; bots rank with
+  the humans they stand in for, so an operator bot does not outrank operators.
+- "link" is no longer accepted as an account level: it named no level a user
+  can hold but ranked above super. mod_auth_sqlite refuses a record whose
+  level does not parse.
 - Hub linking: a peer may route only chat, searches and directed traffic,
   and a roster entry (LINF) must be a BINF; an update that changes a user's
   CID is ignored.
