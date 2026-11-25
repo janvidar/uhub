@@ -28,6 +28,7 @@
 #include "fuse/roster.h"
 #include "fuse/session.h"
 #include "util/memory.h"
+#include "util/threads.h"
 
 /*
  * The kernel side of the mount.
@@ -58,6 +59,11 @@ struct fs_handle
 	char* snapshot;         /** Metadata files: the bytes read() serves. */
 	size_t snapshot_size;
 
+	/* FUSE runs callbacks on a pool of threads, and nothing stops two of them
+	   writing to one descriptor at once on every platform -- so the buffer
+	   below has a lock of its own (#142). Initialised once the open has
+	   succeeded, which is before any write can arrive. */
+	uhub_mutex_t lock;
 	char* pending;          /** Written bytes not yet ending in a newline. */
 	size_t pending_len;
 
@@ -980,6 +986,8 @@ static int fs_open(const char* path, struct fuse_file_info* fi)
 	}
 
 opened:
+	uhub_mutex_init(&handle->lock);
+
 	/*
 	 * The kernel must not answer a read out of what it thinks it knows about
 	 * these files. A by-tth file has no size until it has been fetched, so the
@@ -1144,7 +1152,8 @@ static int handle_send(struct fs_handle* handle, const char* text)
 	return fs_bridge_submit(current_session()->bridge, &op.task);
 }
 
-/** Send whatever has been collected, and start again. */
+/** Send whatever has been collected, and start again. Called with handle->lock
+    held, which also keeps the text still while the ADC thread reads it. */
 static int handle_flush(struct fs_handle* handle)
 {
 	int result;
@@ -1159,11 +1168,13 @@ static int handle_flush(struct fs_handle* handle)
 	return result;
 }
 
+static int fs_write_locked(struct fs_handle* handle, const char* buf, size_t size);
+
 static int fs_write(const char* path, const char* buf, size_t size, off_t offset,
                     struct fuse_file_info* fi)
 {
 	struct fs_handle* handle = (struct fs_handle*) (uintptr_t) fi->fh;
-	size_t n;
+	int result;
 
 	(void) path;
 	(void) offset;   /* A message is not a byte at a position. */
@@ -1173,6 +1184,16 @@ static int fs_write(const char* path, const char* buf, size_t size, off_t offset
 
 	if (handle->type != FS_NODE_CHAT_MAIN && handle->type != FS_NODE_USER_MSG)
 		return -EACCES;
+
+	uhub_mutex_lock(&handle->lock);
+	result = fs_write_locked(handle, buf, size);
+	uhub_mutex_unlock(&handle->lock);
+	return result;
+}
+
+static int fs_write_locked(struct fs_handle* handle, const char* buf, size_t size)
+{
+	size_t n;
 
 	if (!handle->pending)
 	{
@@ -1246,7 +1267,9 @@ static int fs_release(const char* path, struct fuse_file_info* fi)
 	if (handle)
 	{
 		/* Anything written without a closing newline is a message too. */
+		uhub_mutex_lock(&handle->lock);
 		handle_flush(handle);
+		uhub_mutex_unlock(&handle->lock);
 
 		if (handle->stream)
 		{
@@ -1270,6 +1293,7 @@ static int fs_release(const char* path, struct fuse_file_info* fi)
 
 		hub_free(handle->snapshot);
 		hub_free(handle->pending);
+		uhub_mutex_destroy(&handle->lock);
 		hub_free(handle);
 		fi->fh = 0;
 	}
