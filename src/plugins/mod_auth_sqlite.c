@@ -27,6 +27,9 @@ static void set_error_message(struct plugin_handle *plugin, const char *msg) {
     plugin->error_msg = msg;
 }
 
+#define SQL_BUSY_TIMEOUT_MS   1000
+#define SQL_BAN_RETRY_SECONDS 60
+
 struct sql_data {
     int exclusive;
     sqlite3 *db;
@@ -59,6 +62,10 @@ static struct sql_data *parse_config(const char *line, struct plugin_handle *plu
                     set_error_message(plugin, "Unable to open database file");
                     return 0;
                 }
+                /* Another process writing (uhub-passwd, a backup) holds the
+                   lock briefly; wait for it rather than fail the lookup. Kept
+                   short: the hub is single-threaded and waits with it. */
+                sqlite3_busy_timeout(data->db, SQL_BUSY_TIMEOUT_MS);
             }
         } else if (strcmp(cfg_settings_get_key(setting), "exclusive") == 0) {
             if (!string_to_boolean(cfg_settings_get_value(setting), &data->exclusive))
@@ -408,6 +415,18 @@ static plugin_st ban_del(struct plugin_handle *plugin, const struct ban_info *ba
    *expiry is set to the matching record's expiry (0 = permanent). When several
    records match, the most permanent one wins (a permanent 0 sorts first, else
    the latest expiry) so the hub reports the longest-lasting ban. */
+/* is_banned() could not tell: answer as a short temporary ban. */
+static plugin_st ban_check_failed(struct sql_data *sql, sqlite3_int64 now, time_t *expiry, char *reason) {
+    fprintf(stderr, "mod_auth_sqlite: ban lookup failed, refusing the login: %s\n", sqlite3_errmsg(sql->db));
+    if (expiry)
+        *expiry = (time_t) (now + SQL_BAN_RETRY_SECONDS);
+    if (reason) {
+        strncpy(reason, "Ban check unavailable, try again shortly", MAX_BAN_REASON - 1);
+        reason[MAX_BAN_REASON - 1] = '\0';
+    }
+    return st_deny;
+}
+
 static plugin_st is_banned(struct plugin_handle *plugin, struct plugin_user *user, time_t *expiry, char *reason) {
     struct sql_data *sql = (struct sql_data *)plugin->ptr;
     sqlite3_stmt *stmt;
@@ -422,18 +441,28 @@ static plugin_st is_banned(struct plugin_handle *plugin, struct plugin_user *use
         sqlite3_finalize(stmt);
     }
 
+    /* A lookup that fails is not "not banned": the bans live only here, so a
+       locked or broken database would otherwise let every banned user in
+       (#139). Refuse for a minute instead, as a temporary ban the client
+       retries after. */
     rc = sqlite3_prepare_v2(sql->db,
         "SELECT expiry, reason FROM bans WHERE ((nickname <> '' AND nickname = ? COLLATE NOCASE) "
         "OR (cid <> '' AND cid = ?)) AND (expiry = 0 OR expiry > ?) "
         "ORDER BY (expiry = 0) DESC, expiry DESC LIMIT 1;", -1, &stmt, NULL);
     if (rc != SQLITE_OK)
-        return st_default;
+        return ban_check_failed(sql, now, expiry, reason);
 
     sqlite3_bind_text(stmt, 1, plugin->hub.get_user_nick(plugin, user), -1, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 2, plugin->hub.get_user_cid(plugin, user), -1, SQLITE_STATIC);
     sqlite3_bind_int64(stmt, 3, now);
 
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
+    rc = sqlite3_step(stmt);
+    if (rc != SQLITE_ROW && rc != SQLITE_DONE) {
+        sqlite3_finalize(stmt);
+        return ban_check_failed(sql, now, expiry, reason);
+    }
+
+    if (rc == SQLITE_ROW) {
         banned = 1;
         if (expiry)
             *expiry = (time_t) sqlite3_column_int64(stmt, 0);

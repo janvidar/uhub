@@ -403,6 +403,59 @@ EXO_TEST(mas_not_banned, {
 	return mas_stop(mas_plugin.funcs.auth_is_banned(&mas_plugin, mas_as_puser(&u), &exp, NULL) == st_default);
 });
 
+/* #139: a ban lookup that fails refuses the login (as a short temporary ban)
+   rather than reading as "not banned". Here the bans table is replaced behind
+   the plugin's back with one the query cannot use. */
+EXO_TEST(mas_ban_lookup_failure_refused, {
+	struct mas_user u = mas_puser(MAS_CID, "Eviluser");
+	time_t exp = 0;
+	char reason[MAX_BAN_REASON] = "";
+	if (!mas_start()
+		|| !mas_exec("DROP TABLE bans; CREATE TABLE bans (x INTEGER);"))
+		return mas_stop(0);
+	return mas_stop(mas_plugin.funcs.auth_is_banned(&mas_plugin, mas_as_puser(&u), &exp, reason) == st_deny
+		&& exp > time(NULL) && reason[0] != '\0');
+});
+
+/* Another process holding the database locked: the lookup waits out the busy
+   timeout and then refuses, instead of letting a banned user in. */
+EXO_TEST(mas_ban_lookup_locked_refused, {
+	struct mas_user u = mas_puser(MAS_CID, "Eviluser");
+	time_t exp = 0;
+	sqlite3* other = 0;
+	int ok;
+	if (!MAS_EVIL_BAN())
+		return mas_stop(0);
+	if (sqlite3_open(MAS_DB, &other) != SQLITE_OK
+		|| sqlite3_exec(other, "BEGIN EXCLUSIVE;", 0, 0, 0) != SQLITE_OK)
+	{
+		sqlite3_close(other);
+		return mas_stop(0);
+	}
+	ok = mas_plugin.funcs.auth_is_banned(&mas_plugin, mas_as_puser(&u), &exp, NULL) == st_deny;
+	sqlite3_exec(other, "ROLLBACK;", 0, 0, 0);
+	sqlite3_close(other);
+	return mas_stop(ok);
+});
+
+/* Once the lock is gone an unrelated user is not banned: the refusal above
+   is the lock, not a stuck state. */
+EXO_TEST(mas_ban_lookup_after_lock, {
+	struct mas_user u = mas_puser("CLEANCID000000000000000000000000000000A", "innocent");
+	time_t exp = 0;
+	sqlite3* other = 0;
+	if (!MAS_EVIL_BAN())
+		return mas_stop(0);
+	if (sqlite3_open(MAS_DB, &other) != SQLITE_OK
+		|| sqlite3_exec(other, "BEGIN EXCLUSIVE; ROLLBACK;", 0, 0, 0) != SQLITE_OK)
+	{
+		sqlite3_close(other);
+		return mas_stop(0);
+	}
+	sqlite3_close(other);
+	return mas_stop(mas_plugin.funcs.auth_is_banned(&mas_plugin, mas_as_puser(&u), &exp, NULL) == st_default);
+});
+
 /* Unban by nick (hub offers the target as both fields) removes the record. */
 EXO_TEST(mas_ban_del, {
 	struct ban_info b = mas_ban("Eviluser", "Eviluser");
