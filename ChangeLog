@@ -142,14 +142,15 @@ New features:
   mod_auth_sqlite and mod_auth_simple.
 
 Security:
-- #131: a client could send broadcasts, private messages and INFs as the hub
-  itself: the source-SID check was skipped for "AAAA", the hub's reserved SID,
-  which parses to 0. Affects all releases.
-- #134: !kick, !redirect and !ban only refused acting on oneself, so an
-  operator could kick, redirect or ban (cluster-wide, persistently) an admin
-  or a fellow operator. They now act only on lower ranks; a user on a linked
-  hub is ranked by the CT flag its hub set. Affects !kick since 0.3.0, !ban
-  since 0.7.0, !redirect since 0.7.1.
+- #131 (UHUB-2026-012, also fixed in 0.8.3): a client could send broadcasts,
+  private messages and INFs as the hub itself: the source-SID check was
+  skipped for "AAAA", the hub's reserved SID, which parses to 0. Affects all
+  releases.
+- #134 (UHUB-2026-013, also fixed in 0.8.3): !kick, !redirect and !ban only
+  refused acting on oneself, so an operator could kick, redirect or ban
+  (cluster-wide, persistently) an admin or a fellow operator. They now act
+  only on lower ranks; a user on a linked hub is ranked by the CT flag its hub
+  set. Affects !kick since 0.3.0, !ban since 0.7.0, !redirect since 0.7.1.
 - #135: hub-list registration over https:// did not verify the server's
   certificate, so anyone on the path could take the announce. It is now
   checked against the system trust store and the URL's host. Affects 0.7.0 -
@@ -250,6 +251,26 @@ Packaging:
 Tests:
 - Every unit test runs alone and in any order, and CI also runs the suite in
   a random order, plain and under ASan.
+
+0.8.3:
+A security release. See doc/advisories/ on the security-advisories branch for
+UHUB-2026-012 and -013. No configuration or protocol changes; nodes of a
+linked hub can be upgraded one at a time.
+
+Security:
+- UHUB-2026-012 (#131): a client could send broadcasts and private messages
+  as the hub itself. The source-SID check was skipped for "AAAA", the hub's
+  reserved SID, which parses to 0. Affects all releases up to 0.8.2.
+- UHUB-2026-013 (#134): !kick, !redirect and !ban only refused acting on
+  oneself, so an operator could kick, redirect or ban an admin or a fellow
+  operator; a ban is persistent and cluster-wide. They now act only on lower
+  ranks, and a user on a linked hub is ranked by the CT flag its hub set.
+  Affects !kick since 0.3.0, !ban since 0.7.0, !redirect since 0.7.1.
+
+Not in this release: hub-list registration does not verify the server's
+certificate (#135), and hub links run in plain text (#133). Both are fixed in
+0.9.0; until then leave reg_server_url empty, and link only over a network you
+trust.
 
 0.8.2:
 A security release. See doc/advisories/ on the security-advisories branch for

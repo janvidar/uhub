@@ -3,7 +3,8 @@
 State: master is 0.9.0 in CMakeLists.txt, build.zig and build.zig.zon (not yet
 tagged): TLS required by default, key-pinned hub links, uhub-seeder, uhub-fuse
 and BBS0. After the tag, master goes to the next version with the "dev" label
-(doc/release.txt). 0.8.2 was released from the 0.8.x-stable branch.
+(doc/release.txt). 0.8.3 (0.8.2 plus UHUB-2026-012 and -013) is prepared on the
+0.8.x-stable branch.
 
 ## HBRI
 - A failed or lost ITCP challenge is not retried within a session; the client
