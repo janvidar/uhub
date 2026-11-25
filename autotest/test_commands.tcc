@@ -348,6 +348,16 @@ EXO_TEST(command_rank_remote_operator,       { return may_act(auth_cred_operator
 EXO_TEST(command_rank_remote_user,           { return may_act(auth_cred_operator, auth_cred_none, "2") == 1; });
 EXO_TEST(command_rank_remote_guest,          { return may_act(auth_cred_operator, auth_cred_none, "") == 1; });
 
+/* The bot levels rank with the humans they stand in for: an operator bot is
+   an operator, and no bot outranks the operators. */
+EXO_TEST(command_rank_opbot_not_above_operator, { return may_act(auth_cred_opbot, auth_cred_operator, NULL) == 0
+                                                     && may_act(auth_cred_opubot, auth_cred_operator, NULL) == 0; });
+EXO_TEST(command_rank_operator_not_above_opbot, { return may_act(auth_cred_operator, auth_cred_opbot, NULL) == 0; });
+EXO_TEST(command_rank_opbot_on_user,            { return may_act(auth_cred_opbot, auth_cred_user, NULL) == 1
+                                                     && may_act(auth_cred_opbot, auth_cred_ubot, NULL) == 1; });
+EXO_TEST(command_rank_super_on_opbot,           { return may_act(auth_cred_super, auth_cred_opubot, NULL) == 1; });
+EXO_TEST(command_rank_operator_on_bot,          { return may_act(auth_cred_operator, auth_cred_ubot, NULL) == 1; });
+
 EXO_TEST(command_rank_not_self, {
 	struct hub_user u;
 	struct cbuffer* buf = cbuf_create(64);

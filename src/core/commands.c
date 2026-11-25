@@ -474,18 +474,37 @@ static int command_uptime(struct command_base* cbase, struct hub_user* user, str
 }
 
 /*
- * A user's rank, for deciding who may act on whom. A local user's is their
- * credential. A remote user, learned over a hub link, holds none on this hub;
- * their own hub states their rank in the CT flag of their INF (4 operator,
- * 8 super, 16 owner), and a linked peer is trusted to say so.
+ * A user's rank, for deciding who may act on whom. The credential numbers are
+ * not a ranking: the bot levels interleave with the human ones (opbot and
+ * opubot sit above operator), so a bot is ranked with the humans it stands in
+ * for -- an operator bot as an operator, any other bot as a user. A bot can
+ * then act on those below the operators, and no bot outranks the operators
+ * who run it. A remote user, learned over a hub link, holds no credential on
+ * this hub; their own hub states their rank in the CT flag of their INF (4
+ * operator, 8 super, 16 owner), and a linked peer is trusted to say so.
  */
+static enum auth_credentials command_rank_of(enum auth_credentials cred)
+{
+	switch (cred)
+	{
+		case auth_cred_bot:
+		case auth_cred_ubot:
+			return auth_cred_user;
+		case auth_cred_opbot:
+		case auth_cred_opubot:
+			return auth_cred_operator;
+		default:
+			return cred;
+	}
+}
+
 static enum auth_credentials command_user_rank(struct hub_user* u)
 {
 	char* ct;
 	int flags;
 
 	if (!u->origin_link)
-		return u->credentials;
+		return command_rank_of(u->credentials);
 
 	ct = adc_msg_get_named_argument(u->info, ADC_INF_FLAG_CLIENT_TYPE);
 	flags = ct ? uhub_atoi(ct) : 0;
@@ -514,7 +533,7 @@ int command_may_act_on(struct hub_user* user, struct hub_user* target, const cha
 		cbuf_append_format(buf, "Cannot %s yourself.", verb);
 		return 0;
 	}
-	if (command_user_rank(target) >= user->credentials)
+	if (command_user_rank(target) >= command_user_rank(user))
 	{
 		cbuf_append_format(buf, "Cannot %s \"%s\": they are of your rank or above.", verb, target->id.nick);
 		return 0;
