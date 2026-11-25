@@ -358,6 +358,17 @@ EXO_TEST(command_rank_opbot_on_user,            { return may_act(auth_cred_opbot
 EXO_TEST(command_rank_super_on_opbot,           { return may_act(auth_cred_super, auth_cred_opubot, NULL) == 1; });
 EXO_TEST(command_rank_operator_on_bot,          { return may_act(auth_cred_operator, auth_cred_ubot, NULL) == 1; });
 
+/* !getip and !whoip show the addresses of lower ranks only. */
+EXO_TEST(command_outranks_rule, {
+	struct hub_user op, admin, guest;
+	memset(&op, 0, sizeof(op)); memset(&admin, 0, sizeof(admin)); memset(&guest, 0, sizeof(guest));
+	op.credentials = auth_cred_operator;
+	admin.credentials = auth_cred_admin;
+	guest.credentials = auth_cred_guest;
+	return command_outranks(&op, &guest) && !command_outranks(&op, &admin)
+		&& !command_outranks(&op, &op) && command_outranks(&admin, &op);
+});
+
 EXO_TEST(command_rank_not_self, {
 	struct hub_user u;
 	struct cbuffer* buf = cbuf_create(64);

@@ -127,6 +127,12 @@ int command_redirect_valid_address(const char* addr);
 int command_may_act_on(struct hub_user* user, struct hub_user* target, const char* verb, struct cbuffer* buf);
 
 /**
+ * Whether @p user ranks above @p target (see command_may_act_on()). Also
+ * decides whose address !getip and !whoip show. Exposed for testing.
+ */
+int command_outranks(struct hub_user* user, struct hub_user* target);
+
+/**
  * Lookup a command handle based on prefix.
  * If no matching command handle is found then NULL is returned.
  */

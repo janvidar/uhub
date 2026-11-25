@@ -526,6 +526,11 @@ static enum auth_credentials command_user_rank(struct hub_user* u)
  * admin -- cluster-wide, and persistently -- or kick another operator. This
  * is the rule mod_users applies to accounts. On refusal the reason is in buf.
  */
+int command_outranks(struct hub_user* user, struct hub_user* target)
+{
+	return command_user_rank(user) > command_user_rank(target);
+}
+
 int command_may_act_on(struct hub_user* user, struct hub_user* target, const char* verb, struct cbuffer* buf)
 {
 	if (target == user)
@@ -533,7 +538,7 @@ int command_may_act_on(struct hub_user* user, struct hub_user* target, const cha
 		cbuf_append_format(buf, "Cannot %s yourself.", verb);
 		return 0;
 	}
-	if (command_user_rank(target) >= command_user_rank(user))
+	if (!command_outranks(user, target))
 	{
 		cbuf_append_format(buf, "Cannot %s \"%s\": they are of your rank or above.", verb, target->id.nick);
 		return 0;
@@ -838,6 +843,14 @@ static int command_getip(struct command_base* cbase, struct hub_user* user, stru
 	struct cbuffer* buf = cbuf_create(128);
 	struct hub_command_arg_data* arg = hub_command_arg_next(cmd, type_user);
 
+	/* An address is for those who could act on its owner: oneself, and
+	   anyone ranked below. An operator has no business with an admin's. */
+	if (arg->data.user != user && !command_outranks(user, arg->data.user))
+	{
+		cbuf_append_format(buf, "Cannot show the address of \"%s\": they are of your rank or above.", arg->data.user->id.nick);
+		return command_status(cbase, user, cmd, buf);
+	}
+
 	if (command_rich_text_ok(cbase, user))
 	{
 		cbuf_append(buf, "**");
@@ -861,7 +874,20 @@ static int command_whoip(struct command_base* cbase, struct hub_user* user, stru
 	int rich = command_rich_text_ok(cbase, user);
 	int ret = 0;
 
-	ret = uman_get_user_by_addr(cbase->hub->users, users, arg->data.range);
+	uman_get_user_by_addr(cbase->hub->users, users, arg->data.range);
+
+	/* As !getip: only oneself and those ranked below. The others are left
+	   out entirely -- a nick next to a hidden address still says who is
+	   behind the range. */
+	{
+		struct node* cursor;
+		LIST_FOREACH_SAFE(struct hub_user*, u, users, cursor,
+		{
+			if (u != user && !command_outranks(user, u))
+				list_remove(users, u);
+		});
+	}
+	ret = (int) list_size(users);
 	if (!ret)
 	{
 		list_clear(users, NULL);
